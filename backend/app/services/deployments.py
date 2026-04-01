@@ -1,7 +1,9 @@
 import os
+import json
 import shlex
 import subprocess
 import tempfile
+import time
 from typing import Dict, List, Optional
 from shutil import which
 
@@ -91,6 +93,15 @@ def _run_remote_command(server: dict, command: List[str]) -> subprocess.Complete
 
 
 def _run_docker_command(command: List[str], server: Optional[dict]) -> subprocess.CompletedProcess:
+    if server:
+        return _run_remote_command(server, command)
+    return _run_local_command(command)
+
+
+def run_diagnostic_command(
+    command: List[str],
+    server: Optional[dict] = None,
+) -> subprocess.CompletedProcess:
     if server:
         return _run_remote_command(server, command)
     return _run_local_command(command)
@@ -234,12 +245,217 @@ def get_container_logs(container_name: str, server: Optional[dict] = None) -> su
     return _run_docker_command(["docker", "logs", container_name], server)
 
 
-def test_server_connection(server: dict) -> dict[str, object]:
+def get_container_logs_tail(
+    container_name: str,
+    server: Optional[dict] = None,
+    *,
+    tail: int = 40,
+) -> subprocess.CompletedProcess:
+    return _run_docker_command(["docker", "logs", "--tail", str(tail), container_name], server)
+
+
+def inspect_container_state(
+    container_name: str,
+    server: Optional[dict] = None,
+) -> dict[str, object] | None:
+    result = _run_docker_command(
+        ["docker", "inspect", "--format", "{{json .State}}", container_name],
+        server,
+    )
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or result.stdout.strip()
+        if "No such object" in error_message or "No such container" in error_message:
+            return None
+        raise HTTPException(
+            status_code=500,
+            detail=error_message or "Failed to inspect container state.",
+        )
+
+    payload = result.stdout.strip()
+    if not payload:
+        return None
+
+    try:
+        decoded = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to decode container diagnostics.",
+        ) from exc
+
+    return decoded if isinstance(decoded, dict) else None
+
+
+def probe_http_endpoint(url: str, timeout: float = 5.0) -> dict[str, object]:
+    import httpx
+
+    checked_at = time.time()
+    started_at = time.perf_counter()
+    try:
+        response = httpx.get(url, timeout=timeout)
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        return {
+            "checked_at": checked_at,
+            "ok": 200 <= response.status_code < 400,
+            "status_code": response.status_code,
+            "error": None,
+            "response_time_ms": elapsed_ms,
+        }
+    except httpx.RequestError as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        return {
+            "checked_at": checked_at,
+            "ok": False,
+            "status_code": None,
+            "error": str(exc),
+            "response_time_ms": elapsed_ms,
+        }
+
+
+def collect_server_diagnostics(server: dict) -> dict[str, object]:
     target = f'{server["username"]}@{server["host"]}:{server["port"]}'
+    diagnostics: dict[str, object] = {
+        "target": target,
+        "checked_at": time.time(),
+        "ssh_ok": False,
+        "docker_ok": False,
+        "hostname": None,
+        "operating_system": None,
+        "uptime": None,
+        "disk_usage": None,
+        "memory": None,
+        "docker_version": None,
+        "docker_compose_version": None,
+        "listening_ports": [],
+        "items": [],
+    }
 
     ssh_result = _run_remote_command(server, ["echo", "deploymate-ssh-ok"])
     if ssh_result.returncode != 0:
         error_message = ssh_result.stderr.strip() or ssh_result.stdout.strip()
+        diagnostics["items"] = [
+            {
+                "key": "ssh",
+                "label": "SSH access",
+                "status": "error",
+                "summary": "SSH connection failed.",
+                "details": error_message or "SSH connection failed.",
+            }
+        ]
+        return diagnostics
+
+    diagnostics["ssh_ok"] = True
+    items: list[dict[str, object]] = [
+        {
+            "key": "ssh",
+            "label": "SSH access",
+            "status": "ok",
+            "summary": "SSH connection is available.",
+            "details": target,
+        }
+    ]
+
+    docker_result = _run_remote_command(server, ["docker", "--version"])
+    if docker_result.returncode == 0:
+        docker_output = docker_result.stdout.strip() or docker_result.stderr.strip()
+        diagnostics["docker_ok"] = True
+        diagnostics["docker_version"] = docker_output
+        items.append(
+            {
+                "key": "docker",
+                "label": "Docker engine",
+                "status": "ok",
+                "summary": "Docker is available.",
+                "details": docker_output,
+            }
+        )
+    else:
+        docker_error = docker_result.stderr.strip() or docker_result.stdout.strip()
+        items.append(
+            {
+                "key": "docker",
+                "label": "Docker engine",
+                "status": "error",
+                "summary": "Docker is not available.",
+                "details": docker_error or "Docker is not available on the server.",
+            }
+        )
+        diagnostics["items"] = items
+        return diagnostics
+
+    command_specs = [
+        ("hostname", ["hostname"], "Hostname"),
+        ("operating_system", ["sh", "-lc", "uname -sr"], "Operating system"),
+        ("uptime", ["sh", "-lc", "uptime"], "Uptime"),
+        ("disk_usage", ["sh", "-lc", "df -h / | tail -1"], "Disk usage"),
+        (
+            "memory",
+            ["sh", "-lc", "free -m | awk 'NR==2 {printf \"used %sMB / total %sMB\", $3, $2}'"],
+            "Memory",
+        ),
+        ("docker_compose_version", ["docker", "compose", "version"], "Docker Compose"),
+        ("listening_ports", ["ss", "-ltnH"], "Listening ports"),
+    ]
+
+    for key, command, label in command_specs:
+        result = _run_remote_command(server, command)
+        output = result.stdout.strip() or result.stderr.strip()
+        if result.returncode != 0:
+            if key in {"disk_usage", "memory", "docker_compose_version", "listening_ports"}:
+                items.append(
+                    {
+                        "key": key,
+                        "label": label,
+                        "status": "warn",
+                        "summary": "This diagnostic could not be collected.",
+                        "details": output or "Command failed.",
+                    }
+                )
+            continue
+
+        if key == "listening_ports":
+            ports: list[int] = []
+            for line in output.splitlines():
+                parts = line.split()
+                if len(parts) < 4:
+                    continue
+                port_text = parts[3].rsplit(":", 1)[-1]
+                if port_text.isdigit():
+                    ports.append(int(port_text))
+            diagnostics["listening_ports"] = sorted(set(ports))[:12]
+            items.append(
+                {
+                    "key": "listening_ports",
+                    "label": label,
+                    "status": "ok",
+                    "summary": f"Found {len(set(ports))} listening TCP ports.",
+                    "details": ", ".join(str(port) for port in sorted(set(ports))[:12]) or "No TCP ports reported.",
+                }
+            )
+            continue
+
+        diagnostics[key] = output
+        if key in {"disk_usage", "memory", "docker_compose_version"}:
+            items.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "status": "ok",
+                    "summary": f"{label} collected.",
+                    "details": output,
+                }
+            )
+
+    diagnostics["items"] = items
+    return diagnostics
+
+
+def test_server_connection(server: dict) -> dict[str, object]:
+    diagnostics = collect_server_diagnostics(server)
+    target = str(diagnostics["target"])
+    if not diagnostics.get("ssh_ok"):
+        items = diagnostics.get("items") or []
+        error_message = items[0]["details"] if items else None
         return {
             "status": "error",
             "message": error_message or "SSH connection failed.",
@@ -249,9 +465,12 @@ def test_server_connection(server: dict) -> dict[str, object]:
             "docker_version": None,
         }
 
-    docker_result = _run_remote_command(server, ["docker", "--version"])
-    if docker_result.returncode != 0:
-        error_message = docker_result.stderr.strip() or docker_result.stdout.strip()
+    if not diagnostics.get("docker_ok"):
+        docker_item = next(
+            (item for item in diagnostics.get("items", []) if item.get("key") == "docker"),
+            None,
+        )
+        error_message = docker_item.get("details") if docker_item else None
         return {
             "status": "error",
             "message": error_message or "Docker is not available on the server.",
@@ -261,7 +480,7 @@ def test_server_connection(server: dict) -> dict[str, object]:
             "docker_version": None,
         }
 
-    docker_output = docker_result.stdout.strip() or docker_result.stderr.strip()
+    docker_output = diagnostics.get("docker_version")
     return {
         "status": "success",
         "message": docker_output or f'SSH and Docker are available on server {server["name"]}.',

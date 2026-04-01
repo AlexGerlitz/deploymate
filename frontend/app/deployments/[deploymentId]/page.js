@@ -81,6 +81,7 @@ export default function DeploymentDetailsPage({ params }) {
   const [deployment, setDeployment] = useState(null);
   const [logs, setLogs] = useState("");
   const [health, setHealth] = useState(null);
+  const [diagnostics, setDiagnostics] = useState(null);
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -93,7 +94,10 @@ export default function DeploymentDetailsPage({ params }) {
   const [templateError, setTemplateError] = useState("");
   const [templateSuccess, setTemplateSuccess] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
+  const [diagnosticsError, setDiagnosticsError] = useState("");
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [logsExpanded, setLogsExpanded] = useState(false);
+  const [diagnosticsLogsExpanded, setDiagnosticsLogsExpanded] = useState(false);
   const [envExpanded, setEnvExpanded] = useState(false);
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
@@ -104,6 +108,33 @@ export default function DeploymentDetailsPage({ params }) {
     external_port: "",
   });
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
+
+  async function loadDeploymentDiagnostics() {
+    setDiagnosticsLoading(true);
+    setDiagnosticsError("");
+    try {
+      const response = await fetch(`${apiBaseUrl}/deployments/${deploymentId}/diagnostics`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const data = await readJsonOrError(response, "Failed to load deployment diagnostics.");
+      setDiagnostics(data);
+      return data;
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return null;
+      }
+      setDiagnosticsError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to load deployment diagnostics.",
+      );
+      return null;
+    } finally {
+      setDiagnosticsLoading(false);
+    }
+  }
 
   async function loadDeploymentDetails(silent = false) {
     if (!silent) {
@@ -147,7 +178,7 @@ export default function DeploymentDetailsPage({ params }) {
           : [{ key: "", value: "" }],
       );
 
-      const [logsResult, healthResult, activityResult] = await Promise.allSettled([
+      const [logsResult, healthResult, activityResult, diagnosticsResult] = await Promise.allSettled([
         fetch(`${apiBaseUrl}/deployments/${deploymentId}/logs`, {
           cache: "no-store",
           credentials: "include",
@@ -165,6 +196,12 @@ export default function DeploymentDetailsPage({ params }) {
           credentials: "include",
         }).then((response) =>
           readJsonOrError(response, "Failed to load deployment activity."),
+        ),
+        fetch(`${apiBaseUrl}/deployments/${deploymentId}/diagnostics`, {
+          cache: "no-store",
+          credentials: "include",
+        }).then((response) =>
+          readJsonOrError(response, "Failed to load deployment diagnostics."),
         ),
       ]);
 
@@ -188,6 +225,16 @@ export default function DeploymentDetailsPage({ params }) {
       } else {
         setActivity([]);
       }
+
+      if (diagnosticsResult.status === "fulfilled") {
+        setDiagnostics(diagnosticsResult.value);
+        setDiagnosticsError("");
+      } else {
+        setDiagnostics(null);
+        setDiagnosticsError(
+          diagnosticsResult.reason?.message || "Failed to load deployment diagnostics.",
+        );
+      }
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
         router.replace("/login");
@@ -203,6 +250,7 @@ export default function DeploymentDetailsPage({ params }) {
         setDeployment(null);
         setLogs("");
         setHealth(null);
+        setDiagnostics(null);
         setActivity([]);
       }
     } finally {
@@ -575,6 +623,8 @@ export default function DeploymentDetailsPage({ params }) {
           Deployment, health, and activity refresh automatically every 8 seconds.
         </div>
 
+        {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
+
         <article className="card formCard">
           <h2>Save as template</h2>
           <div className="form">
@@ -831,6 +881,101 @@ export default function DeploymentDetailsPage({ params }) {
             </article>
 
             <article className="card">
+              <div className="sectionHeader">
+                <h2>Diagnostics</h2>
+                <div className="actions">
+                  <button
+                    type="button"
+                    onClick={loadDeploymentDiagnostics}
+                    disabled={diagnosticsLoading}
+                  >
+                    {diagnosticsLoading ? "Refreshing diagnostics..." : "Refresh diagnostics"}
+                  </button>
+                </div>
+              </div>
+              {diagnostics ? (
+                <>
+                  <div className="row">
+                    <span className="label">Checked</span>
+                    <span>{formatDate(diagnostics.checked_at)}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Server target</span>
+                    <span>{diagnostics.server_target || "N/A"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Activity summary</span>
+                    <span>
+                      {diagnostics.activity.total_events} events,{" "}
+                      {diagnostics.activity.error_events} errors,{" "}
+                      {diagnostics.activity.success_events} successes
+                    </span>
+                  </div>
+                  <div className="diagnosticsGrid">
+                    {Array.isArray(diagnostics.items) &&
+                      diagnostics.items.map((item) => (
+                        <div className="diagnosticItem" key={item.key}>
+                          <div className="row">
+                            <span className="label">{item.label}</span>
+                            <span className={`status ${item.status || "unknown"}`}>
+                              {item.status || "unknown"}
+                            </span>
+                          </div>
+                          <p>{item.summary || "-"}</p>
+                          {item.details ? <div className="diagnosticDetails">{item.details}</div> : null}
+                        </div>
+                      ))}
+                  </div>
+                  {diagnostics.activity.recent_failure_titles?.length > 0 ? (
+                    <div className="row">
+                      <span className="label">Recent failures</span>
+                      <div className="stackedValue">
+                        {diagnostics.activity.recent_failure_titles.map((title) => (
+                          <span key={title}>{title}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="row">
+                    <span className="label">Recent logs excerpt</span>
+                    <div className="stackedValue">
+                      <div className="inlineActions">
+                        <button
+                          type="button"
+                          className="smallButton"
+                          onClick={() =>
+                            copyText(
+                              diagnostics.log_excerpt || "No log excerpt available.",
+                              "Diagnostics logs",
+                            )
+                          }
+                        >
+                          Copy
+                        </button>
+                        <button
+                          type="button"
+                          className="smallButton"
+                          onClick={() => setDiagnosticsLogsExpanded((current) => !current)}
+                        >
+                          {diagnosticsLogsExpanded ? "Show less" : "Show more"}
+                        </button>
+                      </div>
+                      <pre
+                        className={`logs ${
+                          diagnosticsLogsExpanded ? "expandedBlock" : "collapsedBlock"
+                        }`}
+                      >
+                        {diagnostics.log_excerpt || "No log excerpt available."}
+                      </pre>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="empty">Diagnostics are not available yet.</div>
+              )}
+            </article>
+
+            <article className="card">
               <div className="row">
                 <span className="label">Health status</span>
                 <span className={`status ${health?.status || "unknown"}`}>
@@ -861,6 +1006,18 @@ export default function DeploymentDetailsPage({ params }) {
               <div className="row">
                 <span className="label">Health error</span>
                 <span>{health?.error || "-"}</span>
+              </div>
+              <div className="row">
+                <span className="label">Checked</span>
+                <span>{formatDate(health?.checked_at)}</span>
+              </div>
+              <div className="row">
+                <span className="label">Latency</span>
+                <span>
+                  {health?.response_time_ms || health?.response_time_ms === 0
+                    ? `${health.response_time_ms} ms`
+                    : "-"}
+                </span>
               </div>
             </article>
 
@@ -911,6 +1068,10 @@ export default function DeploymentDetailsPage({ params }) {
                       <div className="row">
                         <span className="label">Title</span>
                         <span>{item.title || "-"}</span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Category</span>
+                        <span>{item.category || "-"}</span>
                       </div>
                       <div className="row">
                         <span className="label">Message</span>

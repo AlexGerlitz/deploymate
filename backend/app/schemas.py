@@ -9,6 +9,7 @@ NotificationLevel = Literal["success", "error"]
 ServerAuthType = Literal["password", "ssh_key"]
 UserPlan = Literal["trial", "solo", "team"]
 UserRole = Literal["admin", "member"]
+DiagnosticStatus = Literal["ok", "warn", "error", "unknown"]
 
 
 class DeploymentCreateRequest(BaseModel):
@@ -85,6 +86,8 @@ class DeploymentHealthResponse(BaseModel):
     status: HealthStatus
     status_code: Optional[int]
     error: Optional[str]
+    checked_at: Optional[str] = None
+    response_time_ms: Optional[int] = None
 
 
 class NotificationResponse(BaseModel):
@@ -94,6 +97,39 @@ class NotificationResponse(BaseModel):
     title: str
     message: str
     created_at: str
+    category: Optional[str] = None
+
+
+class DiagnosticItem(BaseModel):
+    key: str
+    label: str
+    status: DiagnosticStatus
+    summary: str
+    details: Optional[str] = None
+
+
+class DeploymentActivitySummaryResponse(BaseModel):
+    total_events: int = 0
+    success_events: int = 0
+    error_events: int = 0
+    recent_failure_count: int = 0
+    recent_failure_titles: list[str] = Field(default_factory=list)
+    last_event_title: Optional[str] = None
+    last_event_level: Optional[NotificationLevel] = None
+    last_event_at: Optional[str] = None
+
+
+class DeploymentDiagnosticsResponse(BaseModel):
+    deployment_id: str
+    container_name: str
+    current_status: str
+    server_target: str
+    checked_at: str
+    url: Optional[str] = None
+    health: DeploymentHealthResponse
+    activity: DeploymentActivitySummaryResponse
+    log_excerpt: str = ""
+    items: list[DiagnosticItem] = Field(default_factory=list)
 
 
 class ServerCreateRequest(BaseModel):
@@ -124,6 +160,23 @@ class ServerConnectionTestResponse(BaseModel):
     ssh_ok: bool = False
     docker_ok: bool = False
     docker_version: Optional[str] = None
+
+
+class ServerDiagnosticsResponse(BaseModel):
+    server_id: str
+    target: str
+    checked_at: str
+    overall_status: DiagnosticStatus
+    deployment_count: int = 0
+    hostname: Optional[str] = None
+    operating_system: Optional[str] = None
+    uptime: Optional[str] = None
+    disk_usage: Optional[str] = None
+    memory: Optional[str] = None
+    docker_version: Optional[str] = None
+    docker_compose_version: Optional[str] = None
+    listening_ports: list[int] = Field(default_factory=list)
+    items: list[DiagnosticItem] = Field(default_factory=list)
 
 
 class ServerSuggestedPortsResponse(BaseModel):

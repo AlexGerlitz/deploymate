@@ -12,12 +12,18 @@ from app.db import (
     list_servers,
 )
 from app.schemas import (
+    DiagnosticItem,
     ServerConnectionTestResponse,
     ServerCreateRequest,
+    ServerDiagnosticsResponse,
     ServerResponse,
     ServerSuggestedPortsResponse,
 )
-from app.services.deployments import get_suggested_external_ports, test_server_connection
+from app.services.deployments import (
+    collect_server_diagnostics,
+    get_suggested_external_ports,
+    test_server_connection,
+)
 from app.services.auth import enforce_plan_limit, require_auth
 
 
@@ -74,6 +80,37 @@ def test_server(server_id: str) -> ServerConnectionTestResponse:
         ssh_ok=bool(result.get("ssh_ok")),
         docker_ok=bool(result.get("docker_ok")),
         docker_version=result.get("docker_version"),
+    )
+
+
+@router.get("/servers/{server_id}/diagnostics", response_model=ServerDiagnosticsResponse)
+def get_server_diagnostics(server_id: str) -> ServerDiagnosticsResponse:
+    server = get_server_or_404(server_id)
+    diagnostics = collect_server_diagnostics(server)
+    items = [DiagnosticItem(**item) for item in diagnostics.get("items", [])]
+    overall_status = "unknown"
+    if any(item.status == "error" for item in items):
+        overall_status = "error"
+    elif any(item.status == "warn" for item in items):
+        overall_status = "warn"
+    elif any(item.status == "ok" for item in items):
+        overall_status = "ok"
+
+    return ServerDiagnosticsResponse(
+        server_id=server_id,
+        target=str(diagnostics["target"]),
+        checked_at=datetime.now(timezone.utc).isoformat(),
+        overall_status=overall_status,
+        deployment_count=count_deployments_for_server(server_id),
+        hostname=diagnostics.get("hostname"),
+        operating_system=diagnostics.get("operating_system"),
+        uptime=diagnostics.get("uptime"),
+        disk_usage=diagnostics.get("disk_usage"),
+        memory=diagnostics.get("memory"),
+        docker_version=diagnostics.get("docker_version"),
+        docker_compose_version=diagnostics.get("docker_compose_version"),
+        listening_ports=list(diagnostics.get("listening_ports", [])),
+        items=items,
     )
 
 

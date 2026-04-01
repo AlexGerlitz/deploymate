@@ -192,6 +192,9 @@ export default function HomePage() {
   const [duplicatingTemplateId, setDuplicatingTemplateId] = useState("");
   const [testingServerId, setTestingServerId] = useState("");
   const [serverTestResults, setServerTestResults] = useState({});
+  const [serverDiagnostics, setServerDiagnostics] = useState({});
+  const [serverDiagnosticsError, setServerDiagnosticsError] = useState({});
+  const [diagnosingServerId, setDiagnosingServerId] = useState("");
   const [deploymentFilter, setDeploymentFilter] = useState("all");
   const [deploymentQuery, setDeploymentQuery] = useState("");
   const [notificationFilter, setNotificationFilter] = useState("all");
@@ -1191,6 +1194,41 @@ export default function HomePage() {
     }
   }
 
+  async function handleRunServerDiagnostics(serverId) {
+    setDiagnosingServerId(serverId);
+    setServerDiagnosticsError((current) => ({
+      ...current,
+      [serverId]: "",
+    }));
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/servers/${serverId}/diagnostics`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const data = await readJsonOrError(response, "Failed to load server diagnostics.");
+      setServerDiagnostics((current) => ({
+        ...current,
+        [serverId]: data,
+      }));
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setServerDiagnosticsError((current) => ({
+        ...current,
+        [serverId]:
+          requestError instanceof Error
+            ? requestError.message
+            : "Failed to load server diagnostics.",
+      }));
+    } finally {
+      setDiagnosingServerId("");
+    }
+  }
+
   function applyTemplate(template) {
     applyTemplateToForm(template);
   }
@@ -1603,6 +1641,12 @@ export default function HomePage() {
                     <span>{serverTestResults[server.id].docker_version}</span>
                   </div>
                 ) : null}
+                {serverDiagnostics[server.id]?.checked_at ? (
+                  <div className="row">
+                    <span className="label">Diagnostics</span>
+                    <span>{formatDate(serverDiagnostics[server.id].checked_at)}</span>
+                  </div>
+                ) : null}
                 <div className="actions">
                   {serverTestResults[server.id]?.status ? (
                     <span
@@ -1627,6 +1671,15 @@ export default function HomePage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleRunServerDiagnostics(server.id)}
+                    disabled={diagnosingServerId === server.id}
+                  >
+                    {diagnosingServerId === server.id
+                      ? "Running diagnostics..."
+                      : "Run diagnostics"}
+                  </button>
+                  <button
+                    type="button"
                     className="dangerButton"
                     onClick={() => handleDeleteServer(server.id)}
                     disabled={deletingServerId === server.id}
@@ -1645,6 +1698,60 @@ export default function HomePage() {
                     } inlineBanner`}
                   >
                     {serverTestResults[server.id].message}
+                  </div>
+                ) : null}
+                {serverDiagnosticsError[server.id] ? (
+                  <div className="banner error inlineBanner">
+                    {serverDiagnosticsError[server.id]}
+                  </div>
+                ) : null}
+                {serverDiagnostics[server.id] ? (
+                  <div className="diagnosticsGrid">
+                    <div className="diagnosticItem">
+                      <div className="row">
+                        <span className="label">Overall</span>
+                        <span
+                          className={`status ${
+                            serverDiagnostics[server.id].overall_status || "unknown"
+                          }`}
+                        >
+                          {serverDiagnostics[server.id].overall_status || "unknown"}
+                        </span>
+                      </div>
+                      <p>{serverDiagnostics[server.id].target}</p>
+                      <div className="diagnosticDetails">
+                        Deployments on server: {serverDiagnostics[server.id].deployment_count}
+                      </div>
+                    </div>
+                    {(serverDiagnostics[server.id].items || []).map((item) => (
+                      <div className="diagnosticItem" key={`${server.id}-${item.key}`}>
+                        <div className="row">
+                          <span className="label">{item.label}</span>
+                          <span className={`status ${item.status || "unknown"}`}>
+                            {item.status || "unknown"}
+                          </span>
+                        </div>
+                        <p>{item.summary || "-"}</p>
+                        {item.details ? <div className="diagnosticDetails">{item.details}</div> : null}
+                      </div>
+                    ))}
+                    <div className="diagnosticMeta">
+                      <span>Hostname: {serverDiagnostics[server.id].hostname || "-"}</span>
+                      <span>OS: {serverDiagnostics[server.id].operating_system || "-"}</span>
+                      <span>Uptime: {serverDiagnostics[server.id].uptime || "-"}</span>
+                      <span>Disk: {serverDiagnostics[server.id].disk_usage || "-"}</span>
+                      <span>Memory: {serverDiagnostics[server.id].memory || "-"}</span>
+                      <span>
+                        Compose: {serverDiagnostics[server.id].docker_compose_version || "-"}
+                      </span>
+                      <span>
+                        Ports:{" "}
+                        {Array.isArray(serverDiagnostics[server.id].listening_ports) &&
+                        serverDiagnostics[server.id].listening_ports.length > 0
+                          ? serverDiagnostics[server.id].listening_ports.join(", ")
+                          : "-"}
+                      </span>
+                    </div>
                   </div>
                 ) : null}
               </article>
