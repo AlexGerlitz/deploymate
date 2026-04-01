@@ -319,3 +319,36 @@ class AdminUserItem(BaseModel):
     role: UserRole
     must_change_password: bool = False
     created_at: str
+
+
+class AdminUsersSummary(BaseModel):
+    total: int = 0
+    admins: int = 0
+    members: int = 0
+    trial: int = 0
+    solo: int = 0
+    team: int = 0
+    must_change_password: int = 0
+
+
+class AdminUpgradeRequestsSummary(BaseModel):
+    total: int = 0
+    new: int = 0
+    in_review: int = 0
+    approved: int = 0
+    rejected: int = 0
+    closed: int = 0
+    linked_users: int = 0
+
+
+class AdminAttentionItem(BaseModel):
+    level: Literal["info", "warn", "error"]
+    title: str
+    detail: str
+
+
+class AdminOverviewResponse(BaseModel):
+    generated_at: str
+    users: AdminUsersSummary = Field(default_factory=AdminUsersSummary)
+    upgrade_requests: AdminUpgradeRequestsSummary = Field(default_factory=AdminUpgradeRequestsSummary)
+    attention_items: list[AdminAttentionItem] = Field(default_factory=list)

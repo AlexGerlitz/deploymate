@@ -1,9 +1,12 @@
+import csv
+import io
 import uuid
 from datetime import datetime, timezone
 
 from typing import List
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query
+from fastapi.responses import Response
 
 from app.db import (
     count_users_by_role,
@@ -23,7 +26,11 @@ from app.db import (
 from app.schemas import (
     AdminUserCreateRequest,
     AdminUserItem,
+    AdminAttentionItem,
+    AdminOverviewResponse,
+    AdminUpgradeRequestsSummary,
     AdminUserUpdateRequest,
+    AdminUsersSummary,
     UpgradeRequestCreate,
     UpgradeRequestItem,
     UpgradeRequestResponse,
@@ -33,6 +40,20 @@ from app.services.auth import SESSION_COOKIE_NAME, hash_password, require_admin
 
 
 router = APIRouter()
+
+
+def _csv_response(filename: str, rows: list[dict], fieldnames: list[str]) -> Response:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({field: row.get(field) for field in fieldnames})
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/")
@@ -88,8 +109,42 @@ def create_upgrade_request(
     response_model=List[UpgradeRequestItem],
     dependencies=[Depends(require_admin)],
 )
-def get_upgrade_requests() -> List[UpgradeRequestItem]:
-    return [UpgradeRequestItem(**item) for item in list_upgrade_requests()]
+def get_upgrade_requests(
+    status: str = Query(default="all", pattern="^(all|new|in_review|approved|rejected|closed)$"),
+    plan: str = Query(default="all", pattern="^(all|trial|solo|team)$"),
+    q: str = Query(default=""),
+    linked_only: bool = Query(default=False),
+) -> List[UpgradeRequestItem]:
+    normalized_query = q.strip().lower()
+    items = list_upgrade_requests()
+    filtered: list[UpgradeRequestItem] = []
+    for item in items:
+      if status != "all" and item.get("status") != status:
+          continue
+      if plan != "all" and (item.get("current_plan") or "") != plan:
+          continue
+      if linked_only and not item.get("target_user_id"):
+          continue
+      if normalized_query:
+          haystack = " ".join(
+              filter(
+                  None,
+                  [
+                      item.get("name"),
+                      item.get("email"),
+                      item.get("company_or_team"),
+                      item.get("use_case"),
+                      item.get("current_plan"),
+                      item.get("status"),
+                      item.get("target_username"),
+                      item.get("handled_by_username"),
+                  ],
+              )
+          ).lower()
+          if normalized_query not in haystack:
+              continue
+      filtered.append(UpgradeRequestItem(**item))
+    return filtered
 
 
 @router.get(
@@ -165,8 +220,150 @@ def update_upgrade_request_endpoint(
     response_model=List[AdminUserItem],
     dependencies=[Depends(require_admin)],
 )
-def get_users() -> List[AdminUserItem]:
-    return [AdminUserItem(**item) for item in list_users()]
+def get_users(
+    role: str = Query(default="all", pattern="^(all|admin|member)$"),
+    plan: str = Query(default="all", pattern="^(all|trial|solo|team)$"),
+    q: str = Query(default=""),
+    must_change_password: bool | None = Query(default=None),
+) -> List[AdminUserItem]:
+    normalized_query = q.strip().lower()
+    items = list_users()
+    filtered: list[AdminUserItem] = []
+    for item in items:
+      if role != "all" and item.get("role") != role:
+          continue
+      if plan != "all" and item.get("plan") != plan:
+          continue
+      if must_change_password is not None and bool(item.get("must_change_password")) != must_change_password:
+          continue
+      if normalized_query and normalized_query not in (item.get("username") or "").lower():
+          continue
+      filtered.append(AdminUserItem(**item))
+    return filtered
+
+
+@router.get(
+    "/admin/overview",
+    response_model=AdminOverviewResponse,
+    dependencies=[Depends(require_admin)],
+)
+def get_admin_overview() -> AdminOverviewResponse:
+    users = list_users()
+    upgrade_requests = list_upgrade_requests()
+
+    admins = [item for item in users if item.get("role") == "admin"]
+    members = [item for item in users if item.get("role") == "member"]
+    trial_users = [item for item in users if item.get("plan") == "trial"]
+    solo_users = [item for item in users if item.get("plan") == "solo"]
+    team_users = [item for item in users if item.get("plan") == "team"]
+    must_change_users = [item for item in users if item.get("must_change_password")]
+
+    new_requests = [item for item in upgrade_requests if item.get("status") == "new"]
+    in_review_requests = [item for item in upgrade_requests if item.get("status") == "in_review"]
+    approved_requests = [item for item in upgrade_requests if item.get("status") == "approved"]
+    rejected_requests = [item for item in upgrade_requests if item.get("status") == "rejected"]
+    closed_requests = [item for item in upgrade_requests if item.get("status") == "closed"]
+    linked_requests = [item for item in upgrade_requests if item.get("target_user_id")]
+
+    attention_items: list[AdminAttentionItem] = []
+    if must_change_users:
+        attention_items.append(
+            AdminAttentionItem(
+                level="warn",
+                title=f"{len(must_change_users)} user{'s' if len(must_change_users) != 1 else ''} must change password",
+                detail="Review user security state from the admin users page.",
+            )
+        )
+    if new_requests:
+        attention_items.append(
+            AdminAttentionItem(
+                level="info",
+                title=f"{len(new_requests)} new upgrade request{'s' if len(new_requests) != 1 else ''}",
+                detail="Review inbound demand in the upgrade inbox.",
+            )
+        )
+    if approved_requests and len(linked_requests) < len(approved_requests):
+        attention_items.append(
+            AdminAttentionItem(
+                level="warn",
+                title="Some approved upgrade requests are not linked to users",
+                detail="Link approved requests to target users where appropriate.",
+            )
+        )
+    if len(admins) <= 1:
+        attention_items.append(
+            AdminAttentionItem(
+                level="info",
+                title="Only one admin account remains",
+                detail="Consider adding another admin account for operational redundancy.",
+            )
+        )
+
+    return AdminOverviewResponse(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        users=AdminUsersSummary(
+            total=len(users),
+            admins=len(admins),
+            members=len(members),
+            trial=len(trial_users),
+            solo=len(solo_users),
+            team=len(team_users),
+            must_change_password=len(must_change_users),
+        ),
+        upgrade_requests=AdminUpgradeRequestsSummary(
+            total=len(upgrade_requests),
+            new=len(new_requests),
+            in_review=len(in_review_requests),
+            approved=len(approved_requests),
+            rejected=len(rejected_requests),
+            closed=len(closed_requests),
+            linked_users=len(linked_requests),
+        ),
+        attention_items=attention_items,
+    )
+
+
+@router.get(
+    "/admin/exports/users",
+    dependencies=[Depends(require_admin)],
+)
+def export_admin_users(format: str = Query(default="json", pattern="^(json|csv)$")):
+    items = list_users()
+    if format == "csv":
+        return _csv_response(
+            "deploymate-admin-users.csv",
+            items,
+            ["id", "username", "role", "plan", "must_change_password", "created_at"],
+        )
+    return {"exported_at": datetime.now(timezone.utc).isoformat(), "count": len(items), "items": items}
+
+
+@router.get(
+    "/admin/exports/upgrade-requests",
+    dependencies=[Depends(require_admin)],
+)
+def export_admin_upgrade_requests(format: str = Query(default="json", pattern="^(json|csv)$")):
+    items = list_upgrade_requests()
+    if format == "csv":
+        return _csv_response(
+            "deploymate-upgrade-requests.csv",
+            items,
+            [
+                "id",
+                "status",
+                "name",
+                "email",
+                "company_or_team",
+                "use_case",
+                "current_plan",
+                "handled_by_username",
+                "target_username",
+                "reviewed_at",
+                "updated_at",
+                "created_at",
+            ],
+        )
+    return {"exported_at": datetime.now(timezone.utc).isoformat(), "count": len(items), "items": items}
 
 
 @router.post(

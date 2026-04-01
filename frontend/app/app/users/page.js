@@ -39,11 +39,23 @@ async function readJsonOrError(response, fallbackMessage) {
   return payload;
 }
 
+function triggerFileDownload(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 export default function UsersPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
+  const [adminOverview, setAdminOverview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -54,31 +66,42 @@ export default function UsersPage() {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
+  const [mustChangeFilter, setMustChangeFilter] = useState("all");
   const [form, setForm] = useState({
     username: "",
     password: "",
     role: "member",
   });
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredUsers = users.filter((user) => {
-    if (roleFilter !== "all" && user.role !== roleFilter) {
-      return false;
-    }
-    if (planFilter !== "all" && user.plan !== planFilter) {
-      return false;
-    }
-    if (!normalizedQuery) {
-      return true;
-    }
-    return user.username.toLowerCase().includes(normalizedQuery);
-  });
+  const filteredUsers = users;
+
+  async function loadAdminOverview() {
+    const response = await fetch(`${apiBaseUrl}/admin/overview`, {
+      cache: "no-store",
+      credentials: "include",
+    });
+    const data = await readJsonOrError(response, "Failed to load admin overview.");
+    setAdminOverview(data);
+  }
 
   async function loadUsers() {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`${apiBaseUrl}/admin/users`, {
+      const params = new URLSearchParams();
+      if (roleFilter !== "all") {
+        params.set("role", roleFilter);
+      }
+      if (planFilter !== "all") {
+        params.set("plan", planFilter);
+      }
+      if (mustChangeFilter !== "all") {
+        params.set("must_change_password", mustChangeFilter === "required" ? "true" : "false");
+      }
+      if (query.trim()) {
+        params.set("q", query.trim());
+      }
+      const response = await fetch(`${apiBaseUrl}/admin/users?${params.toString()}`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -121,7 +144,7 @@ export default function UsersPage() {
           return;
         }
 
-        await loadUsers();
+        await Promise.all([loadUsers(), loadAdminOverview()]);
       } catch {
         router.replace("/login");
       }
@@ -162,7 +185,7 @@ export default function UsersPage() {
         role: "member",
       });
       setSuccess("User created successfully.");
-      await loadUsers();
+      await Promise.all([loadUsers(), loadAdminOverview()]);
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "Failed to create user.",
@@ -190,7 +213,7 @@ export default function UsersPage() {
         "Failed to update user role.",
       );
       setSuccess("User role updated successfully.");
-      await loadUsers();
+      await Promise.all([loadUsers(), loadAdminOverview()]);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -220,7 +243,7 @@ export default function UsersPage() {
         "Failed to update user plan.",
       );
       setSuccess("User plan updated successfully.");
-      await loadUsers();
+      await Promise.all([loadUsers(), loadAdminOverview()]);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -251,7 +274,7 @@ export default function UsersPage() {
         "Failed to delete user.",
       );
       setSuccess("User deleted successfully.");
-      await loadUsers();
+      await Promise.all([loadUsers(), loadAdminOverview()]);
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "Failed to delete user.",
@@ -260,6 +283,32 @@ export default function UsersPage() {
       setDeletingUserId("");
     }
   }
+
+  async function handleDownloadUsersExport() {
+    setError("");
+    try {
+      const response = await fetch(`${apiBaseUrl}/admin/exports/users?format=csv`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to download users export.");
+      }
+      const blob = await response.blob();
+      triggerFileDownload("deploymate-admin-users.csv", blob);
+      setSuccess("Users export downloaded.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to download users export.",
+      );
+    }
+  }
+
+  useEffect(() => {
+    if (!authChecked || accessDenied) {
+      return;
+    }
+    loadUsers();
+  }, [authChecked, accessDenied, query, roleFilter, planFilter, mustChangeFilter]);
 
   if (!authChecked) {
     return (
@@ -303,14 +352,70 @@ export default function UsersPage() {
             <Link href="/app" className="linkButton">
               Back
             </Link>
-            <button type="button" onClick={loadUsers} disabled={loading}>
+            <button type="button" onClick={() => Promise.all([loadUsers(), loadAdminOverview()])} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh"}
+            </button>
+            <button type="button" onClick={handleDownloadUsersExport}>
+              Export CSV
             </button>
           </div>
         </div>
 
         {error ? <div className="banner error">{error}</div> : null}
         {success ? <div className="banner success">{success}</div> : null}
+
+        {adminOverview ? (
+          <article className="card formCard">
+            <div className="sectionHeader">
+              <div>
+                <h2>Admin overview</h2>
+                <p className="formHint">Server-side snapshot of users, plans, and security state.</p>
+              </div>
+            </div>
+            <div className="overviewGrid">
+              <div className="overviewCard">
+                <span className="overviewLabel">Users</span>
+                <strong className="overviewValue">{adminOverview.users.total}</strong>
+                <div className="overviewMeta">
+                  <span>Admins {adminOverview.users.admins}</span>
+                  <span>Members {adminOverview.users.members}</span>
+                  <span>Password changes required {adminOverview.users.must_change_password}</span>
+                </div>
+              </div>
+              <div className="overviewCard">
+                <span className="overviewLabel">Plans</span>
+                <strong className="overviewValue">{adminOverview.users.team + adminOverview.users.solo}</strong>
+                <div className="overviewMeta">
+                  <span>Trial {adminOverview.users.trial}</span>
+                  <span>Solo {adminOverview.users.solo}</span>
+                  <span>Team {adminOverview.users.team}</span>
+                </div>
+              </div>
+            </div>
+            {Array.isArray(adminOverview.attention_items) && adminOverview.attention_items.length > 0 ? (
+              <div className="overviewAttentionList">
+                {adminOverview.attention_items.map((item, index) => (
+                  <div key={`${item.title}-${index}`} className="overviewAttentionItem">
+                    <div className="row">
+                      <span className="label">Level</span>
+                      <span className={`status ${item.level === "info" ? "unknown" : item.level}`}>
+                        {item.level}
+                      </span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Title</span>
+                      <span>{item.title}</span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Action</span>
+                      <span>{item.detail}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </article>
+        ) : null}
 
         <article className="card formCard">
           <div className="sectionHeader">
@@ -371,6 +476,29 @@ export default function UsersPage() {
                 onClick={() => setPlanFilter("team")}
               >
                 Team
+              </button>
+            </div>
+            <div className="filterTabs" role="tablist" aria-label="Password change filters">
+              <button
+                type="button"
+                className={mustChangeFilter === "all" ? "active" : ""}
+                onClick={() => setMustChangeFilter("all")}
+              >
+                All security states
+              </button>
+              <button
+                type="button"
+                className={mustChangeFilter === "required" ? "active" : ""}
+                onClick={() => setMustChangeFilter("required")}
+              >
+                Change required
+              </button>
+              <button
+                type="button"
+                className={mustChangeFilter === "ok" ? "active" : ""}
+                onClick={() => setMustChangeFilter("ok")}
+              >
+                Password OK
               </button>
             </div>
             <label className="field deploymentSearch">

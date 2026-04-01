@@ -39,11 +39,23 @@ async function readJsonOrError(response, fallbackMessage) {
   return payload;
 }
 
+function triggerFileDownload(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 export default function UpgradeRequestsPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [requests, setRequests] = useState([]);
+  const [adminOverview, setAdminOverview] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -51,32 +63,11 @@ export default function UpgradeRequestsPage() {
   const [query, setQuery] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [linkedOnly, setLinkedOnly] = useState(false);
   const [savingId, setSavingId] = useState("");
   const [saveFeedback, setSaveFeedback] = useState("");
   const [drafts, setDrafts] = useState({});
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredRequests = requests.filter((item) => {
-    if (planFilter !== "all" && (item.current_plan || "-") !== planFilter) {
-      return false;
-    }
-    if (statusFilter !== "all" && item.status !== statusFilter) {
-      return false;
-    }
-    if (!normalizedQuery) {
-      return true;
-    }
-    return [
-      item.name,
-      item.email,
-      item.company_or_team,
-      item.use_case,
-      item.current_plan,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase()
-      .includes(normalizedQuery);
-  });
+  const filteredRequests = requests;
 
   function buildDraft(item) {
     return {
@@ -100,7 +91,20 @@ export default function UpgradeRequestsPage() {
     setError("");
 
     try {
-      const response = await fetch(`${apiBaseUrl}/admin/upgrade-requests`, {
+      const params = new URLSearchParams();
+      if (statusFilter !== "all") {
+        params.set("status", statusFilter);
+      }
+      if (planFilter !== "all") {
+        params.set("plan", planFilter);
+      }
+      if (linkedOnly) {
+        params.set("linked_only", "true");
+      }
+      if (query.trim()) {
+        params.set("q", query.trim());
+      }
+      const response = await fetch(`${apiBaseUrl}/admin/upgrade-requests?${params.toString()}`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -137,6 +141,15 @@ export default function UpgradeRequestsPage() {
     });
     const data = await readJsonOrError(response, "Failed to load admin users.");
     setUsers(Array.isArray(data) ? data : []);
+  }
+
+  async function loadAdminOverview() {
+    const response = await fetch(`${apiBaseUrl}/admin/overview`, {
+      cache: "no-store",
+      credentials: "include",
+    });
+    const data = await readJsonOrError(response, "Failed to load admin overview.");
+    setAdminOverview(data);
   }
 
   function updateDraft(requestId, field, value) {
@@ -203,7 +216,7 @@ export default function UpgradeRequestsPage() {
           return;
         }
 
-        await Promise.all([loadUsers(), loadRequests()]);
+        await Promise.all([loadUsers(), loadRequests(), loadAdminOverview()]);
       } catch {
         router.replace("/login");
       }
@@ -211,6 +224,34 @@ export default function UpgradeRequestsPage() {
 
     checkAuthAndLoad();
   }, [router]);
+
+  useEffect(() => {
+    if (!authChecked || accessDenied) {
+      return;
+    }
+    loadRequests();
+  }, [authChecked, accessDenied, query, planFilter, statusFilter, linkedOnly]);
+
+  async function handleDownloadUpgradeExport() {
+    setError("");
+    try {
+      const response = await fetch(`${apiBaseUrl}/admin/exports/upgrade-requests?format=csv`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to download upgrade requests export.");
+      }
+      const blob = await response.blob();
+      triggerFileDownload("deploymate-upgrade-requests.csv", blob);
+      setSaveFeedback("Upgrade requests export downloaded.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to download upgrade requests export.",
+      );
+    }
+  }
 
   if (!authChecked) {
     return (
@@ -254,14 +295,74 @@ export default function UpgradeRequestsPage() {
             <Link href="/app" className="linkButton">
               Back
             </Link>
-            <button type="button" onClick={loadRequests} disabled={loading}>
+            <button
+              type="button"
+              onClick={() => Promise.all([loadUsers(), loadRequests(), loadAdminOverview()])}
+              disabled={loading}
+            >
               {loading ? "Refreshing..." : "Refresh"}
+            </button>
+            <button type="button" onClick={handleDownloadUpgradeExport}>
+              Export CSV
             </button>
           </div>
         </div>
 
         {error ? <div className="banner error">{error}</div> : null}
         {saveFeedback ? <div className="banner success">{saveFeedback}</div> : null}
+
+        {adminOverview ? (
+          <article className="card formCard">
+            <div className="sectionHeader">
+              <div>
+                <h2>Inbox overview</h2>
+                <p className="formHint">Server-side snapshot of upgrade demand and review progress.</p>
+              </div>
+            </div>
+            <div className="overviewGrid">
+              <div className="overviewCard">
+                <span className="overviewLabel">Requests</span>
+                <strong className="overviewValue">{adminOverview.upgrade_requests.total}</strong>
+                <div className="overviewMeta">
+                  <span>New {adminOverview.upgrade_requests.new}</span>
+                  <span>In review {adminOverview.upgrade_requests.in_review}</span>
+                  <span>Approved {adminOverview.upgrade_requests.approved}</span>
+                </div>
+              </div>
+              <div className="overviewCard">
+                <span className="overviewLabel">Resolution</span>
+                <strong className="overviewValue">{adminOverview.upgrade_requests.linked_users}</strong>
+                <div className="overviewMeta">
+                  <span>Linked users {adminOverview.upgrade_requests.linked_users}</span>
+                  <span>Rejected {adminOverview.upgrade_requests.rejected}</span>
+                  <span>Closed {adminOverview.upgrade_requests.closed}</span>
+                </div>
+              </div>
+            </div>
+            {Array.isArray(adminOverview.attention_items) && adminOverview.attention_items.length > 0 ? (
+              <div className="overviewAttentionList">
+                {adminOverview.attention_items.map((item, index) => (
+                  <div key={`${item.title}-${index}`} className="overviewAttentionItem">
+                    <div className="row">
+                      <span className="label">Level</span>
+                      <span className={`status ${item.level === "info" ? "unknown" : item.level}`}>
+                        {item.level}
+                      </span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Title</span>
+                      <span>{item.title}</span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Action</span>
+                      <span>{item.detail}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </article>
+        ) : null}
 
         <article className="card formCard">
           <div className="sectionHeader">
@@ -343,6 +444,14 @@ export default function UpgradeRequestsPage() {
                 Team
               </button>
             </div>
+            <label className="field toolbarField">
+              <span>Linked users only</span>
+              <input
+                type="checkbox"
+                checked={linkedOnly}
+                onChange={(event) => setLinkedOnly(event.target.checked)}
+              />
+            </label>
             <label className="field deploymentSearch">
               <span>Search</span>
               <input
