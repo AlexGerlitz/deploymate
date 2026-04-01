@@ -62,6 +62,8 @@ def _run_remote_command(server: dict, command: List[str]) -> subprocess.Complete
             "StrictHostKeyChecking=no",
             "-o",
             "UserKnownHostsFile=/dev/null",
+            "-o",
+            "LogLevel=ERROR",
         ]
     )
 
@@ -106,6 +108,29 @@ def ensure_docker_is_available(server: Optional[dict] = None) -> None:
                 or f'Docker is not available on server {server["name"]}.',
             )
         raise HTTPException(status_code=500, detail="Docker is not available.")
+
+
+def ensure_external_port_is_available(external_port: Optional[int], server: Optional[dict] = None) -> None:
+    if external_port is None:
+        return
+
+    result = _run_docker_command(["ss", "-ltnH", f"( sport = :{external_port} )"], server)
+    if result.returncode != 0:
+        return
+
+    if not result.stdout.strip():
+        return
+
+    if server:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Port {external_port} is already in use on server {server['name']}.",
+        )
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Port {external_port} is already in use on this host.",
+    )
 
 
 def run_container(

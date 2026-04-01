@@ -29,6 +29,7 @@ from app.schemas import (
 from app.services.deployments import (
     build_container_name,
     ensure_docker_is_available,
+    ensure_external_port_is_available,
     get_container_logs,
     remove_container_if_exists,
     run_container,
@@ -53,6 +54,7 @@ def create_deployment_endpoint(
     enforce_plan_limit(user, "deployments")
     server = get_server_or_404(payload.server_id) if payload.server_id else None
     ensure_docker_is_available(server)
+    ensure_external_port_is_available(payload.external_port, server)
 
     if (payload.internal_port is None) != (payload.external_port is None):
         raise HTTPException(
@@ -295,6 +297,13 @@ def get_deployment_logs(deployment_id: str) -> DeploymentLogsResponse:
     ensure_docker_is_available(server)
     container_name = deployment["container_name"]
 
+    if deployment.get("status") != "running" or not deployment.get("container_id"):
+        return DeploymentLogsResponse(
+            deployment_id=deployment_id,
+            container_name=container_name,
+            logs=deployment.get("error") or "",
+        )
+
     result = get_container_logs(container_name, server)
 
     if result.returncode != 0:
@@ -328,6 +337,16 @@ def get_deployment_health(deployment_id: str) -> DeploymentHealthResponse:
 
     host = deployment.get("server_host") or "127.0.0.1"
     url = f"http://{host}:{external_port}"
+
+    if deployment.get("status") != "running" or not deployment.get("container_id"):
+        return DeploymentHealthResponse(
+            deployment_id=deployment_id,
+            container_name=container_name,
+            url=url,
+            status="unhealthy",
+            status_code=None,
+            error=deployment.get("error") or f"Deployment is {deployment.get('status', 'not running')}.",
+        )
 
     try:
         response = httpx.get(url, timeout=5.0)

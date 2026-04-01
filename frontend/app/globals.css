@@ -201,6 +201,11 @@ a {
   font-size: 14px;
 }
 
+.fieldHint {
+  color: #666;
+  font-size: 13px;
+}
+
 .successActions {
   margin-top: 10px;
 }

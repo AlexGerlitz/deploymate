@@ -20,6 +20,18 @@ function formatDate(value) {
   return date.toLocaleString();
 }
 
+function normalizeCreateDeploymentError(message) {
+  if (!message) {
+    return "Failed to create deployment. Please try again.";
+  }
+
+  if (message.includes("is already in use on server")) {
+    return `${message} Choose a different external port like 8080 or 8081.`;
+  }
+
+  return message;
+}
+
 async function readJsonOrError(response, fallbackMessage) {
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json")
@@ -361,7 +373,7 @@ export default function HomePage() {
 
       setSubmitError(
         requestError instanceof Error
-          ? requestError.message
+          ? normalizeCreateDeploymentError(requestError.message)
           : "Failed to create deployment. Please try again.",
       );
     } finally {
@@ -846,7 +858,8 @@ export default function HomePage() {
 
         <article className="card formCard">
           <div className="sectionHeader">
-            <h2>Notifications</h2>
+            <h2>Activity history</h2>
+            <p className="formHint">Past deploy events stay here even after a deployment is deleted.</p>
           </div>
 
           {notificationsError ? <div className="banner error">{notificationsError}</div> : null}
@@ -951,6 +964,9 @@ export default function HomePage() {
                 placeholder="optional"
                 disabled={submitting}
               />
+              <span className="fieldHint">
+                On main-vps, port 80 is already used by DeployMate itself. Prefer 8080 or 8081.
+              </span>
             </label>
 
             <div className="field">
