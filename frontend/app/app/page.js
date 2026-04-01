@@ -111,6 +111,14 @@ export default function HomePage() {
     typeof currentUser.usage?.deployments === "number" &&
     currentUser.usage.deployments >= currentUser.limits.max_deployments;
 
+  function getSuggestedExternalPort(serverId) {
+    const selectedServer = servers.find((server) => server.id === serverId);
+    if (selectedServer?.name === "main-vps") {
+      return "8080";
+    }
+    return "";
+  }
+
   async function loadCurrentUser() {
     const response = await fetch(`${apiBaseUrl}/auth/me`, {
       cache: "no-store",
@@ -262,10 +270,18 @@ export default function HomePage() {
 
   function updateFormField(event) {
     const { name, value } = event.target;
-    setForm((currentForm) => ({
-      ...currentForm,
-      [name]: value,
-    }));
+    setForm((currentForm) => {
+      const nextForm = {
+        ...currentForm,
+        [name]: value,
+      };
+
+      if (name === "server_id" && !currentForm.external_port.trim()) {
+        nextForm.external_port = getSuggestedExternalPort(value);
+      }
+
+      return nextForm;
+    });
   }
 
   function updateServerFormField(event) {
@@ -359,7 +375,7 @@ export default function HomePage() {
         image: "",
         name: "",
         internal_port: "",
-        external_port: "",
+        external_port: getSuggestedExternalPort(form.server_id),
         server_id: form.server_id,
       });
       setEnvRows([{ key: "", value: "" }]);
