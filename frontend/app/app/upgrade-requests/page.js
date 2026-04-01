@@ -419,8 +419,12 @@ export default function UpgradeRequestsPage() {
               placeholder="approved, in_review, target user"
             />
           </label>
+          <p className="formHint">Recent audit events shown: {auditEvents.length}</p>
+          <p className="formHint">Audit search updates after a short pause.</p>
           {auditEvents.length === 0 ? (
-            <div className="empty">No upgrade audit events yet.</div>
+            <div className="empty">
+              {auditQuery.trim() ? "No upgrade audit events match this search." : "No upgrade audit events yet."}
+            </div>
           ) : (
             <div className="timeline">
               {auditEvents.map((item) => (
@@ -548,6 +552,8 @@ export default function UpgradeRequestsPage() {
               />
             </label>
           </div>
+          <p className="formHint">Showing {filteredRequests.length} request{filteredRequests.length === 1 ? "" : "s"} for the current filters.</p>
+          <p className="formHint">Request search updates after a short pause.</p>
         </article>
 
         {loading && requests.length === 0 ? (
@@ -555,12 +561,12 @@ export default function UpgradeRequestsPage() {
         ) : null}
 
         {!loading && requests.length === 0 ? (
-          <div className="empty">No upgrade requests yet.</div>
+          <div className="empty">No upgrade requests found for the current filters.</div>
         ) : null}
 
         <div className="list">
           {!loading && requests.length > 0 && filteredRequests.length === 0 ? (
-            <div className="empty">No upgrade requests match this filter.</div>
+            <div className="empty">No upgrade requests match this filter or search.</div>
           ) : null}
 
           {filteredRequests.map((item) => (
@@ -634,6 +640,7 @@ export default function UpgradeRequestsPage() {
                   placeholder="Next step, pricing context, follow-up owner"
                 />
               </label>
+              <p className="formHint">Use internal notes for follow-up context visible to admins only.</p>
               <label className="field">
                 <span>Target user</span>
                 <select
@@ -710,7 +717,7 @@ export default function UpgradeRequestsPage() {
                       "Upgrade request approved.",
                     )
                   }
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || !drafts[item.id]?.target_user_id}
                 >
                   Approve
                 </button>

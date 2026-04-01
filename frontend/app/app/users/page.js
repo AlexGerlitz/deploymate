@@ -136,6 +136,7 @@ export default function UsersPage() {
     role: "member",
   });
   const filteredUsers = users;
+  const bundleLineCount = backupBundleText ? backupBundleText.split("\n").length : 0;
 
   async function loadAdminOverview() {
     const response = await fetch(`${apiBaseUrl}/admin/overview`, {
@@ -690,8 +691,12 @@ export default function UsersPage() {
               placeholder="user.updated, alice, approved"
             />
           </label>
+          <p className="formHint">Recent audit events shown: {auditEvents.length}</p>
+          <p className="formHint">Audit search updates after a short pause.</p>
           {auditEvents.length === 0 ? (
-            <div className="empty">No admin audit events yet.</div>
+            <div className="empty">
+              {auditQuery.trim() ? "No admin audit events match this search." : "No admin audit events yet."}
+            </div>
           ) : (
             <div className="timeline">
               {auditEvents.map((item) => (
@@ -742,22 +747,18 @@ export default function UsersPage() {
               Load backup file
               <input type="file" accept="application/json,.json" onChange={handleBackupFileChange} />
             </label>
-            <button type="button" onClick={handleClearBundle}>
+            <button type="button" onClick={handleClearBundle} disabled={!backupBundleText.trim()}>
               Clear bundle
             </button>
-            <button type="button" onClick={handleRunRestoreDryRun} disabled={restoreLoading}>
+            <button type="button" onClick={handleRunRestoreDryRun} disabled={restoreLoading || !backupBundleText.trim()}>
               {restoreLoading ? "Validating..." : "Run restore dry-run"}
             </button>
-            {restoreDryRun ? (
-              <>
-                <button type="button" onClick={handleDownloadRestoreReportJson}>
-                  Report JSON
-                </button>
-                <button type="button" onClick={handleDownloadRestoreReportCsv}>
-                  Report CSV
-                </button>
-              </>
-            ) : null}
+            <button type="button" onClick={handleDownloadRestoreReportJson} disabled={!restoreDryRun}>
+              Report JSON
+            </button>
+            <button type="button" onClick={handleDownloadRestoreReportCsv} disabled={!restoreDryRun}>
+              Report CSV
+            </button>
           </div>
           <label className="field">
             <span>Bundle JSON</span>
@@ -767,6 +768,8 @@ export default function UsersPage() {
               placeholder='{"manifest": {...}, "data": {...}}'
             />
           </label>
+          <p className="formHint">Paste an exported bundle JSON here or load a saved `.json` file before running validation.</p>
+          <p className="formHint">Bundle size: {backupBundleText.length} chars · {bundleLineCount} lines.</p>
           {restoreDryRun ? (
             <div className="backupReport">
               <div className="overviewGrid">
@@ -948,6 +951,8 @@ export default function UsersPage() {
               />
             </label>
           </div>
+          <p className="formHint">Showing {filteredUsers.length} user{filteredUsers.length === 1 ? "" : "s"} for the current filters.</p>
+          <p className="formHint">User search updates after a short pause.</p>
         </article>
 
         <article className="card formCard">
@@ -960,6 +965,7 @@ export default function UsersPage() {
                 value={form.username}
                 onChange={updateFormField}
                 disabled={submitting}
+                placeholder="new-admin"
                 required
               />
             </label>
@@ -972,6 +978,7 @@ export default function UsersPage() {
                 value={form.password}
                 onChange={updateFormField}
                 disabled={submitting}
+                placeholder="Temporary password"
                 required
               />
             </label>
@@ -994,6 +1001,7 @@ export default function UsersPage() {
                 {submitting ? "Creating..." : "Create user"}
               </button>
             </div>
+            <p className="formHint">New users start on the `trial` plan and can be updated immediately after creation.</p>
           </form>
         </article>
 
@@ -1002,12 +1010,12 @@ export default function UsersPage() {
         ) : null}
 
         {!loading && users.length === 0 ? (
-          <div className="empty">No users yet.</div>
+          <div className="empty">No users found for the current filters.</div>
         ) : null}
 
         <div className="list">
           {!loading && users.length > 0 && filteredUsers.length === 0 ? (
-            <div className="empty">No users match this filter.</div>
+            <div className="empty">No users match this filter or search.</div>
           ) : null}
 
           {filteredUsers.map((user) => (
@@ -1037,22 +1045,22 @@ export default function UsersPage() {
                   value={user.role}
                   onChange={(event) => handleRoleChange(user.id, event.target.value)}
                   disabled={updatingUserId === user.id || deletingUserId === user.id}
-                  >
-                    <option value="member">member</option>
-                    <option value="admin">admin</option>
-                  </select>
-                  <select
-                    value={user.plan}
-                    onChange={(event) => handlePlanChange(user.id, event.target.value)}
-                    disabled={updatingUserId === user.id}
-                  >
-                    <option value="trial">trial</option>
-                    <option value="solo">solo</option>
-                    <option value="team">team</option>
-                  </select>
-                  <button
-                    type="button"
-                    className="dangerButton"
+                >
+                  <option value="member">member</option>
+                  <option value="admin">admin</option>
+                </select>
+                <select
+                  value={user.plan}
+                  onChange={(event) => handlePlanChange(user.id, event.target.value)}
+                  disabled={updatingUserId === user.id || deletingUserId === user.id}
+                >
+                  <option value="trial">trial</option>
+                  <option value="solo">solo</option>
+                  <option value="team">team</option>
+                </select>
+                <button
+                  type="button"
+                  className="dangerButton"
                   onClick={() => handleDeleteUser(user.id)}
                   disabled={deletingUserId === user.id || updatingUserId === user.id}
                 >
