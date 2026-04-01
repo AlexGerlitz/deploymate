@@ -121,12 +121,17 @@ def init_db() -> None:
     create_notifications_table_sql = """
     CREATE TABLE IF NOT EXISTS notifications (
         id UUID PRIMARY KEY,
-        deployment_id UUID NOT NULL REFERENCES deployments(id) ON DELETE CASCADE,
+        deployment_id UUID NOT NULL,
         level VARCHAR(32) NOT NULL,
         title TEXT NOT NULL,
         message TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL
     );
+    """
+
+    drop_notifications_fk_sql = """
+    ALTER TABLE notifications
+    DROP CONSTRAINT IF EXISTS notifications_deployment_id_fkey;
     """
 
     create_deployment_activity_table_sql = """
@@ -164,6 +169,7 @@ def init_db() -> None:
             cur.execute(alter_deployments_add_server_id_sql)
             cur.execute(alter_deployments_add_env_sql)
             cur.execute(create_notifications_table_sql)
+            cur.execute(drop_notifications_fk_sql)
             cur.execute(create_deployment_activity_table_sql)
             cur.execute(create_upgrade_requests_table_sql)
         conn.commit()
