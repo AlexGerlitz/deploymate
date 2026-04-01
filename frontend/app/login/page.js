@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -27,34 +27,12 @@ async function readJsonOrError(response, fallbackMessage) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     username: "",
     password: "",
   });
-
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        const response = await fetch(`${apiBaseUrl}/auth/me`, {
-          cache: "no-store",
-          credentials: "include",
-        });
-
-        if (response.ok) {
-          const user = await response.json();
-          router.replace(user.must_change_password ? "/change-password" : "/app");
-          return;
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    checkAuth();
-  }, [router]);
 
   function updateFormField(event) {
     const { name, value } = event.target;
@@ -89,16 +67,6 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (loading) {
-    return (
-      <main className="page">
-        <div className="container">
-          <div className="empty">Checking authentication...</div>
-        </div>
-      </main>
-    );
   }
 
   return (
