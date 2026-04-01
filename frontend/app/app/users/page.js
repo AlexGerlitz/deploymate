@@ -57,6 +57,9 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [adminOverview, setAdminOverview] = useState(null);
   const [auditEvents, setAuditEvents] = useState([]);
+  const [backupBundleText, setBackupBundleText] = useState("");
+  const [restoreDryRun, setRestoreDryRun] = useState(null);
+  const [restoreLoading, setRestoreLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -338,6 +341,76 @@ export default function UsersPage() {
     }
   }
 
+  async function handleDownloadBackupBundle() {
+    setError("");
+    try {
+      const response = await fetch(`${apiBaseUrl}/admin/exports/backup-bundle`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to download backup bundle.");
+      }
+      const blob = await response.blob();
+      triggerFileDownload("deploymate-backup-bundle.json", blob);
+      setSuccess("Backup bundle downloaded.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to download backup bundle.",
+      );
+    }
+  }
+
+  function handleBackupFileChange(event) {
+    const [file] = Array.from(event.target.files || []);
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setBackupBundleText(typeof reader.result === "string" ? reader.result : "");
+      setRestoreDryRun(null);
+      setSuccess(`Loaded backup file ${file.name}.`);
+      setError("");
+    };
+    reader.onerror = () => {
+      setError("Failed to read backup file.");
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleRunRestoreDryRun() {
+    setRestoreLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      if (!backupBundleText.trim()) {
+        throw new Error("Load or paste a backup bundle first.");
+      }
+
+      const parsedBundle = JSON.parse(backupBundleText);
+      const response = await fetch(`${apiBaseUrl}/admin/restore/dry-run`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ bundle: parsedBundle }),
+      });
+      const data = await readJsonOrError(response, "Failed to run restore dry-run.");
+      setRestoreDryRun(data);
+      setSuccess("Restore dry-run completed.");
+    } catch (requestError) {
+      setRestoreDryRun(null);
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to run restore dry-run.",
+      );
+    } finally {
+      setRestoreLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!authChecked || accessDenied) {
       return;
@@ -507,6 +580,110 @@ export default function UsersPage() {
               ))}
             </div>
           )}
+        </article>
+
+        <article className="card formCard">
+          <div className="sectionHeader">
+            <div>
+              <h2>Backup and restore dry run</h2>
+              <p className="formHint">
+                Export a full admin backup bundle, then validate a restore bundle without applying any changes.
+              </p>
+            </div>
+          </div>
+          <div className="backupActions">
+            <button type="button" onClick={handleDownloadBackupBundle}>
+              Download backup bundle
+            </button>
+            <label className="linkButton backupUploadButton">
+              Load backup file
+              <input type="file" accept="application/json,.json" onChange={handleBackupFileChange} />
+            </label>
+            <button type="button" onClick={handleRunRestoreDryRun} disabled={restoreLoading}>
+              {restoreLoading ? "Validating..." : "Run restore dry-run"}
+            </button>
+          </div>
+          <label className="field">
+            <span>Bundle JSON</span>
+            <textarea
+              value={backupBundleText}
+              onChange={(event) => setBackupBundleText(event.target.value)}
+              placeholder='{"manifest": {...}, "data": {...}}'
+            />
+          </label>
+          {restoreDryRun ? (
+            <div className="backupReport">
+              <div className="overviewGrid">
+                <div className="overviewCard">
+                  <span className="overviewLabel">Bundle</span>
+                  <strong className="overviewValue">{restoreDryRun.manifest.bundle_name}</strong>
+                  <div className="overviewMeta">
+                    <span>Version {restoreDryRun.manifest.version}</span>
+                    <span>Generated {formatDate(restoreDryRun.manifest.generated_at)}</span>
+                  </div>
+                </div>
+                <div className="overviewCard">
+                  <span className="overviewLabel">Validation summary</span>
+                  <strong className="overviewValue">{restoreDryRun.summary.total_records}</strong>
+                  <div className="overviewMeta">
+                    <span>Sections {restoreDryRun.summary.total_sections}</span>
+                    <span>Blockers {restoreDryRun.summary.blocker_count}</span>
+                    <span>Warnings {restoreDryRun.summary.warning_count}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="overviewAttentionList">
+                {restoreDryRun.sections.map((section) => (
+                  <div className="overviewAttentionItem" key={section.name}>
+                    <div className="row">
+                      <span className="label">Section</span>
+                      <span>{section.name}</span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Status</span>
+                      <span className={`status ${section.status === "ok" ? "healthy" : section.status}`}>
+                        {section.status}
+                      </span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Records</span>
+                      <span>{section.incoming_count} incoming · {section.current_count} current</span>
+                    </div>
+                    {section.blockers.length > 0 ? (
+                      <div className="backupIssueList">
+                        {section.blockers.map((issue, index) => (
+                          <div className="row" key={`${section.name}-blocker-${issue.code}-${index}`}>
+                            <span className="label">Blocker</span>
+                            <span>{issue.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {section.warnings.length > 0 ? (
+                      <div className="backupIssueList">
+                        {section.warnings.map((issue, index) => (
+                          <div className="row" key={`${section.name}-warning-${issue.code}-${index}`}>
+                            <span className="label">Warning</span>
+                            <span>{issue.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {section.notes.length > 0 ? (
+                      <div className="backupIssueList">
+                        {section.notes.map((note, index) => (
+                          <div className="row" key={`${section.name}-note-${index}`}>
+                            <span className="label">Note</span>
+                            <span>{note}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </article>
 
         <article className="card formCard">

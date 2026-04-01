@@ -181,6 +181,35 @@ a {
   background: #fff;
 }
 
+.backupActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.backupUploadButton {
+  position: relative;
+  overflow: hidden;
+}
+
+.backupUploadButton input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.backupReport {
+  margin-top: 16px;
+}
+
+.backupIssueList {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .sectionHeader {
   margin-bottom: 16px;
 }

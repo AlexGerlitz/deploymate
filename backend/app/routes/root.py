@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -13,12 +14,15 @@ from app.db import (
     create_admin_audit_event,
     delete_user_record,
     get_session_user_by_token,
+    list_deployment_records,
+    list_deployment_templates,
     get_upgrade_request_or_404,
     get_user_by_id,
     get_user_by_username,
     insert_upgrade_request,
     insert_user,
     list_admin_audit_events,
+    list_servers,
     list_upgrade_requests,
     list_users,
     set_user_plan,
@@ -35,6 +39,13 @@ from app.schemas import (
     AdminUpgradeRequestsSummary,
     AdminUserUpdateRequest,
     AdminUsersSummary,
+    BackupBundleManifest,
+    BackupBundleResponse,
+    RestoreDryRunIssue,
+    RestoreDryRunRequest,
+    RestoreDryRunResponse,
+    RestoreDryRunSection,
+    RestoreDryRunSummary,
     UpgradeRequestCreate,
     UpgradeRequestItem,
     UpgradeRequestResponse,
@@ -60,6 +71,14 @@ def _csv_response(filename: str, rows: list[dict], fieldnames: list[str]) -> Res
     )
 
 
+def _json_attachment_response(filename: str, payload: dict) -> Response:
+    return Response(
+        content=json.dumps(payload, ensure_ascii=True, indent=2),
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 def _build_admin_audit_summary(items: list[dict]) -> AdminAuditSummary:
     user_actions = [item for item in items if item.get("target_type") == "user"]
     upgrade_actions = [item for item in items if item.get("target_type") == "upgrade_request"]
@@ -70,6 +89,229 @@ def _build_admin_audit_summary(items: list[dict]) -> AdminAuditSummary:
         upgrade_request_actions=len(upgrade_actions),
         latest_action_type=latest.get("action_type") if latest else None,
         latest_action_at=latest.get("created_at") if latest else None,
+    )
+
+
+def _build_backup_bundle() -> BackupBundleResponse:
+    data = {
+        "users": list_users(),
+        "upgrade_requests": list_upgrade_requests(),
+        "audit_events": list_admin_audit_events(limit=1000),
+        "servers": list_servers(),
+        "deployments": list_deployment_records(),
+        "templates": list_deployment_templates(),
+    }
+    manifest = BackupBundleManifest(
+        version="2026-04-01.backup-bundle.v1",
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        bundle_name=f"deploymate-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
+        sections={name: len(items) for name, items in data.items()},
+    )
+    return BackupBundleResponse(manifest=manifest, data=data)
+
+
+def _issue(severity: str, code: str, message: str) -> RestoreDryRunIssue:
+    return RestoreDryRunIssue(severity=severity, code=code, message=message)
+
+
+def _finalize_section(section: RestoreDryRunSection) -> RestoreDryRunSection:
+    if section.blockers:
+        section.status = "error"
+    elif section.warnings:
+        section.status = "warn"
+    else:
+        section.status = "ok"
+    return section
+
+
+def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
+    manifest_raw = bundle.get("manifest")
+    data_raw = bundle.get("data")
+
+    if not isinstance(manifest_raw, dict):
+        raise HTTPException(status_code=400, detail="Bundle manifest is missing or invalid.")
+    if not isinstance(data_raw, dict):
+        raise HTTPException(status_code=400, detail="Bundle data is missing or invalid.")
+
+    manifest = BackupBundleManifest(**manifest_raw)
+
+    current_users = list_users()
+    current_upgrade_requests = list_upgrade_requests()
+    current_audit_events = list_admin_audit_events(limit=1000)
+    current_servers = list_servers()
+    current_deployments = list_deployment_records()
+    current_templates = list_deployment_templates()
+
+    sections: list[RestoreDryRunSection] = []
+
+    incoming_users = data_raw.get("users") if isinstance(data_raw.get("users"), list) else []
+    section = RestoreDryRunSection(
+        name="users",
+        incoming_count=len(incoming_users),
+        current_count=len(current_users),
+    )
+    current_usernames = {item.get("username"): item for item in current_users}
+    seen_usernames: set[str] = set()
+    for item in incoming_users:
+        username = item.get("username")
+        if not username:
+            section.blockers.append(_issue("error", "missing_username", "User entry is missing username."))
+            continue
+        if username in seen_usernames:
+            section.blockers.append(_issue("error", "duplicate_username_bundle", f'Bundle contains duplicate username "{username}".'))
+        seen_usernames.add(username)
+        existing = current_usernames.get(username)
+        if existing and existing.get("id") != item.get("id"):
+            section.blockers.append(_issue("error", "username_conflict", f'Username "{username}" already exists in current system.'))
+        elif existing:
+            section.warnings.append(_issue("warn", "user_id_exists", f'User "{username}" already exists and would require merge handling.'))
+    section.notes.append("Users can be validated safely, but restore apply should stay controlled because of credential state.")
+    sections.append(_finalize_section(section))
+
+    incoming_requests = data_raw.get("upgrade_requests") if isinstance(data_raw.get("upgrade_requests"), list) else []
+    section = RestoreDryRunSection(
+        name="upgrade_requests",
+        incoming_count=len(incoming_requests),
+        current_count=len(current_upgrade_requests),
+    )
+    current_request_ids = {item.get("id") for item in current_upgrade_requests}
+    seen_request_ids: set[str] = set()
+    for item in incoming_requests:
+        request_id = item.get("id")
+        if not request_id:
+            section.blockers.append(_issue("error", "missing_request_id", "Upgrade request entry is missing id."))
+            continue
+        if request_id in seen_request_ids:
+            section.blockers.append(_issue("error", "duplicate_request_id_bundle", f'Bundle contains duplicate upgrade request id "{request_id}".'))
+        seen_request_ids.add(request_id)
+        if request_id in current_request_ids:
+            section.warnings.append(_issue("warn", "request_id_exists", f'Upgrade request "{request_id}" already exists in current system.'))
+    section.notes.append("Upgrade requests can usually be restored after ID and linking review.")
+    sections.append(_finalize_section(section))
+
+    incoming_audit = data_raw.get("audit_events") if isinstance(data_raw.get("audit_events"), list) else []
+    section = RestoreDryRunSection(
+        name="audit_events",
+        incoming_count=len(incoming_audit),
+        current_count=len(current_audit_events),
+    )
+    current_audit_ids = {item.get("id") for item in current_audit_events}
+    seen_audit_ids: set[str] = set()
+    for item in incoming_audit:
+        audit_id = item.get("id")
+        if not audit_id:
+            section.blockers.append(_issue("error", "missing_audit_id", "Audit event entry is missing id."))
+            continue
+        if audit_id in seen_audit_ids:
+            section.blockers.append(_issue("error", "duplicate_audit_id_bundle", f'Bundle contains duplicate audit id "{audit_id}".'))
+        seen_audit_ids.add(audit_id)
+        if audit_id in current_audit_ids:
+            section.warnings.append(_issue("warn", "audit_id_exists", f'Audit event "{audit_id}" already exists in current system.'))
+    section.notes.append("Audit history is append-only and low-risk, but duplicate IDs should be deduplicated on restore.")
+    sections.append(_finalize_section(section))
+
+    incoming_servers = data_raw.get("servers") if isinstance(data_raw.get("servers"), list) else []
+    section = RestoreDryRunSection(
+        name="servers",
+        incoming_count=len(incoming_servers),
+        current_count=len(current_servers),
+    )
+    current_server_names = {item.get("name"): item for item in current_servers}
+    current_server_targets = {f'{item.get("username")}@{item.get("host")}:{item.get("port")}': item for item in current_servers}
+    seen_server_names: set[str] = set()
+    seen_server_targets: set[str] = set()
+    for item in incoming_servers:
+        name = item.get("name")
+        target = f'{item.get("username")}@{item.get("host")}:{item.get("port")}'
+        if not name or not item.get("host") or not item.get("username"):
+            section.blockers.append(_issue("error", "invalid_server", "Server entry is missing required identity fields."))
+            continue
+        if name in seen_server_names:
+            section.blockers.append(_issue("error", "duplicate_server_name_bundle", f'Bundle contains duplicate server name "{name}".'))
+        if target in seen_server_targets:
+            section.blockers.append(_issue("error", "duplicate_server_target_bundle", f'Bundle contains duplicate server target "{target}".'))
+        seen_server_names.add(name)
+        seen_server_targets.add(target)
+        if name in current_server_names and current_server_names[name].get("id") != item.get("id"):
+            section.blockers.append(_issue("error", "server_name_conflict", f'Server name "{name}" already exists in current system.'))
+        if target in current_server_targets and current_server_targets[target].get("id") != item.get("id"):
+            section.warnings.append(_issue("warn", "server_target_conflict", f'Server target "{target}" already exists in current system.'))
+    section.notes.append("Server restore is sensitive because credentials and remote targets may have changed.")
+    sections.append(_finalize_section(section))
+
+    incoming_templates = data_raw.get("templates") if isinstance(data_raw.get("templates"), list) else []
+    section = RestoreDryRunSection(
+        name="templates",
+        incoming_count=len(incoming_templates),
+        current_count=len(current_templates),
+    )
+    current_template_names = {item.get("template_name"): item for item in current_templates}
+    seen_template_names: set[str] = set()
+    for item in incoming_templates:
+        name = item.get("template_name")
+        if not name:
+            section.blockers.append(_issue("error", "missing_template_name", "Template entry is missing template_name."))
+            continue
+        if name in seen_template_names:
+            section.blockers.append(_issue("error", "duplicate_template_name_bundle", f'Bundle contains duplicate template "{name}".'))
+        seen_template_names.add(name)
+        existing = current_template_names.get(name)
+        if existing and existing.get("id") != item.get("id"):
+            section.blockers.append(_issue("error", "template_name_conflict", f'Template "{name}" already exists in current system.'))
+        elif existing:
+            section.warnings.append(_issue("warn", "template_id_exists", f'Template "{name}" already exists and would require merge handling.'))
+    section.notes.append("Templates are good restore candidates after conflict cleanup.")
+    sections.append(_finalize_section(section))
+
+    incoming_deployments = data_raw.get("deployments") if isinstance(data_raw.get("deployments"), list) else []
+    section = RestoreDryRunSection(
+        name="deployments",
+        incoming_count=len(incoming_deployments),
+        current_count=len(current_deployments),
+    )
+    current_container_names = {item.get("container_name"): item for item in current_deployments}
+    current_ports = {
+        f'{item.get("server_id") or "local"}:{item.get("external_port")}': item
+        for item in current_deployments
+        if item.get("external_port") is not None
+    }
+    seen_container_names: set[str] = set()
+    seen_ports: set[str] = set()
+    for item in incoming_deployments:
+        container_name = item.get("container_name")
+        if not container_name:
+            section.blockers.append(_issue("error", "missing_container_name", "Deployment entry is missing container_name."))
+            continue
+        if container_name in seen_container_names:
+            section.blockers.append(_issue("error", "duplicate_container_name_bundle", f'Bundle contains duplicate container "{container_name}".'))
+        seen_container_names.add(container_name)
+        if container_name in current_container_names and current_container_names[container_name].get("id") != item.get("id"):
+            section.blockers.append(_issue("error", "container_name_conflict", f'Container "{container_name}" already exists in current system.'))
+        external_port = item.get("external_port")
+        if external_port is not None:
+            port_key = f'{item.get("server_id") or "local"}:{external_port}'
+            if port_key in seen_ports:
+                section.blockers.append(_issue("error", "duplicate_port_bundle", f'Bundle contains duplicate external port "{external_port}" on the same target.'))
+            seen_ports.add(port_key)
+            if port_key in current_ports and current_ports[port_key].get("id") != item.get("id"):
+                section.blockers.append(_issue("error", "deployment_port_conflict", f'External port "{external_port}" is already used on the target environment.'))
+    section.notes.append("Deployment restore is runtime-sensitive and should stay dry-run only for now.")
+    sections.append(_finalize_section(section))
+
+    blocker_count = sum(len(section.blockers) for section in sections)
+    warning_count = sum(len(section.warnings) for section in sections)
+    total_records = sum(section.incoming_count for section in sections)
+
+    return RestoreDryRunResponse(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        manifest=manifest,
+        summary=RestoreDryRunSummary(
+            total_sections=len(sections),
+            total_records=total_records,
+            blocker_count=blocker_count,
+            warning_count=warning_count,
+        ),
+        sections=sections,
     )
 
 
@@ -410,6 +652,36 @@ def export_admin_upgrade_requests(format: str = Query(default="json", pattern="^
             ],
         )
     return {"exported_at": datetime.now(timezone.utc).isoformat(), "count": len(items), "items": items}
+
+
+@router.get(
+    "/admin/backup-bundle",
+    response_model=BackupBundleResponse,
+    dependencies=[Depends(require_admin)],
+)
+def get_admin_backup_bundle() -> BackupBundleResponse:
+    return _build_backup_bundle()
+
+
+@router.get(
+    "/admin/exports/backup-bundle",
+    dependencies=[Depends(require_admin)],
+)
+def export_admin_backup_bundle():
+    bundle = _build_backup_bundle()
+    return _json_attachment_response(
+        f"{bundle.manifest.bundle_name}.json",
+        bundle.model_dump(),
+    )
+
+
+@router.post(
+    "/admin/restore/dry-run",
+    response_model=RestoreDryRunResponse,
+    dependencies=[Depends(require_admin)],
+)
+def run_restore_dry_run(payload: RestoreDryRunRequest) -> RestoreDryRunResponse:
+    return _analyze_restore_bundle(payload.bundle)
 
 
 @router.post(

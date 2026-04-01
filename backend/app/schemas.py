@@ -372,3 +372,49 @@ class AdminAuditSummary(BaseModel):
     upgrade_request_actions: int = 0
     latest_action_type: Optional[str] = None
     latest_action_at: Optional[str] = None
+
+
+class BackupBundleManifest(BaseModel):
+    version: str
+    generated_at: str
+    bundle_name: str
+    sections: Dict[str, int] = Field(default_factory=dict)
+
+
+class BackupBundleResponse(BaseModel):
+    manifest: BackupBundleManifest
+    data: Dict[str, list[dict]] = Field(default_factory=dict)
+
+
+class RestoreDryRunRequest(BaseModel):
+    bundle: Dict[str, object]
+
+
+class RestoreDryRunIssue(BaseModel):
+    severity: Literal["info", "warn", "error"]
+    code: str
+    message: str
+
+
+class RestoreDryRunSection(BaseModel):
+    name: str
+    incoming_count: int = 0
+    current_count: int = 0
+    status: Literal["ok", "warn", "error"] = "ok"
+    blockers: list[RestoreDryRunIssue] = Field(default_factory=list)
+    warnings: list[RestoreDryRunIssue] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class RestoreDryRunSummary(BaseModel):
+    total_sections: int = 0
+    total_records: int = 0
+    blocker_count: int = 0
+    warning_count: int = 0
+
+
+class RestoreDryRunResponse(BaseModel):
+    generated_at: str
+    manifest: BackupBundleManifest
+    summary: RestoreDryRunSummary
+    sections: list[RestoreDryRunSection] = Field(default_factory=list)
