@@ -20,6 +20,18 @@ function formatDate(value) {
   return date.toLocaleString();
 }
 
+function normalizeRedeployError(message) {
+  if (!message) {
+    return "Failed to redeploy deployment.";
+  }
+
+  if (message.includes("is already in use on server")) {
+    return `${message} Recommended free ports on main-vps: 8080, 8081, 8082.`;
+  }
+
+  return message;
+}
+
 async function readJsonOrError(response, fallbackMessage) {
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json")
@@ -210,6 +222,13 @@ export default function DeploymentDetailsPage({ params }) {
     }));
   }
 
+  function useSuggestedPort(port) {
+    setForm((currentForm) => ({
+      ...currentForm,
+      external_port: String(port),
+    }));
+  }
+
   function updateEnvRow(index, field, value) {
     setEnvRows((currentRows) =>
       currentRows.map((row, rowIndex) =>
@@ -289,7 +308,7 @@ export default function DeploymentDetailsPage({ params }) {
 
       setRedeployError(
         requestError instanceof Error
-          ? requestError.message
+          ? normalizeRedeployError(requestError.message)
           : "Failed to redeploy deployment.",
       );
     } finally {
@@ -457,6 +476,32 @@ export default function DeploymentDetailsPage({ params }) {
                 placeholder="optional"
                 disabled={redeploying}
               />
+              <span className="fieldHint">
+                On main-vps, port 80 is reserved by DeployMate. Recommended: 8080, 8081, 8082.
+              </span>
+              <div className="portSuggestions">
+                <button
+                  type="button"
+                  onClick={() => useSuggestedPort(8080)}
+                  disabled={redeploying}
+                >
+                  Use 8080
+                </button>
+                <button
+                  type="button"
+                  onClick={() => useSuggestedPort(8081)}
+                  disabled={redeploying}
+                >
+                  Use 8081
+                </button>
+                <button
+                  type="button"
+                  onClick={() => useSuggestedPort(8082)}
+                  disabled={redeploying}
+                >
+                  Use 8082
+                </button>
+              </div>
             </label>
 
             <div className="field">

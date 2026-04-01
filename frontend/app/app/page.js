@@ -26,7 +26,7 @@ function normalizeCreateDeploymentError(message) {
   }
 
   if (message.includes("is already in use on server")) {
-    return `${message} Choose a different external port like 8080 or 8081.`;
+    return `${message} Recommended free ports on main-vps: 8080, 8081, 8082.`;
   }
 
   return message;
@@ -282,6 +282,13 @@ export default function HomePage() {
 
       return nextForm;
     });
+  }
+
+  function useSuggestedPort(port) {
+    setForm((currentForm) => ({
+      ...currentForm,
+      external_port: String(port),
+    }));
   }
 
   function updateServerFormField(event) {
@@ -550,7 +557,11 @@ export default function HomePage() {
   async function handleTestServer(serverId) {
     setServerTestResults((currentResults) => ({
       ...currentResults,
-      [serverId]: null,
+      [serverId]: {
+        status: "loading",
+        message: "Checking SSH and Docker on this server...",
+        tested_at: new Date().toISOString(),
+      },
     }));
     setTestingServerId(serverId);
 
@@ -562,7 +573,10 @@ export default function HomePage() {
       const data = await readJsonOrError(response, "Failed to test server connection.");
       setServerTestResults((currentResults) => ({
         ...currentResults,
-        [serverId]: data,
+        [serverId]: {
+          ...data,
+          tested_at: new Date().toISOString(),
+        },
       }));
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -578,6 +592,7 @@ export default function HomePage() {
             requestError instanceof Error
               ? requestError.message
               : "Failed to test server connection.",
+          tested_at: new Date().toISOString(),
         },
       }));
     } finally {
@@ -841,7 +856,27 @@ export default function HomePage() {
                   <span className="label">Auth</span>
                   <span>{server.auth_type}</span>
                 </div>
+                {serverTestResults[server.id]?.tested_at ? (
+                  <div className="row">
+                    <span className="label">Last test</span>
+                    <span>{formatDate(serverTestResults[server.id].tested_at)}</span>
+                  </div>
+                ) : null}
                 <div className="actions">
+                  {serverTestResults[server.id]?.status ? (
+                    <span
+                      className={`status ${
+                        serverTestResults[server.id].status === "loading"
+                          ? "unknown"
+                          : serverTestResults[server.id].status
+                      }`}
+                    >
+                      Last test:{" "}
+                      {serverTestResults[server.id].status === "loading"
+                        ? "checking"
+                        : serverTestResults[server.id].status}
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => handleTestServer(server.id)}
@@ -861,7 +896,11 @@ export default function HomePage() {
                 {serverTestResults[server.id]?.message ? (
                   <div
                     className={`banner ${
-                      serverTestResults[server.id].status === "success" ? "success" : "error"
+                      serverTestResults[server.id].status === "success"
+                        ? "success"
+                        : serverTestResults[server.id].status === "loading"
+                          ? "subtle"
+                          : "error"
                     } inlineBanner`}
                   >
                     {serverTestResults[server.id].message}
@@ -981,8 +1020,19 @@ export default function HomePage() {
                 disabled={submitting}
               />
               <span className="fieldHint">
-                On main-vps, port 80 is already used by DeployMate itself. Prefer 8080 or 8081.
+                On main-vps, port 80 is reserved by DeployMate. Recommended: 8080, 8081, 8082.
               </span>
+              <div className="portSuggestions">
+                <button type="button" onClick={() => useSuggestedPort(8080)} disabled={submitting}>
+                  Use 8080
+                </button>
+                <button type="button" onClick={() => useSuggestedPort(8081)} disabled={submitting}>
+                  Use 8081
+                </button>
+                <button type="button" onClick={() => useSuggestedPort(8082)} disabled={submitting}>
+                  Use 8082
+                </button>
+              </div>
             </label>
 
             <div className="field">

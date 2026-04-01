@@ -206,6 +206,20 @@ a {
   font-size: 13px;
 }
 
+.portSuggestions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.portSuggestions button {
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  background: #fff;
+  padding: 6px 10px;
+  font: inherit;
+}
+
 .successActions {
   margin-top: 10px;
 }
