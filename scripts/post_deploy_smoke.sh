@@ -11,9 +11,11 @@ LOGIN_BODY_FILE="$(mktemp)"
 ME_BODY_FILE="$(mktemp)"
 LOGOUT_BODY_FILE="$(mktemp)"
 ME_AFTER_LOGOUT_BODY_FILE="$(mktemp)"
+BACKUP_BUNDLE_BODY_FILE="$(mktemp)"
+DRY_RUN_BODY_FILE="$(mktemp)"
 
 cleanup() {
-  rm -f "$COOKIE_JAR" "$LOGIN_BODY_FILE" "$ME_BODY_FILE" "$LOGOUT_BODY_FILE" "$ME_AFTER_LOGOUT_BODY_FILE"
+  rm -f "$COOKIE_JAR" "$LOGIN_BODY_FILE" "$ME_BODY_FILE" "$LOGOUT_BODY_FILE" "$ME_AFTER_LOGOUT_BODY_FILE" "$BACKUP_BUNDLE_BODY_FILE" "$DRY_RUN_BODY_FILE"
 }
 
 trap cleanup EXIT
@@ -125,6 +127,56 @@ if [ "$me_username" != "$USERNAME" ]; then
   exit 1
 fi
 echo "[smoke] auth/me ok"
+
+backup_bundle_status="$(
+  curl -sS -o "$BACKUP_BUNDLE_BODY_FILE" -w "%{http_code}" \
+    -b "$COOKIE_JAR" \
+    "$BASE_URL/api/admin/backup-bundle"
+)"
+
+if [ "$backup_bundle_status" != "200" ]; then
+  echo "[smoke] backup bundle failed with HTTP $backup_bundle_status" >&2
+  cat "$BACKUP_BUNDLE_BODY_FILE" >&2
+  exit 1
+fi
+
+backup_bundle_name="$(json_get "$BACKUP_BUNDLE_BODY_FILE" "manifest.bundle_name")"
+if [ -z "$backup_bundle_name" ]; then
+  echo "[smoke] backup bundle manifest is missing bundle_name" >&2
+  exit 1
+fi
+echo "[smoke] backup bundle ok"
+
+python3 - "$BACKUP_BUNDLE_BODY_FILE" > "$DRY_RUN_BODY_FILE" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as fh:
+    bundle = json.load(fh)
+
+print(json.dumps({"bundle": bundle}, ensure_ascii=True))
+PY
+
+dry_run_status="$(
+  curl -sS -o "$ME_AFTER_LOGOUT_BODY_FILE" -w "%{http_code}" \
+    -b "$COOKIE_JAR" \
+    -H "Content-Type: application/json" \
+    -X POST "$BASE_URL/api/admin/restore/dry-run" \
+    --data-binary @"$DRY_RUN_BODY_FILE"
+)"
+
+if [ "$dry_run_status" != "200" ]; then
+  echo "[smoke] restore dry-run failed with HTTP $dry_run_status" >&2
+  cat "$ME_AFTER_LOGOUT_BODY_FILE" >&2
+  exit 1
+fi
+
+dry_run_sections="$(json_get "$ME_AFTER_LOGOUT_BODY_FILE" "summary.total_sections")"
+if [ "$dry_run_sections" = "0" ]; then
+  echo "[smoke] restore dry-run returned zero sections" >&2
+  exit 1
+fi
+echo "[smoke] restore dry-run ok"
 
 logout_status="$(
   curl -sS -o "$LOGOUT_BODY_FILE" -w "%{http_code}" \

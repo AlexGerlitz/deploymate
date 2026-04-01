@@ -411,6 +411,9 @@ class RestoreDryRunSummary(BaseModel):
     total_records: int = 0
     blocker_count: int = 0
     warning_count: int = 0
+    ok_sections: int = 0
+    review_required_sections: int = 0
+    blocked_sections: int = 0
 
 
 class RestoreDryRunResponse(BaseModel):

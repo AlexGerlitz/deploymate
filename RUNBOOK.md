@@ -224,6 +224,40 @@ bash scripts/post_deploy_smoke.sh
 # 9. delete the test deployment
 ```
 
+Backup and restore dry-run:
+
+```bash
+# download a full backup bundle as admin
+curl -sS -b "<cookie jar>" https://deploymatecloud.ru/api/admin/backup-bundle
+
+# or from UI:
+# App -> Users -> Backup and restore dry run -> Download backup bundle
+
+# validate a bundle without applying changes
+curl -sS -b "<cookie jar>" \
+  -H "Content-Type: application/json" \
+  -X POST https://deploymatecloud.ru/api/admin/restore/dry-run \
+  --data-binary @restore-dry-run-payload.json
+```
+
+How to read the dry-run result:
+
+```text
+ok      section can be imported later with low review cost
+warn    merge or conflict review is required before any future restore
+error   section has blockers and should not be applied
+```
+
+Common conflict types:
+
+```text
+username_conflict         existing user already owns that username
+template_name_conflict    existing template already owns that name
+server_name_conflict      existing server already owns that label
+deployment_port_conflict  external port is already in use
+container_name_conflict   deployment container name is already in use
+```
+
 Safer release order:
 
 ```bash

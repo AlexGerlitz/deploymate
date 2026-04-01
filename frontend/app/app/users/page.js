@@ -50,6 +50,62 @@ function triggerFileDownload(filename, blob) {
   URL.revokeObjectURL(url);
 }
 
+function escapeCsvCell(value) {
+  const normalized =
+    value === null || value === undefined ? "" : String(value);
+  if (/[",\n]/.test(normalized)) {
+    return `"${normalized.replaceAll("\"", "\"\"")}"`;
+  }
+  return normalized;
+}
+
+function buildRestoreDryRunCsv(report) {
+  const rows = [
+    ["section", "status", "incoming_count", "current_count", "issue_type", "code", "message"],
+  ];
+
+  for (const section of report.sections || []) {
+    if (!section.blockers.length && !section.warnings.length) {
+      rows.push([
+        section.name,
+        section.status,
+        section.incoming_count,
+        section.current_count,
+        "note",
+        "",
+        (section.notes || []).join(" | "),
+      ]);
+      continue;
+    }
+
+    for (const issue of section.blockers || []) {
+      rows.push([
+        section.name,
+        section.status,
+        section.incoming_count,
+        section.current_count,
+        "blocker",
+        issue.code,
+        issue.message,
+      ]);
+    }
+
+    for (const issue of section.warnings || []) {
+      rows.push([
+        section.name,
+        section.status,
+        section.incoming_count,
+        section.current_count,
+        "warning",
+        issue.code,
+        issue.message,
+      ]);
+    }
+  }
+
+  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
 export default function UsersPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
@@ -411,6 +467,70 @@ export default function UsersPage() {
     }
   }
 
+  function handleLoadSampleBundle() {
+    setBackupBundleText(
+      JSON.stringify(
+        {
+          manifest: {
+            version: "2026-04-01.backup-bundle.v1",
+            generated_at: new Date().toISOString(),
+            bundle_name: "deploymate-sample-bundle",
+            sections: {
+              users: 1,
+              upgrade_requests: 1,
+              audit_events: 0,
+              servers: 1,
+              deployments: 0,
+              templates: 1,
+            },
+          },
+          data: {
+            users: [{ id: "sample-user-1", username: "sample-admin", role: "admin", plan: "team" }],
+            upgrade_requests: [{ id: "sample-request-1", name: "Sample Team", email: "ops@example.com", current_plan: "trial" }],
+            audit_events: [],
+            servers: [{ id: "sample-server-1", name: "sample-server", host: "10.0.0.10", port: 22, username: "deploy" }],
+            deployments: [],
+            templates: [{ id: "sample-template-1", template_name: "sample-template", image: "nginx:latest" }],
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    setRestoreDryRun(null);
+    setSuccess("Sample bundle loaded.");
+    setError("");
+  }
+
+  function handleClearBundle() {
+    setBackupBundleText("");
+    setRestoreDryRun(null);
+    setSuccess("Backup bundle editor cleared.");
+    setError("");
+  }
+
+  function handleDownloadRestoreReportJson() {
+    if (!restoreDryRun) {
+      return;
+    }
+    const blob = new Blob([JSON.stringify(restoreDryRun, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-restore-dry-run-report.json", blob);
+    setSuccess("Validation report JSON downloaded.");
+  }
+
+  function handleDownloadRestoreReportCsv() {
+    if (!restoreDryRun) {
+      return;
+    }
+    const blob = new Blob([buildRestoreDryRunCsv(restoreDryRun)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-restore-dry-run-report.csv", blob);
+    setSuccess("Validation report CSV downloaded.");
+  }
+
   useEffect(() => {
     if (!authChecked || accessDenied) {
       return;
@@ -595,13 +715,29 @@ export default function UsersPage() {
             <button type="button" onClick={handleDownloadBackupBundle}>
               Download backup bundle
             </button>
+            <button type="button" onClick={handleLoadSampleBundle}>
+              Paste sample
+            </button>
             <label className="linkButton backupUploadButton">
               Load backup file
               <input type="file" accept="application/json,.json" onChange={handleBackupFileChange} />
             </label>
+            <button type="button" onClick={handleClearBundle}>
+              Clear bundle
+            </button>
             <button type="button" onClick={handleRunRestoreDryRun} disabled={restoreLoading}>
               {restoreLoading ? "Validating..." : "Run restore dry-run"}
             </button>
+            {restoreDryRun ? (
+              <>
+                <button type="button" onClick={handleDownloadRestoreReportJson}>
+                  Report JSON
+                </button>
+                <button type="button" onClick={handleDownloadRestoreReportCsv}>
+                  Report CSV
+                </button>
+              </>
+            ) : null}
           </div>
           <label className="field">
             <span>Bundle JSON</span>
@@ -631,6 +767,19 @@ export default function UsersPage() {
                     <span>Warnings {restoreDryRun.summary.warning_count}</span>
                   </div>
                 </div>
+              </div>
+              <div className="backupSummaryBadges">
+                <span className="status healthy">safe {restoreDryRun.summary.ok_sections}</span>
+                <span className="status warn">review {restoreDryRun.summary.review_required_sections}</span>
+                <span className="status error">blocked {restoreDryRun.summary.blocked_sections}</span>
+              </div>
+              <div className="backupManifestGrid">
+                {Object.entries(restoreDryRun.manifest.sections || {}).map(([name, count]) => (
+                  <div key={name} className="backupManifestItem">
+                    <span className="label">{name}</span>
+                    <strong>{count}</strong>
+                  </div>
+                ))}
               </div>
               <div className="overviewAttentionList">
                 {restoreDryRun.sections.map((section) => (

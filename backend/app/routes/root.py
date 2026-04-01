@@ -301,6 +301,9 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     blocker_count = sum(len(section.blockers) for section in sections)
     warning_count = sum(len(section.warnings) for section in sections)
     total_records = sum(section.incoming_count for section in sections)
+    ok_sections = sum(1 for section in sections if section.status == "ok")
+    review_required_sections = sum(1 for section in sections if section.status == "warn")
+    blocked_sections = sum(1 for section in sections if section.status == "error")
 
     return RestoreDryRunResponse(
         generated_at=datetime.now(timezone.utc).isoformat(),
@@ -310,6 +313,9 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
             total_records=total_records,
             blocker_count=blocker_count,
             warning_count=warning_count,
+            ok_sections=ok_sections,
+            review_required_sections=review_required_sections,
+            blocked_sections=blocked_sections,
         ),
         sections=sections,
     )
