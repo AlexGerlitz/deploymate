@@ -50,7 +50,7 @@ class DeploymentLogsResponse(BaseModel):
 class DeploymentHealthResponse(BaseModel):
     deployment_id: str
     container_name: str
-    url: str
+    url: Optional[str] = None
     status: HealthStatus
     status_code: Optional[int]
     error: Optional[str]

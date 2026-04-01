@@ -40,6 +40,26 @@ from app.services.auth import enforce_plan_limit, require_auth
 router = APIRouter(dependencies=[Depends(require_auth)])
 
 
+def _normalize_runtime_error(message: str | None, fallback: str) -> str:
+    text = (message or "").strip()
+    if not text:
+        return fallback
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return fallback
+
+    text = " ".join(lines)
+    text = text.replace("docker: Error response from daemon:", "")
+    text = text.replace("Error response from daemon:", "")
+    text = text.replace("docker:", "")
+
+    if "See 'docker run --help'." in text:
+        text = text.split("See 'docker run --help'.", 1)[0].strip()
+
+    return text.strip() or fallback
+
+
 @router.get("/deployments", response_model=List[DeploymentResponse])
 def list_deployments() -> List[DeploymentResponse]:
     deployments = list_deployment_records()
@@ -91,7 +111,10 @@ def create_deployment_endpoint(
     )
 
     if result.returncode != 0:
-        error_message = result.stderr.strip() or "Docker run failed."
+        error_message = _normalize_runtime_error(
+            result.stderr.strip() or result.stdout.strip(),
+            "Docker run failed.",
+        )
         update_deployment_record(
             deployment_id=deployment_id,
             status="failed",
@@ -151,30 +174,36 @@ def redeploy_deployment(
     existing_deployment = get_deployment_record_or_404(deployment_id)
     server = get_server_or_404(existing_deployment["server_id"]) if existing_deployment.get("server_id") else None
     ensure_docker_is_available(server)
+    if (
+        payload.external_port is not None
+        and payload.external_port != existing_deployment.get("external_port")
+    ):
+        ensure_external_port_is_available(payload.external_port, server)
     container_name = payload.name or existing_deployment["container_name"]
 
     try:
         remove_container_if_exists(existing_deployment["container_name"], server)
     except HTTPException as exc:
+        error_message = _normalize_runtime_error(exc.detail, "Failed to redeploy deployment.")
         update_deployment_record(
             deployment_id=deployment_id,
             status="failed",
-            container_id=existing_deployment.get("container_id"),
-            error=exc.detail,
+            container_id=None,
+            error=error_message,
         )
         create_notification(
             deployment_id=deployment_id,
             level="error",
             title="Redeploy failed",
-            message=f"Redeploy for {deployment_id} failed: {exc.detail}",
+            message=f"Redeploy for {deployment_id} failed: {error_message}",
         )
         create_activity_event(
             deployment_id=deployment_id,
             level="error",
             title="Redeploy failed",
-            message=f"Redeploy for {deployment_id} failed: {exc.detail}",
+            message=f"Redeploy for {deployment_id} failed: {error_message}",
         )
-        raise
+        raise HTTPException(status_code=exc.status_code, detail=error_message) from exc
 
     update_deployment_configuration(
         deployment_id=deployment_id,
@@ -201,7 +230,10 @@ def redeploy_deployment(
     )
 
     if result.returncode != 0:
-        error_message = result.stderr.strip() or "Docker run failed."
+        error_message = _normalize_runtime_error(
+            result.stderr.strip() or result.stdout.strip(),
+            "Docker run failed.",
+        )
         update_deployment_record(
             deployment_id=deployment_id,
             status="failed",
@@ -268,14 +300,27 @@ def delete_deployment(deployment_id: str) -> DeploymentDeleteResponse:
     try:
         remove_container_if_exists(deployment["container_name"], server)
     except HTTPException as exc:
+        error_message = _normalize_runtime_error(exc.detail, "Failed to delete deployment.")
+        create_notification(
+            deployment_id=deployment_id,
+            level="error",
+            title="Delete failed",
+            message=f"Delete for {deployment_id} failed: {error_message}",
+        )
         create_activity_event(
             deployment_id=deployment_id,
             level="error",
             title="Delete failed",
-            message=f"Delete for {deployment_id} failed: {exc.detail}",
+            message=f"Delete for {deployment_id} failed: {error_message}",
         )
-        raise
+        raise HTTPException(status_code=exc.status_code, detail=error_message) from exc
 
+    create_notification(
+        deployment_id=deployment_id,
+        level="success",
+        title="Delete succeeded",
+        message=f"Deployment {deployment_id} was deleted.",
+    )
     create_activity_event(
         deployment_id=deployment_id,
         level="success",
@@ -307,9 +352,16 @@ def get_deployment_logs(deployment_id: str) -> DeploymentLogsResponse:
     result = get_container_logs(container_name, server)
 
     if result.returncode != 0:
+        error_message = result.stderr.strip() or result.stdout.strip()
+        if "No such container" in error_message:
+            return DeploymentLogsResponse(
+                deployment_id=deployment_id,
+                container_name=container_name,
+                logs=deployment.get("error") or "",
+            )
         raise HTTPException(
             status_code=500,
-            detail=result.stderr.strip() or "Failed to get container logs.",
+            detail=error_message or "Failed to get container logs.",
         )
 
     logs_output = result.stdout.strip()
@@ -342,7 +394,7 @@ def get_deployment_health(deployment_id: str) -> DeploymentHealthResponse:
         return DeploymentHealthResponse(
             deployment_id=deployment_id,
             container_name=container_name,
-            url=url,
+            url=None,
             status="unhealthy",
             status_code=None,
             error=deployment.get("error") or f"Deployment is {deployment.get('status', 'not running')}.",
