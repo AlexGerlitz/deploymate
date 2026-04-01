@@ -105,6 +105,9 @@ export default function HomePage() {
   const [templateSubmitting, setTemplateSubmitting] = useState(false);
   const [templateSubmitError, setTemplateSubmitError] = useState("");
   const [templateSubmitSuccess, setTemplateSubmitSuccess] = useState("");
+  const [templateDeployError, setTemplateDeployError] = useState("");
+  const [templateDeploySuccess, setTemplateDeploySuccess] = useState("");
+  const [templateCreatedDeployment, setTemplateCreatedDeployment] = useState(null);
 
   const [deleteError, setDeleteError] = useState("");
   const [deletingDeploymentId, setDeletingDeploymentId] = useState("");
@@ -112,6 +115,7 @@ export default function HomePage() {
   const [deletingServerId, setDeletingServerId] = useState("");
   const [templateDeleteError, setTemplateDeleteError] = useState("");
   const [deletingTemplateId, setDeletingTemplateId] = useState("");
+  const [deployingTemplateId, setDeployingTemplateId] = useState("");
   const [testingServerId, setTestingServerId] = useState("");
   const [serverTestResults, setServerTestResults] = useState({});
   const [deploymentFilter, setDeploymentFilter] = useState("all");
@@ -581,6 +585,7 @@ export default function HomePage() {
     setTemplateSubmitting(true);
     setTemplateSubmitError("");
     setTemplateSubmitSuccess("");
+    setTemplateDeployError("");
 
     try {
       const response = await fetch(`${apiBaseUrl}/deployment-templates`, {
@@ -874,6 +879,40 @@ export default function HomePage() {
     }
   }
 
+  async function handleDeployTemplate(templateId) {
+    setTemplateDeployError("");
+    setTemplateDeploySuccess("");
+    setTemplateCreatedDeployment(null);
+    setDeployingTemplateId(templateId);
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/deployment-templates/${templateId}/deploy`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      const data = await readJsonOrError(response, "Failed to deploy from template.");
+      setTemplateCreatedDeployment(data);
+      setTemplateDeploySuccess("Deployment created from template.");
+      await refreshPage();
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setTemplateDeployError(
+        requestError instanceof Error
+          ? normalizeCreateDeploymentError(requestError.message)
+          : "Failed to deploy from template.",
+      );
+    } finally {
+      setDeployingTemplateId("");
+    }
+  }
+
   async function handleLogout() {
     try {
       await fetch(`${apiBaseUrl}/auth/logout`, {
@@ -935,6 +974,7 @@ export default function HomePage() {
         {serverDeleteError ? <div className="banner error">{serverDeleteError}</div> : null}
         {templatesError ? <div className="banner error">{templatesError}</div> : null}
         {templateDeleteError ? <div className="banner error">{templateDeleteError}</div> : null}
+        {templateDeployError ? <div className="banner error">{templateDeployError}</div> : null}
         {currentUser?.must_change_password ? (
           <div className="banner error">
             You are still using the default admin password.{" "}
@@ -1314,7 +1354,7 @@ export default function HomePage() {
         <article className="card formCard">
           <h2>Deployment templates</h2>
           <p className="formHint">
-            Save common image, ports, server, and env settings once, then apply them back to the create form.
+            Save common image, ports, server, and env settings once, then deploy directly or apply them back to the create form.
           </p>
 
           {templatesLoading ? (
@@ -1362,6 +1402,13 @@ export default function HomePage() {
                     <span>{formatDate(template.created_at)}</span>
                   </div>
                   <div className="actions">
+                    <button
+                      type="button"
+                      onClick={() => handleDeployTemplate(template.id)}
+                      disabled={deployingTemplateId === template.id || deploymentLimitReached}
+                    >
+                      {deployingTemplateId === template.id ? "Deploying..." : "Deploy now"}
+                    </button>
                     <button type="button" onClick={() => applyTemplate(template)}>
                       Apply to form
                     </button>
@@ -1378,6 +1425,34 @@ export default function HomePage() {
               ))}
             </div>
           )}
+
+          {templateDeploySuccess ? (
+            <div className="banner success inlineBanner">
+              <div>{templateDeploySuccess}</div>
+              {templateCreatedDeployment?.id || buildDeploymentUrl(templateCreatedDeployment) ? (
+                <div className="successActions">
+                  {templateCreatedDeployment?.id ? (
+                    <Link
+                      href={`/deployments/${templateCreatedDeployment.id}`}
+                      className="linkButton"
+                    >
+                      View details
+                    </Link>
+                  ) : null}
+                  {buildDeploymentUrl(templateCreatedDeployment) ? (
+                    <a
+                      href={buildDeploymentUrl(templateCreatedDeployment)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="linkButton"
+                    >
+                      Open app
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </article>
 
         <article className="card formCard">
