@@ -128,6 +128,8 @@ export default function UsersPage() {
   const [planFilter, setPlanFilter] = useState("all");
   const [mustChangeFilter, setMustChangeFilter] = useState("all");
   const [auditQuery, setAuditQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
   const [form, setForm] = useState({
     username: "",
     password: "",
@@ -147,8 +149,8 @@ export default function UsersPage() {
   async function loadAuditEvents() {
     const params = new URLSearchParams();
     params.set("limit", "20");
-    if (auditQuery.trim()) {
-      params.set("q", auditQuery.trim());
+    if (debouncedAuditQuery.trim()) {
+      params.set("q", debouncedAuditQuery.trim());
     }
     const response = await fetch(`${apiBaseUrl}/admin/audit-events?${params.toString()}`, {
       cache: "no-store",
@@ -173,8 +175,8 @@ export default function UsersPage() {
       if (mustChangeFilter !== "all") {
         params.set("must_change_password", mustChangeFilter === "required" ? "true" : "false");
       }
-      if (query.trim()) {
-        params.set("q", query.trim());
+      if (debouncedQuery.trim()) {
+        params.set("q", debouncedQuery.trim());
       }
       const response = await fetch(`${apiBaseUrl}/admin/users?${params.toString()}`, {
         cache: "no-store",
@@ -532,18 +534,32 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [query]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedAuditQuery(auditQuery);
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [auditQuery]);
+
+  useEffect(() => {
     if (!authChecked || accessDenied) {
       return;
     }
     loadUsers();
-  }, [authChecked, accessDenied, query, roleFilter, planFilter, mustChangeFilter]);
+  }, [authChecked, accessDenied, debouncedQuery, roleFilter, planFilter, mustChangeFilter]);
 
   useEffect(() => {
     if (!authChecked || accessDenied) {
       return;
     }
     loadAuditEvents();
-  }, [authChecked, accessDenied, auditQuery]);
+  }, [authChecked, accessDenied, debouncedAuditQuery]);
 
   if (!authChecked) {
     return (

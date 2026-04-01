@@ -66,6 +66,8 @@ export default function UpgradeRequestsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [linkedOnly, setLinkedOnly] = useState(false);
   const [auditQuery, setAuditQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
   const [savingId, setSavingId] = useState("");
   const [saveFeedback, setSaveFeedback] = useState("");
   const [drafts, setDrafts] = useState({});
@@ -103,8 +105,8 @@ export default function UpgradeRequestsPage() {
       if (linkedOnly) {
         params.set("linked_only", "true");
       }
-      if (query.trim()) {
-        params.set("q", query.trim());
+      if (debouncedQuery.trim()) {
+        params.set("q", debouncedQuery.trim());
       }
       const response = await fetch(`${apiBaseUrl}/admin/upgrade-requests?${params.toString()}`, {
         cache: "no-store",
@@ -158,8 +160,8 @@ export default function UpgradeRequestsPage() {
     const params = new URLSearchParams();
     params.set("limit", "20");
     params.set("target_type", "upgrade_request");
-    if (auditQuery.trim()) {
-      params.set("q", auditQuery.trim());
+    if (debouncedAuditQuery.trim()) {
+      params.set("q", debouncedAuditQuery.trim());
     }
     const response = await fetch(`${apiBaseUrl}/admin/audit-events?${params.toString()}`, {
       cache: "no-store",
@@ -243,18 +245,32 @@ export default function UpgradeRequestsPage() {
   }, [router]);
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [query]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedAuditQuery(auditQuery);
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [auditQuery]);
+
+  useEffect(() => {
     if (!authChecked || accessDenied) {
       return;
     }
     loadRequests();
-  }, [authChecked, accessDenied, query, planFilter, statusFilter, linkedOnly]);
+  }, [authChecked, accessDenied, debouncedQuery, planFilter, statusFilter, linkedOnly]);
 
   useEffect(() => {
     if (!authChecked || accessDenied) {
       return;
     }
     loadAuditEvents();
-  }, [authChecked, accessDenied, auditQuery]);
+  }, [authChecked, accessDenied, debouncedAuditQuery]);
 
   async function handleDownloadUpgradeExport() {
     setError("");
