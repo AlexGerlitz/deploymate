@@ -603,7 +603,11 @@ export default function UsersPage() {
             <Link href="/app" className="linkButton">
               Back
             </Link>
-            <button type="button" onClick={() => Promise.all([loadUsers(), loadAdminOverview()])} disabled={loading}>
+            <button
+              type="button"
+              onClick={() => Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()])}
+              disabled={loading}
+            >
               {loading ? "Refreshing..." : "Refresh"}
             </button>
             <button type="button" onClick={handleDownloadUsersExport}>
