@@ -70,6 +70,10 @@ def test_server(server_id: str) -> ServerConnectionTestResponse:
         server_id=server_id,
         status=result["status"],
         message=result["message"],
+        target=result.get("target"),
+        ssh_ok=bool(result.get("ssh_ok")),
+        docker_ok=bool(result.get("docker_ok")),
+        docker_version=result.get("docker_version"),
     )
 
 

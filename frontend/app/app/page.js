@@ -968,6 +968,42 @@ export default function HomePage() {
                     <span>{formatDate(serverTestResults[server.id].tested_at)}</span>
                   </div>
                 ) : null}
+                {serverTestResults[server.id]?.target ? (
+                  <div className="row">
+                    <span className="label">Target</span>
+                    <span>{serverTestResults[server.id].target}</span>
+                  </div>
+                ) : null}
+                {serverTestResults[server.id]?.tested_at ? (
+                  <>
+                    <div className="row">
+                      <span className="label">SSH</span>
+                      <span
+                        className={`status ${
+                          serverTestResults[server.id].ssh_ok ? "success" : "error"
+                        }`}
+                      >
+                        {serverTestResults[server.id].ssh_ok ? "ok" : "failed"}
+                      </span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Docker</span>
+                      <span
+                        className={`status ${
+                          serverTestResults[server.id].docker_ok ? "success" : "error"
+                        }`}
+                      >
+                        {serverTestResults[server.id].docker_ok ? "ok" : "failed"}
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+                {serverTestResults[server.id]?.docker_version ? (
+                  <div className="row">
+                    <span className="label">Docker version</span>
+                    <span>{serverTestResults[server.id].docker_version}</span>
+                  </div>
+                ) : null}
                 <div className="actions">
                   {serverTestResults[server.id]?.status ? (
                     <span

@@ -234,13 +234,19 @@ def get_container_logs(container_name: str, server: Optional[dict] = None) -> su
     return _run_docker_command(["docker", "logs", container_name], server)
 
 
-def test_server_connection(server: dict) -> dict[str, str]:
+def test_server_connection(server: dict) -> dict[str, object]:
+    target = f'{server["username"]}@{server["host"]}:{server["port"]}'
+
     ssh_result = _run_remote_command(server, ["echo", "deploymate-ssh-ok"])
     if ssh_result.returncode != 0:
         error_message = ssh_result.stderr.strip() or ssh_result.stdout.strip()
         return {
             "status": "error",
             "message": error_message or "SSH connection failed.",
+            "target": target,
+            "ssh_ok": False,
+            "docker_ok": False,
+            "docker_version": None,
         }
 
     docker_result = _run_remote_command(server, ["docker", "--version"])
@@ -249,10 +255,18 @@ def test_server_connection(server: dict) -> dict[str, str]:
         return {
             "status": "error",
             "message": error_message or "Docker is not available on the server.",
+            "target": target,
+            "ssh_ok": True,
+            "docker_ok": False,
+            "docker_version": None,
         }
 
     docker_output = docker_result.stdout.strip() or docker_result.stderr.strip()
     return {
         "status": "success",
         "message": docker_output or f'SSH and Docker are available on server {server["name"]}.',
+        "target": target,
+        "ssh_ok": True,
+        "docker_ok": True,
+        "docker_version": docker_output or None,
     }

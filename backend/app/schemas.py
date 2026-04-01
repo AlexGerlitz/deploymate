@@ -89,6 +89,10 @@ class ServerConnectionTestResponse(BaseModel):
     server_id: str
     status: Literal["success", "error"]
     message: str
+    target: Optional[str] = None
+    ssh_ok: bool = False
+    docker_ok: bool = False
+    docker_version: Optional[str] = None
 
 
 class ServerSuggestedPortsResponse(BaseModel):
