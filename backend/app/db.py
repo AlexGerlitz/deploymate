@@ -819,7 +819,7 @@ def list_users() -> list[dict[str, Any]]:
     select_sql = """
     SELECT id, username, plan, role, must_change_password, created_at
     FROM users
-    ORDER BY r.created_at DESC;
+    ORDER BY created_at DESC;
     """
 
     with get_db_connection() as conn:
