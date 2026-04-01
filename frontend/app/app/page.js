@@ -352,6 +352,17 @@ function downloadJsonFile(filename, payload) {
   URL.revokeObjectURL(url);
 }
 
+function triggerFileDownload(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
@@ -411,6 +422,8 @@ export default function HomePage() {
   const [editingTemplateId, setEditingTemplateId] = useState("");
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
+  const [opsOverview, setOpsOverview] = useState(null);
+  const [opsOverviewLoading, setOpsOverviewLoading] = useState(true);
   const [opsActionMessage, setOpsActionMessage] = useState("");
   const [opsActionError, setOpsActionError] = useState("");
 
@@ -568,13 +581,14 @@ export default function HomePage() {
     filteredTemplates.find((template) => template.id === templatePreviewId) ||
     templates.find((template) => template.id === templatePreviewId) ||
     null;
-  const opsSnapshot = buildOpsSnapshot({
+  const derivedOpsSnapshot = buildOpsSnapshot({
     currentUser,
     deployments,
     servers,
     notifications,
     templates,
   });
+  const opsSnapshot = opsOverview || derivedOpsSnapshot;
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -597,7 +611,14 @@ export default function HomePage() {
     }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/deployments`, {
+      const params = new URLSearchParams();
+      if (deploymentFilter !== "all") {
+        params.set("status", deploymentFilter);
+      }
+      if (deploymentQuery.trim()) {
+        params.set("q", deploymentQuery.trim());
+      }
+      const response = await fetch(`${apiBaseUrl}/deployments?${params.toString()}`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -665,7 +686,15 @@ export default function HomePage() {
     }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/notifications`, {
+      const params = new URLSearchParams();
+      params.set("limit", "100");
+      if (notificationFilter !== "all") {
+        params.set("level", notificationFilter);
+      }
+      if (notificationQuery.trim()) {
+        params.set("q", notificationQuery.trim());
+      }
+      const response = await fetch(`${apiBaseUrl}/notifications?${params.toString()}`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -699,7 +728,14 @@ export default function HomePage() {
     }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/deployment-templates`, {
+      const params = new URLSearchParams();
+      if (templateFilter !== "all") {
+        params.set("state", templateFilter);
+      }
+      if (templateQuery.trim()) {
+        params.set("q", templateQuery.trim());
+      }
+      const response = await fetch(`${apiBaseUrl}/deployment-templates?${params.toString()}`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -726,6 +762,34 @@ export default function HomePage() {
     }
   }
 
+  async function loadOpsOverview(silent = false) {
+    if (!silent) {
+      setOpsOverviewLoading(true);
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/ops/overview?notifications_limit=100`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const data = await readJsonOrError(response, "Failed to load operations overview.");
+      setOpsOverview(data);
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      if (!silent) {
+        setOpsOverview(null);
+      }
+    } finally {
+      if (!silent) {
+        setOpsOverviewLoading(false);
+      }
+    }
+  }
+
   async function refreshPage(silent = false) {
     await Promise.all([
       loadCurrentUser(),
@@ -733,6 +797,7 @@ export default function HomePage() {
       loadServers(silent),
       loadNotifications(silent),
       loadTemplates(silent),
+      loadOpsOverview(silent),
     ]);
   }
 
@@ -763,6 +828,27 @@ export default function HomePage() {
       window.clearInterval(intervalId);
     };
   }, [authChecked]);
+
+  useEffect(() => {
+    if (!authChecked) {
+      return;
+    }
+    loadDeployments();
+  }, [authChecked, deploymentFilter, deploymentQuery]);
+
+  useEffect(() => {
+    if (!authChecked) {
+      return;
+    }
+    loadNotifications();
+  }, [authChecked, notificationFilter, notificationQuery]);
+
+  useEffect(() => {
+    if (!authChecked) {
+      return;
+    }
+    loadTemplates();
+  }, [authChecked, templateFilter, templateQuery]);
 
   useEffect(() => {
     async function loadSuggestedPorts() {
@@ -1638,20 +1724,49 @@ export default function HomePage() {
     }
   }
 
-  function handleDownloadSnapshot() {
+  async function handleDownloadSnapshot() {
     clearOpsMessages();
-    downloadJsonFile("deploymate-ops-snapshot.json", opsSnapshot);
-    setOpsActionMessage("Operations snapshot downloaded.");
+    try {
+      const response = await fetch(`${apiBaseUrl}/ops/overview?notifications_limit=100`, {
+        credentials: "include",
+      });
+      const data = await readJsonOrError(response, "Failed to download operations snapshot.");
+      downloadJsonFile("deploymate-ops-snapshot.json", data);
+      setOpsActionMessage("Operations snapshot downloaded.");
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      setOpsActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to download operations snapshot.",
+      );
+    }
   }
 
-  function handleDownloadCollection(name, items) {
+  async function handleDownloadRemoteExport(filename, url) {
     clearOpsMessages();
-    downloadJsonFile(`deploymate-${name}.json`, {
-      exported_at: new Date().toISOString(),
-      count: items.length,
-      items,
-    });
-    setOpsActionMessage(`${name} export downloaded.`);
+    try {
+      const response = await fetch(url, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Export request failed.");
+      }
+      const blob = await response.blob();
+      triggerFileDownload(filename, blob);
+      setOpsActionMessage(`${filename} downloaded.`);
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      setOpsActionError(
+        requestError instanceof Error ? requestError.message : `Failed to download ${filename}.`,
+      );
+    }
   }
 
   const currentDraft = buildCurrentDraft();
@@ -1759,22 +1874,58 @@ export default function HomePage() {
                 Copy summary
               </button>
               <button type="button" onClick={handleDownloadSnapshot}>
-                Download snapshot
+                Download overview JSON
               </button>
               <button
                 type="button"
-                onClick={() => handleDownloadCollection("deployments", deployments)}
+                onClick={() =>
+                  handleDownloadRemoteExport(
+                    "deploymate-deployments.csv",
+                    `${apiBaseUrl}/ops/exports/deployments?format=csv`,
+                  )
+                }
               >
-                Export deployments
+                Export deployments CSV
               </button>
               <button
                 type="button"
-                onClick={() => handleDownloadCollection("activity", notifications)}
+                onClick={() =>
+                  handleDownloadRemoteExport(
+                    "deploymate-servers.csv",
+                    `${apiBaseUrl}/ops/exports/servers?format=csv`,
+                  )
+                }
               >
-                Export activity
+                Export servers CSV
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleDownloadRemoteExport(
+                    "deploymate-templates.csv",
+                    `${apiBaseUrl}/ops/exports/templates?format=csv`,
+                  )
+                }
+              >
+                Export templates CSV
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleDownloadRemoteExport(
+                    "deploymate-activity.csv",
+                    `${apiBaseUrl}/ops/exports/activity?format=csv&limit=200`,
+                  )
+                }
+              >
+                Export activity CSV
               </button>
             </div>
           </div>
+
+          {opsOverviewLoading ? (
+            <div className="banner subtle">Refreshing server-side operations overview...</div>
+          ) : null}
 
           <div className="overviewGrid">
             <div className="overviewCard">

@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.db import (
     create_activity_event,
@@ -434,15 +434,91 @@ def _validate_template_payload(payload: DeploymentTemplateCreateRequest) -> None
 
 
 @router.get("/deployments", response_model=List[DeploymentResponse])
-def list_deployments() -> List[DeploymentResponse]:
+def list_deployments(
+    status: str = Query(default="all", pattern="^(all|running|failed|pending)$"),
+    q: str = Query(default=""),
+    server_id: str = Query(default=""),
+) -> List[DeploymentResponse]:
     deployments = list_deployment_records()
-    return [DeploymentResponse(**deployment) for deployment in deployments]
+    normalized_query = q.strip().lower()
+    normalized_server_id = server_id.strip()
+    filtered = []
+    for deployment in deployments:
+        if status != "all" and deployment.get("status") != status:
+            continue
+        if normalized_server_id and (deployment.get("server_id") or "") != normalized_server_id:
+            continue
+        if normalized_query:
+            haystack = " ".join(
+                filter(
+                    None,
+                    [
+                        deployment.get("image"),
+                        deployment.get("container_name"),
+                        deployment.get("server_name"),
+                        deployment.get("server_host"),
+                        deployment.get("status"),
+                    ],
+                )
+            ).lower()
+            if normalized_query not in haystack:
+                continue
+        filtered.append(DeploymentResponse(**deployment))
+    return filtered
 
 
 @router.get("/deployment-templates", response_model=List[DeploymentTemplateResponse])
-def list_templates() -> List[DeploymentTemplateResponse]:
+def list_templates(
+    state: str = Query(default="all", pattern="^(all|unused|recent|popular)$"),
+    q: str = Query(default=""),
+) -> List[DeploymentTemplateResponse]:
     templates = list_deployment_templates()
-    return [DeploymentTemplateResponse(**template) for template in templates]
+    normalized_query = q.strip().lower()
+    filtered: list[DeploymentTemplateResponse] = []
+
+    for template in templates:
+        use_count = int(template.get("use_count") or 0)
+        if state == "unused" and use_count > 0:
+            continue
+        if state == "recent":
+            last_used_at = template.get("last_used_at")
+            if not last_used_at:
+                continue
+            try:
+                parsed = datetime.fromisoformat(last_used_at.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds() > 7 * 24 * 60 * 60:
+                continue
+        if state == "popular" and use_count == 0:
+            continue
+
+        if normalized_query:
+            haystack = " ".join(
+                filter(
+                    None,
+                    [
+                        template.get("template_name"),
+                        template.get("image"),
+                        template.get("name"),
+                        template.get("server_name"),
+                        template.get("server_host"),
+                        " ".join((template.get("env") or {}).keys()),
+                        " ".join(str(value) for value in (template.get("env") or {}).values()),
+                    ],
+                )
+            ).lower()
+            if normalized_query not in haystack:
+                continue
+
+        filtered.append(DeploymentTemplateResponse(**template))
+
+    if state == "popular":
+        filtered.sort(key=lambda item: item.use_count, reverse=True)
+    elif state == "recent":
+        filtered.sort(key=lambda item: item.last_used_at or "", reverse=True)
+
+    return filtered
 
 
 @router.post("/deployment-templates", response_model=DeploymentTemplateResponse)

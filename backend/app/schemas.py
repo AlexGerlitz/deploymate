@@ -101,6 +101,62 @@ class NotificationResponse(BaseModel):
     category: Optional[str] = None
 
 
+class OpsAttentionItem(BaseModel):
+    level: Literal["info", "warn", "error"]
+    title: str
+    detail: str
+
+
+class OpsDeploymentsSummary(BaseModel):
+    total: int = 0
+    running: int = 0
+    failed: int = 0
+    pending: int = 0
+    local: int = 0
+    remote: int = 0
+    exposed: int = 0
+    public_urls: int = 0
+
+
+class OpsServersSummary(BaseModel):
+    total: int = 0
+    password_auth: int = 0
+    ssh_key_auth: int = 0
+    unused: int = 0
+
+
+class OpsNotificationsSummary(BaseModel):
+    total: int = 0
+    success: int = 0
+    error: int = 0
+    latest_error_title: Optional[str] = None
+    latest_error_at: Optional[str] = None
+
+
+class OpsTemplatesSummary(BaseModel):
+    total: int = 0
+    unused: int = 0
+    recently_used: int = 0
+    top_template_name: Optional[str] = None
+    top_template_use_count: int = 0
+
+
+class OpsUserSummary(BaseModel):
+    username: str
+    plan: UserPlan = "trial"
+    role: UserRole = "member"
+
+
+class OpsOverviewResponse(BaseModel):
+    generated_at: str
+    user: Optional[OpsUserSummary] = None
+    deployments: OpsDeploymentsSummary = Field(default_factory=OpsDeploymentsSummary)
+    servers: OpsServersSummary = Field(default_factory=OpsServersSummary)
+    notifications: OpsNotificationsSummary = Field(default_factory=OpsNotificationsSummary)
+    templates: OpsTemplatesSummary = Field(default_factory=OpsTemplatesSummary)
+    attention_items: list[OpsAttentionItem] = Field(default_factory=list)
+
+
 class DiagnosticItem(BaseModel):
     key: str
     label: str

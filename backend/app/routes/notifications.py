@@ -11,6 +11,52 @@ router = APIRouter(dependencies=[Depends(require_auth)])
 
 
 @router.get("/notifications", response_model=List[NotificationResponse])
-def get_notifications(limit: int = Query(default=20, ge=1, le=100)) -> List[NotificationResponse]:
+def get_notifications(
+    limit: int = Query(default=20, ge=1, le=100),
+    level: str = Query(default="all", pattern="^(all|success|error)$"),
+    category: str = Query(default="all"),
+    q: str = Query(default=""),
+) -> List[NotificationResponse]:
     notifications = list_notifications(limit=limit)
-    return [NotificationResponse(**item) for item in notifications]
+    normalized_query = q.strip().lower()
+    normalized_category = category.strip().lower()
+
+    def infer_activity_category(item: dict) -> str:
+        haystack = " ".join(
+            filter(None, [item.get("title"), item.get("message")]),
+        ).lower()
+        if not haystack:
+            return "general"
+        if "redeploy" in haystack:
+            return "redeploy"
+        if "delete" in haystack:
+            return "delete"
+        if "health" in haystack:
+            return "health"
+        if "deploy" in haystack:
+            return "deploy"
+        return "general"
+
+    filtered: list[NotificationResponse] = []
+    for item in notifications:
+        inferred_category = infer_activity_category(item)
+        if level != "all" and item.get("level") != level:
+            continue
+        if normalized_category and normalized_category != "all" and inferred_category != normalized_category:
+            continue
+        if normalized_query:
+            haystack = " ".join(
+                filter(
+                    None,
+                    [
+                        item.get("title"),
+                        item.get("message"),
+                        item.get("deployment_id"),
+                        inferred_category,
+                    ],
+                )
+            ).lower()
+            if normalized_query not in haystack:
+                continue
+        filtered.append(NotificationResponse(**item, category=inferred_category))
+    return filtered
