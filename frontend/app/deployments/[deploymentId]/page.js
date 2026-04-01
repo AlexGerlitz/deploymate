@@ -20,6 +20,13 @@ function formatDate(value) {
   return date.toLocaleString();
 }
 
+function buildDeploymentUrl(deployment) {
+  if (!deployment?.server_host || !deployment?.external_port) {
+    return "";
+  }
+  return `http://${deployment.server_host}:${deployment.external_port}`;
+}
+
 function normalizeRedeployError(message) {
   if (!message) {
     return "Failed to redeploy deployment.";
@@ -66,6 +73,9 @@ export default function DeploymentDetailsPage({ params }) {
   const [redeploying, setRedeploying] = useState(false);
   const [redeployError, setRedeployError] = useState("");
   const [redeploySuccess, setRedeploySuccess] = useState("");
+  const [copyMessage, setCopyMessage] = useState("");
+  const [logsExpanded, setLogsExpanded] = useState(false);
+  const [envExpanded, setEnvExpanded] = useState(false);
   const [form, setForm] = useState({
     image: "",
     name: "",
@@ -262,6 +272,22 @@ export default function DeploymentDetailsPage({ params }) {
     return env;
   }
 
+  async function copyText(value, label) {
+    if (!value) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyMessage(`${label} copied.`);
+      window.setTimeout(() => {
+        setCopyMessage("");
+      }, 2000);
+    } catch {
+      setCopyMessage(`Failed to copy ${label.toLowerCase()}.`);
+    }
+  }
+
   async function handleRedeploy(event) {
     event.preventDefault();
     setRedeploying(true);
@@ -388,6 +414,16 @@ export default function DeploymentDetailsPage({ params }) {
             <Link href="/app" className="linkButton">
               Back
             </Link>
+            {buildDeploymentUrl(deployment) ? (
+              <a
+                href={buildDeploymentUrl(deployment)}
+                target="_blank"
+                rel="noreferrer"
+                className="linkButton"
+              >
+                Open app
+              </a>
+            ) : null}
             <button type="button" onClick={() => loadDeploymentDetails()} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh"}
             </button>
@@ -406,6 +442,7 @@ export default function DeploymentDetailsPage({ params }) {
         </div>
 
         {error ? <div className="banner error">{error}</div> : null}
+        {copyMessage ? <div className="banner subtle">{copyMessage}</div> : null}
         {currentUser?.must_change_password ? (
           <div className="banner error">
             You are still using the default admin password.{" "}
@@ -563,7 +600,18 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
               <div className="row">
                 <span className="label">Image</span>
-                <span>{deployment.image || "N/A"}</span>
+                <span className="valueWithActions">
+                  <span>{deployment.image || "N/A"}</span>
+                  {deployment.image ? (
+                    <button
+                      type="button"
+                      className="smallButton"
+                      onClick={() => copyText(deployment.image, "Image")}
+                    >
+                      Copy
+                    </button>
+                  ) : null}
+                </span>
               </div>
               <div className="row">
                 <span className="label">Container</span>
@@ -586,10 +634,56 @@ export default function DeploymentDetailsPage({ params }) {
                 <span>{deployment.error || "-"}</span>
               </div>
               <div className="row">
+                <span className="label">URL</span>
+                <span className="valueWithActions">
+                  {buildDeploymentUrl(deployment) ? (
+                    <>
+                      <a
+                        href={buildDeploymentUrl(deployment)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inlineLink"
+                      >
+                        {buildDeploymentUrl(deployment)}
+                      </a>
+                      <button
+                        type="button"
+                        className="smallButton"
+                        onClick={() => copyText(buildDeploymentUrl(deployment), "URL")}
+                      >
+                        Copy
+                      </button>
+                    </>
+                  ) : (
+                    "-"
+                  )}
+                </span>
+              </div>
+              <div className="row">
                 <span className="label">Env vars</span>
                 <span>
                   {Object.keys(deployment.env || {}).length > 0 ? (
-                    <pre className="logs">{JSON.stringify(deployment.env, null, 2)}</pre>
+                    <div className="stackedValue">
+                      <div className="inlineActions">
+                        <button
+                          type="button"
+                          className="smallButton"
+                          onClick={() => copyText(JSON.stringify(deployment.env, null, 2), "Env")}
+                        >
+                          Copy
+                        </button>
+                        <button
+                          type="button"
+                          className="smallButton"
+                          onClick={() => setEnvExpanded((current) => !current)}
+                        >
+                          {envExpanded ? "Show less" : "Show more"}
+                        </button>
+                      </div>
+                      <pre className={`logs ${envExpanded ? "expandedBlock" : "collapsedBlock"}`}>
+                        {JSON.stringify(deployment.env, null, 2)}
+                      </pre>
+                    </div>
                   ) : (
                     "-"
                   )}
@@ -605,6 +699,27 @@ export default function DeploymentDetailsPage({ params }) {
                 </span>
               </div>
               <div className="row">
+                <span className="label">Health URL</span>
+                <span className="valueWithActions">
+                  {health?.url ? (
+                    <>
+                      <a href={health.url} target="_blank" rel="noreferrer" className="inlineLink">
+                        {health.url}
+                      </a>
+                      <button
+                        type="button"
+                        className="smallButton"
+                        onClick={() => copyText(health.url, "Health URL")}
+                      >
+                        Copy
+                      </button>
+                    </>
+                  ) : (
+                    "-"
+                  )}
+                </span>
+              </div>
+              <div className="row">
                 <span className="label">Health error</span>
                 <span>{health?.error || "-"}</span>
               </div>
@@ -613,7 +728,27 @@ export default function DeploymentDetailsPage({ params }) {
             <article className="card">
               <div className="row">
                 <span className="label">Logs</span>
-                <pre className="logs">{logs || "No logs available."}</pre>
+                <div className="stackedValue">
+                  <div className="inlineActions">
+                    <button
+                      type="button"
+                      className="smallButton"
+                      onClick={() => copyText(logs || "No logs available.", "Logs")}
+                    >
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      className="smallButton"
+                      onClick={() => setLogsExpanded((current) => !current)}
+                    >
+                      {logsExpanded ? "Show less" : "Show more"}
+                    </button>
+                  </div>
+                  <pre className={`logs ${logsExpanded ? "expandedBlock" : "collapsedBlock"}`}>
+                    {logs || "No logs available."}
+                  </pre>
+                </div>
               </div>
             </article>
 

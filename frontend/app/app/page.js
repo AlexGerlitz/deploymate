@@ -20,6 +20,13 @@ function formatDate(value) {
   return date.toLocaleString();
 }
 
+function buildDeploymentUrl(deployment) {
+  if (!deployment?.server_host || !deployment?.external_port) {
+    return "";
+  }
+  return `http://${deployment.server_host}:${deployment.external_port}`;
+}
+
 function normalizeCreateDeploymentError(message) {
   if (!message) {
     return "Failed to create deployment. Please try again.";
@@ -81,6 +88,9 @@ export default function HomePage() {
   const [deletingServerId, setDeletingServerId] = useState("");
   const [testingServerId, setTestingServerId] = useState("");
   const [serverTestResults, setServerTestResults] = useState({});
+  const [deploymentFilter, setDeploymentFilter] = useState("all");
+  const [deploymentQuery, setDeploymentQuery] = useState("");
+  const [notificationFilter, setNotificationFilter] = useState("all");
 
   const [form, setForm] = useState({
     image: "",
@@ -110,6 +120,44 @@ export default function HomePage() {
     typeof currentUser.limits?.max_deployments === "number" &&
     typeof currentUser.usage?.deployments === "number" &&
     currentUser.usage.deployments >= currentUser.limits.max_deployments;
+  const normalizedDeploymentQuery = deploymentQuery.trim().toLowerCase();
+  const filteredDeployments = deployments.filter((deployment) => {
+    if (deploymentFilter === "running" && deployment.status !== "running") {
+      return false;
+    }
+
+    if (deploymentFilter === "failed" && deployment.status !== "failed") {
+      return false;
+    }
+
+    if (!normalizedDeploymentQuery) {
+      return true;
+    }
+
+    const haystack = [
+      deployment.image,
+      deployment.container_name,
+      deployment.server_name,
+      deployment.server_host,
+      deployment.status,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalizedDeploymentQuery);
+  });
+  const filteredNotifications = notifications.filter((item) => {
+    if (notificationFilter === "success") {
+      return item.level === "success";
+    }
+
+    if (notificationFilter === "error") {
+      return item.level === "error";
+    }
+
+    return true;
+  });
 
   function getSuggestedExternalPort(serverId) {
     const selectedServer = servers.find((server) => server.id === serverId);
@@ -917,6 +965,30 @@ export default function HomePage() {
             <p className="formHint">Past deploy events stay here even after a deployment is deleted.</p>
           </div>
 
+          <div className="filterTabs historyFilters" role="tablist" aria-label="Activity filters">
+            <button
+              type="button"
+              className={notificationFilter === "all" ? "active" : ""}
+              onClick={() => setNotificationFilter("all")}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={notificationFilter === "success" ? "active" : ""}
+              onClick={() => setNotificationFilter("success")}
+            >
+              Success
+            </button>
+            <button
+              type="button"
+              className={notificationFilter === "error" ? "active" : ""}
+              onClick={() => setNotificationFilter("error")}
+            >
+              Errors
+            </button>
+          </div>
+
           {notificationsError ? <div className="banner error">{notificationsError}</div> : null}
 
           {notificationsLoading && notifications.length === 0 ? (
@@ -927,9 +999,15 @@ export default function HomePage() {
             <div className="empty">No notifications yet.</div>
           ) : null}
 
-          {notifications.length > 0 ? (
+          {!notificationsLoading &&
+          notifications.length > 0 &&
+          filteredNotifications.length === 0 ? (
+            <div className="empty">No activity matches this filter yet.</div>
+          ) : null}
+
+          {filteredNotifications.length > 0 ? (
             <div className="timeline">
-              {notifications.map((item) => (
+              {filteredNotifications.map((item) => (
                 <div className="timelineItem" key={item.id}>
                   <div className="row">
                     <span className="label">Level</span>
@@ -1098,19 +1176,73 @@ export default function HomePage() {
           {submitSuccess ? (
             <div className="banner success">
               <div>{submitSuccess}</div>
-              {createdDeployment?.id ? (
+              {createdDeployment?.id || buildDeploymentUrl(createdDeployment) ? (
                 <div className="successActions">
-                  <Link
-                    href={`/deployments/${createdDeployment.id}`}
-                    className="linkButton"
-                  >
-                    View details
-                  </Link>
+                  {createdDeployment?.id ? (
+                    <Link
+                      href={`/deployments/${createdDeployment.id}`}
+                      className="linkButton"
+                    >
+                      View details
+                    </Link>
+                  ) : null}
+                  {buildDeploymentUrl(createdDeployment) ? (
+                    <a
+                      href={buildDeploymentUrl(createdDeployment)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="linkButton"
+                    >
+                      Open app
+                    </a>
+                  ) : null}
                 </div>
               ) : null}
             </div>
           ) : null}
         </article>
+
+        <div className="sectionHeader deploymentsHeader">
+          <div>
+            <h2>Deployments</h2>
+            <p className="formHint">
+              Filter current deployments by status or search by image, container, or server.
+            </p>
+          </div>
+          <div className="deploymentControls">
+            <div className="filterTabs" role="tablist" aria-label="Deployment filters">
+              <button
+                type="button"
+                className={deploymentFilter === "all" ? "active" : ""}
+                onClick={() => setDeploymentFilter("all")}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={deploymentFilter === "running" ? "active" : ""}
+                onClick={() => setDeploymentFilter("running")}
+              >
+                Running
+              </button>
+              <button
+                type="button"
+                className={deploymentFilter === "failed" ? "active" : ""}
+                onClick={() => setDeploymentFilter("failed")}
+              >
+                Failed
+              </button>
+            </div>
+            <label className="field deploymentSearch">
+              <span>Search</span>
+              <input
+                value={deploymentQuery}
+                onChange={(event) => setDeploymentQuery(event.target.value)}
+                placeholder="nginx, test-nginx, main-vps"
+              />
+            </label>
+          </div>
+        </div>
 
         <div className="list">
           {loading && deployments.length === 0 ? (
@@ -1121,7 +1253,13 @@ export default function HomePage() {
             <div className="empty">No deployments found.</div>
           ) : null}
 
-          {deployments.map((deployment) => (
+          {!loading && deployments.length > 0 && filteredDeployments.length === 0 ? (
+            <div className="empty">
+              No deployments match this filter. Try another status or clear the search.
+            </div>
+          ) : null}
+
+          {filteredDeployments.map((deployment) => (
             <article className="card" key={deployment.id}>
               <div className="row">
                 <span className="label">Status</span>
@@ -1153,10 +1291,24 @@ export default function HomePage() {
                 <span className="label">Error</span>
                 <span>{deployment.error || "-"}</span>
               </div>
+              <div className="row">
+                <span className="label">URL</span>
+                <span>{buildDeploymentUrl(deployment) || "-"}</span>
+              </div>
               <div className="actions">
                 <Link href={`/deployments/${deployment.id}`} className="linkButton">
                   View details
                 </Link>
+                {buildDeploymentUrl(deployment) ? (
+                  <a
+                    href={buildDeploymentUrl(deployment)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="linkButton"
+                  >
+                    Open app
+                  </a>
+                ) : null}
                 <button
                   type="button"
                   className="dangerButton"

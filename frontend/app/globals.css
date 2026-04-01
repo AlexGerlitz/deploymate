@@ -143,6 +143,44 @@ a {
   font-size: 22px;
 }
 
+.deploymentsHeader {
+  display: grid;
+  gap: 14px;
+}
+
+.deploymentControls {
+  display: grid;
+  gap: 12px;
+}
+
+.deploymentSearch {
+  max-width: 360px;
+}
+
+.filterTabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.historyFilters {
+  margin-bottom: 16px;
+}
+
+.filterTabs button {
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 12px;
+  font: inherit;
+}
+
+.filterTabs button.active {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
 .formCard {
   margin-bottom: 16px;
 }
@@ -275,6 +313,27 @@ a {
   padding: 4px 0;
 }
 
+.valueWithActions,
+.stackedValue {
+  display: grid;
+  gap: 8px;
+}
+
+.inlineActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.smallButton {
+  width: fit-content;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  background: #fff;
+  padding: 6px 10px;
+  font: inherit;
+}
+
 .label {
   color: #666;
 }
@@ -338,6 +397,15 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
   font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.collapsedBlock {
+  max-height: 180px;
+  overflow: hidden;
+}
+
+.expandedBlock {
+  max-height: none;
 }
 
 .timeline {
