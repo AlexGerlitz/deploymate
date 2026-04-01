@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Python
+backend/venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+__pycache__/
+*.pyc
+
+# Node / Next
+frontend/node_modules/
+frontend/.next/
+.next/
+node_modules/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Archives
+*.tar.gz
+
+# Codex/temp files
+codex-summary.txt
+
+# Editor temp files
+*.swp
+*.swo

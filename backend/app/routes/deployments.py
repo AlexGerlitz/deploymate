@@ -1,0 +1,360 @@
+import json
+import uuid
+from datetime import datetime, timezone
+from typing import List
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.db import (
+    create_activity_event,
+    create_notification,
+    delete_deployment_record,
+    get_server_or_404,
+    get_deployment_record_or_404,
+    insert_deployment_record,
+    list_deployment_activity,
+    list_deployment_records,
+    update_deployment_configuration,
+    update_deployment_record,
+)
+from app.schemas import (
+    DeploymentCreateRequest,
+    DeploymentDeleteResponse,
+    DeploymentHealthResponse,
+    DeploymentLogsResponse,
+    DeploymentResponse,
+    NotificationResponse,
+)
+from app.services.deployments import (
+    build_container_name,
+    ensure_docker_is_available,
+    get_container_logs,
+    remove_container_if_exists,
+    run_container,
+)
+from app.services.auth import enforce_plan_limit, require_auth
+
+
+router = APIRouter(dependencies=[Depends(require_auth)])
+
+
+@router.get("/deployments", response_model=List[DeploymentResponse])
+def list_deployments() -> List[DeploymentResponse]:
+    deployments = list_deployment_records()
+    return [DeploymentResponse(**deployment) for deployment in deployments]
+
+
+@router.post("/deployments", response_model=DeploymentResponse)
+def create_deployment_endpoint(
+    payload: DeploymentCreateRequest,
+    user=Depends(require_auth),
+) -> DeploymentResponse:
+    enforce_plan_limit(user, "deployments")
+    server = get_server_or_404(payload.server_id) if payload.server_id else None
+    ensure_docker_is_available(server)
+
+    if (payload.internal_port is None) != (payload.external_port is None):
+        raise HTTPException(
+            status_code=400,
+            detail="internal_port and external_port must be provided together.",
+        )
+
+    deployment_id = str(uuid.uuid4())
+    container_name = build_container_name(payload.name, deployment_id)
+
+    deployment_record = {
+        "id": deployment_id,
+        "status": "pending",
+        "image": payload.image,
+        "container_name": container_name,
+        "container_id": None,
+        "created_at": datetime.now(timezone.utc),
+        "error": None,
+        "internal_port": payload.internal_port,
+        "external_port": payload.external_port,
+        "server_id": payload.server_id,
+        "env": json.dumps(payload.env),
+    }
+
+    insert_deployment_record(deployment_record)
+
+    result = run_container(
+        image=payload.image,
+        container_name=container_name,
+        internal_port=payload.internal_port,
+        external_port=payload.external_port,
+        env=payload.env,
+        server=server,
+    )
+
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or "Docker run failed."
+        update_deployment_record(
+            deployment_id=deployment_id,
+            status="failed",
+            container_id=None,
+            error=error_message,
+        )
+        create_notification(
+            deployment_id=deployment_id,
+            level="error",
+            title="Deployment failed",
+            message=f"Deployment {deployment_id} failed: {error_message}",
+        )
+        create_activity_event(
+            deployment_id=deployment_id,
+            level="error",
+            title="Deployment failed",
+            message=f"Deployment {deployment_id} failed: {error_message}",
+        )
+        saved_record = get_deployment_record_or_404(deployment_id)
+        return DeploymentResponse(**saved_record)
+
+    container_id = result.stdout.strip()
+    update_deployment_record(
+        deployment_id=deployment_id,
+        status="running",
+        container_id=container_id,
+        error=None,
+    )
+    create_notification(
+        deployment_id=deployment_id,
+        level="success",
+        title="Deployment succeeded",
+        message=f"Deployment {deployment_id} is running in container {container_name}.",
+    )
+    create_activity_event(
+        deployment_id=deployment_id,
+        level="success",
+        title="Deployment succeeded",
+        message=f"Deployment {deployment_id} is running in container {container_name}.",
+    )
+
+    saved_record = get_deployment_record_or_404(deployment_id)
+    return DeploymentResponse(**saved_record)
+
+
+@router.post("/deployments/{deployment_id}/redeploy", response_model=DeploymentResponse)
+def redeploy_deployment(
+    deployment_id: str,
+    payload: DeploymentCreateRequest,
+) -> DeploymentResponse:
+    if (payload.internal_port is None) != (payload.external_port is None):
+        raise HTTPException(
+            status_code=400,
+            detail="internal_port and external_port must be provided together.",
+        )
+
+    existing_deployment = get_deployment_record_or_404(deployment_id)
+    server = get_server_or_404(existing_deployment["server_id"]) if existing_deployment.get("server_id") else None
+    ensure_docker_is_available(server)
+    container_name = payload.name or existing_deployment["container_name"]
+
+    try:
+        remove_container_if_exists(existing_deployment["container_name"], server)
+    except HTTPException as exc:
+        update_deployment_record(
+            deployment_id=deployment_id,
+            status="failed",
+            container_id=existing_deployment.get("container_id"),
+            error=exc.detail,
+        )
+        create_notification(
+            deployment_id=deployment_id,
+            level="error",
+            title="Redeploy failed",
+            message=f"Redeploy for {deployment_id} failed: {exc.detail}",
+        )
+        create_activity_event(
+            deployment_id=deployment_id,
+            level="error",
+            title="Redeploy failed",
+            message=f"Redeploy for {deployment_id} failed: {exc.detail}",
+        )
+        raise
+
+    update_deployment_configuration(
+        deployment_id=deployment_id,
+        image=payload.image,
+        container_name=container_name,
+        internal_port=payload.internal_port,
+        external_port=payload.external_port,
+        env=payload.env,
+    )
+    update_deployment_record(
+        deployment_id=deployment_id,
+        status="pending",
+        container_id=None,
+        error=None,
+    )
+
+    result = run_container(
+        image=payload.image,
+        container_name=container_name,
+        internal_port=payload.internal_port,
+        external_port=payload.external_port,
+        env=payload.env,
+        server=server,
+    )
+
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or "Docker run failed."
+        update_deployment_record(
+            deployment_id=deployment_id,
+            status="failed",
+            container_id=None,
+            error=error_message,
+        )
+        create_notification(
+            deployment_id=deployment_id,
+            level="error",
+            title="Redeploy failed",
+            message=f"Redeploy for {deployment_id} failed: {error_message}",
+        )
+        create_activity_event(
+            deployment_id=deployment_id,
+            level="error",
+            title="Redeploy failed",
+            message=f"Redeploy for {deployment_id} failed: {error_message}",
+        )
+        saved_record = get_deployment_record_or_404(deployment_id)
+        return DeploymentResponse(**saved_record)
+
+    container_id = result.stdout.strip()
+    update_deployment_record(
+        deployment_id=deployment_id,
+        status="running",
+        container_id=container_id,
+        error=None,
+    )
+    create_notification(
+        deployment_id=deployment_id,
+        level="success",
+        title="Redeploy succeeded",
+        message=f"Deployment {deployment_id} was redeployed in container {container_name}.",
+    )
+    create_activity_event(
+        deployment_id=deployment_id,
+        level="success",
+        title="Redeploy succeeded",
+        message=f"Deployment {deployment_id} was redeployed in container {container_name}.",
+    )
+
+    saved_record = get_deployment_record_or_404(deployment_id)
+    return DeploymentResponse(**saved_record)
+
+
+@router.get("/deployments/{deployment_id}", response_model=DeploymentResponse)
+def get_deployment(deployment_id: str) -> DeploymentResponse:
+    deployment = get_deployment_record_or_404(deployment_id)
+    return DeploymentResponse(**deployment)
+
+
+@router.get("/deployments/{deployment_id}/activity", response_model=List[NotificationResponse])
+def get_deployment_activity(deployment_id: str) -> List[NotificationResponse]:
+    get_deployment_record_or_404(deployment_id)
+    activity = list_deployment_activity(deployment_id)
+    return [NotificationResponse(**item) for item in activity]
+
+
+@router.delete("/deployments/{deployment_id}", response_model=DeploymentDeleteResponse)
+def delete_deployment(deployment_id: str) -> DeploymentDeleteResponse:
+    deployment = get_deployment_record_or_404(deployment_id)
+    server = get_server_or_404(deployment["server_id"]) if deployment.get("server_id") else None
+    ensure_docker_is_available(server)
+    try:
+        remove_container_if_exists(deployment["container_name"], server)
+    except HTTPException as exc:
+        create_activity_event(
+            deployment_id=deployment_id,
+            level="error",
+            title="Delete failed",
+            message=f"Delete for {deployment_id} failed: {exc.detail}",
+        )
+        raise
+
+    create_activity_event(
+        deployment_id=deployment_id,
+        level="success",
+        title="Delete succeeded",
+        message=f"Deployment {deployment_id} was deleted.",
+    )
+    delete_deployment_record(deployment_id)
+
+    return DeploymentDeleteResponse(
+        deployment_id=deployment_id,
+        status="deleted",
+    )
+
+
+@router.get("/deployments/{deployment_id}/logs", response_model=DeploymentLogsResponse)
+def get_deployment_logs(deployment_id: str) -> DeploymentLogsResponse:
+    deployment = get_deployment_record_or_404(deployment_id)
+    server = get_server_or_404(deployment["server_id"]) if deployment.get("server_id") else None
+    ensure_docker_is_available(server)
+    container_name = deployment["container_name"]
+
+    result = get_container_logs(container_name, server)
+
+    if result.returncode != 0:
+        raise HTTPException(
+            status_code=500,
+            detail=result.stderr.strip() or "Failed to get container logs.",
+        )
+
+    logs_output = result.stdout.strip()
+    if not logs_output:
+        logs_output = result.stderr.strip()
+
+    return DeploymentLogsResponse(
+        deployment_id=deployment_id,
+        container_name=container_name,
+        logs=logs_output,
+    )
+
+
+@router.get("/deployments/{deployment_id}/health", response_model=DeploymentHealthResponse)
+def get_deployment_health(deployment_id: str) -> DeploymentHealthResponse:
+    deployment = get_deployment_record_or_404(deployment_id)
+    container_name = deployment["container_name"]
+    external_port = deployment.get("external_port")
+
+    if not external_port:
+        raise HTTPException(
+            status_code=400,
+            detail="Health check is available only for deployments with external_port.",
+        )
+
+    host = deployment.get("server_host") or "127.0.0.1"
+    url = f"http://{host}:{external_port}"
+
+    try:
+        response = httpx.get(url, timeout=5.0)
+        if 200 <= response.status_code < 400:
+            return DeploymentHealthResponse(
+                deployment_id=deployment_id,
+                container_name=container_name,
+                url=url,
+                status="healthy",
+                status_code=response.status_code,
+                error=None,
+            )
+
+        return DeploymentHealthResponse(
+            deployment_id=deployment_id,
+            container_name=container_name,
+            url=url,
+            status="unhealthy",
+            status_code=response.status_code,
+            error=f"Application returned status code {response.status_code}.",
+        )
+    except httpx.RequestError as exc:
+        return DeploymentHealthResponse(
+            deployment_id=deployment_id,
+            container_name=container_name,
+            url=url,
+            status="unhealthy",
+            status_code=None,
+            error=str(exc),
+        )

@@ -1,0 +1,14 @@
+.idea/
+**/__pycache__/
+*.pyc
+codex-summary.txt
+log.txt
+frontend/node_modules/
+frontend/.next/
+backend/venv/
+.env
+.env.*
+frontend/.env.local
+frontend/.env.*.local
+!.env.production.example
+!frontend/.env.example
