@@ -43,7 +43,7 @@ cd /opt/deploymate
 git fetch origin
 git switch develop
 git pull --ff-only origin develop
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build frontend
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps frontend
 docker compose -f docker-compose.prod.yml --env-file .env.production ps frontend
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 frontend
 curl -I https://deploymatecloud.ru/app
@@ -71,7 +71,7 @@ cd /opt/deploymate
 git fetch origin
 git switch develop
 git pull --ff-only origin develop
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build frontend
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps frontend
 docker compose -f docker-compose.prod.yml --env-file .env.production ps frontend
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 frontend
 curl -I https://deploymatecloud.ru/app
@@ -85,7 +85,7 @@ cd /opt/deploymate
 git log --oneline -n 5
 git switch develop
 git reset --hard <previous_commit_sha>
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build frontend
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps frontend
 curl -I https://deploymatecloud.ru/app
 ```
 
@@ -97,7 +97,7 @@ cd /opt/deploymate
 git fetch origin
 git switch develop
 git pull --ff-only origin develop
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build backend
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps backend
 docker compose -f docker-compose.prod.yml --env-file .env.production ps backend
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 backend
 curl -I https://deploymatecloud.ru/api/health
@@ -125,7 +125,7 @@ cd /opt/deploymate
 git fetch origin
 git switch develop
 git pull --ff-only origin develop
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build backend
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps backend
 docker compose -f docker-compose.prod.yml --env-file .env.production ps backend
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 backend
 curl -I https://deploymatecloud.ru/api/health
@@ -139,7 +139,7 @@ cd /opt/deploymate
 git log --oneline -n 5
 git switch develop
 git reset --hard <previous_commit_sha>
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build backend
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps backend
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 backend
 curl -I https://deploymatecloud.ru/api/health
 ```
@@ -244,6 +244,7 @@ curl -I https://deploymatecloud.ru/app
 - Do not edit files directly on live production unless the app is already broken and you are restoring service.
 - Prefer: local fix -> test -> commit -> push `develop` -> deploy from Git on VPS.
 - On `main-vps`, port `80` is already occupied by DeployMate itself. App deployments should use other external ports such as `8080`, `8081`, and above.
+- For `frontend-only` and `backend-only` deploys, use `--no-deps` so Compose does not recreate dependent services unnecessarily.
 
 ## 8. Emergency restore
 
