@@ -380,6 +380,23 @@ a {
   color: #8a5a00;
 }
 
+.status.new,
+.status.in-review {
+  background: #fff6e5;
+  color: #8a5a00;
+}
+
+.status.approved,
+.status.closed {
+  background: #e8f7ea;
+  color: #1d6b2f;
+}
+
+.status.rejected {
+  background: #fdeaea;
+  color: #9e1c1c;
+}
+
 .status.healthy {
   background: #e8f7ea;
   color: #1d6b2f;

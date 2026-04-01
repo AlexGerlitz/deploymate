@@ -153,8 +153,44 @@ def init_db() -> None:
         company_or_team TEXT NULL,
         use_case TEXT NULL,
         current_plan TEXT NULL,
+        status TEXT NOT NULL DEFAULT 'new',
+        internal_note TEXT NULL,
+        handled_by_user_id UUID NULL,
+        target_user_id UUID NULL,
+        reviewed_at TIMESTAMPTZ NULL,
+        updated_at TIMESTAMPTZ NULL,
         created_at TIMESTAMPTZ NOT NULL
     );
+    """
+
+    alter_upgrade_requests_add_status_sql = """
+    ALTER TABLE upgrade_requests
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'new';
+    """
+
+    alter_upgrade_requests_add_internal_note_sql = """
+    ALTER TABLE upgrade_requests
+    ADD COLUMN IF NOT EXISTS internal_note TEXT NULL;
+    """
+
+    alter_upgrade_requests_add_handled_by_user_id_sql = """
+    ALTER TABLE upgrade_requests
+    ADD COLUMN IF NOT EXISTS handled_by_user_id UUID NULL;
+    """
+
+    alter_upgrade_requests_add_target_user_id_sql = """
+    ALTER TABLE upgrade_requests
+    ADD COLUMN IF NOT EXISTS target_user_id UUID NULL;
+    """
+
+    alter_upgrade_requests_add_reviewed_at_sql = """
+    ALTER TABLE upgrade_requests
+    ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ NULL;
+    """
+
+    alter_upgrade_requests_add_updated_at_sql = """
+    ALTER TABLE upgrade_requests
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NULL;
     """
 
     create_deployment_templates_table_sql = """
@@ -204,6 +240,12 @@ def init_db() -> None:
             cur.execute(drop_notifications_fk_sql)
             cur.execute(create_deployment_activity_table_sql)
             cur.execute(create_upgrade_requests_table_sql)
+            cur.execute(alter_upgrade_requests_add_status_sql)
+            cur.execute(alter_upgrade_requests_add_internal_note_sql)
+            cur.execute(alter_upgrade_requests_add_handled_by_user_id_sql)
+            cur.execute(alter_upgrade_requests_add_target_user_id_sql)
+            cur.execute(alter_upgrade_requests_add_reviewed_at_sql)
+            cur.execute(alter_upgrade_requests_add_updated_at_sql)
             cur.execute(create_deployment_templates_table_sql)
             cur.execute(alter_templates_add_updated_at_sql)
             cur.execute(alter_templates_add_last_used_at_sql)
@@ -777,7 +819,7 @@ def list_users() -> list[dict[str, Any]]:
     select_sql = """
     SELECT id, username, plan, role, must_change_password, created_at
     FROM users
-    ORDER BY created_at DESC;
+    ORDER BY r.created_at DESC;
     """
 
     with get_db_connection() as conn:
@@ -893,6 +935,12 @@ def insert_upgrade_request(request_record: dict[str, Any]) -> None:
         company_or_team,
         use_case,
         current_plan,
+        status,
+        internal_note,
+        handled_by_user_id,
+        target_user_id,
+        reviewed_at,
+        updated_at,
         created_at
     )
     VALUES (
@@ -902,6 +950,12 @@ def insert_upgrade_request(request_record: dict[str, Any]) -> None:
         %(company_or_team)s,
         %(use_case)s,
         %(current_plan)s,
+        %(status)s,
+        %(internal_note)s,
+        %(handled_by_user_id)s,
+        %(target_user_id)s,
+        %(reviewed_at)s,
+        %(updated_at)s,
         %(created_at)s
     );
     """
@@ -915,14 +969,24 @@ def insert_upgrade_request(request_record: dict[str, Any]) -> None:
 def list_upgrade_requests() -> list[dict[str, Any]]:
     select_sql = """
     SELECT
-        id,
-        name,
-        email,
-        company_or_team,
-        use_case,
-        current_plan,
-        created_at
-    FROM upgrade_requests
+        r.id,
+        r.name,
+        r.email,
+        r.company_or_team,
+        r.use_case,
+        r.current_plan,
+        r.status,
+        r.internal_note,
+        r.handled_by_user_id,
+        handler.username AS handled_by_username,
+        r.target_user_id,
+        target_user.username AS target_username,
+        r.reviewed_at,
+        r.updated_at,
+        r.created_at
+    FROM upgrade_requests r
+    LEFT JOIN users handler ON handler.id = r.handled_by_user_id
+    LEFT JOIN users target_user ON target_user.id = r.target_user_id
     ORDER BY created_at DESC;
     """
 
@@ -936,15 +1000,25 @@ def list_upgrade_requests() -> list[dict[str, Any]]:
 def get_upgrade_request_or_404(request_id: str) -> dict[str, Any]:
     select_sql = """
     SELECT
-        id,
-        name,
-        email,
-        company_or_team,
-        use_case,
-        current_plan,
-        created_at
-    FROM upgrade_requests
-    WHERE id = %s;
+        r.id,
+        r.name,
+        r.email,
+        r.company_or_team,
+        r.use_case,
+        r.current_plan,
+        r.status,
+        r.internal_note,
+        r.handled_by_user_id,
+        handler.username AS handled_by_username,
+        r.target_user_id,
+        target_user.username AS target_username,
+        r.reviewed_at,
+        r.updated_at,
+        r.created_at
+    FROM upgrade_requests r
+    LEFT JOIN users handler ON handler.id = r.handled_by_user_id
+    LEFT JOIN users target_user ON target_user.id = r.target_user_id
+    WHERE r.id = %s;
     """
 
     with get_db_connection() as conn:
@@ -954,6 +1028,44 @@ def get_upgrade_request_or_404(request_id: str) -> dict[str, Any]:
             if row is None:
                 raise HTTPException(status_code=404, detail="Upgrade request not found.")
             return _row_to_dict(cur, row)
+
+
+def update_upgrade_request(
+    request_id: str,
+    *,
+    status: str | None = None,
+    internal_note: str | None = None,
+    handled_by_user_id: str | None = None,
+    target_user_id: str | None = None,
+    reviewed_at: datetime | None = None,
+    updated_at: datetime | None = None,
+) -> None:
+    update_sql = """
+    UPDATE upgrade_requests
+    SET status = COALESCE(%s, status),
+        internal_note = %s,
+        handled_by_user_id = COALESCE(%s, handled_by_user_id),
+        target_user_id = %s,
+        reviewed_at = %s,
+        updated_at = %s
+    WHERE id = %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                update_sql,
+                (
+                    status,
+                    internal_note,
+                    handled_by_user_id,
+                    target_user_id,
+                    reviewed_at,
+                    updated_at,
+                    request_id,
+                ),
+            )
+        conn.commit()
 
 
 def create_activity_event(

@@ -18,6 +18,7 @@ from app.db import (
     list_users,
     set_user_plan,
     set_user_role,
+    update_upgrade_request,
 )
 from app.schemas import (
     AdminUserCreateRequest,
@@ -26,6 +27,7 @@ from app.schemas import (
     UpgradeRequestCreate,
     UpgradeRequestItem,
     UpgradeRequestResponse,
+    UpgradeRequestUpdateRequest,
 )
 from app.services.auth import SESSION_COOKIE_NAME, hash_password, require_admin
 
@@ -69,6 +71,12 @@ def create_upgrade_request(
             "company_or_team": payload.company_or_team,
             "use_case": payload.use_case,
             "current_plan": current_plan,
+            "status": "new",
+            "internal_note": None,
+            "handled_by_user_id": None,
+            "target_user_id": None,
+            "reviewed_at": None,
+            "updated_at": datetime.now(timezone.utc),
             "created_at": datetime.now(timezone.utc),
         }
     )
@@ -90,6 +98,65 @@ def get_upgrade_requests() -> List[UpgradeRequestItem]:
     dependencies=[Depends(require_admin)],
 )
 def get_upgrade_request(request_id: str) -> UpgradeRequestItem:
+    return UpgradeRequestItem(**get_upgrade_request_or_404(request_id))
+
+
+@router.patch(
+    "/admin/upgrade-requests/{request_id}",
+    response_model=UpgradeRequestItem,
+)
+def update_upgrade_request_endpoint(
+    request_id: str,
+    payload: UpgradeRequestUpdateRequest,
+    admin_user=Depends(require_admin),
+) -> UpgradeRequestItem:
+    request_item = get_upgrade_request_or_404(request_id)
+    if (
+        payload.status is None
+        and payload.internal_note is None
+        and payload.target_user_id is None
+        and payload.plan is None
+    ):
+        raise HTTPException(status_code=400, detail="At least one field must be provided.")
+
+    target_user_id = payload.target_user_id
+    if target_user_id == "":
+        target_user_id = None
+
+    if target_user_id:
+        target_user = get_user_by_id(target_user_id)
+        if not target_user:
+            raise HTTPException(status_code=404, detail="Target user not found.")
+    else:
+        target_user = None
+
+    if payload.plan is not None and not target_user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="target_user_id is required when assigning a plan.",
+        )
+
+    if target_user and payload.plan is not None:
+        set_user_plan(target_user_id, payload.plan)
+
+    now = datetime.now(timezone.utc)
+    reviewed_at = request_item.get("reviewed_at")
+    if payload.status is not None and payload.status != "new":
+        reviewed_at = reviewed_at or now
+
+    internal_note = request_item.get("internal_note")
+    if payload.internal_note is not None:
+        internal_note = payload.internal_note.strip() or None
+
+    update_upgrade_request(
+        request_id,
+        status=payload.status,
+        internal_note=internal_note,
+        handled_by_user_id=admin_user["id"],
+        target_user_id=target_user_id,
+        reviewed_at=reviewed_at,
+        updated_at=now,
+    )
     return UpgradeRequestItem(**get_upgrade_request_or_404(request_id))
 
 

@@ -10,6 +10,7 @@ ServerAuthType = Literal["password", "ssh_key"]
 UserPlan = Literal["trial", "solo", "team"]
 UserRole = Literal["admin", "member"]
 DiagnosticStatus = Literal["ok", "warn", "error", "unknown"]
+UpgradeRequestStatus = Literal["new", "in_review", "approved", "rejected", "closed"]
 
 
 class DeploymentCreateRequest(BaseModel):
@@ -226,7 +227,22 @@ class UpgradeRequestItem(BaseModel):
     company_or_team: Optional[str] = None
     use_case: Optional[str] = None
     current_plan: Optional[UserPlan] = None
+    status: UpgradeRequestStatus = "new"
+    internal_note: Optional[str] = None
+    handled_by_user_id: Optional[str] = None
+    handled_by_username: Optional[str] = None
+    target_user_id: Optional[str] = None
+    target_username: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    updated_at: Optional[str] = None
     created_at: str
+
+
+class UpgradeRequestUpdateRequest(BaseModel):
+    status: Optional[UpgradeRequestStatus] = None
+    internal_note: Optional[str] = None
+    target_user_id: Optional[str] = None
+    plan: Optional[UserPlan] = None
 
 
 class AdminUserCreateRequest(BaseModel):

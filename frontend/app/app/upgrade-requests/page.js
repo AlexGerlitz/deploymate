@@ -44,14 +44,22 @@ export default function UpgradeRequestsPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [requests, setRequests] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
   const [query, setQuery] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [savingId, setSavingId] = useState("");
+  const [saveFeedback, setSaveFeedback] = useState("");
+  const [drafts, setDrafts] = useState({});
   const normalizedQuery = query.trim().toLowerCase();
   const filteredRequests = requests.filter((item) => {
     if (planFilter !== "all" && (item.current_plan || "-") !== planFilter) {
+      return false;
+    }
+    if (statusFilter !== "all" && item.status !== statusFilter) {
       return false;
     }
     if (!normalizedQuery) {
@@ -70,6 +78,23 @@ export default function UpgradeRequestsPage() {
       .includes(normalizedQuery);
   });
 
+  function buildDraft(item) {
+    return {
+      status: item.status || "new",
+      internal_note: item.internal_note || "",
+      target_user_id: item.target_user_id || "",
+      plan: item.current_plan || "trial",
+    };
+  }
+
+  function syncDrafts(items) {
+    const nextDrafts = {};
+    items.forEach((item) => {
+      nextDrafts[item.id] = buildDraft(item);
+    });
+    setDrafts(nextDrafts);
+  }
+
   async function loadRequests() {
     setLoading(true);
     setError("");
@@ -80,7 +105,9 @@ export default function UpgradeRequestsPage() {
         credentials: "include",
       });
       const data = await readJsonOrError(response, "Failed to load upgrade requests.");
-      setRequests(Array.isArray(data) ? data : []);
+      const items = Array.isArray(data) ? data : [];
+      setRequests(items);
+      syncDrafts(items);
       setAccessDenied(false);
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -103,6 +130,62 @@ export default function UpgradeRequestsPage() {
     }
   }
 
+  async function loadUsers() {
+    const response = await fetch(`${apiBaseUrl}/admin/users`, {
+      cache: "no-store",
+      credentials: "include",
+    });
+    const data = await readJsonOrError(response, "Failed to load admin users.");
+    setUsers(Array.isArray(data) ? data : []);
+  }
+
+  function updateDraft(requestId, field, value) {
+    setDrafts((current) => ({
+      ...current,
+      [requestId]: {
+        ...current[requestId],
+        [field]: value,
+      },
+    }));
+  }
+
+  async function applyRequestUpdate(requestId, payload, successMessage) {
+    setSavingId(requestId);
+    setError("");
+    setSaveFeedback("");
+    try {
+      const response = await fetch(`${apiBaseUrl}/admin/upgrade-requests/${requestId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      const updatedItem = await readJsonOrError(response, "Failed to update upgrade request.");
+      setRequests((current) =>
+        current.map((item) => (item.id === requestId ? updatedItem : item)),
+      );
+      setDrafts((current) => ({
+        ...current,
+        [requestId]: buildDraft(updatedItem),
+      }));
+      setSaveFeedback(successMessage);
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to update upgrade request.",
+      );
+    } finally {
+      setSavingId("");
+    }
+  }
+
   useEffect(() => {
     async function checkAuthAndLoad() {
       try {
@@ -120,7 +203,7 @@ export default function UpgradeRequestsPage() {
           return;
         }
 
-        await loadRequests();
+        await Promise.all([loadUsers(), loadRequests()]);
       } catch {
         router.replace("/login");
       }
@@ -178,13 +261,58 @@ export default function UpgradeRequestsPage() {
         </div>
 
         {error ? <div className="banner error">{error}</div> : null}
+        {saveFeedback ? <div className="banner success">{saveFeedback}</div> : null}
 
         <article className="card formCard">
           <div className="sectionHeader">
             <h2>Inbox filters</h2>
-            <p className="formHint">Filter by current plan or search by requester details.</p>
+            <p className="formHint">Filter by status or current plan, then search requester details.</p>
           </div>
           <div className="deploymentControls">
+            <div className="filterTabs" role="tablist" aria-label="Upgrade status filters">
+              <button
+                type="button"
+                className={statusFilter === "all" ? "active" : ""}
+                onClick={() => setStatusFilter("all")}
+              >
+                All statuses
+              </button>
+              <button
+                type="button"
+                className={statusFilter === "new" ? "active" : ""}
+                onClick={() => setStatusFilter("new")}
+              >
+                New
+              </button>
+              <button
+                type="button"
+                className={statusFilter === "in_review" ? "active" : ""}
+                onClick={() => setStatusFilter("in_review")}
+              >
+                In review
+              </button>
+              <button
+                type="button"
+                className={statusFilter === "approved" ? "active" : ""}
+                onClick={() => setStatusFilter("approved")}
+              >
+                Approved
+              </button>
+              <button
+                type="button"
+                className={statusFilter === "rejected" ? "active" : ""}
+                onClick={() => setStatusFilter("rejected")}
+              >
+                Rejected
+              </button>
+              <button
+                type="button"
+                className={statusFilter === "closed" ? "active" : ""}
+                onClick={() => setStatusFilter("closed")}
+              >
+                Closed
+              </button>
+            </div>
             <div className="filterTabs" role="tablist" aria-label="Upgrade plan filters">
               <button
                 type="button"
@@ -242,6 +370,12 @@ export default function UpgradeRequestsPage() {
           {filteredRequests.map((item) => (
             <article className="card compactCard" key={item.id}>
               <div className="row">
+                <span className="label">Status</span>
+                <span className={`status ${(item.status || "unknown").replace("_", "-")}`}>
+                  {(item.status || "unknown").replace("_", " ")}
+                </span>
+              </div>
+              <div className="row">
                 <span className="label">Name</span>
                 <span>{item.name || "-"}</span>
               </div>
@@ -262,8 +396,163 @@ export default function UpgradeRequestsPage() {
                 <span>{item.current_plan || "-"}</span>
               </div>
               <div className="row">
+                <span className="label">Handled by</span>
+                <span>{item.handled_by_username || "-"}</span>
+              </div>
+              <div className="row">
+                <span className="label">Target user</span>
+                <span>{item.target_username || "-"}</span>
+              </div>
+              <div className="row">
+                <span className="label">Reviewed</span>
+                <span>{formatDate(item.reviewed_at)}</span>
+              </div>
+              <div className="row">
+                <span className="label">Updated</span>
+                <span>{formatDate(item.updated_at)}</span>
+              </div>
+              <div className="row">
                 <span className="label">Created</span>
                 <span>{formatDate(item.created_at)}</span>
+              </div>
+              <label className="field">
+                <span>Lifecycle status</span>
+                <select
+                  value={drafts[item.id]?.status || "new"}
+                  onChange={(event) => updateDraft(item.id, "status", event.target.value)}
+                  disabled={savingId === item.id}
+                >
+                  <option value="new">new</option>
+                  <option value="in_review">in_review</option>
+                  <option value="approved">approved</option>
+                  <option value="rejected">rejected</option>
+                  <option value="closed">closed</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Internal note</span>
+                <textarea
+                  value={drafts[item.id]?.internal_note || ""}
+                  onChange={(event) => updateDraft(item.id, "internal_note", event.target.value)}
+                  disabled={savingId === item.id}
+                  placeholder="Next step, pricing context, follow-up owner"
+                />
+              </label>
+              <label className="field">
+                <span>Target user</span>
+                <select
+                  value={drafts[item.id]?.target_user_id || ""}
+                  onChange={(event) => updateDraft(item.id, "target_user_id", event.target.value)}
+                  disabled={savingId === item.id}
+                >
+                  <option value="">Not linked</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.username} · {user.plan}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Plan to assign</span>
+                <select
+                  value={drafts[item.id]?.plan || "trial"}
+                  onChange={(event) => updateDraft(item.id, "plan", event.target.value)}
+                  disabled={savingId === item.id}
+                >
+                  <option value="trial">trial</option>
+                  <option value="solo">solo</option>
+                  <option value="team">team</option>
+                </select>
+              </label>
+              <div className="actions">
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyRequestUpdate(
+                      item.id,
+                      {
+                        status: drafts[item.id]?.status || item.status,
+                        internal_note: drafts[item.id]?.internal_note || "",
+                        target_user_id: drafts[item.id]?.target_user_id || null,
+                      },
+                      "Upgrade request updated.",
+                    )
+                  }
+                  disabled={savingId === item.id}
+                >
+                  {savingId === item.id ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyRequestUpdate(
+                      item.id,
+                      {
+                        status: "in_review",
+                        internal_note: drafts[item.id]?.internal_note || "",
+                        target_user_id: drafts[item.id]?.target_user_id || null,
+                      },
+                      "Upgrade request marked as in review.",
+                    )
+                  }
+                  disabled={savingId === item.id}
+                >
+                  Mark in review
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyRequestUpdate(
+                      item.id,
+                      {
+                        status: "approved",
+                        internal_note: drafts[item.id]?.internal_note || "",
+                        target_user_id: drafts[item.id]?.target_user_id || null,
+                        plan: drafts[item.id]?.target_user_id ? drafts[item.id]?.plan : undefined,
+                      },
+                      "Upgrade request approved.",
+                    )
+                  }
+                  disabled={savingId === item.id}
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  className="dangerButton"
+                  onClick={() =>
+                    applyRequestUpdate(
+                      item.id,
+                      {
+                        status: "rejected",
+                        internal_note: drafts[item.id]?.internal_note || "",
+                        target_user_id: drafts[item.id]?.target_user_id || null,
+                      },
+                      "Upgrade request rejected.",
+                    )
+                  }
+                  disabled={savingId === item.id}
+                >
+                  Reject
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    applyRequestUpdate(
+                      item.id,
+                      {
+                        status: "closed",
+                        internal_note: drafts[item.id]?.internal_note || "",
+                        target_user_id: drafts[item.id]?.target_user_id || null,
+                      },
+                      "Upgrade request closed.",
+                    )
+                  }
+                  disabled={savingId === item.id}
+                >
+                  Close
+                </button>
               </div>
             </article>
           ))}
