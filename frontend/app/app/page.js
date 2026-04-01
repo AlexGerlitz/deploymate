@@ -84,12 +84,15 @@ export default function HomePage() {
   const [deployments, setDeployments] = useState([]);
   const [servers, setServers] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [serversLoading, setServersLoading] = useState(true);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
   const [error, setError] = useState("");
   const [serversError, setServersError] = useState("");
   const [notificationsError, setNotificationsError] = useState("");
+  const [templatesError, setTemplatesError] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -99,11 +102,16 @@ export default function HomePage() {
   const [serverSubmitting, setServerSubmitting] = useState(false);
   const [serverSubmitError, setServerSubmitError] = useState("");
   const [serverSubmitSuccess, setServerSubmitSuccess] = useState("");
+  const [templateSubmitting, setTemplateSubmitting] = useState(false);
+  const [templateSubmitError, setTemplateSubmitError] = useState("");
+  const [templateSubmitSuccess, setTemplateSubmitSuccess] = useState("");
 
   const [deleteError, setDeleteError] = useState("");
   const [deletingDeploymentId, setDeletingDeploymentId] = useState("");
   const [serverDeleteError, setServerDeleteError] = useState("");
   const [deletingServerId, setDeletingServerId] = useState("");
+  const [templateDeleteError, setTemplateDeleteError] = useState("");
+  const [deletingTemplateId, setDeletingTemplateId] = useState("");
   const [testingServerId, setTestingServerId] = useState("");
   const [serverTestResults, setServerTestResults] = useState({});
   const [deploymentFilter, setDeploymentFilter] = useState("all");
@@ -119,6 +127,7 @@ export default function HomePage() {
     external_port: "",
     server_id: "",
   });
+  const [templateName, setTemplateName] = useState("");
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const [serverForm, setServerForm] = useState({
     name: "",
@@ -295,12 +304,47 @@ export default function HomePage() {
     }
   }
 
+  async function loadTemplates(silent = false) {
+    if (!silent) {
+      setTemplatesLoading(true);
+      setTemplatesError("");
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/deployment-templates`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const data = await readJsonOrError(response, "Failed to load deployment templates.");
+      setTemplates(Array.isArray(data) ? data : []);
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setTemplatesError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to load deployment templates.",
+      );
+      if (!silent) {
+        setTemplates([]);
+      }
+    } finally {
+      if (!silent) {
+        setTemplatesLoading(false);
+      }
+    }
+  }
+
   async function refreshPage(silent = false) {
     await Promise.all([
       loadCurrentUser(),
       loadDeployments(silent),
       loadServers(silent),
       loadNotifications(silent),
+      loadTemplates(silent),
     ]);
   }
 
@@ -435,6 +479,32 @@ export default function HomePage() {
     return env;
   }
 
+  function buildTemplatePayload() {
+    const payload = {
+      template_name: templateName.trim(),
+      image: form.image.trim(),
+      env: buildEnvPayload(envRows),
+    };
+
+    if (form.name.trim()) {
+      payload.name = form.name.trim();
+    }
+
+    if (form.internal_port.trim()) {
+      payload.internal_port = Number(form.internal_port);
+    }
+
+    if (form.external_port.trim()) {
+      payload.external_port = Number(form.external_port);
+    }
+
+    if (form.server_id) {
+      payload.server_id = form.server_id;
+    }
+
+    return payload;
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitting(true);
@@ -504,6 +574,41 @@ export default function HomePage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSaveTemplate() {
+    setTemplateSubmitting(true);
+    setTemplateSubmitError("");
+    setTemplateSubmitSuccess("");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/deployment-templates`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(buildTemplatePayload()),
+      });
+      await readJsonOrError(response, "Failed to save deployment template.");
+
+      setTemplateName("");
+      setTemplateSubmitSuccess("Deployment template saved.");
+      await loadTemplates();
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setTemplateSubmitError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to save deployment template.",
+      );
+    } finally {
+      setTemplateSubmitting(false);
     }
   }
 
@@ -706,6 +811,69 @@ export default function HomePage() {
     }
   }
 
+  function applyTemplate(template) {
+    setForm({
+      image: template.image || "",
+      name: template.name || "",
+      internal_port:
+        template.internal_port === null || template.internal_port === undefined
+          ? ""
+          : String(template.internal_port),
+      external_port:
+        template.external_port === null || template.external_port === undefined
+          ? ""
+          : String(template.external_port),
+      server_id: template.server_id || "",
+    });
+    setEnvRows(
+      Object.entries(template.env || {}).length > 0
+        ? Object.entries(template.env || {}).map(([key, value]) => ({
+            key,
+            value: String(value ?? ""),
+          }))
+        : [{ key: "", value: "" }],
+    );
+    setCreatedDeployment(null);
+    setSubmitError("");
+    setSubmitSuccess(`Template "${template.template_name}" applied to the deploy form.`);
+  }
+
+  async function handleDeleteTemplate(templateId) {
+    const confirmed = window.confirm("Delete this deployment template?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setTemplateDeleteError("");
+    setDeletingTemplateId(templateId);
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/deployment-templates/${templateId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      );
+      await readJsonOrError(response, "Failed to delete deployment template.");
+      await loadTemplates();
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setTemplateDeleteError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to delete deployment template.",
+      );
+    } finally {
+      setDeletingTemplateId("");
+    }
+  }
+
   async function handleLogout() {
     try {
       await fetch(`${apiBaseUrl}/auth/logout`, {
@@ -749,9 +917,11 @@ export default function HomePage() {
             <button
               type="button"
               onClick={refreshPage}
-              disabled={loading || serversLoading || notificationsLoading}
+              disabled={loading || serversLoading || notificationsLoading || templatesLoading}
             >
-              {loading || serversLoading || notificationsLoading ? "Refreshing..." : "Refresh"}
+              {loading || serversLoading || notificationsLoading || templatesLoading
+                ? "Refreshing..."
+                : "Refresh"}
             </button>
             <button type="button" onClick={handleLogout}>
               Logout
@@ -763,6 +933,8 @@ export default function HomePage() {
         {serversError ? <div className="banner error">{serversError}</div> : null}
         {deleteError ? <div className="banner error">{deleteError}</div> : null}
         {serverDeleteError ? <div className="banner error">{serverDeleteError}</div> : null}
+        {templatesError ? <div className="banner error">{templatesError}</div> : null}
+        {templateDeleteError ? <div className="banner error">{templateDeleteError}</div> : null}
         {currentUser?.must_change_password ? (
           <div className="banner error">
             You are still using the default admin password.{" "}
@@ -1140,6 +1312,75 @@ export default function HomePage() {
         </article>
 
         <article className="card formCard">
+          <h2>Deployment templates</h2>
+          <p className="formHint">
+            Save common image, ports, server, and env settings once, then apply them back to the create form.
+          </p>
+
+          {templatesLoading ? (
+            <div className="empty">Loading templates...</div>
+          ) : templates.length === 0 ? (
+            <div className="empty">No templates yet. Save the current create form as your first template.</div>
+          ) : (
+            <div className="list compactList">
+              {templates.map((template) => (
+                <div key={template.id} className="card compactCard">
+                  <div className="row">
+                    <span className="label">Template</span>
+                    <span>{template.template_name}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Image</span>
+                    <span>{template.image}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Deploy name</span>
+                    <span>{template.name || "Auto-generate"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Server</span>
+                    <span>
+                      {template.server_name
+                        ? `${template.server_name} (${template.server_host})`
+                        : "Local"}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Ports</span>
+                    <span>
+                      {template.internal_port && template.external_port
+                        ? `${template.external_port}:${template.internal_port}`
+                        : "No port mapping"}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Env vars</span>
+                    <span>{Object.keys(template.env || {}).length}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Created</span>
+                    <span>{formatDate(template.created_at)}</span>
+                  </div>
+                  <div className="actions">
+                    <button type="button" onClick={() => applyTemplate(template)}>
+                      Apply to form
+                    </button>
+                    <button
+                      type="button"
+                      className="dangerButton"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                      disabled={deletingTemplateId === template.id}
+                    >
+                      {deletingTemplateId === template.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+
+        <article className="card formCard">
           <h2>Create deployment</h2>
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
@@ -1268,15 +1509,42 @@ export default function HomePage() {
               </select>
             </label>
 
+            <label className="field">
+              <span>Template name</span>
+              <input
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                placeholder="Save current form as..."
+                disabled={submitting || templateSubmitting}
+              />
+              <span className="fieldHint">
+                Save the current image, name, ports, server, and env vars as a reusable preset.
+              </span>
+            </label>
+
             <div className="formActions">
               <button type="submit" disabled={submitting || deploymentLimitReached}>
                 {submitting ? "Creating..." : "Create deployment"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTemplate}
+                disabled={
+                  submitting ||
+                  templateSubmitting ||
+                  !templateName.trim() ||
+                  !form.image.trim()
+                }
+              >
+                {templateSubmitting ? "Saving template..." : "Save as template"}
               </button>
               {submitting ? <span className="formHint">Sending request to backend...</span> : null}
             </div>
           </form>
 
           {submitError ? <div className="banner error">{submitError}</div> : null}
+          {templateSubmitError ? <div className="banner error">{templateSubmitError}</div> : null}
+          {templateSubmitSuccess ? <div className="banner success">{templateSubmitSuccess}</div> : null}
           {submitSuccess ? (
             <div className="banner success">
               <div>{submitSuccess}</div>

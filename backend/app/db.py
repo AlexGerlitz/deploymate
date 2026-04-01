@@ -157,6 +157,20 @@ def init_db() -> None:
     );
     """
 
+    create_deployment_templates_table_sql = """
+    CREATE TABLE IF NOT EXISTS deployment_templates (
+        id UUID PRIMARY KEY,
+        template_name TEXT NOT NULL,
+        image TEXT NOT NULL,
+        name TEXT NULL,
+        internal_port INTEGER NULL,
+        external_port INTEGER NULL,
+        server_id UUID NULL,
+        env TEXT NOT NULL DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL
+    );
+    """
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(create_users_table_sql)
@@ -172,6 +186,7 @@ def init_db() -> None:
             cur.execute(drop_notifications_fk_sql)
             cur.execute(create_deployment_activity_table_sql)
             cur.execute(create_upgrade_requests_table_sql)
+            cur.execute(create_deployment_templates_table_sql)
         conn.commit()
 
     ensure_default_user()
@@ -345,6 +360,106 @@ def delete_deployment_record(deployment_id: str) -> None:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(delete_sql, (deployment_id,))
+        conn.commit()
+
+
+def insert_deployment_template(template_record: dict[str, Any]) -> None:
+    insert_sql = """
+    INSERT INTO deployment_templates (
+        id,
+        template_name,
+        image,
+        name,
+        internal_port,
+        external_port,
+        server_id,
+        env,
+        created_at
+    )
+    VALUES (
+        %(id)s,
+        %(template_name)s,
+        %(image)s,
+        %(name)s,
+        %(internal_port)s,
+        %(external_port)s,
+        %(server_id)s,
+        %(env)s,
+        %(created_at)s
+    );
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(insert_sql, template_record)
+        conn.commit()
+
+
+def list_deployment_templates() -> list[dict[str, Any]]:
+    select_sql = """
+    SELECT
+        t.id,
+        t.template_name,
+        t.image,
+        t.name,
+        t.internal_port,
+        t.external_port,
+        t.server_id,
+        t.env,
+        t.created_at,
+        s.name AS server_name,
+        s.host AS server_host
+    FROM deployment_templates t
+    LEFT JOIN servers s ON s.id = t.server_id
+    ORDER BY t.created_at DESC;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(select_sql)
+            rows = cur.fetchall()
+            return [_row_to_dict(cur, row) for row in rows]
+
+
+def get_deployment_template_or_404(template_id: str) -> dict[str, Any]:
+    select_sql = """
+    SELECT
+        t.id,
+        t.template_name,
+        t.image,
+        t.name,
+        t.internal_port,
+        t.external_port,
+        t.server_id,
+        t.env,
+        t.created_at,
+        s.name AS server_name,
+        s.host AS server_host
+    FROM deployment_templates t
+    LEFT JOIN servers s ON s.id = t.server_id
+    WHERE t.id = %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(select_sql, (template_id,))
+            row = cur.fetchone()
+
+            if row is None:
+                raise HTTPException(status_code=404, detail="Deployment template not found.")
+
+            return _row_to_dict(cur, row)
+
+
+def delete_deployment_template_record(template_id: str) -> None:
+    delete_sql = """
+    DELETE FROM deployment_templates
+    WHERE id = %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(delete_sql, (template_id,))
         conn.commit()
 
 

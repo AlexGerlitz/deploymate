@@ -36,6 +36,30 @@ class DeploymentResponse(BaseModel):
     env: Dict[str, str] = Field(default_factory=dict)
 
 
+class DeploymentTemplateCreateRequest(BaseModel):
+    template_name: str = Field(..., min_length=1)
+    image: str = Field(..., min_length=1, description="Docker image, for example nginx:latest")
+    name: Optional[str] = Field(default=None, description="Optional deployment name")
+    internal_port: Optional[int] = Field(default=None, ge=1, le=65535)
+    external_port: Optional[int] = Field(default=None, ge=1, le=65535)
+    server_id: Optional[str] = None
+    env: Dict[str, str] = Field(default_factory=dict)
+
+
+class DeploymentTemplateResponse(BaseModel):
+    id: str
+    template_name: str
+    image: str
+    name: Optional[str] = None
+    internal_port: Optional[int] = None
+    external_port: Optional[int] = None
+    server_id: Optional[str] = None
+    server_name: Optional[str] = None
+    server_host: Optional[str] = None
+    env: Dict[str, str] = Field(default_factory=dict)
+    created_at: str
+
+
 class DeploymentDeleteResponse(BaseModel):
     deployment_id: str
     status: Literal["deleted"]

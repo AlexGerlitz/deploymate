@@ -88,6 +88,10 @@ export default function DeploymentDetailsPage({ params }) {
   const [redeploying, setRedeploying] = useState(false);
   const [redeployError, setRedeployError] = useState("");
   const [redeploySuccess, setRedeploySuccess] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateError, setTemplateError] = useState("");
+  const [templateSuccess, setTemplateSuccess] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
   const [logsExpanded, setLogsExpanded] = useState(false);
   const [envExpanded, setEnvExpanded] = useState(false);
@@ -318,6 +322,32 @@ export default function DeploymentDetailsPage({ params }) {
     return env;
   }
 
+  function buildTemplatePayload() {
+    const payload = {
+      template_name: templateName.trim(),
+      image: form.image.trim(),
+      env: buildEnvPayload(envRows),
+    };
+
+    if (form.name.trim()) {
+      payload.name = form.name.trim();
+    }
+
+    if (form.internal_port.trim()) {
+      payload.internal_port = Number(form.internal_port);
+    }
+
+    if (form.external_port.trim()) {
+      payload.external_port = Number(form.external_port);
+    }
+
+    if (deployment?.server_id) {
+      payload.server_id = deployment.server_id;
+    }
+
+    return payload;
+  }
+
   async function copyText(value, label) {
     if (!value) {
       return;
@@ -426,6 +456,39 @@ export default function DeploymentDetailsPage({ params }) {
     }
   }
 
+  async function handleSaveTemplate() {
+    setTemplateSaving(true);
+    setTemplateError("");
+    setTemplateSuccess("");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/deployment-templates`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(buildTemplatePayload()),
+      });
+      await readJsonOrError(response, "Failed to save deployment template.");
+      setTemplateName("");
+      setTemplateSuccess("Deployment template saved.");
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setTemplateError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to save deployment template.",
+      );
+    } finally {
+      setTemplateSaving(false);
+    }
+  }
+
   async function handleLogout() {
     try {
       await fetch(`${apiBaseUrl}/auth/logout`, {
@@ -492,6 +555,8 @@ export default function DeploymentDetailsPage({ params }) {
 
         {error ? <div className="banner error">{error}</div> : null}
         {copyMessage ? <div className="banner subtle">{copyMessage}</div> : null}
+        {templateError ? <div className="banner error">{templateError}</div> : null}
+        {templateSuccess ? <div className="banner success">{templateSuccess}</div> : null}
         {currentUser?.must_change_password ? (
           <div className="banner error">
             You are still using the default admin password.{" "}
@@ -509,6 +574,33 @@ export default function DeploymentDetailsPage({ params }) {
         <div className="banner subtle">
           Deployment, health, and activity refresh automatically every 8 seconds.
         </div>
+
+        <article className="card formCard">
+          <h2>Save as template</h2>
+          <div className="form">
+            <label className="field">
+              <span>Template name</span>
+              <input
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                placeholder="nginx baseline"
+                disabled={templateSaving}
+              />
+              <span className="fieldHint">
+                Save the current deployment settings as a reusable preset for future deploys.
+              </span>
+            </label>
+            <div className="formActions">
+              <button
+                type="button"
+                onClick={handleSaveTemplate}
+                disabled={templateSaving || !templateName.trim() || !form.image.trim()}
+              >
+                {templateSaving ? "Saving template..." : "Save as template"}
+              </button>
+            </div>
+          </div>
+        </article>
 
         <article className="card formCard">
           <h2>Redeploy</h2>

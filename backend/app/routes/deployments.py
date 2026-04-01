@@ -10,11 +10,15 @@ from app.db import (
     create_activity_event,
     create_notification,
     delete_deployment_record,
+    delete_deployment_template_record,
     get_server_or_404,
     get_deployment_record_or_404,
+    get_deployment_template_or_404,
     insert_deployment_record,
+    insert_deployment_template,
     list_deployment_activity,
     list_deployment_records,
+    list_deployment_templates,
     update_deployment_configuration,
     update_deployment_record,
 )
@@ -24,6 +28,8 @@ from app.schemas import (
     DeploymentHealthResponse,
     DeploymentLogsResponse,
     DeploymentResponse,
+    DeploymentTemplateCreateRequest,
+    DeploymentTemplateResponse,
     NotificationResponse,
 )
 from app.services.deployments import (
@@ -65,6 +71,53 @@ def _normalize_runtime_error(message: str | None, fallback: str) -> str:
 def list_deployments() -> List[DeploymentResponse]:
     deployments = list_deployment_records()
     return [DeploymentResponse(**deployment) for deployment in deployments]
+
+
+@router.get("/deployment-templates", response_model=List[DeploymentTemplateResponse])
+def list_templates() -> List[DeploymentTemplateResponse]:
+    templates = list_deployment_templates()
+    return [DeploymentTemplateResponse(**template) for template in templates]
+
+
+@router.post("/deployment-templates", response_model=DeploymentTemplateResponse)
+def create_template(
+    payload: DeploymentTemplateCreateRequest,
+) -> DeploymentTemplateResponse:
+    if (payload.internal_port is None) != (payload.external_port is None):
+        raise HTTPException(
+            status_code=400,
+            detail="internal_port and external_port must be provided together.",
+        )
+
+    if payload.server_id:
+        get_server_or_404(payload.server_id)
+
+    template_id = str(uuid.uuid4())
+    template_record = {
+        "id": template_id,
+        "template_name": payload.template_name.strip(),
+        "image": payload.image,
+        "name": payload.name.strip() if payload.name else None,
+        "internal_port": payload.internal_port,
+        "external_port": payload.external_port,
+        "server_id": payload.server_id,
+        "env": json.dumps(payload.env),
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    insert_deployment_template(template_record)
+    saved_template = get_deployment_template_or_404(template_id)
+    return DeploymentTemplateResponse(**saved_template)
+
+
+@router.delete(
+    "/deployment-templates/{template_id}",
+    response_model=DeploymentTemplateResponse,
+)
+def delete_template(template_id: str) -> DeploymentTemplateResponse:
+    template = get_deployment_template_or_404(template_id)
+    delete_deployment_template_record(template_id)
+    return DeploymentTemplateResponse(**template)
 
 
 @router.post("/deployments", response_model=DeploymentResponse)
