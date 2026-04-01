@@ -28,6 +28,7 @@ from app.schemas import (
 )
 from app.services.deployments import (
     build_container_name,
+    ensure_container_name_is_available,
     ensure_docker_is_available,
     ensure_external_port_is_available,
     get_container_logs,
@@ -84,6 +85,7 @@ def create_deployment_endpoint(
 
     deployment_id = str(uuid.uuid4())
     container_name = build_container_name(payload.name, deployment_id)
+    ensure_container_name_is_available(container_name, server)
 
     deployment_record = {
         "id": deployment_id,
@@ -180,6 +182,8 @@ def redeploy_deployment(
     ):
         ensure_external_port_is_available(payload.external_port, server)
     container_name = payload.name or existing_deployment["container_name"]
+    if container_name != existing_deployment["container_name"]:
+        ensure_container_name_is_available(container_name, server)
 
     try:
         remove_container_if_exists(existing_deployment["container_name"], server)

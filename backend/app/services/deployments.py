@@ -133,6 +133,29 @@ def ensure_external_port_is_available(external_port: Optional[int], server: Opti
     )
 
 
+def ensure_container_name_is_available(
+    container_name: str,
+    server: Optional[dict] = None,
+) -> None:
+    result = _run_docker_command(["docker", "container", "inspect", container_name], server)
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or result.stdout.strip()
+        if "No such object" in error_message or "No such container" in error_message:
+            return
+        return
+
+    if server:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Container name {container_name} is already in use on server {server['name']}.",
+        )
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Container name {container_name} is already in use on this host.",
+    )
+
+
 def run_container(
     image: str,
     container_name: str,
