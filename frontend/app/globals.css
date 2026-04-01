@@ -69,6 +69,7 @@ a {
 .buttonRow {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .banner {
@@ -132,6 +133,52 @@ a {
 
 .compactCard {
   padding: 14px;
+}
+
+.overviewGrid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.overviewCard {
+  padding: 14px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fcfcfd;
+}
+
+.overviewLabel {
+  display: block;
+  margin-bottom: 8px;
+  color: #666;
+  font-size: 14px;
+}
+
+.overviewValue {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+
+.overviewMeta {
+  display: grid;
+  gap: 6px;
+  color: #555;
+  font-size: 14px;
+}
+
+.overviewAttentionList {
+  display: grid;
+  gap: 12px;
+}
+
+.overviewAttentionItem {
+  padding: 14px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .sectionHeader {
@@ -198,6 +245,10 @@ a {
 .field {
   display: grid;
   gap: 6px;
+}
+
+.toolbarField {
+  width: min(100%, 340px);
 }
 
 .field span {
@@ -664,6 +715,10 @@ code {
 }
 
 @media (min-width: 720px) {
+  .overviewGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .landingGrid,
   .stepsGrid,
   .pricingGrid {

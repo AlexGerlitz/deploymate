@@ -147,6 +147,211 @@ function buildTemplateDiff(template, currentDraft, servers) {
   return rows.filter((row) => row.templateValue !== row.currentValue);
 }
 
+function inferActivityCategory(title, message) {
+  const haystack = [title, message].filter(Boolean).join(" ").toLowerCase();
+  if (!haystack) {
+    return "general";
+  }
+  if (haystack.includes("redeploy")) {
+    return "redeploy";
+  }
+  if (haystack.includes("delete")) {
+    return "delete";
+  }
+  if (haystack.includes("health")) {
+    return "health";
+  }
+  if (haystack.includes("deploy")) {
+    return "deploy";
+  }
+  return "general";
+}
+
+function isRecentDate(value, days = 7) {
+  if (!value) {
+    return false;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return Date.now() - date.getTime() <= days * 24 * 60 * 60 * 1000;
+}
+
+function buildOpsSnapshot({ currentUser, deployments, servers, notifications, templates }) {
+  const activeServerIds = new Set(
+    deployments.map((deployment) => deployment.server_id).filter(Boolean),
+  );
+  const failedDeployments = deployments.filter((deployment) => deployment.status === "failed");
+  const runningDeployments = deployments.filter((deployment) => deployment.status === "running");
+  const pendingDeployments = deployments.filter((deployment) => deployment.status === "pending");
+  const localDeployments = deployments.filter((deployment) => !deployment.server_id);
+  const remoteDeployments = deployments.filter((deployment) => deployment.server_id);
+  const exposedDeployments = deployments.filter(
+    (deployment) => deployment.external_port !== null && deployment.external_port !== undefined,
+  );
+  const publicUrlDeployments = deployments.filter(
+    (deployment) => deployment.server_host && deployment.external_port,
+  );
+  const passwordServers = servers.filter((server) => server.auth_type === "password");
+  const sshKeyServers = servers.filter((server) => server.auth_type === "ssh_key");
+  const unusedServers = servers.filter((server) => !activeServerIds.has(server.id));
+  const errorNotifications = notifications.filter((item) => item.level === "error");
+  const successNotifications = notifications.filter((item) => item.level === "success");
+  const recentError = errorNotifications[0] || null;
+  const unusedTemplates = templates.filter((template) => (template.use_count || 0) === 0);
+  const recentTemplates = templates.filter((template) => isRecentDate(template.last_used_at, 7));
+  const popularTemplates = [...templates]
+    .filter((template) => (template.use_count || 0) > 0)
+    .sort((left, right) => (right.use_count || 0) - (left.use_count || 0));
+  const topTemplate = popularTemplates[0] || null;
+
+  const attentionItems = [];
+
+  if (currentUser?.must_change_password) {
+    attentionItems.push({
+      level: "warn",
+      title: "Default admin password is still active",
+      detail: "Change it before making more production changes.",
+    });
+  }
+
+  if (failedDeployments.length > 0) {
+    attentionItems.push({
+      level: "error",
+      title: `${failedDeployments.length} failed deployment${failedDeployments.length === 1 ? "" : "s"}`,
+      detail: "Open deployment details and activity history before the next rollout.",
+    });
+  }
+
+  if (errorNotifications.length > 0) {
+    attentionItems.push({
+      level: "warn",
+      title: `${errorNotifications.length} recent error event${errorNotifications.length === 1 ? "" : "s"}`,
+      detail: recentError?.title || "Review recent activity history.",
+    });
+  }
+
+  if (servers.length === 0) {
+    attentionItems.push({
+      level: "info",
+      title: "No saved servers",
+      detail: "Only local deploys are available until a VPS target is added.",
+    });
+  }
+
+  if (unusedTemplates.length > 0) {
+    attentionItems.push({
+      level: "info",
+      title: `${unusedTemplates.length} template${unusedTemplates.length === 1 ? "" : "s"} never used`,
+      detail: "Review whether they are still useful or should be cleaned up later.",
+    });
+  }
+
+  if (
+    runningDeployments.some(
+      (deployment) =>
+        deployment.external_port === null || deployment.external_port === undefined,
+    )
+  ) {
+    attentionItems.push({
+      level: "info",
+      title: "Some running deployments have no external port",
+      detail: "They may be internal-only or require proxy access.",
+    });
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    user: currentUser
+      ? {
+          username: currentUser.username,
+          plan: currentUser.plan,
+          role: currentUser.role,
+        }
+      : null,
+    deployments: {
+      total: deployments.length,
+      running: runningDeployments.length,
+      failed: failedDeployments.length,
+      pending: pendingDeployments.length,
+      local: localDeployments.length,
+      remote: remoteDeployments.length,
+      exposed: exposedDeployments.length,
+      public_urls: publicUrlDeployments.length,
+    },
+    servers: {
+      total: servers.length,
+      password_auth: passwordServers.length,
+      ssh_key_auth: sshKeyServers.length,
+      unused: unusedServers.length,
+    },
+    notifications: {
+      total: notifications.length,
+      success: successNotifications.length,
+      error: errorNotifications.length,
+      latest_error_title: recentError?.title || null,
+      latest_error_at: recentError?.created_at || null,
+    },
+    templates: {
+      total: templates.length,
+      unused: unusedTemplates.length,
+      recently_used: recentTemplates.length,
+      top_template_name: topTemplate?.template_name || null,
+      top_template_use_count: topTemplate?.use_count || 0,
+    },
+    attention_items: attentionItems,
+  };
+}
+
+function buildOpsSummaryText(snapshot) {
+  const lines = [
+    "DeployMate operations summary",
+    `Generated: ${formatDate(snapshot.generated_at)}`,
+    snapshot.user
+      ? `User: ${snapshot.user.username} (${snapshot.user.role}, ${snapshot.user.plan})`
+      : "User: n/a",
+    `Deployments: ${snapshot.deployments.total} total, ${snapshot.deployments.running} running, ${snapshot.deployments.failed} failed, ${snapshot.deployments.pending} pending`,
+    `Targets: ${snapshot.deployments.local} local, ${snapshot.deployments.remote} remote, ${snapshot.deployments.exposed} exposed, ${snapshot.deployments.public_urls} public URLs`,
+    `Servers: ${snapshot.servers.total} total, ${snapshot.servers.password_auth} password auth, ${snapshot.servers.ssh_key_auth} ssh key auth, ${snapshot.servers.unused} unused`,
+    `Activity: ${snapshot.notifications.total} events, ${snapshot.notifications.success} success, ${snapshot.notifications.error} error`,
+    `Templates: ${snapshot.templates.total} total, ${snapshot.templates.unused} unused, ${snapshot.templates.recently_used} used in last 7 days`,
+  ];
+
+  if (snapshot.templates.top_template_name) {
+    lines.push(
+      `Top template: ${snapshot.templates.top_template_name} (${snapshot.templates.top_template_use_count} uses)`,
+    );
+  }
+
+  if (snapshot.attention_items.length > 0) {
+    lines.push("Attention:");
+    snapshot.attention_items.forEach((item) => {
+      lines.push(`- [${item.level}] ${item.title}: ${item.detail}`);
+    });
+  } else {
+    lines.push("Attention: no immediate issues detected from current dashboard data.");
+  }
+
+  return lines.join("\n");
+}
+
+function downloadJsonFile(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
@@ -197,12 +402,17 @@ export default function HomePage() {
   const [diagnosingServerId, setDiagnosingServerId] = useState("");
   const [deploymentFilter, setDeploymentFilter] = useState("all");
   const [deploymentQuery, setDeploymentQuery] = useState("");
+  const [serverQuery, setServerQuery] = useState("");
   const [notificationFilter, setNotificationFilter] = useState("all");
+  const [notificationQuery, setNotificationQuery] = useState("");
   const [templateQuery, setTemplateQuery] = useState("");
+  const [templateFilter, setTemplateFilter] = useState("all");
   const [templatePreviewId, setTemplatePreviewId] = useState("");
   const [editingTemplateId, setEditingTemplateId] = useState("");
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
+  const [opsActionMessage, setOpsActionMessage] = useState("");
+  const [opsActionError, setOpsActionError] = useState("");
 
   const [form, setForm] = useState({
     image: "",
@@ -260,42 +470,111 @@ export default function HomePage() {
 
     return haystack.includes(normalizedDeploymentQuery);
   });
-  const filteredNotifications = notifications.filter((item) => {
-    if (notificationFilter === "success") {
-      return item.level === "success";
-    }
-
-    if (notificationFilter === "error") {
-      return item.level === "error";
-    }
-
-    return true;
-  });
-  const normalizedTemplateQuery = templateQuery.trim().toLowerCase();
-  const filteredTemplates = templates.filter((template) => {
-    if (!normalizedTemplateQuery) {
+  const normalizedServerQuery = serverQuery.trim().toLowerCase();
+  const filteredServers = servers.filter((server) => {
+    if (!normalizedServerQuery) {
       return true;
     }
 
     const haystack = [
-      template.template_name,
-      template.image,
-      template.name,
-      template.server_name,
-      template.server_host,
-      Object.keys(template.env || {}).join(" "),
-      Object.values(template.env || {}).join(" "),
+      server.name,
+      server.host,
+      server.username,
+      server.auth_type,
+      `${server.username}@${server.host}:${server.port}`,
     ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
 
-    return haystack.includes(normalizedTemplateQuery);
+    return haystack.includes(normalizedServerQuery);
   });
+  const normalizedNotificationQuery = notificationQuery.trim().toLowerCase();
+  const filteredNotifications = notifications.filter((item) => {
+    if (notificationFilter === "success") {
+      if (item.level !== "success") {
+        return false;
+      }
+    }
+
+    if (notificationFilter === "error") {
+      if (item.level !== "error") {
+        return false;
+      }
+    }
+
+    if (!normalizedNotificationQuery) {
+      return true;
+    }
+
+    const haystack = [
+      item.title,
+      item.message,
+      item.deployment_id,
+      inferActivityCategory(item.title, item.message),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalizedNotificationQuery);
+  });
+  const normalizedTemplateQuery = templateQuery.trim().toLowerCase();
+  const filteredTemplates = [...templates]
+    .filter((template) => {
+      if (templateFilter === "unused" && (template.use_count || 0) > 0) {
+        return false;
+      }
+
+      if (templateFilter === "recent" && !isRecentDate(template.last_used_at, 7)) {
+        return false;
+      }
+
+      if (templateFilter === "popular" && (template.use_count || 0) === 0) {
+        return false;
+      }
+
+      if (!normalizedTemplateQuery) {
+        return true;
+      }
+
+      const haystack = [
+        template.template_name,
+        template.image,
+        template.name,
+        template.server_name,
+        template.server_host,
+        Object.keys(template.env || {}).join(" "),
+        Object.values(template.env || {}).join(" "),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedTemplateQuery);
+    })
+    .sort((left, right) => {
+      if (templateFilter === "popular") {
+        return (right.use_count || 0) - (left.use_count || 0);
+      }
+
+      if (templateFilter === "recent") {
+        return new Date(right.last_used_at || 0).getTime() - new Date(left.last_used_at || 0).getTime();
+      }
+
+      return 0;
+    });
   const previewTemplate =
     filteredTemplates.find((template) => template.id === templatePreviewId) ||
     templates.find((template) => template.id === templatePreviewId) ||
     null;
+  const opsSnapshot = buildOpsSnapshot({
+    currentUser,
+    deployments,
+    servers,
+    notifications,
+    templates,
+  });
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -1343,6 +1622,38 @@ export default function HomePage() {
     }
   }
 
+  function clearOpsMessages() {
+    setOpsActionMessage("");
+    setOpsActionError("");
+  }
+
+  async function handleCopyOpsSummary() {
+    clearOpsMessages();
+
+    try {
+      await navigator.clipboard.writeText(buildOpsSummaryText(opsSnapshot));
+      setOpsActionMessage("Operations summary copied to clipboard.");
+    } catch {
+      setOpsActionError("Failed to copy operations summary.");
+    }
+  }
+
+  function handleDownloadSnapshot() {
+    clearOpsMessages();
+    downloadJsonFile("deploymate-ops-snapshot.json", opsSnapshot);
+    setOpsActionMessage("Operations snapshot downloaded.");
+  }
+
+  function handleDownloadCollection(name, items) {
+    clearOpsMessages();
+    downloadJsonFile(`deploymate-${name}.json`, {
+      exported_at: new Date().toISOString(),
+      count: items.length,
+      items,
+    });
+    setOpsActionMessage(`${name} export downloaded.`);
+  }
+
   const currentDraft = buildCurrentDraft();
   const templateFormPreflight = validateTemplateDraft(currentDraft, {
     ignoreTemplateId: editingTemplateId,
@@ -1400,6 +1711,8 @@ export default function HomePage() {
         {templatesError ? <div className="banner error">{templatesError}</div> : null}
         {templateDeleteError ? <div className="banner error">{templateDeleteError}</div> : null}
         {templateDeployError ? <div className="banner error">{templateDeployError}</div> : null}
+        {opsActionError ? <div className="banner error">{opsActionError}</div> : null}
+        {opsActionMessage ? <div className="banner success">{opsActionMessage}</div> : null}
         {currentUser?.must_change_password ? (
           <div className="banner error">
             You are still using the default admin password.{" "}
@@ -1432,6 +1745,109 @@ export default function HomePage() {
         <div className="banner subtle">
           Deployments and notifications refresh automatically every 8 seconds.
         </div>
+
+        <article className="card formCard">
+          <div className="sectionHeader">
+            <div>
+              <h2>Operations overview</h2>
+              <p className="formHint">
+                High-signal summary, attention items, and export actions built from the current dashboard state.
+              </p>
+            </div>
+            <div className="actions">
+              <button type="button" onClick={handleCopyOpsSummary}>
+                Copy summary
+              </button>
+              <button type="button" onClick={handleDownloadSnapshot}>
+                Download snapshot
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadCollection("deployments", deployments)}
+              >
+                Export deployments
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadCollection("activity", notifications)}
+              >
+                Export activity
+              </button>
+            </div>
+          </div>
+
+          <div className="overviewGrid">
+            <div className="overviewCard">
+              <span className="overviewLabel">Deployments</span>
+              <strong className="overviewValue">{opsSnapshot.deployments.total}</strong>
+              <div className="overviewMeta">
+                <span>Running {opsSnapshot.deployments.running}</span>
+                <span>Failed {opsSnapshot.deployments.failed}</span>
+                <span>Pending {opsSnapshot.deployments.pending}</span>
+                <span>Public URLs {opsSnapshot.deployments.public_urls}</span>
+              </div>
+            </div>
+            <div className="overviewCard">
+              <span className="overviewLabel">Servers</span>
+              <strong className="overviewValue">{opsSnapshot.servers.total}</strong>
+              <div className="overviewMeta">
+                <span>Password auth {opsSnapshot.servers.password_auth}</span>
+                <span>SSH key auth {opsSnapshot.servers.ssh_key_auth}</span>
+                <span>Unused {opsSnapshot.servers.unused}</span>
+              </div>
+            </div>
+            <div className="overviewCard">
+              <span className="overviewLabel">Activity</span>
+              <strong className="overviewValue">{opsSnapshot.notifications.total}</strong>
+              <div className="overviewMeta">
+                <span>Success {opsSnapshot.notifications.success}</span>
+                <span>Errors {opsSnapshot.notifications.error}</span>
+                <span>
+                  Latest error{" "}
+                  {opsSnapshot.notifications.latest_error_at
+                    ? formatDate(opsSnapshot.notifications.latest_error_at)
+                    : "N/A"}
+                </span>
+              </div>
+            </div>
+            <div className="overviewCard">
+              <span className="overviewLabel">Templates</span>
+              <strong className="overviewValue">{opsSnapshot.templates.total}</strong>
+              <div className="overviewMeta">
+                <span>Unused {opsSnapshot.templates.unused}</span>
+                <span>Used in 7d {opsSnapshot.templates.recently_used}</span>
+                <span>
+                  Top {opsSnapshot.templates.top_template_name || "No popular template yet"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {opsSnapshot.attention_items.length > 0 ? (
+            <div className="overviewAttentionList">
+              {opsSnapshot.attention_items.map((item, index) => (
+                <div key={`${item.title}-${index}`} className="overviewAttentionItem">
+                  <div className="row">
+                    <span className="label">Level</span>
+                    <span className={`status ${item.level === "info" ? "unknown" : item.level}`}>
+                      {item.level}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Title</span>
+                    <span>{item.title}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Action</span>
+                    <span>{item.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="banner subtle">No immediate attention items from the current data.</div>
+          )}
+        </article>
 
         <article className="card formCard onboardingCard">
           <h2>Getting Started</h2>
@@ -1472,7 +1888,23 @@ export default function HomePage() {
         ) : null}
 
         <article className="card formCard">
-          <h2>Servers</h2>
+          <div className="sectionHeader">
+            <div>
+              <h2>Servers</h2>
+              <p className="formHint">
+                Search saved targets, run diagnostics, and watch for unused entries before the next rollout.
+              </p>
+            </div>
+            <label className="field toolbarField">
+              <span>Search servers</span>
+              <input
+                value={serverQuery}
+                onChange={(event) => setServerQuery(event.target.value)}
+                placeholder="demo-vps, 203.0.113.10, root"
+                disabled={serversLoading}
+              />
+            </label>
+          </div>
           <form className="form" onSubmit={handleCreateServer}>
             <label className="field">
               <span>Name</span>
@@ -1583,7 +2015,11 @@ export default function HomePage() {
               <div className="empty">No servers yet. Local deploy is still available.</div>
             ) : null}
 
-            {servers.map((server) => (
+            {!serversLoading && servers.length > 0 && filteredServers.length === 0 ? (
+              <div className="empty">No servers match this search.</div>
+            ) : null}
+
+            {filteredServers.map((server) => (
               <article className="card compactCard" key={server.id}>
                 <div className="row">
                   <span className="label">Name</span>
@@ -1789,6 +2225,16 @@ export default function HomePage() {
             </button>
           </div>
 
+          <label className="field toolbarField">
+            <span>Search activity</span>
+            <input
+              value={notificationQuery}
+              onChange={(event) => setNotificationQuery(event.target.value)}
+              placeholder="deployment failed, health, delete"
+              disabled={notificationsLoading}
+            />
+          </label>
+
           {notificationsError ? <div className="banner error">{notificationsError}</div> : null}
 
           {notificationsLoading && notifications.length === 0 ? (
@@ -1820,6 +2266,12 @@ export default function HomePage() {
                     <span>{item.title || "-"}</span>
                   </div>
                   <div className="row">
+                    <span className="label">Category</span>
+                    <span className="status unknown">
+                      {inferActivityCategory(item.title, item.message)}
+                    </span>
+                  </div>
+                  <div className="row">
                     <span className="label">Message</span>
                     <span>{item.message || "-"}</span>
                   </div>
@@ -1846,10 +2298,44 @@ export default function HomePage() {
         </article>
 
         <article className="card formCard">
-          <h2>Deployment templates</h2>
-          <p className="formHint">
-            Save common image, ports, server, and env settings once, then deploy directly or apply them back to the create form.
-          </p>
+          <div className="sectionHeader">
+            <div>
+              <h2>Deployment templates</h2>
+              <p className="formHint">
+                Save common image, ports, server, and env settings once, then deploy directly or apply them back to the create form.
+              </p>
+            </div>
+          </div>
+          <div className="filterTabs historyFilters" role="tablist" aria-label="Template filters">
+            <button
+              type="button"
+              className={templateFilter === "all" ? "active" : ""}
+              onClick={() => setTemplateFilter("all")}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={templateFilter === "unused" ? "active" : ""}
+              onClick={() => setTemplateFilter("unused")}
+            >
+              Unused
+            </button>
+            <button
+              type="button"
+              className={templateFilter === "recent" ? "active" : ""}
+              onClick={() => setTemplateFilter("recent")}
+            >
+              Used in 7d
+            </button>
+            <button
+              type="button"
+              className={templateFilter === "popular" ? "active" : ""}
+              onClick={() => setTemplateFilter("popular")}
+            >
+              Popular
+            </button>
+          </div>
           <label className="field">
             <span>Search templates</span>
             <input
@@ -2261,7 +2747,7 @@ export default function HomePage() {
           ) : null}
         </article>
 
-        <div className="sectionHeader deploymentsHeader">
+          <div className="sectionHeader deploymentsHeader">
           <div>
             <h2>Deployments</h2>
             <p className="formHint">
@@ -2300,6 +2786,9 @@ export default function HomePage() {
                 placeholder="nginx, test-nginx, main-vps"
               />
             </label>
+            <div className="banner subtle inlineBanner">
+              Showing {filteredDeployments.length} of {deployments.length} deployments.
+            </div>
           </div>
         </div>
 
