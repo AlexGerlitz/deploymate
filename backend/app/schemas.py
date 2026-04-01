@@ -152,11 +152,14 @@ class AdminUserCreateRequest(BaseModel):
 
 
 class AdminUserUpdateRequest(BaseModel):
-    role: UserRole
+    role: Optional[UserRole] = None
+    plan: Optional[UserPlan] = None
 
 
 class AdminUserItem(BaseModel):
     id: str
     username: str
+    plan: UserPlan = "trial"
     role: UserRole
+    must_change_password: bool = False
     created_at: str

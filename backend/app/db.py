@@ -548,6 +548,19 @@ def set_user_role(user_id: str, role: str) -> None:
         conn.commit()
 
 
+def set_user_plan(user_id: str, plan: str) -> None:
+    update_sql = """
+    UPDATE users
+    SET plan = %s
+    WHERE id = %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(update_sql, (plan, user_id))
+        conn.commit()
+
+
 def insert_user(user_record: dict[str, Any]) -> None:
     insert_sql = """
     INSERT INTO users (

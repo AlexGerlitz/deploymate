@@ -47,6 +47,28 @@ export default function UpgradeRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
+  const [query, setQuery] = useState("");
+  const [planFilter, setPlanFilter] = useState("all");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredRequests = requests.filter((item) => {
+    if (planFilter !== "all" && (item.current_plan || "-") !== planFilter) {
+      return false;
+    }
+    if (!normalizedQuery) {
+      return true;
+    }
+    return [
+      item.name,
+      item.email,
+      item.company_or_team,
+      item.use_case,
+      item.current_plan,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedQuery);
+  });
 
   async function loadRequests() {
     setLoading(true);
@@ -157,6 +179,53 @@ export default function UpgradeRequestsPage() {
 
         {error ? <div className="banner error">{error}</div> : null}
 
+        <article className="card formCard">
+          <div className="sectionHeader">
+            <h2>Inbox filters</h2>
+            <p className="formHint">Filter by current plan or search by requester details.</p>
+          </div>
+          <div className="deploymentControls">
+            <div className="filterTabs" role="tablist" aria-label="Upgrade plan filters">
+              <button
+                type="button"
+                className={planFilter === "all" ? "active" : ""}
+                onClick={() => setPlanFilter("all")}
+              >
+                All plans
+              </button>
+              <button
+                type="button"
+                className={planFilter === "trial" ? "active" : ""}
+                onClick={() => setPlanFilter("trial")}
+              >
+                Trial
+              </button>
+              <button
+                type="button"
+                className={planFilter === "solo" ? "active" : ""}
+                onClick={() => setPlanFilter("solo")}
+              >
+                Solo
+              </button>
+              <button
+                type="button"
+                className={planFilter === "team" ? "active" : ""}
+                onClick={() => setPlanFilter("team")}
+              >
+                Team
+              </button>
+            </div>
+            <label className="field deploymentSearch">
+              <span>Search</span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="name, email, company, use case"
+              />
+            </label>
+          </div>
+        </article>
+
         {loading && requests.length === 0 ? (
           <div className="empty">Loading upgrade requests...</div>
         ) : null}
@@ -166,7 +235,11 @@ export default function UpgradeRequestsPage() {
         ) : null}
 
         <div className="list">
-          {requests.map((item) => (
+          {!loading && requests.length > 0 && filteredRequests.length === 0 ? (
+            <div className="empty">No upgrade requests match this filter.</div>
+          ) : null}
+
+          {filteredRequests.map((item) => (
             <article className="card compactCard" key={item.id}>
               <div className="row">
                 <span className="label">Name</span>

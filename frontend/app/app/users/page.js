@@ -51,10 +51,26 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState("");
   const [deletingUserId, setDeletingUserId] = useState("");
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState("all");
   const [form, setForm] = useState({
     username: "",
     password: "",
     role: "member",
+  });
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredUsers = users.filter((user) => {
+    if (roleFilter !== "all" && user.role !== roleFilter) {
+      return false;
+    }
+    if (planFilter !== "all" && user.plan !== planFilter) {
+      return false;
+    }
+    if (!normalizedQuery) {
+      return true;
+    }
+    return user.username.toLowerCase().includes(normalizedQuery);
   });
 
   async function loadUsers() {
@@ -186,6 +202,36 @@ export default function UsersPage() {
     }
   }
 
+  async function handlePlanChange(userId, plan) {
+    setUpdatingUserId(userId);
+    setError("");
+    setSuccess("");
+
+    try {
+      await readJsonOrError(
+        await fetch(`${apiBaseUrl}/admin/users/${userId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ plan }),
+        }),
+        "Failed to update user plan.",
+      );
+      setSuccess("User plan updated successfully.");
+      await loadUsers();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to update user plan.",
+      );
+    } finally {
+      setUpdatingUserId("");
+    }
+  }
+
   async function handleDeleteUser(userId) {
     const confirmed = window.confirm("Delete this user?");
     if (!confirmed) {
@@ -267,6 +313,78 @@ export default function UsersPage() {
         {success ? <div className="banner success">{success}</div> : null}
 
         <article className="card formCard">
+          <div className="sectionHeader">
+            <h2>Users overview</h2>
+            <p className="formHint">
+              Filter by role or plan, and search by username.
+            </p>
+          </div>
+          <div className="deploymentControls">
+            <div className="filterTabs" role="tablist" aria-label="User role filters">
+              <button
+                type="button"
+                className={roleFilter === "all" ? "active" : ""}
+                onClick={() => setRoleFilter("all")}
+              >
+                All roles
+              </button>
+              <button
+                type="button"
+                className={roleFilter === "admin" ? "active" : ""}
+                onClick={() => setRoleFilter("admin")}
+              >
+                Admin
+              </button>
+              <button
+                type="button"
+                className={roleFilter === "member" ? "active" : ""}
+                onClick={() => setRoleFilter("member")}
+              >
+                Member
+              </button>
+            </div>
+            <div className="filterTabs" role="tablist" aria-label="User plan filters">
+              <button
+                type="button"
+                className={planFilter === "all" ? "active" : ""}
+                onClick={() => setPlanFilter("all")}
+              >
+                All plans
+              </button>
+              <button
+                type="button"
+                className={planFilter === "trial" ? "active" : ""}
+                onClick={() => setPlanFilter("trial")}
+              >
+                Trial
+              </button>
+              <button
+                type="button"
+                className={planFilter === "solo" ? "active" : ""}
+                onClick={() => setPlanFilter("solo")}
+              >
+                Solo
+              </button>
+              <button
+                type="button"
+                className={planFilter === "team" ? "active" : ""}
+                onClick={() => setPlanFilter("team")}
+              >
+                Team
+              </button>
+            </div>
+            <label className="field deploymentSearch">
+              <span>Search</span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="admin, alice, bob"
+              />
+            </label>
+          </div>
+        </article>
+
+        <article className="card formCard">
           <h2>Create user</h2>
           <form className="form" onSubmit={handleCreateUser}>
             <label className="field">
@@ -322,15 +440,27 @@ export default function UsersPage() {
         ) : null}
 
         <div className="list">
-          {users.map((user) => (
+          {!loading && users.length > 0 && filteredUsers.length === 0 ? (
+            <div className="empty">No users match this filter.</div>
+          ) : null}
+
+          {filteredUsers.map((user) => (
             <article className="card compactCard" key={user.id}>
               <div className="row">
                 <span className="label">Username</span>
                 <span>{user.username}</span>
               </div>
               <div className="row">
+                <span className="label">Plan</span>
+                <span>{user.plan}</span>
+              </div>
+              <div className="row">
                 <span className="label">Role</span>
                 <span>{user.role}</span>
+              </div>
+              <div className="row">
+                <span className="label">Password</span>
+                <span>{user.must_change_password ? "Change required" : "OK"}</span>
               </div>
               <div className="row">
                 <span className="label">Created</span>
@@ -341,13 +471,22 @@ export default function UsersPage() {
                   value={user.role}
                   onChange={(event) => handleRoleChange(user.id, event.target.value)}
                   disabled={updatingUserId === user.id || deletingUserId === user.id}
-                >
-                  <option value="member">member</option>
-                  <option value="admin">admin</option>
-                </select>
-                <button
-                  type="button"
-                  className="dangerButton"
+                  >
+                    <option value="member">member</option>
+                    <option value="admin">admin</option>
+                  </select>
+                  <select
+                    value={user.plan}
+                    onChange={(event) => handlePlanChange(user.id, event.target.value)}
+                    disabled={updatingUserId === user.id}
+                  >
+                    <option value="trial">trial</option>
+                    <option value="solo">solo</option>
+                    <option value="team">team</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="dangerButton"
                   onClick={() => handleDeleteUser(user.id)}
                   disabled={deletingUserId === user.id || updatingUserId === user.id}
                 >

@@ -16,6 +16,7 @@ from app.db import (
     insert_user,
     list_upgrade_requests,
     list_users,
+    set_user_plan,
     set_user_role,
 )
 from app.schemas import (
@@ -131,9 +132,23 @@ def update_user(user_id: str, payload: AdminUserUpdateRequest) -> AdminUserItem:
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    if user["role"] == "admin" and payload.role != "admin" and count_users_by_role("admin") <= 1:
+
+    if payload.role is None and payload.plan is None:
+        raise HTTPException(status_code=400, detail="At least one field must be provided.")
+
+    if (
+        payload.role is not None
+        and user["role"] == "admin"
+        and payload.role != "admin"
+        and count_users_by_role("admin") <= 1
+    ):
         raise HTTPException(status_code=400, detail="Cannot demote the last admin user.")
-    set_user_role(user_id, payload.role)
+
+    if payload.role is not None:
+        set_user_role(user_id, payload.role)
+    if payload.plan is not None:
+        set_user_plan(user_id, payload.plan)
+
     updated_user = get_user_by_id(user_id)
     return AdminUserItem(**updated_user)
 
