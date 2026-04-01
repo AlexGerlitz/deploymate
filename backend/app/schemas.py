@@ -58,6 +58,13 @@ class DeploymentTemplateResponse(BaseModel):
     server_host: Optional[str] = None
     env: Dict[str, str] = Field(default_factory=dict)
     created_at: str
+    updated_at: Optional[str] = None
+    last_used_at: Optional[str] = None
+    use_count: int = 0
+
+
+class DeploymentTemplateDuplicateRequest(BaseModel):
+    template_name: Optional[str] = Field(default=None, min_length=1)
 
 
 class DeploymentDeleteResponse(BaseModel):

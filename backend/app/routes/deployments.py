@@ -19,8 +19,10 @@ from app.db import (
     list_deployment_activity,
     list_deployment_records,
     list_deployment_templates,
+    mark_deployment_template_used,
     update_deployment_configuration,
     update_deployment_record,
+    update_deployment_template,
 )
 from app.schemas import (
     DeploymentCreateRequest,
@@ -29,6 +31,7 @@ from app.schemas import (
     DeploymentLogsResponse,
     DeploymentResponse,
     DeploymentTemplateCreateRequest,
+    DeploymentTemplateDuplicateRequest,
     DeploymentTemplateResponse,
     NotificationResponse,
 )
@@ -161,6 +164,43 @@ def _create_deployment(
     return DeploymentResponse(**saved_record)
 
 
+def _build_template_record(
+    template_id: str,
+    payload: DeploymentTemplateCreateRequest,
+    created_at: datetime | None = None,
+    updated_at: datetime | None = None,
+    last_used_at: datetime | None = None,
+    use_count: int = 0,
+) -> dict:
+    created = created_at or datetime.now(timezone.utc)
+    updated = updated_at or created
+    return {
+        "id": template_id,
+        "template_name": payload.template_name.strip(),
+        "image": payload.image.strip(),
+        "name": payload.name.strip() if payload.name else None,
+        "internal_port": payload.internal_port,
+        "external_port": payload.external_port,
+        "server_id": payload.server_id,
+        "env": json.dumps(payload.env),
+        "created_at": created,
+        "updated_at": updated,
+        "last_used_at": last_used_at,
+        "use_count": use_count,
+    }
+
+
+def _validate_template_payload(payload: DeploymentTemplateCreateRequest) -> None:
+    if (payload.internal_port is None) != (payload.external_port is None):
+        raise HTTPException(
+            status_code=400,
+            detail="internal_port and external_port must be provided together.",
+        )
+
+    if payload.server_id:
+        get_server_or_404(payload.server_id)
+
+
 @router.get("/deployments", response_model=List[DeploymentResponse])
 def list_deployments() -> List[DeploymentResponse]:
     deployments = list_deployment_records()
@@ -177,30 +217,75 @@ def list_templates() -> List[DeploymentTemplateResponse]:
 def create_template(
     payload: DeploymentTemplateCreateRequest,
 ) -> DeploymentTemplateResponse:
-    if (payload.internal_port is None) != (payload.external_port is None):
-        raise HTTPException(
-            status_code=400,
-            detail="internal_port and external_port must be provided together.",
-        )
-
-    if payload.server_id:
-        get_server_or_404(payload.server_id)
-
+    _validate_template_payload(payload)
     template_id = str(uuid.uuid4())
-    template_record = {
-        "id": template_id,
-        "template_name": payload.template_name.strip(),
-        "image": payload.image,
-        "name": payload.name.strip() if payload.name else None,
-        "internal_port": payload.internal_port,
-        "external_port": payload.external_port,
-        "server_id": payload.server_id,
-        "env": json.dumps(payload.env),
-        "created_at": datetime.now(timezone.utc),
-    }
+    template_record = _build_template_record(template_id, payload)
 
     insert_deployment_template(template_record)
     saved_template = get_deployment_template_or_404(template_id)
+    return DeploymentTemplateResponse(**saved_template)
+
+
+@router.put(
+    "/deployment-templates/{template_id}",
+    response_model=DeploymentTemplateResponse,
+)
+def update_template_endpoint(
+    template_id: str,
+    payload: DeploymentTemplateCreateRequest,
+) -> DeploymentTemplateResponse:
+    existing_template = get_deployment_template_or_404(template_id)
+    _validate_template_payload(payload)
+    update_deployment_template(
+        template_id,
+        {
+            "template_name": payload.template_name.strip(),
+            "image": payload.image.strip(),
+            "name": payload.name.strip() if payload.name else None,
+            "internal_port": payload.internal_port,
+            "external_port": payload.external_port,
+            "server_id": payload.server_id,
+            "env": json.dumps(payload.env),
+            "updated_at": datetime.now(timezone.utc),
+        },
+    )
+    saved_template = get_deployment_template_or_404(template_id)
+    if saved_template["id"] != existing_template["id"]:
+        raise HTTPException(status_code=500, detail="Template update failed.")
+    return DeploymentTemplateResponse(**saved_template)
+
+
+@router.post(
+    "/deployment-templates/{template_id}/duplicate",
+    response_model=DeploymentTemplateResponse,
+)
+def duplicate_template(
+    template_id: str,
+    payload: DeploymentTemplateDuplicateRequest | None = None,
+) -> DeploymentTemplateResponse:
+    template = get_deployment_template_or_404(template_id)
+    duplicate_id = str(uuid.uuid4())
+    duplicate_name = (
+        payload.template_name.strip()
+        if payload and payload.template_name
+        else f"{template['template_name']} copy"
+    )
+    template_record = {
+        "id": duplicate_id,
+        "template_name": duplicate_name,
+        "image": template["image"],
+        "name": template.get("name"),
+        "internal_port": template.get("internal_port"),
+        "external_port": template.get("external_port"),
+        "server_id": template.get("server_id"),
+        "env": json.dumps(template.get("env") or {}),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "last_used_at": None,
+        "use_count": 0,
+    }
+    insert_deployment_template(template_record)
+    saved_template = get_deployment_template_or_404(duplicate_id)
     return DeploymentTemplateResponse(**saved_template)
 
 
@@ -221,7 +306,9 @@ def deploy_from_template(
         server_id=template.get("server_id"),
         env=template.get("env") or {},
     )
-    return _create_deployment(payload, user)
+    deployment = _create_deployment(payload, user)
+    mark_deployment_template_used(template_id)
+    return deployment
 
 
 @router.delete(

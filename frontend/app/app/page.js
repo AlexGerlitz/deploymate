@@ -34,6 +34,34 @@ function formatSuggestedPorts(ports) {
   return ports.join(", ");
 }
 
+function formatServerLabel(serverName, serverHost) {
+  return serverName ? `${serverName} (${serverHost})` : "Local";
+}
+
+function formatPortMapping(internalPort, externalPort) {
+  if (!internalPort || !externalPort) {
+    return "No port mapping";
+  }
+  return `${externalPort}:${internalPort}`;
+}
+
+function normalizeDraftValue(value) {
+  return value === null || value === undefined || value === "" ? "" : String(value);
+}
+
+function buildEnvRowsFromObject(env) {
+  return Object.entries(env || {}).length > 0
+    ? Object.entries(env || {}).map(([key, value]) => ({
+        key,
+        value: String(value ?? ""),
+      }))
+    : [{ key: "", value: "" }];
+}
+
+function countFilledEnvRows(rows) {
+  return rows.filter((row) => row.key.trim()).length;
+}
+
 function normalizeCreateDeploymentError(message) {
   return normalizeDeploymentActionError(
     message,
@@ -76,6 +104,49 @@ async function readJsonOrError(response, fallbackMessage) {
   return payload;
 }
 
+function buildTemplateDiff(template, currentDraft, servers) {
+  if (!template) {
+    return [];
+  }
+
+  const currentServer =
+    servers.find((server) => server.id === currentDraft.server_id) || null;
+  const envText = JSON.stringify(template.env || {}, null, 2);
+  const currentEnvText = JSON.stringify(currentDraft.env || {}, null, 2);
+  const rows = [
+    {
+      label: "Image",
+      templateValue: normalizeDraftValue(template.image),
+      currentValue: normalizeDraftValue(currentDraft.image),
+    },
+    {
+      label: "Deploy name",
+      templateValue: normalizeDraftValue(template.name || "Auto-generate"),
+      currentValue: normalizeDraftValue(currentDraft.name || "Auto-generate"),
+    },
+    {
+      label: "Server",
+      templateValue: formatServerLabel(template.server_name, template.server_host),
+      currentValue: formatServerLabel(currentServer?.name, currentServer?.host),
+    },
+    {
+      label: "Ports",
+      templateValue: formatPortMapping(template.internal_port, template.external_port),
+      currentValue: formatPortMapping(
+        currentDraft.internal_port ? Number(currentDraft.internal_port) : null,
+        currentDraft.external_port ? Number(currentDraft.external_port) : null,
+      ),
+    },
+    {
+      label: "Env",
+      templateValue: envText === "{}" ? "No env vars" : envText,
+      currentValue: currentEnvText === "{}" ? "No env vars" : currentEnvText,
+    },
+  ];
+
+  return rows.filter((row) => row.templateValue !== row.currentValue);
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
@@ -108,6 +179,8 @@ export default function HomePage() {
   const [templateDeployError, setTemplateDeployError] = useState("");
   const [templateDeploySuccess, setTemplateDeploySuccess] = useState("");
   const [templateCreatedDeployment, setTemplateCreatedDeployment] = useState(null);
+  const [templateDuplicateError, setTemplateDuplicateError] = useState("");
+  const [templateDuplicateSuccess, setTemplateDuplicateSuccess] = useState("");
 
   const [deleteError, setDeleteError] = useState("");
   const [deletingDeploymentId, setDeletingDeploymentId] = useState("");
@@ -116,11 +189,15 @@ export default function HomePage() {
   const [templateDeleteError, setTemplateDeleteError] = useState("");
   const [deletingTemplateId, setDeletingTemplateId] = useState("");
   const [deployingTemplateId, setDeployingTemplateId] = useState("");
+  const [duplicatingTemplateId, setDuplicatingTemplateId] = useState("");
   const [testingServerId, setTestingServerId] = useState("");
   const [serverTestResults, setServerTestResults] = useState({});
   const [deploymentFilter, setDeploymentFilter] = useState("all");
   const [deploymentQuery, setDeploymentQuery] = useState("");
   const [notificationFilter, setNotificationFilter] = useState("all");
+  const [templateQuery, setTemplateQuery] = useState("");
+  const [templatePreviewId, setTemplatePreviewId] = useState("");
+  const [editingTemplateId, setEditingTemplateId] = useState("");
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
 
@@ -191,6 +268,31 @@ export default function HomePage() {
 
     return true;
   });
+  const normalizedTemplateQuery = templateQuery.trim().toLowerCase();
+  const filteredTemplates = templates.filter((template) => {
+    if (!normalizedTemplateQuery) {
+      return true;
+    }
+
+    const haystack = [
+      template.template_name,
+      template.image,
+      template.name,
+      template.server_name,
+      template.server_host,
+      Object.keys(template.env || {}).join(" "),
+      Object.values(template.env || {}).join(" "),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalizedTemplateQuery);
+  });
+  const previewTemplate =
+    filteredTemplates.find((template) => template.id === templatePreviewId) ||
+    templates.find((template) => template.id === templatePreviewId) ||
+    null;
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -483,27 +585,197 @@ export default function HomePage() {
     return env;
   }
 
-  function buildTemplatePayload() {
-    const payload = {
+  function buildEnvIssues(rows) {
+    const seenKeys = new Set();
+    const issues = [];
+
+    rows.forEach((row, index) => {
+      const key = row.key.trim();
+      if (!key && row.value.trim()) {
+        issues.push(`Env var row ${index + 1} has a value but no key.`);
+        return;
+      }
+
+      if (!key) {
+        return;
+      }
+
+      if (seenKeys.has(key)) {
+        issues.push(`Env var key "${key}" is duplicated.`);
+        return;
+      }
+
+      seenKeys.add(key);
+    });
+
+    return issues;
+  }
+
+  function buildCurrentDraft() {
+    return {
+      id: editingTemplateId || "",
       template_name: templateName.trim(),
       image: form.image.trim(),
+      name: form.name.trim(),
+      internal_port: form.internal_port.trim(),
+      external_port: form.external_port.trim(),
+      server_id: form.server_id,
       env: buildEnvPayload(envRows),
+      envRows,
+    };
+  }
+
+  function buildTemplateDraftFromTemplate(template) {
+    return {
+      id: template.id,
+      template_name: template.template_name || "",
+      image: template.image || "",
+      name: template.name || "",
+      internal_port:
+        template.internal_port === null || template.internal_port === undefined
+          ? ""
+          : String(template.internal_port),
+      external_port:
+        template.external_port === null || template.external_port === undefined
+          ? ""
+          : String(template.external_port),
+      server_id: template.server_id || "",
+      env: template.env || {},
+      envRows: buildEnvRowsFromObject(template.env || {}),
+    };
+  }
+
+  function validateTemplateDraft(draft, options = {}) {
+    const { forDeployment = false, ignoreTemplateId = "" } = options;
+    const errors = [];
+    const warnings = [];
+    const internalPort = draft.internal_port.trim();
+    const externalPort = draft.external_port.trim();
+    const envIssues = buildEnvIssues(draft.envRows || []);
+
+    if (!draft.image.trim()) {
+      errors.push("Image is required.");
+    }
+
+    if ((internalPort && !externalPort) || (!internalPort && externalPort)) {
+      errors.push("Internal port and external port must be provided together.");
+    }
+
+    errors.push(...envIssues);
+
+    const matchingDeployment = deployments.find((deployment) => {
+      if (!externalPort || !deployment.external_port) {
+        return false;
+      }
+
+      return (
+        String(deployment.external_port) === externalPort &&
+        (deployment.server_id || "") === (draft.server_id || "")
+      );
+    });
+
+    if (matchingDeployment) {
+      errors.push(
+        `Port ${externalPort} is already used by deployment ${matchingDeployment.container_name}.`,
+      );
+    }
+
+    const matchingTemplate = templates.find((template) => {
+      if (!externalPort || !template.external_port) {
+        return false;
+      }
+
+      return (
+        template.id !== ignoreTemplateId &&
+        String(template.external_port) === externalPort &&
+        (template.server_id || "") === (draft.server_id || "")
+      );
+    });
+
+    if (matchingTemplate) {
+      warnings.push(
+        `Template "${matchingTemplate.template_name}" already reserves port ${externalPort}.`,
+      );
+    }
+
+    if (!draft.server_id && externalPort) {
+      warnings.push(
+        "This deploy/template targets Local. Make sure the external port is free on the DeployMate host.",
+      );
+    }
+
+    if (forDeployment && deploymentLimitReached) {
+      errors.push("Deployment limit reached for your current plan. Upgrade to continue.");
+    }
+
+    return { errors, warnings };
+  }
+
+  function applyTemplateToForm(template, options = {}) {
+    const { startEditing = false } = options;
+    setForm({
+      image: template.image || "",
+      name: template.name || "",
+      internal_port:
+        template.internal_port === null || template.internal_port === undefined
+          ? ""
+          : String(template.internal_port),
+      external_port:
+        template.external_port === null || template.external_port === undefined
+          ? ""
+          : String(template.external_port),
+      server_id: template.server_id || "",
+    });
+    setEnvRows(buildEnvRowsFromObject(template.env || {}));
+    setTemplateName(template.template_name || "");
+    setTemplatePreviewId(template.id);
+    setCreatedDeployment(null);
+    setTemplateCreatedDeployment(null);
+    setTemplateDeployError("");
+    setTemplateDuplicateError("");
+    setTemplateDuplicateSuccess("");
+    setSubmitError("");
+    setTemplateSubmitError("");
+    if (startEditing) {
+      setEditingTemplateId(template.id);
+      setTemplateSubmitSuccess(`Editing template "${template.template_name}". Save to update it.`);
+      setSubmitSuccess("");
+      return;
+    }
+
+    setEditingTemplateId("");
+    setSubmitSuccess(`Template "${template.template_name}" applied to the deploy form.`);
+  }
+
+  function cancelTemplateEditing() {
+    setEditingTemplateId("");
+    setTemplateName("");
+    setTemplateSubmitError("");
+    setTemplateSubmitSuccess("");
+  }
+
+  function buildTemplatePayload() {
+    const draft = buildCurrentDraft();
+    const payload = {
+      template_name: draft.template_name,
+      image: draft.image,
+      env: draft.env,
     };
 
-    if (form.name.trim()) {
-      payload.name = form.name.trim();
+    if (draft.name) {
+      payload.name = draft.name;
     }
 
-    if (form.internal_port.trim()) {
-      payload.internal_port = Number(form.internal_port);
+    if (draft.internal_port) {
+      payload.internal_port = Number(draft.internal_port);
     }
 
-    if (form.external_port.trim()) {
-      payload.external_port = Number(form.external_port);
+    if (draft.external_port) {
+      payload.external_port = Number(draft.external_port);
     }
 
-    if (form.server_id) {
-      payload.server_id = form.server_id;
+    if (draft.server_id) {
+      payload.server_id = draft.server_id;
     }
 
     return payload;
@@ -516,31 +788,42 @@ export default function HomePage() {
     setSubmitSuccess("");
     setCreatedDeployment(null);
 
-    if (deploymentLimitReached) {
-      setSubmitError("Deployment limit reached for your current plan. Upgrade to continue.");
+    const draft = buildCurrentDraft();
+    const preflight = validateTemplateDraft(draft, { forDeployment: true });
+
+    if (preflight.errors.length > 0) {
+      setSubmitError(preflight.errors[0]);
+      setSubmitting(false);
+      return;
+    }
+
+    if (
+      preflight.warnings.length > 0 &&
+      !window.confirm(`${preflight.warnings.join("\n")}\n\nCreate deployment anyway?`)
+    ) {
       setSubmitting(false);
       return;
     }
 
     const payload = {
-      image: form.image,
-      env: buildEnvPayload(envRows),
+      image: draft.image,
+      env: draft.env,
     };
 
-    if (form.name.trim()) {
-      payload.name = form.name.trim();
+    if (draft.name) {
+      payload.name = draft.name;
     }
 
-    if (form.internal_port.trim()) {
-      payload.internal_port = Number(form.internal_port);
+    if (draft.internal_port) {
+      payload.internal_port = Number(draft.internal_port);
     }
 
-    if (form.external_port.trim()) {
-      payload.external_port = Number(form.external_port);
+    if (draft.external_port) {
+      payload.external_port = Number(draft.external_port);
     }
 
-    if (form.server_id) {
-      payload.server_id = form.server_id;
+    if (draft.server_id) {
+      payload.server_id = draft.server_id;
     }
 
     try {
@@ -586,20 +869,63 @@ export default function HomePage() {
     setTemplateSubmitError("");
     setTemplateSubmitSuccess("");
     setTemplateDeployError("");
+    setTemplateDuplicateError("");
+    setTemplateDuplicateSuccess("");
+
+    const draft = buildCurrentDraft();
+    const preflight = validateTemplateDraft(draft, {
+      ignoreTemplateId: editingTemplateId,
+    });
+
+    if (!draft.template_name) {
+      setTemplateSubmitError("Template name is required.");
+      setTemplateSubmitting(false);
+      return;
+    }
+
+    if (preflight.errors.length > 0) {
+      setTemplateSubmitError(preflight.errors[0]);
+      setTemplateSubmitting(false);
+      return;
+    }
+
+    if (
+      preflight.warnings.length > 0 &&
+      !window.confirm(`${preflight.warnings.join("\n")}\n\nSave template anyway?`)
+    ) {
+      setTemplateSubmitting(false);
+      return;
+    }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/deployment-templates`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        editingTemplateId
+          ? `${apiBaseUrl}/deployment-templates/${editingTemplateId}`
+          : `${apiBaseUrl}/deployment-templates`,
+        {
+          method: editingTemplateId ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(buildTemplatePayload()),
         },
-        credentials: "include",
-        body: JSON.stringify(buildTemplatePayload()),
-      });
-      await readJsonOrError(response, "Failed to save deployment template.");
+      );
+      const savedTemplate = await readJsonOrError(
+        response,
+        editingTemplateId
+          ? "Failed to update deployment template."
+          : "Failed to save deployment template.",
+      );
 
-      setTemplateName("");
-      setTemplateSubmitSuccess("Deployment template saved.");
+      setTemplateName(savedTemplate.template_name || "");
+      setTemplatePreviewId(savedTemplate.id);
+      setEditingTemplateId(savedTemplate.id);
+      setTemplateSubmitSuccess(
+        editingTemplateId
+          ? "Deployment template updated."
+          : "Deployment template saved.",
+      );
       await loadTemplates();
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -610,10 +936,59 @@ export default function HomePage() {
       setTemplateSubmitError(
         requestError instanceof Error
           ? requestError.message
-          : "Failed to save deployment template.",
+          : editingTemplateId
+            ? "Failed to update deployment template."
+            : "Failed to save deployment template.",
       );
     } finally {
       setTemplateSubmitting(false);
+    }
+  }
+
+  async function handleDuplicateTemplate(template) {
+    const suggestedName = `${template.template_name} copy`;
+    const nextName = window.prompt("Name for the duplicated template:", suggestedName);
+
+    if (!nextName) {
+      return;
+    }
+
+    setTemplateDuplicateError("");
+    setTemplateDuplicateSuccess("");
+    setDuplicatingTemplateId(template.id);
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/deployment-templates/${template.id}/duplicate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ template_name: nextName }),
+        },
+      );
+      const duplicatedTemplate = await readJsonOrError(
+        response,
+        "Failed to duplicate deployment template.",
+      );
+      setTemplatePreviewId(duplicatedTemplate.id);
+      setTemplateDuplicateSuccess(`Template duplicated as "${duplicatedTemplate.template_name}".`);
+      await loadTemplates();
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setTemplateDuplicateError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to duplicate deployment template.",
+      );
+    } finally {
+      setDuplicatingTemplateId("");
     }
   }
 
@@ -817,30 +1192,7 @@ export default function HomePage() {
   }
 
   function applyTemplate(template) {
-    setForm({
-      image: template.image || "",
-      name: template.name || "",
-      internal_port:
-        template.internal_port === null || template.internal_port === undefined
-          ? ""
-          : String(template.internal_port),
-      external_port:
-        template.external_port === null || template.external_port === undefined
-          ? ""
-          : String(template.external_port),
-      server_id: template.server_id || "",
-    });
-    setEnvRows(
-      Object.entries(template.env || {}).length > 0
-        ? Object.entries(template.env || {}).map(([key, value]) => ({
-            key,
-            value: String(value ?? ""),
-          }))
-        : [{ key: "", value: "" }],
-    );
-    setCreatedDeployment(null);
-    setSubmitError("");
-    setSubmitSuccess(`Template "${template.template_name}" applied to the deploy form.`);
+    applyTemplateToForm(template);
   }
 
   async function handleDeleteTemplate(templateId) {
@@ -862,6 +1214,12 @@ export default function HomePage() {
         },
       );
       await readJsonOrError(response, "Failed to delete deployment template.");
+      if (templatePreviewId === templateId) {
+        setTemplatePreviewId("");
+      }
+      if (editingTemplateId === templateId) {
+        cancelTemplateEditing();
+      }
       await loadTemplates();
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -880,10 +1238,33 @@ export default function HomePage() {
   }
 
   async function handleDeployTemplate(templateId) {
+    const template = templates.find((item) => item.id === templateId);
+    const draft = template ? buildTemplateDraftFromTemplate(template) : null;
+    const preflight = draft
+      ? validateTemplateDraft(draft, {
+          forDeployment: true,
+          ignoreTemplateId: templateId,
+        })
+      : { errors: [], warnings: [] };
+
     setTemplateDeployError("");
     setTemplateDeploySuccess("");
     setTemplateCreatedDeployment(null);
     setDeployingTemplateId(templateId);
+
+    if (preflight.errors.length > 0) {
+      setTemplateDeployError(preflight.errors[0]);
+      setDeployingTemplateId("");
+      return;
+    }
+
+    if (
+      preflight.warnings.length > 0 &&
+      !window.confirm(`${preflight.warnings.join("\n")}\n\nDeploy from template anyway?`)
+    ) {
+      setDeployingTemplateId("");
+      return;
+    }
 
     try {
       const response = await fetch(
@@ -923,6 +1304,12 @@ export default function HomePage() {
       router.replace("/login");
     }
   }
+
+  const currentDraft = buildCurrentDraft();
+  const templateFormPreflight = validateTemplateDraft(currentDraft, {
+    ignoreTemplateId: editingTemplateId,
+  });
+  const previewDiffRows = buildTemplateDiff(previewTemplate, currentDraft, servers);
 
   if (!authChecked) {
     return (
@@ -1356,14 +1743,23 @@ export default function HomePage() {
           <p className="formHint">
             Save common image, ports, server, and env settings once, then deploy directly or apply them back to the create form.
           </p>
+          <label className="field">
+            <span>Search templates</span>
+            <input
+              value={templateQuery}
+              onChange={(event) => setTemplateQuery(event.target.value)}
+              placeholder="template name, image, server, env key"
+              disabled={templatesLoading}
+            />
+          </label>
 
           {templatesLoading ? (
             <div className="empty">Loading templates...</div>
-          ) : templates.length === 0 ? (
+          ) : filteredTemplates.length === 0 ? (
             <div className="empty">No templates yet. Save the current create form as your first template.</div>
           ) : (
             <div className="list compactList">
-              {templates.map((template) => (
+              {filteredTemplates.map((template) => (
                 <div key={template.id} className="card compactCard">
                   <div className="row">
                     <span className="label">Template</span>
@@ -1379,29 +1775,43 @@ export default function HomePage() {
                   </div>
                   <div className="row">
                     <span className="label">Server</span>
-                    <span>
-                      {template.server_name
-                        ? `${template.server_name} (${template.server_host})`
-                        : "Local"}
-                    </span>
+                    <span>{formatServerLabel(template.server_name, template.server_host)}</span>
                   </div>
                   <div className="row">
                     <span className="label">Ports</span>
-                    <span>
-                      {template.internal_port && template.external_port
-                        ? `${template.external_port}:${template.internal_port}`
-                        : "No port mapping"}
-                    </span>
+                    <span>{formatPortMapping(template.internal_port, template.external_port)}</span>
                   </div>
                   <div className="row">
                     <span className="label">Env vars</span>
                     <span>{Object.keys(template.env || {}).length}</span>
                   </div>
                   <div className="row">
+                    <span className="label">Used</span>
+                    <span>{template.use_count || 0}</span>
+                  </div>
+                  <div className="row">
                     <span className="label">Created</span>
                     <span>{formatDate(template.created_at)}</span>
                   </div>
+                  <div className="row">
+                    <span className="label">Updated</span>
+                    <span>{formatDate(template.updated_at || template.created_at)}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Last used</span>
+                    <span>{template.last_used_at ? formatDate(template.last_used_at) : "Never"}</span>
+                  </div>
                   <div className="actions">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTemplatePreviewId((currentId) =>
+                          currentId === template.id ? "" : template.id,
+                        )
+                      }
+                    >
+                      {templatePreviewId === template.id ? "Hide preview" : "Preview"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDeployTemplate(template.id)}
@@ -1409,8 +1819,15 @@ export default function HomePage() {
                     >
                       {deployingTemplateId === template.id ? "Deploying..." : "Deploy now"}
                     </button>
-                    <button type="button" onClick={() => applyTemplate(template)}>
-                      Apply to form
+                    <button type="button" onClick={() => applyTemplateToForm(template, { startEditing: true })}>
+                      Edit in form
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDuplicateTemplate(template)}
+                      disabled={duplicatingTemplateId === template.id}
+                    >
+                      {duplicatingTemplateId === template.id ? "Duplicating..." : "Duplicate"}
                     </button>
                     <button
                       type="button"
@@ -1425,6 +1842,56 @@ export default function HomePage() {
               ))}
             </div>
           )}
+
+          {previewTemplate ? (
+            <div className="card compactCard previewCard">
+              <div className="sectionHeader">
+                <div>
+                  <h3>Template preview</h3>
+                  <p className="formHint">
+                    Review the selected template against the current create form before apply or deploy.
+                  </p>
+                </div>
+              </div>
+              {previewDiffRows.length === 0 ? (
+                <div className="banner subtle">
+                  Current create form already matches "{previewTemplate.template_name}".
+                </div>
+              ) : (
+                <div className="list compactList">
+                  {previewDiffRows.map((row) => (
+                    <div key={`${previewTemplate.id}-${row.label}`} className="card compactCard diffCard">
+                      <div className="row">
+                        <span className="label">{row.label}</span>
+                        <span className="stackedValue">
+                          <span><strong>Template:</strong> {row.templateValue}</span>
+                          <span><strong>Current form:</strong> {row.currentValue}</span>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="actions">
+                <button type="button" onClick={() => applyTemplate(previewTemplate)}>
+                  Apply to form
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyTemplateToForm(previewTemplate, { startEditing: true })}
+                >
+                  Edit in form
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeployTemplate(previewTemplate.id)}
+                  disabled={deployingTemplateId === previewTemplate.id || deploymentLimitReached}
+                >
+                  {deployingTemplateId === previewTemplate.id ? "Deploying..." : "Deploy from preview"}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {templateDeploySuccess ? (
             <div className="banner success inlineBanner">
@@ -1453,10 +1920,22 @@ export default function HomePage() {
               ) : null}
             </div>
           ) : null}
+          {templateDuplicateError ? <div className="banner error">{templateDuplicateError}</div> : null}
+          {templateDuplicateSuccess ? <div className="banner success">{templateDuplicateSuccess}</div> : null}
         </article>
 
         <article className="card formCard">
           <h2>Create deployment</h2>
+          {editingTemplateId ? (
+            <div className="banner subtle">
+              <div>Editing template in the deploy form. Saving will update the selected template instead of creating a new one.</div>
+              <div className="successActions">
+                <button type="button" className="linkButton" onClick={cancelTemplateEditing}>
+                  Cancel template editing
+                </button>
+              </div>
+            </div>
+          ) : null}
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
               <span>Image</span>
@@ -1611,13 +2090,39 @@ export default function HomePage() {
                   !form.image.trim()
                 }
               >
-                {templateSubmitting ? "Saving template..." : "Save as template"}
+                {templateSubmitting
+                  ? editingTemplateId
+                    ? "Updating template..."
+                    : "Saving template..."
+                  : editingTemplateId
+                    ? "Update template"
+                    : "Save as template"}
               </button>
+              {editingTemplateId ? (
+                <button type="button" className="linkButton" onClick={cancelTemplateEditing}>
+                  Cancel template editing
+                </button>
+              ) : null}
               {submitting ? <span className="formHint">Sending request to backend...</span> : null}
             </div>
           </form>
 
           {submitError ? <div className="banner error">{submitError}</div> : null}
+          {templateFormPreflight.errors.length > 0 ? (
+            <div className="banner error">{templateFormPreflight.errors[0]}</div>
+          ) : null}
+          {templateFormPreflight.warnings.length > 0 ? (
+            <div className="banner subtle">
+              {templateFormPreflight.warnings.join(" ")}
+            </div>
+          ) : null}
+          <div className="banner subtle">
+            Current form snapshot: {countFilledEnvRows(envRows)} env vars,{" "}
+            {form.server_id ? "remote server selected" : "local target"},{" "}
+            {form.internal_port.trim() && form.external_port.trim()
+              ? `ports ${form.external_port}:${form.internal_port}`
+              : "no port mapping"}.
+          </div>
           {templateSubmitError ? <div className="banner error">{templateSubmitError}</div> : null}
           {templateSubmitSuccess ? <div className="banner success">{templateSubmitSuccess}</div> : null}
           {submitSuccess ? (

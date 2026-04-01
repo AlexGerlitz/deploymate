@@ -167,8 +167,26 @@ def init_db() -> None:
         external_port INTEGER NULL,
         server_id UUID NULL,
         env TEXT NOT NULL DEFAULT '{}',
-        created_at TIMESTAMPTZ NOT NULL
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL,
+        last_used_at TIMESTAMPTZ NULL,
+        use_count INTEGER NOT NULL DEFAULT 0
     );
+    """
+
+    alter_templates_add_updated_at_sql = """
+    ALTER TABLE deployment_templates
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    """
+
+    alter_templates_add_last_used_at_sql = """
+    ALTER TABLE deployment_templates
+    ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMPTZ NULL;
+    """
+
+    alter_templates_add_use_count_sql = """
+    ALTER TABLE deployment_templates
+    ADD COLUMN IF NOT EXISTS use_count INTEGER NOT NULL DEFAULT 0;
     """
 
     with get_db_connection() as conn:
@@ -187,6 +205,9 @@ def init_db() -> None:
             cur.execute(create_deployment_activity_table_sql)
             cur.execute(create_upgrade_requests_table_sql)
             cur.execute(create_deployment_templates_table_sql)
+            cur.execute(alter_templates_add_updated_at_sql)
+            cur.execute(alter_templates_add_last_used_at_sql)
+            cur.execute(alter_templates_add_use_count_sql)
         conn.commit()
 
     ensure_default_user()
@@ -374,7 +395,10 @@ def insert_deployment_template(template_record: dict[str, Any]) -> None:
         external_port,
         server_id,
         env,
-        created_at
+        created_at,
+        updated_at,
+        last_used_at,
+        use_count
     )
     VALUES (
         %(id)s,
@@ -385,7 +409,10 @@ def insert_deployment_template(template_record: dict[str, Any]) -> None:
         %(external_port)s,
         %(server_id)s,
         %(env)s,
-        %(created_at)s
+        %(created_at)s,
+        %(updated_at)s,
+        %(last_used_at)s,
+        %(use_count)s
     );
     """
 
@@ -407,6 +434,9 @@ def list_deployment_templates() -> list[dict[str, Any]]:
         t.server_id,
         t.env,
         t.created_at,
+        t.updated_at,
+        t.last_used_at,
+        t.use_count,
         s.name AS server_name,
         s.host AS server_host
     FROM deployment_templates t
@@ -433,6 +463,9 @@ def get_deployment_template_or_404(template_id: str) -> dict[str, Any]:
         t.server_id,
         t.env,
         t.created_at,
+        t.updated_at,
+        t.last_used_at,
+        t.use_count,
         s.name AS server_name,
         s.host AS server_host
     FROM deployment_templates t
@@ -460,6 +493,42 @@ def delete_deployment_template_record(template_id: str) -> None:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(delete_sql, (template_id,))
+        conn.commit()
+
+
+def update_deployment_template(template_id: str, template_record: dict[str, Any]) -> None:
+    update_sql = """
+    UPDATE deployment_templates
+    SET template_name = %(template_name)s,
+        image = %(image)s,
+        name = %(name)s,
+        internal_port = %(internal_port)s,
+        external_port = %(external_port)s,
+        server_id = %(server_id)s,
+        env = %(env)s,
+        updated_at = %(updated_at)s
+    WHERE id = %(id)s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(update_sql, {"id": template_id, **template_record})
+        conn.commit()
+
+
+def mark_deployment_template_used(template_id: str) -> None:
+    update_sql = """
+    UPDATE deployment_templates
+    SET last_used_at = %s,
+        updated_at = %s,
+        use_count = use_count + 1
+    WHERE id = %s;
+    """
+
+    now = datetime.now(timezone.utc)
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(update_sql, (now, now, template_id))
         conn.commit()
 
 
