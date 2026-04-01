@@ -352,3 +352,23 @@ class AdminOverviewResponse(BaseModel):
     users: AdminUsersSummary = Field(default_factory=AdminUsersSummary)
     upgrade_requests: AdminUpgradeRequestsSummary = Field(default_factory=AdminUpgradeRequestsSummary)
     attention_items: list[AdminAttentionItem] = Field(default_factory=list)
+
+
+class AdminAuditItem(BaseModel):
+    id: str
+    actor_user_id: Optional[str] = None
+    actor_username: Optional[str] = None
+    action_type: str
+    target_type: str
+    target_id: Optional[str] = None
+    target_label: Optional[str] = None
+    details: Optional[str] = None
+    created_at: str
+
+
+class AdminAuditSummary(BaseModel):
+    total: int = 0
+    user_actions: int = 0
+    upgrade_request_actions: int = 0
+    latest_action_type: Optional[str] = None
+    latest_action_at: Optional[str] = None

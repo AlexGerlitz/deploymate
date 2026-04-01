@@ -56,6 +56,7 @@ export default function UpgradeRequestsPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [requests, setRequests] = useState([]);
   const [adminOverview, setAdminOverview] = useState(null);
+  const [auditEvents, setAuditEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -64,6 +65,7 @@ export default function UpgradeRequestsPage() {
   const [planFilter, setPlanFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [linkedOnly, setLinkedOnly] = useState(false);
+  const [auditQuery, setAuditQuery] = useState("");
   const [savingId, setSavingId] = useState("");
   const [saveFeedback, setSaveFeedback] = useState("");
   const [drafts, setDrafts] = useState({});
@@ -152,6 +154,21 @@ export default function UpgradeRequestsPage() {
     setAdminOverview(data);
   }
 
+  async function loadAuditEvents() {
+    const params = new URLSearchParams();
+    params.set("limit", "20");
+    params.set("target_type", "upgrade_request");
+    if (auditQuery.trim()) {
+      params.set("q", auditQuery.trim());
+    }
+    const response = await fetch(`${apiBaseUrl}/admin/audit-events?${params.toString()}`, {
+      cache: "no-store",
+      credentials: "include",
+    });
+    const data = await readJsonOrError(response, "Failed to load admin audit events.");
+    setAuditEvents(Array.isArray(data) ? data : []);
+  }
+
   function updateDraft(requestId, field, value) {
     setDrafts((current) => ({
       ...current,
@@ -216,7 +233,7 @@ export default function UpgradeRequestsPage() {
           return;
         }
 
-        await Promise.all([loadUsers(), loadRequests(), loadAdminOverview()]);
+        await Promise.all([loadUsers(), loadRequests(), loadAdminOverview(), loadAuditEvents()]);
       } catch {
         router.replace("/login");
       }
@@ -231,6 +248,13 @@ export default function UpgradeRequestsPage() {
     }
     loadRequests();
   }, [authChecked, accessDenied, query, planFilter, statusFilter, linkedOnly]);
+
+  useEffect(() => {
+    if (!authChecked || accessDenied) {
+      return;
+    }
+    loadAuditEvents();
+  }, [authChecked, accessDenied, auditQuery]);
 
   async function handleDownloadUpgradeExport() {
     setError("");
@@ -297,7 +321,7 @@ export default function UpgradeRequestsPage() {
             </Link>
             <button
               type="button"
-              onClick={() => Promise.all([loadUsers(), loadRequests(), loadAdminOverview()])}
+              onClick={() => Promise.all([loadUsers(), loadRequests(), loadAdminOverview(), loadAuditEvents()])}
               disabled={loading}
             >
               {loading ? "Refreshing..." : "Refresh"}
@@ -363,6 +387,53 @@ export default function UpgradeRequestsPage() {
             ) : null}
           </article>
         ) : null}
+
+        <article className="card formCard">
+          <div className="sectionHeader">
+            <div>
+              <h2>Upgrade audit trail</h2>
+              <p className="formHint">Recent admin actions taken on upgrade requests.</p>
+            </div>
+          </div>
+          <label className="field deploymentSearch">
+            <span>Search audit</span>
+            <input
+              value={auditQuery}
+              onChange={(event) => setAuditQuery(event.target.value)}
+              placeholder="approved, in_review, target user"
+            />
+          </label>
+          {auditEvents.length === 0 ? (
+            <div className="empty">No upgrade audit events yet.</div>
+          ) : (
+            <div className="timeline">
+              {auditEvents.map((item) => (
+                <div className="timelineItem" key={item.id}>
+                  <div className="row">
+                    <span className="label">Action</span>
+                    <span>{item.action_type}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Actor</span>
+                    <span>{item.actor_username || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Target</span>
+                    <span>{item.target_label || item.target_id || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Details</span>
+                    <span>{item.details || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Created</span>
+                    <span>{formatDate(item.created_at)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
 
         <article className="card formCard">
           <div className="sectionHeader">

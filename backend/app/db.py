@@ -193,6 +193,19 @@ def init_db() -> None:
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NULL;
     """
 
+    create_admin_audit_events_table_sql = """
+    CREATE TABLE IF NOT EXISTS admin_audit_events (
+        id UUID PRIMARY KEY,
+        actor_user_id UUID NULL,
+        action_type TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NULL,
+        target_label TEXT NULL,
+        details TEXT NULL,
+        created_at TIMESTAMPTZ NOT NULL
+    );
+    """
+
     create_deployment_templates_table_sql = """
     CREATE TABLE IF NOT EXISTS deployment_templates (
         id UUID PRIMARY KEY,
@@ -246,6 +259,7 @@ def init_db() -> None:
             cur.execute(alter_upgrade_requests_add_target_user_id_sql)
             cur.execute(alter_upgrade_requests_add_reviewed_at_sql)
             cur.execute(alter_upgrade_requests_add_updated_at_sql)
+            cur.execute(create_admin_audit_events_table_sql)
             cur.execute(create_deployment_templates_table_sql)
             cur.execute(alter_templates_add_updated_at_sql)
             cur.execute(alter_templates_add_last_used_at_sql)
@@ -1120,5 +1134,78 @@ def list_deployment_activity(deployment_id: str) -> list[dict[str, Any]]:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(select_sql, (deployment_id,))
+            rows = cur.fetchall()
+            return [_row_to_dict(cur, row) for row in rows]
+
+
+def create_admin_audit_event(
+    actor_user_id: str | None,
+    action_type: str,
+    target_type: str,
+    target_id: str | None,
+    target_label: str | None,
+    details: str | None,
+) -> None:
+    record = {
+        "id": str(uuid.uuid4()),
+        "actor_user_id": actor_user_id,
+        "action_type": action_type,
+        "target_type": target_type,
+        "target_id": target_id,
+        "target_label": target_label,
+        "details": details,
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    insert_sql = """
+    INSERT INTO admin_audit_events (
+        id,
+        actor_user_id,
+        action_type,
+        target_type,
+        target_id,
+        target_label,
+        details,
+        created_at
+    )
+    VALUES (
+        %(id)s,
+        %(actor_user_id)s,
+        %(action_type)s,
+        %(target_type)s,
+        %(target_id)s,
+        %(target_label)s,
+        %(details)s,
+        %(created_at)s
+    );
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(insert_sql, record)
+        conn.commit()
+
+
+def list_admin_audit_events(limit: int = 100) -> list[dict[str, Any]]:
+    select_sql = """
+    SELECT
+        a.id,
+        a.actor_user_id,
+        u.username AS actor_username,
+        a.action_type,
+        a.target_type,
+        a.target_id,
+        a.target_label,
+        a.details,
+        a.created_at
+    FROM admin_audit_events a
+    LEFT JOIN users u ON u.id = a.actor_user_id
+    ORDER BY a.created_at DESC
+    LIMIT %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(select_sql, (limit,))
             rows = cur.fetchall()
             return [_row_to_dict(cur, row) for row in rows]

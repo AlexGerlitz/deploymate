@@ -10,6 +10,7 @@ from fastapi.responses import Response
 
 from app.db import (
     count_users_by_role,
+    create_admin_audit_event,
     delete_user_record,
     get_session_user_by_token,
     get_upgrade_request_or_404,
@@ -17,6 +18,7 @@ from app.db import (
     get_user_by_username,
     insert_upgrade_request,
     insert_user,
+    list_admin_audit_events,
     list_upgrade_requests,
     list_users,
     set_user_plan,
@@ -27,6 +29,8 @@ from app.schemas import (
     AdminUserCreateRequest,
     AdminUserItem,
     AdminAttentionItem,
+    AdminAuditItem,
+    AdminAuditSummary,
     AdminOverviewResponse,
     AdminUpgradeRequestsSummary,
     AdminUserUpdateRequest,
@@ -53,6 +57,19 @@ def _csv_response(filename: str, rows: list[dict], fieldnames: list[str]) -> Res
         content=buffer.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _build_admin_audit_summary(items: list[dict]) -> AdminAuditSummary:
+    user_actions = [item for item in items if item.get("target_type") == "user"]
+    upgrade_actions = [item for item in items if item.get("target_type") == "upgrade_request"]
+    latest = items[0] if items else None
+    return AdminAuditSummary(
+        total=len(items),
+        user_actions=len(user_actions),
+        upgrade_request_actions=len(upgrade_actions),
+        latest_action_type=latest.get("action_type") if latest else None,
+        latest_action_at=latest.get("created_at") if latest else None,
     )
 
 
@@ -212,7 +229,27 @@ def update_upgrade_request_endpoint(
         reviewed_at=reviewed_at,
         updated_at=now,
     )
-    return UpgradeRequestItem(**get_upgrade_request_or_404(request_id))
+    updated_request = get_upgrade_request_or_404(request_id)
+    create_admin_audit_event(
+        actor_user_id=admin_user["id"],
+        action_type="upgrade_request.updated",
+        target_type="upgrade_request",
+        target_id=request_id,
+        target_label=updated_request.get("email") or updated_request.get("name"),
+        details=", ".join(
+            filter(
+                None,
+                [
+                    f"status -> {payload.status}" if payload.status is not None else None,
+                    "internal note updated" if payload.internal_note is not None else None,
+                    f"target user -> {target_user.get('username')}" if target_user else None,
+                    f"plan -> {payload.plan}" if payload.plan is not None else None,
+                ],
+            )
+        )
+        or "Upgrade request updated.",
+    )
+    return UpgradeRequestItem(**updated_request)
 
 
 @router.get(
@@ -250,6 +287,7 @@ def get_users(
 def get_admin_overview() -> AdminOverviewResponse:
     users = list_users()
     upgrade_requests = list_upgrade_requests()
+    audit_events = list_admin_audit_events(limit=200)
 
     admins = [item for item in users if item.get("role") == "admin"]
     members = [item for item in users if item.get("role") == "member"]
@@ -296,6 +334,14 @@ def get_admin_overview() -> AdminOverviewResponse:
                 level="info",
                 title="Only one admin account remains",
                 detail="Consider adding another admin account for operational redundancy.",
+            )
+        )
+    if not audit_events:
+        attention_items.append(
+            AdminAttentionItem(
+                level="info",
+                title="No admin audit history yet",
+                detail="Audit entries will appear after admin create, update, or review actions.",
             )
         )
 
@@ -371,7 +417,10 @@ def export_admin_upgrade_requests(format: str = Query(default="json", pattern="^
     response_model=AdminUserItem,
     dependencies=[Depends(require_admin)],
 )
-def create_user(payload: AdminUserCreateRequest) -> AdminUserItem:
+def create_user(
+    payload: AdminUserCreateRequest,
+    admin_user=Depends(require_admin),
+) -> AdminUserItem:
     if get_user_by_username(payload.username):
         raise HTTPException(status_code=400, detail="Username already exists.")
     user_record = {
@@ -384,6 +433,14 @@ def create_user(payload: AdminUserCreateRequest) -> AdminUserItem:
         "created_at": datetime.now(timezone.utc),
     }
     insert_user(user_record)
+    create_admin_audit_event(
+        actor_user_id=admin_user["id"],
+        action_type="user.created",
+        target_type="user",
+        target_id=user_record["id"],
+        target_label=payload.username,
+        details=f"Role {payload.role}, initial plan trial.",
+    )
     return AdminUserItem(**get_user_by_id(user_record["id"]))
 
 
@@ -392,7 +449,11 @@ def create_user(payload: AdminUserCreateRequest) -> AdminUserItem:
     response_model=AdminUserItem,
     dependencies=[Depends(require_admin)],
 )
-def update_user(user_id: str, payload: AdminUserUpdateRequest) -> AdminUserItem:
+def update_user(
+    user_id: str,
+    payload: AdminUserUpdateRequest,
+    admin_user=Depends(require_admin),
+) -> AdminUserItem:
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -414,6 +475,23 @@ def update_user(user_id: str, payload: AdminUserUpdateRequest) -> AdminUserItem:
         set_user_plan(user_id, payload.plan)
 
     updated_user = get_user_by_id(user_id)
+    create_admin_audit_event(
+        actor_user_id=admin_user["id"],
+        action_type="user.updated",
+        target_type="user",
+        target_id=user_id,
+        target_label=updated_user["username"] if updated_user else None,
+        details=", ".join(
+            filter(
+                None,
+                [
+                    f"role -> {payload.role}" if payload.role is not None else None,
+                    f"plan -> {payload.plan}" if payload.plan is not None else None,
+                ],
+            )
+        )
+        or "User updated.",
+    )
     return AdminUserItem(**updated_user)
 
 
@@ -421,11 +499,90 @@ def update_user(user_id: str, payload: AdminUserUpdateRequest) -> AdminUserItem:
     "/admin/users/{user_id}",
     dependencies=[Depends(require_admin)],
 )
-def delete_user(user_id: str) -> dict:
+def delete_user(
+    user_id: str,
+    admin_user=Depends(require_admin),
+) -> dict:
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     if user["role"] == "admin" and count_users_by_role("admin") <= 1:
         raise HTTPException(status_code=400, detail="Cannot delete the last admin user.")
     delete_user_record(user_id)
+    create_admin_audit_event(
+        actor_user_id=admin_user["id"],
+        action_type="user.deleted",
+        target_type="user",
+        target_id=user_id,
+        target_label=user.get("username"),
+        details=f"Deleted user with role {user.get('role')} and plan {user.get('plan')}.",
+    )
     return {"user_id": user_id, "status": "deleted"}
+
+
+@router.get(
+    "/admin/audit-events",
+    response_model=List[AdminAuditItem],
+    dependencies=[Depends(require_admin)],
+)
+def get_admin_audit_events(
+    limit: int = Query(default=100, ge=1, le=500),
+    target_type: str = Query(default="all", pattern="^(all|user|upgrade_request)$"),
+    q: str = Query(default=""),
+) -> List[AdminAuditItem]:
+    normalized_query = q.strip().lower()
+    items = list_admin_audit_events(limit=limit)
+    filtered: list[AdminAuditItem] = []
+    for item in items:
+        if target_type != "all" and item.get("target_type") != target_type:
+            continue
+        if normalized_query:
+            haystack = " ".join(
+                filter(
+                    None,
+                    [
+                        item.get("actor_username"),
+                        item.get("action_type"),
+                        item.get("target_type"),
+                        item.get("target_label"),
+                        item.get("details"),
+                    ],
+                )
+            ).lower()
+            if normalized_query not in haystack:
+                continue
+        filtered.append(AdminAuditItem(**item))
+    return filtered
+
+
+@router.get(
+    "/admin/audit-summary",
+    response_model=AdminAuditSummary,
+    dependencies=[Depends(require_admin)],
+)
+def get_admin_audit_summary() -> AdminAuditSummary:
+    return _build_admin_audit_summary(list_admin_audit_events(limit=200))
+
+
+@router.get(
+    "/admin/exports/audit-events",
+    dependencies=[Depends(require_admin)],
+)
+def export_admin_audit_events(format: str = Query(default="json", pattern="^(json|csv)$")):
+    items = list_admin_audit_events(limit=1000)
+    if format == "csv":
+        return _csv_response(
+            "deploymate-admin-audit-events.csv",
+            items,
+            [
+                "id",
+                "actor_username",
+                "action_type",
+                "target_type",
+                "target_id",
+                "target_label",
+                "details",
+                "created_at",
+            ],
+        )
+    return {"exported_at": datetime.now(timezone.utc).isoformat(), "count": len(items), "items": items}
