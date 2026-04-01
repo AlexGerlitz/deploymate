@@ -27,6 +27,13 @@ function buildDeploymentUrl(deployment) {
   return `http://${deployment.server_host}:${deployment.external_port}`;
 }
 
+function formatSuggestedPorts(ports) {
+  if (!Array.isArray(ports) || ports.length === 0) {
+    return "";
+  }
+  return ports.join(", ");
+}
+
 function normalizeRedeployError(message) {
   return normalizeDeploymentActionError(message, "Failed to redeploy deployment.");
 }
@@ -37,7 +44,7 @@ function normalizeDeploymentActionError(message, fallbackMessage) {
   }
 
   if (message.includes("Port ") && message.includes("is already in use on server")) {
-    return `${message} Recommended free ports on main-vps: 8080, 8081, 8082.`;
+    return `${message} Use one of the suggested free ports for this server.`;
   }
 
   if (message.includes("Container name ") && message.includes("is already in use on server")) {
@@ -84,6 +91,8 @@ export default function DeploymentDetailsPage({ params }) {
   const [copyMessage, setCopyMessage] = useState("");
   const [logsExpanded, setLogsExpanded] = useState(false);
   const [envExpanded, setEnvExpanded] = useState(false);
+  const [suggestedPorts, setSuggestedPorts] = useState([]);
+  const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
   const [form, setForm] = useState({
     image: "",
     name: "",
@@ -231,6 +240,35 @@ export default function DeploymentDetailsPage({ params }) {
       window.clearInterval(intervalId);
     };
   }, [authChecked, deploymentId]);
+
+  useEffect(() => {
+    async function loadSuggestedPorts() {
+      if (!deployment?.server_id) {
+        setSuggestedPorts([]);
+        setSuggestedPortsLoading(false);
+        return;
+      }
+
+      setSuggestedPortsLoading(true);
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/servers/${deployment.server_id}/suggested-ports`,
+          {
+            cache: "no-store",
+            credentials: "include",
+          },
+        );
+        const data = await readJsonOrError(response, "Failed to load suggested ports.");
+        setSuggestedPorts(Array.isArray(data?.ports) ? data.ports : []);
+      } catch {
+        setSuggestedPorts([]);
+      } finally {
+        setSuggestedPortsLoading(false);
+      }
+    }
+
+    loadSuggestedPorts();
+  }, [deployment?.server_id]);
 
   function updateFormField(event) {
     const { name, value } = event.target;
@@ -528,30 +566,25 @@ export default function DeploymentDetailsPage({ params }) {
                 disabled={redeploying}
               />
               <span className="fieldHint">
-                On main-vps, port 80 is reserved by DeployMate. Recommended: 8080, 8081, 8082.
+                {deployment?.server_id
+                  ? suggestedPortsLoading
+                    ? "Checking suggested free ports on this server..."
+                    : suggestedPorts.length > 0
+                      ? `Suggested free ports on this server: ${formatSuggestedPorts(suggestedPorts)}.`
+                      : "No suggested ports available right now. Try a free port above 8080."
+                  : "For local deploys, choose a free external port if you want direct access."}
               </span>
               <div className="portSuggestions">
-                <button
-                  type="button"
-                  onClick={() => useSuggestedPort(8080)}
-                  disabled={redeploying}
-                >
-                  Use 8080
-                </button>
-                <button
-                  type="button"
-                  onClick={() => useSuggestedPort(8081)}
-                  disabled={redeploying}
-                >
-                  Use 8081
-                </button>
-                <button
-                  type="button"
-                  onClick={() => useSuggestedPort(8082)}
-                  disabled={redeploying}
-                >
-                  Use 8082
-                </button>
+                {suggestedPorts.map((port) => (
+                  <button
+                    key={`redeploy-port-${port}`}
+                    type="button"
+                    onClick={() => useSuggestedPort(port)}
+                    disabled={redeploying}
+                  >
+                    Use {port}
+                  </button>
+                ))}
               </div>
             </label>
 

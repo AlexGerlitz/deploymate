@@ -156,6 +156,43 @@ def ensure_container_name_is_available(
     )
 
 
+def get_suggested_external_ports(
+    server: Optional[dict] = None,
+    *,
+    limit: int = 3,
+    start_port: int = 8080,
+    end_port: int = 65535,
+) -> list[int]:
+    result = _run_docker_command(["ss", "-ltnH"], server)
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or result.stdout.strip()
+        raise HTTPException(
+            status_code=500,
+            detail=error_message or "Failed to inspect listening ports.",
+        )
+
+    used_ports: set[int] = set()
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        local_address = parts[3]
+        port_text = local_address.rsplit(":", 1)[-1]
+        if port_text.startswith("[") or not port_text.isdigit():
+            continue
+        used_ports.add(int(port_text))
+
+    suggestions: list[int] = []
+    for port in range(start_port, end_port + 1):
+        if port in used_ports:
+            continue
+        suggestions.append(port)
+        if len(suggestions) >= limit:
+            break
+
+    return suggestions
+
+
 def run_container(
     image: str,
     container_name: str,

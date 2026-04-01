@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.db import (
     count_deployments_for_server,
@@ -11,9 +11,13 @@ from app.db import (
     insert_server,
     list_servers,
 )
-from app.schemas import ServerCreateRequest, ServerResponse
-from app.schemas import ServerConnectionTestResponse
-from app.services.deployments import test_server_connection
+from app.schemas import (
+    ServerConnectionTestResponse,
+    ServerCreateRequest,
+    ServerResponse,
+    ServerSuggestedPortsResponse,
+)
+from app.services.deployments import get_suggested_external_ports, test_server_connection
 from app.services.auth import enforce_plan_limit, require_auth
 
 
@@ -67,6 +71,18 @@ def test_server(server_id: str) -> ServerConnectionTestResponse:
         status=result["status"],
         message=result["message"],
     )
+
+
+@router.get("/servers/{server_id}/suggested-ports", response_model=ServerSuggestedPortsResponse)
+def get_server_suggested_ports(
+    server_id: str,
+    limit: int = Query(default=3, ge=1, le=10),
+    start_port: int = Query(default=8080, ge=1, le=65535),
+) -> ServerSuggestedPortsResponse:
+    server = get_server_or_404(server_id)
+    ensure_limit = min(limit, 10)
+    ports = get_suggested_external_ports(server, limit=ensure_limit, start_port=start_port)
+    return ServerSuggestedPortsResponse(server_id=server_id, ports=ports)
 
 
 @router.delete("/servers/{server_id}")

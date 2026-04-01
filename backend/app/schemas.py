@@ -91,6 +91,11 @@ class ServerConnectionTestResponse(BaseModel):
     message: str
 
 
+class ServerSuggestedPortsResponse(BaseModel):
+    server_id: str
+    ports: list[int] = Field(default_factory=list)
+
+
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)

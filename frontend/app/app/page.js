@@ -27,6 +27,13 @@ function buildDeploymentUrl(deployment) {
   return `http://${deployment.server_host}:${deployment.external_port}`;
 }
 
+function formatSuggestedPorts(ports) {
+  if (!Array.isArray(ports) || ports.length === 0) {
+    return "";
+  }
+  return ports.join(", ");
+}
+
 function normalizeCreateDeploymentError(message) {
   return normalizeDeploymentActionError(
     message,
@@ -40,7 +47,7 @@ function normalizeDeploymentActionError(message, fallbackMessage) {
   }
 
   if (message.includes("Port ") && message.includes("is already in use on server")) {
-    return `${message} Recommended free ports on main-vps: 8080, 8081, 8082.`;
+    return `${message} Use one of the suggested free ports for this server.`;
   }
 
   if (message.includes("Container name ") && message.includes("is already in use on server")) {
@@ -102,6 +109,8 @@ export default function HomePage() {
   const [deploymentFilter, setDeploymentFilter] = useState("all");
   const [deploymentQuery, setDeploymentQuery] = useState("");
   const [notificationFilter, setNotificationFilter] = useState("all");
+  const [suggestedPorts, setSuggestedPorts] = useState([]);
+  const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
 
   const [form, setForm] = useState({
     image: "",
@@ -170,12 +179,8 @@ export default function HomePage() {
     return true;
   });
 
-  function getSuggestedExternalPort(serverId) {
-    const selectedServer = servers.find((server) => server.id === serverId);
-    if (selectedServer?.name === "main-vps") {
-      return "8080";
-    }
-    return "";
+  function getSuggestedExternalPort() {
+    return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
   }
 
   async function loadCurrentUser() {
@@ -327,6 +332,45 @@ export default function HomePage() {
     };
   }, [authChecked]);
 
+  useEffect(() => {
+    async function loadSuggestedPorts() {
+      if (!form.server_id) {
+        setSuggestedPorts([]);
+        setSuggestedPortsLoading(false);
+        return;
+      }
+
+      setSuggestedPortsLoading(true);
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/servers/${form.server_id}/suggested-ports`,
+          {
+            cache: "no-store",
+            credentials: "include",
+          },
+        );
+        const data = await readJsonOrError(response, "Failed to load suggested ports.");
+        const ports = Array.isArray(data?.ports) ? data.ports : [];
+        setSuggestedPorts(ports);
+        setForm((currentForm) => {
+          if (currentForm.external_port.trim()) {
+            return currentForm;
+          }
+          return {
+            ...currentForm,
+            external_port: ports.length > 0 ? String(ports[0]) : "",
+          };
+        });
+      } catch {
+        setSuggestedPorts([]);
+      } finally {
+        setSuggestedPortsLoading(false);
+      }
+    }
+
+    loadSuggestedPorts();
+  }, [form.server_id]);
+
   function updateFormField(event) {
     const { name, value } = event.target;
     setForm((currentForm) => {
@@ -336,7 +380,7 @@ export default function HomePage() {
       };
 
       if (name === "server_id" && !currentForm.external_port.trim()) {
-        nextForm.external_port = getSuggestedExternalPort(value);
+        nextForm.external_port = "";
       }
 
       return nextForm;
@@ -441,7 +485,7 @@ export default function HomePage() {
         image: "",
         name: "",
         internal_port: "",
-        external_port: getSuggestedExternalPort(form.server_id),
+        external_port: getSuggestedExternalPort(),
         server_id: form.server_id,
       });
       setEnvRows([{ key: "", value: "" }]);
@@ -1115,18 +1159,25 @@ export default function HomePage() {
                 disabled={submitting}
               />
               <span className="fieldHint">
-                On main-vps, port 80 is reserved by DeployMate. Recommended: 8080, 8081, 8082.
+                {form.server_id
+                  ? suggestedPortsLoading
+                    ? "Checking suggested free ports on this server..."
+                    : suggestedPorts.length > 0
+                      ? `Suggested free ports on this server: ${formatSuggestedPorts(suggestedPorts)}.`
+                      : "No suggested ports available right now. Try a free port above 8080."
+                  : "For local deploys, choose a free external port if you want direct access."}
               </span>
               <div className="portSuggestions">
-                <button type="button" onClick={() => useSuggestedPort(8080)} disabled={submitting}>
-                  Use 8080
-                </button>
-                <button type="button" onClick={() => useSuggestedPort(8081)} disabled={submitting}>
-                  Use 8081
-                </button>
-                <button type="button" onClick={() => useSuggestedPort(8082)} disabled={submitting}>
-                  Use 8082
-                </button>
+                {suggestedPorts.map((port) => (
+                  <button
+                    key={`create-port-${port}`}
+                    type="button"
+                    onClick={() => useSuggestedPort(port)}
+                    disabled={submitting}
+                  >
+                    Use {port}
+                  </button>
+                ))}
               </div>
             </label>
 
