@@ -28,12 +28,23 @@ function buildDeploymentUrl(deployment) {
 }
 
 function normalizeCreateDeploymentError(message) {
+  return normalizeDeploymentActionError(
+    message,
+    "Failed to create deployment. Please try again.",
+  );
+}
+
+function normalizeDeploymentActionError(message, fallbackMessage) {
   if (!message) {
-    return "Failed to create deployment. Please try again.";
+    return fallbackMessage;
   }
 
-  if (message.includes("is already in use on server")) {
+  if (message.includes("Port ") && message.includes("is already in use on server")) {
     return `${message} Recommended free ports on main-vps: 8080, 8081, 8082.`;
+  }
+
+  if (message.includes("Container name ") && message.includes("is already in use on server")) {
+    return `${message} Choose another deployment name or leave Name empty to let DeployMate generate one.`;
   }
 
   return message;
@@ -551,7 +562,10 @@ export default function HomePage() {
 
       setDeleteError(
         requestError instanceof Error
-          ? requestError.message
+          ? normalizeDeploymentActionError(
+              requestError.message,
+              "Failed to delete deployment.",
+            )
           : "Failed to delete deployment.",
       );
     } finally {
@@ -1069,6 +1083,9 @@ export default function HomePage() {
                 placeholder="optional"
                 disabled={submitting}
               />
+              <span className="fieldHint">
+                Leave Name empty to let DeployMate generate a unique container name automatically.
+              </span>
             </label>
 
             <label className="field">

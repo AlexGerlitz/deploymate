@@ -28,12 +28,20 @@ function buildDeploymentUrl(deployment) {
 }
 
 function normalizeRedeployError(message) {
+  return normalizeDeploymentActionError(message, "Failed to redeploy deployment.");
+}
+
+function normalizeDeploymentActionError(message, fallbackMessage) {
   if (!message) {
-    return "Failed to redeploy deployment.";
+    return fallbackMessage;
   }
 
-  if (message.includes("is already in use on server")) {
+  if (message.includes("Port ") && message.includes("is already in use on server")) {
     return `${message} Recommended free ports on main-vps: 8080, 8081, 8082.`;
+  }
+
+  if (message.includes("Container name ") && message.includes("is already in use on server")) {
+    return `${message} Choose another deployment name or keep the current one.`;
   }
 
   return message;
@@ -369,7 +377,10 @@ export default function DeploymentDetailsPage({ params }) {
 
       setError(
         requestError instanceof Error
-          ? requestError.message
+          ? normalizeDeploymentActionError(
+              requestError.message,
+              "Failed to delete deployment.",
+            )
           : "Failed to delete deployment.",
       );
     } finally {
@@ -485,6 +496,9 @@ export default function DeploymentDetailsPage({ params }) {
                 placeholder="optional"
                 disabled={redeploying}
               />
+              <span className="fieldHint">
+                Keep the current name or choose a new unique container name for this redeploy.
+              </span>
             </label>
 
             <label className="field">
