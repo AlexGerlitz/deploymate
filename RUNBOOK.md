@@ -25,6 +25,13 @@ curl -I https://deploymatecloud.ru
 curl -I https://deploymatecloud.ru/app
 ```
 
+Before any new release, also run the local preflight from your workstation:
+
+```bash
+cd ~/deploymate
+./scripts/preflight.sh
+```
+
 ## 2. Update From `develop`
 
 ```bash
@@ -170,11 +177,8 @@ cd ~/deploymate
 git switch develop
 git pull --ff-only origin develop
 
-# frontend checks when frontend changed
-npm --prefix frontend run build
-
-# backend checks when backend changed
-python3 -m py_compile backend/app/main.py backend/app/routes/*.py backend/app/services/*.py backend/app/db.py backend/app/schemas.py
+# shared safety check before any push
+./scripts/preflight.sh
 
 git status --short
 git add .
@@ -212,6 +216,18 @@ Post-deploy smoke check:
 # 7. open deployment details
 # 8. check logs / health / activity
 # 9. delete the test deployment
+```
+
+Safer release order:
+
+```bash
+# 1. identify last known good commit first
+git log --oneline -n 5
+
+# 2. deploy the smallest possible surface:
+# frontend-only, backend-only, or full stack
+
+# 3. run the smoke check immediately after deploy
 ```
 
 ## 6. Rollback

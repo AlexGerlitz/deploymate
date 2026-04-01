@@ -79,6 +79,7 @@ export default function LoginPage() {
               <span>Username</span>
               <input
                 name="username"
+                autoComplete="username"
                 value={form.username}
                 onChange={updateFormField}
                 disabled={submitting}
@@ -91,6 +92,7 @@ export default function LoginPage() {
               <input
                 name="password"
                 type="password"
+                autoComplete="current-password"
                 value={form.password}
                 onChange={updateFormField}
                 disabled={submitting}
