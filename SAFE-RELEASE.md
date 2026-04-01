@@ -61,7 +61,26 @@ This reduces container churn and narrows rollback scope.
 
 ## 5. Run production smoke check
 
-Minimum manual smoke sequence:
+Use the scripted smoke check first:
+
+```bash
+DEPLOYMATE_BASE_URL=https://deploymatecloud.ru \
+DEPLOYMATE_ADMIN_USERNAME=admin \
+DEPLOYMATE_ADMIN_PASSWORD='<secret>' \
+bash scripts/post_deploy_smoke.sh
+```
+
+This validates:
+
+- `/login` responds
+- `/app` responds
+- `/api/health` reports `healthy`
+- admin login succeeds
+- `/api/auth/me` works with the issued session
+- logout succeeds
+- the session is invalid after logout
+
+Then run the minimum manual smoke sequence:
 
 1. Open `/login`
 2. Sign in with an admin account

@@ -207,6 +207,12 @@ curl -I https://deploymatecloud.ru/api/health
 Post-deploy smoke check:
 
 ```bash
+# scripted baseline
+DEPLOYMATE_BASE_URL=https://deploymatecloud.ru \
+DEPLOYMATE_ADMIN_USERNAME=admin \
+DEPLOYMATE_ADMIN_PASSWORD='<secret>' \
+bash scripts/post_deploy_smoke.sh
+
 # 1. open /login
 # 2. sign in as admin
 # 3. open /app
