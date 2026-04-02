@@ -38,8 +38,8 @@ class ServerCredentialTests(unittest.TestCase):
 
         with patch.dict(os.environ, {SERVER_CREDENTIALS_KEY_ENV: key}, clear=False):
             server["password"] = encrypt_server_credential("s3cr3t")
-            with patch("app.services.deployments.which", return_value="/usr/bin/sshpass"):
-                with patch("app.services.deployments.subprocess.run") as mock_run:
+            with patch("app.services.runtime_executors.which", return_value="/usr/bin/sshpass"):
+                with patch("app.services.runtime_executors.subprocess.run") as mock_run:
                     mock_run.return_value = CompletedProcess(args=[], returncode=0, stdout="", stderr="")
                     _run_remote_command(server, ["docker", "--version"])
 
@@ -67,7 +67,7 @@ class ServerCredentialTests(unittest.TestCase):
                     self.assertEqual(handle.read(), "PRIVATE-KEY")
                 return CompletedProcess(args=command, returncode=0, stdout="", stderr="")
 
-            with patch("app.services.deployments.subprocess.run", side_effect=_fake_run):
+            with patch("app.services.runtime_executors.subprocess.run", side_effect=_fake_run):
                 _run_remote_command(server, ["docker", "--version"])
 
     def test_encrypted_credentials_fail_without_key(self):

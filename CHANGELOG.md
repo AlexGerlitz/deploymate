@@ -22,6 +22,7 @@ Highlights:
 - added runtime capability posture to ops overview so the UI reflects backend local-Docker, SSH trust, and credential-key state
 - added runtime capability contract audit and aligned production frontend local-runtime default with remote-only backend policy
 - wired the runtime capability audit into the main security audit so release gates fail on frontend/backend capability drift
+- split runtime execution into dedicated local and remote executor layers so SSH transport and local Docker policy no longer live in one deployment service module
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface

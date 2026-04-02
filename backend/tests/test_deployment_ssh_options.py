@@ -11,6 +11,11 @@ from app.services.deployments import (
     ensure_local_docker_runtime_enabled,
     local_docker_runtime_enabled,
 )
+from app.services.runtime_executors import (
+    LocalRuntimeExecutor,
+    RemoteRuntimeExecutor,
+    get_runtime_executor,
+)
 
 
 class DeploymentSshOptionsTests(unittest.TestCase):
@@ -37,6 +42,14 @@ class DeploymentSshOptionsTests(unittest.TestCase):
     def test_local_runtime_is_disabled_by_default(self):
         with patch.dict(os.environ, {}, clear=False):
             self.assertFalse(local_docker_runtime_enabled())
+
+    def test_runtime_executor_factory_returns_local_executor_without_server(self):
+        executor = get_runtime_executor()
+        self.assertIsInstance(executor, LocalRuntimeExecutor)
+
+    def test_runtime_executor_factory_returns_remote_executor_with_server(self):
+        executor = get_runtime_executor({"host": "example.com"})
+        self.assertIsInstance(executor, RemoteRuntimeExecutor)
 
     def test_default_ssh_mode_is_accept_new(self):
         server = {"port": 22}
