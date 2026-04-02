@@ -32,8 +32,6 @@ router = APIRouter(dependencies=[Depends(require_admin)])
 
 @router.post("/servers", response_model=ServerResponse)
 def create_server(payload: ServerCreateRequest, user=Depends(require_admin)) -> ServerResponse:
-    enforce_plan_limit(user, "servers")
-
     if payload.auth_type != "ssh_key":
         raise HTTPException(
             status_code=400,
@@ -42,6 +40,8 @@ def create_server(payload: ServerCreateRequest, user=Depends(require_admin)) -> 
 
     if payload.auth_type == "ssh_key" and not payload.ssh_key:
         raise HTTPException(status_code=400, detail="ssh_key is required for auth_type=ssh_key.")
+
+    enforce_plan_limit(user, "servers")
 
     server_record = {
         "id": str(uuid.uuid4()),
