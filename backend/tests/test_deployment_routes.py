@@ -9,6 +9,7 @@ from app.routes.deployments import (
     delete_deployment,
     redeploy_deployment,
 )
+from app.services.deployment_observability import build_deployment_health_response
 from app.schemas import DeploymentCreateRequest
 
 
@@ -250,6 +251,55 @@ class DeploymentRouteTests(unittest.TestCase):
         self.assertEqual(item_by_key["container_runtime"].summary, "Container state is unavailable.")
         self.assertEqual(item_by_key["logs"].status, "warn")
         self.assertEqual(item_by_key["logs"].details, "docker logs failed")
+
+    def test_build_deployment_health_response_returns_unhealthy_when_external_port_missing(self):
+        deployment = _deployment_record(
+            external_port=None,
+            status="running",
+            container_id="container-1",
+        )
+
+        health = build_deployment_health_response(deployment)
+
+        self.assertEqual(health.status, "unhealthy")
+        self.assertIsNone(health.url)
+        self.assertIn("no external port", health.error.lower())
+
+    def test_build_deployment_diagnostics_keeps_working_when_server_record_is_missing(self):
+        deployment = _deployment_record(
+            server_host="prod.example.com",
+            status="running",
+        )
+
+        with patch(
+            "app.routes.deployments.get_server_or_404",
+            side_effect=HTTPException(status_code=404, detail="Server not found."),
+        ):
+            with patch("app.routes.deployments.list_deployment_activity", return_value=[]):
+                with patch(
+                    "app.routes.deployments.inspect_container_state",
+                    return_value={
+                        "Running": True,
+                        "RestartCount": 0,
+                        "StartedAt": "2026-04-02T00:00:00Z",
+                        "Error": "",
+                    },
+                ):
+                    with patch(
+                        "app.routes.deployments.get_container_logs_tail",
+                        return_value=CompletedProcess(
+                            args=["docker", "logs"],
+                            returncode=0,
+                            stdout="runtime ok",
+                            stderr="",
+                        ),
+                    ):
+                        diagnostics = _build_deployment_diagnostics(deployment)
+
+        self.assertEqual(diagnostics.server_target, "deploy@prod.example.com:22")
+        item_by_key = {item.key: item for item in diagnostics.items}
+        self.assertEqual(item_by_key["server_record"].status, "warn")
+        self.assertIn("404", item_by_key["server_record"].details)
 
 
 if __name__ == "__main__":

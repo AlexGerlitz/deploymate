@@ -21,6 +21,16 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _fallback_server_target(deployment: dict) -> str:
+    if deployment.get("server_host"):
+        username = deployment.get("server_username") or deployment.get("server_user") or "deploy"
+        port = deployment.get("server_port") or 22
+        return f"{username}@{deployment['server_host']}:{port}"
+    if deployment.get("server_name"):
+        return str(deployment["server_name"])
+    return "local host"
+
+
 def build_activity_summary(activity: list[dict]) -> DeploymentActivitySummaryResponse:
     success_events = sum(1 for item in activity if item.get("level") == "success")
     error_events = sum(1 for item in activity if item.get("level") == "error")
@@ -53,9 +63,15 @@ def build_deployment_health_response(
     checked_at = _now_iso()
 
     if not external_port:
-        raise HTTPException(
-            status_code=400,
-            detail="Health check is available only for deployments with external_port.",
+        return DeploymentHealthResponse(
+            deployment_id=deployment_id,
+            container_name=container_name,
+            url=None,
+            status="unhealthy",
+            status_code=None,
+            error="Health check is unavailable because this deployment has no external port.",
+            checked_at=checked_at,
+            response_time_ms=None,
         )
 
     host = deployment.get("server_host") or "127.0.0.1"
@@ -112,26 +128,21 @@ def build_deployment_diagnostics(
     inspect_container_state_fn=inspect_container_state,
     get_container_logs_tail_fn=get_container_logs_tail,
 ) -> DeploymentDiagnosticsResponse:
-    server = get_server_or_404_fn(deployment["server_id"]) if deployment.get("server_id") else None
-    try:
-        health = build_deployment_health_response_fn(deployment)
-    except HTTPException:
-        health = DeploymentHealthResponse(
-            deployment_id=deployment["id"],
-            container_name=deployment["container_name"],
-            url=None,
-            status="unhealthy",
-            status_code=None,
-            error="Health check is unavailable because this deployment has no external port.",
-            checked_at=_now_iso(),
-            response_time_ms=None,
-        )
+    server = None
+    server_lookup_error = None
+    if deployment.get("server_id"):
+        try:
+            server = get_server_or_404_fn(deployment["server_id"])
+        except HTTPException as exc:
+            server_lookup_error = exc
+
+    health = build_deployment_health_response_fn(deployment)
     activity = list_deployment_activity_fn(deployment["id"])
     activity_summary = build_activity_summary(activity)
     server_target = (
         f'{server["username"]}@{server["host"]}:{server["port"]}'
         if server
-        else "local host"
+        else _fallback_server_target(deployment)
     )
 
     items: list[DiagnosticItem] = [
@@ -164,6 +175,17 @@ def build_deployment_diagnostics(
             details=activity_summary.last_event_title,
         ),
     ]
+
+    if server_lookup_error is not None:
+        items.append(
+            DiagnosticItem(
+                key="server_record",
+                label="Server record",
+                status="warn",
+                summary="Saved server record could not be loaded.",
+                details=f"Diagnostics continued with deployment metadata because server lookup returned {server_lookup_error.status_code}.",
+            )
+        )
 
     container_state = inspect_container_state_fn(deployment["container_name"], server)
     if container_state:

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from subprocess import CompletedProcess
 from unittest.mock import patch
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -203,6 +204,32 @@ class DeploymentApiFlowTests(unittest.TestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(delete_response.json()["status"], "deleted")
         self.assertIsNone(self.deployment)
+
+    def test_logs_stay_readable_when_saved_server_target_is_missing(self):
+        self.deployment = {
+            "id": "dep-missing-server",
+            "status": "running",
+            "image": "nginx:alpine",
+            "container_name": "missing-server-runtime",
+            "container_id": "container-flow-2",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "error": None,
+            "internal_port": 80,
+            "external_port": 38080,
+            "server_id": "srv-missing",
+            "server_name": "Missing server",
+            "server_host": "missing.example.com",
+            "env": {},
+        }
+
+        with patch(
+            "app.routes.deployment_observability.get_server_or_404",
+            side_effect=HTTPException(status_code=404, detail="Server not found."),
+        ):
+            logs_response = self.client.get("/deployments/dep-missing-server/logs")
+
+        self.assertEqual(logs_response.status_code, 200)
+        self.assertIn("could not be loaded", logs_response.json()["logs"])
 
 
 if __name__ == "__main__":

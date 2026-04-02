@@ -84,8 +84,6 @@ def get_deployment_diagnostics(deployment_id: str) -> DeploymentDiagnosticsRespo
 @router.get("/deployments/{deployment_id}/logs", response_model=DeploymentLogsResponse)
 def get_deployment_logs(deployment_id: str) -> DeploymentLogsResponse:
     deployment = get_deployment_record_or_404(deployment_id)
-    server = get_server_or_404(deployment["server_id"]) if deployment.get("server_id") else None
-    ensure_docker_is_available(server)
     container_name = deployment["container_name"]
 
     if deployment.get("status") != "running" or not deployment.get("container_id"):
@@ -94,6 +92,21 @@ def get_deployment_logs(deployment_id: str) -> DeploymentLogsResponse:
             container_name=container_name,
             logs=deployment.get("error") or "",
         )
+
+    server = None
+    if deployment.get("server_id"):
+        try:
+            server = get_server_or_404(deployment["server_id"])
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                return DeploymentLogsResponse(
+                    deployment_id=deployment_id,
+                    container_name=container_name,
+                    logs="Logs are unavailable because the saved server target could not be loaded.",
+                )
+            raise
+
+    ensure_docker_is_available(server)
 
     result = get_container_logs(container_name, server)
 
