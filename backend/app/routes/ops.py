@@ -68,6 +68,18 @@ def _build_runtime_capabilities_summary() -> OpsRuntimeCapabilitiesSummary:
     )
 
 
+def _sanitize_server_export(item: dict) -> dict:
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "host": item.get("host"),
+        "port": item.get("port"),
+        "username": item.get("username"),
+        "auth_type": item.get("auth_type"),
+        "created_at": item.get("created_at"),
+    }
+
+
 def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOverviewResponse:
     deployments = list_deployment_records()
     servers = list_servers()
@@ -276,7 +288,7 @@ def export_deployments(format: str = Query(default="json", pattern="^(json|csv)$
 
 @router.get("/exports/servers")
 def export_servers(format: str = Query(default="json", pattern="^(json|csv)$")):
-    items = list_servers()
+    items = [_sanitize_server_export(item) for item in list_servers()]
     if format == "csv":
         return _csv_response(
             "deploymate-servers.csv",

@@ -182,6 +182,13 @@ class OpsApiFlowTests(unittest.TestCase):
         self.assertIn("deploymate-servers.csv", servers_export_response.headers["content-disposition"])
         self.assertIn("Smoke VPS", servers_export_response.text)
 
+        servers_json_response = self.client.get("/ops/exports/servers?format=json")
+        self.assertEqual(servers_json_response.status_code, 200)
+        servers_json = servers_json_response.json()
+        self.assertEqual(servers_json["count"], 2)
+        self.assertNotIn("password", servers_json["items"][0])
+        self.assertNotIn("ssh_key", servers_json["items"][0])
+
         templates_export_response = self.client.get("/ops/exports/templates?format=json")
         self.assertEqual(templates_export_response.status_code, 200)
         templates_export = templates_export_response.json()
