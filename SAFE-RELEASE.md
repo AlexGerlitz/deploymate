@@ -73,6 +73,8 @@ bash scripts/remote_release.sh \
   --admin-password '<secret>'
 ```
 
+For teams that want a guarded click-to-release path, the repository also includes `.github/workflows/release.yml`, a manual GitHub Actions workflow that runs the same remote helper with repository secrets and an environment gate.
+
 This validates:
 
 - `/login`

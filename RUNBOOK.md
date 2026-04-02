@@ -45,6 +45,8 @@ bash scripts/remote_release.sh \
   --admin-password '<secret>'
 ```
 
+If you want the same flow from GitHub instead of a workstation shell, use the manual workflow in `.github/workflows/release.yml` after configuring repository secrets for the deploy host, deploy SSH key, pinned known_hosts contents, base URL, and admin smoke credentials.
+
 Before the first deploy of encrypted server credentials, or before enabling remote server management on a fresh environment:
 
 ```bash
@@ -232,6 +234,27 @@ bash scripts/remote_release.sh \
   --admin-username admin \
   --admin-password '<secret>'
 ```
+
+GitHub Actions release workflow secrets for runtime smoke:
+
+- `RUNTIME_SMOKE_SERVER_ID` for a pre-saved smoke target, or
+- `RUNTIME_SMOKE_SERVER_HOST`, `RUNTIME_SMOKE_SERVER_USERNAME`, and `RUNTIME_SMOKE_SSH_PRIVATE_KEY` for a temporary target
+- optional `RUNTIME_SMOKE_SERVER_PORT`, `RUNTIME_SMOKE_SERVER_NAME`, `RUNTIME_SMOKE_IMAGE`, `RUNTIME_SMOKE_INTERNAL_PORT`, `RUNTIME_SMOKE_EXTERNAL_PORT`, `RUNTIME_SMOKE_START_PORT`, and `RUNTIME_SMOKE_HEALTH_TIMEOUT`
+
+Required GitHub Actions release workflow secrets:
+
+- `DEPLOY_HOST`
+- `DEPLOY_SSH_PRIVATE_KEY`
+- `DEPLOY_SSH_KNOWN_HOSTS`
+- `DEPLOYMATE_BASE_URL`
+- `DEPLOYMATE_ADMIN_USERNAME`
+- `DEPLOYMATE_ADMIN_PASSWORD`
+
+Optional GitHub Actions release workflow secrets:
+
+- `DEPLOY_REPO_DIR`
+- `DEPLOY_BRANCH`
+- `DEPLOY_ENV_FILE`
 
 Runtime smoke notes:
 
