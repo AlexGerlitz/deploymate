@@ -5,6 +5,7 @@ set -euo pipefail
 PORT="${FRONTEND_SMOKE_PORT:-3001}"
 BASE_URL="http://127.0.0.1:${PORT}"
 SERVER_LOG="${FRONTEND_SMOKE_LOG:-/tmp/deploymate-frontend-runtime-smoke.log}"
+DIST_DIR="${FRONTEND_SMOKE_DIST_DIR:-.next-smoke-${PORT}}"
 APP_HTML="$(mktemp)"
 DETAIL_HTML="$(mktemp)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,12 +16,15 @@ cleanup() {
     kill "$SERVER_PID" >/dev/null 2>&1 || true
     wait "$SERVER_PID" 2>/dev/null || true
   fi
+  if [ -n "${DIST_DIR:-}" ] && [ -d "$REPO_ROOT/frontend/$DIST_DIR" ]; then
+    rm -rf "$REPO_ROOT/frontend/$DIST_DIR"
+  fi
   rm -f "$APP_HTML" "$DETAIL_HTML"
 }
 
 trap cleanup EXIT
 
-NEXT_PUBLIC_SMOKE_TEST_MODE=1 npm --prefix "$REPO_ROOT/frontend" run dev -- --hostname 127.0.0.1 --port "$PORT" >"$SERVER_LOG" 2>&1 &
+NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_DIST_DIR="$DIST_DIR" npm --prefix "$REPO_ROOT/frontend" run dev -- --hostname 127.0.0.1 --port "$PORT" >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
 for _ in $(seq 1 60); do

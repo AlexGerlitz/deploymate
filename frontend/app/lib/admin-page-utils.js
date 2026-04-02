@@ -100,6 +100,8 @@ export function createTextFilterDefinition(options) {
     key,
     value,
     normalizedValue: value.trim(),
+    setValue,
+    resolveAppliedValue: (nextValue) => nextValue || "",
     chipKey,
     chipLabel,
     onRemove: () => setValue(""),
@@ -117,12 +119,18 @@ export function createChoiceFilterDefinition(options) {
     testId,
     resetValue = "all",
     normalizedValue = value,
+    activeWhen,
+    serializeWhen,
   } = options;
 
   return {
     key,
     value,
     normalizedValue,
+    setValue,
+    resolveAppliedValue: (nextValue) => nextValue || resetValue,
+    activeWhen,
+    serializeWhen,
     chipKey,
     chipLabel,
     onRemove: () => setValue(resetValue),
@@ -146,6 +154,8 @@ export function createBooleanFilterDefinition(options) {
     key,
     value,
     normalizedValue: Boolean(value),
+    setValue,
+    resolveAppliedValue: (nextValue) => Boolean(nextValue),
     serializeValue,
     chipKey,
     chipLabel,
@@ -184,11 +194,27 @@ export function buildFilterState(definitions = []) {
     ]);
   }
 
+  const serializedParams = Object.fromEntries(serializedEntries);
+
   return {
     currentFilters,
     hasActiveFilters,
-    syncedSearchParams: buildSearchParams(Object.fromEntries(serializedEntries)).toString(),
+    serializedParams,
+    syncedSearchParams: buildSearchParams(serializedParams).toString(),
   };
+}
+
+export function applyFilterDefinitions(definitions = [], filters = {}) {
+  for (const definition of definitions) {
+    if (typeof definition.setValue !== "function") {
+      continue;
+    }
+
+    const nextValue = definition.resolveAppliedValue
+      ? definition.resolveAppliedValue(filters[definition.key], filters)
+      : filters[definition.key];
+    definition.setValue(nextValue);
+  }
 }
 
 export function buildFilterChipsFromDefinitions(definitions = []) {

@@ -30,7 +30,7 @@ import {
   useDebouncedValue,
 } from "../../lib/admin-page-hooks";
 import {
-  buildFilterChips,
+  applyFilterDefinitions,
   buildFilterChipsFromDefinitions,
   buildFilterState,
   buildAuditEventsCsv,
@@ -156,6 +156,24 @@ function UpgradeRequestsPageContent() {
   ];
   const { currentFilters: currentUpgradeView, hasActiveFilters: hasRequestFilters } =
     buildFilterState(primaryFilterDefinitions);
+  const auditFilterDefinitions = [
+    createTextFilterDefinition({
+      key: "audit_q",
+      value: auditQuery,
+      setValue: setAuditQuery,
+      chipKey: "upgrade-audit-search",
+      chipLabel: `Audit: ${auditQuery.trim()}`,
+      testId: "upgrade-audit-filter-chip-query",
+    }),
+    createChoiceFilterDefinition({
+      key: "audit_sort",
+      value: auditSort,
+      setValue: setAuditSort,
+      resetValue: "newest",
+      activeWhen: (value) => value !== "newest",
+      serializeWhen: (value) => value !== "newest",
+    }),
+  ];
   const {
     savedViews,
     savedViewName,
@@ -218,24 +236,16 @@ function UpgradeRequestsPageContent() {
       `Saved inbox views merged. Total: ${total}. Replaced: ${replacedCount}. Skipped by limit: ${skippedCount}.`,
   });
   const activeFilterChips = buildFilterChipsFromDefinitions(primaryFilterDefinitions);
-  const activeAuditFilterChips = buildFilterChips([
-    auditQuery.trim()
-      ? {
-          key: "upgrade-audit-search",
-          label: `Audit: ${auditQuery.trim()}`,
-          onRemove: () => setAuditQuery(""),
-          testId: "upgrade-audit-filter-chip-query",
-        }
-      : null,
-  ]);
+  const activeAuditFilterChips = buildFilterChipsFromDefinitions(auditFilterDefinitions);
   const visibleAuditEvents = sortItemsByDateMode(auditEvents, {
     valueKey: "created_at",
     mode: auditSort,
   });
-  const currentAuditView = {
-    audit_q: auditQuery.trim(),
-    audit_sort: auditSort,
-  };
+  const {
+    currentFilters: currentAuditView,
+    hasActiveFilters: hasAuditFilters,
+    serializedParams: auditCopyParams,
+  } = buildFilterState(auditFilterDefinitions);
   const {
     auditViews,
     auditViewName,
@@ -255,23 +265,14 @@ function UpgradeRequestsPageContent() {
     formatViews: formatUpgradeSavedViews,
     storageKey: upgradeAuditViewsStorageKey,
     currentFilters: currentAuditView,
-    canSaveWhen: auditQuery.trim() || auditSort !== "newest",
-    applyViewFilters: (filters) => {
-      setAuditQuery(filters.audit_q || "");
-      setAuditSort(filters.audit_sort || "newest");
-    },
+    canSaveWhen: hasAuditFilters,
+    applyViewFilters: (filters) => applyFilterDefinitions(auditFilterDefinitions, filters),
     pathname,
     copyText: copyTextToClipboard,
     setFeedback: setSaveFeedback,
     setError,
-    resetViewFilters: () => {
-      setAuditQuery("");
-      setAuditSort("newest");
-    },
-    copyParams: {
-      audit_q: auditQuery.trim(),
-      audit_sort: auditSort !== "newest" ? auditSort : undefined,
-    },
+    resetViewFilters: () => applyFilterDefinitions(auditFilterDefinitions, {}),
+    copyParams: auditCopyParams,
   });
   const selectedVisibleRequestIds = filteredRequests
     .map((item) => item.id)
@@ -287,11 +288,7 @@ function UpgradeRequestsPageContent() {
   const bulkRequestsDirty = hasSelectedRequests || bulkStatusValue !== "";
   const { syncedSearchParams } = buildFilterState([
     ...primaryFilterDefinitions,
-    {
-      key: "audit_sort",
-      value: auditSort,
-      serializeWhen: (value) => value !== "newest",
-    },
+    ...auditFilterDefinitions.filter((definition) => definition.key !== "audit_q"),
   ]);
 
   function buildDraft(item) {
@@ -393,11 +390,7 @@ function UpgradeRequestsPageContent() {
   }
 
   function applyViewFilters(filters) {
-    setQuery(filters.q || "");
-    setPlanFilter(filters.plan || "all");
-    setStatusFilter(filters.status || "all");
-    setLinkedOnly(Boolean(filters.linked_only));
-    setAuditQuery(filters.audit_q || "");
+    applyFilterDefinitions(primaryFilterDefinitions, filters);
   }
 
   async function refreshPageData() {

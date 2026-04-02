@@ -32,7 +32,7 @@ import {
   useDebouncedValue,
 } from "../../lib/admin-page-hooks";
 import {
-  buildFilterChips,
+  applyFilterDefinitions,
   buildFilterChipsFromDefinitions,
   buildFilterState,
   buildAuditEventsCsv,
@@ -194,6 +194,32 @@ function UsersPageContent() {
   ];
   const { currentFilters: currentUserView, hasActiveFilters: hasUserFilters } =
     buildFilterState(primaryFilterDefinitions);
+  const auditFilterDefinitions = [
+    createTextFilterDefinition({
+      key: "audit_q",
+      value: auditQuery,
+      setValue: setAuditQuery,
+      chipKey: "users-audit-search",
+      chipLabel: `Audit: ${auditQuery.trim()}`,
+      testId: "users-audit-filter-chip-query",
+    }),
+    createChoiceFilterDefinition({
+      key: "audit_scope",
+      value: auditScopeFilter,
+      setValue: setAuditScopeFilter,
+      chipKey: "users-audit-scope",
+      chipLabel: `Scope: ${auditScopeFilter}`,
+      testId: "users-audit-filter-chip-scope",
+    }),
+    createChoiceFilterDefinition({
+      key: "audit_sort",
+      value: auditSort,
+      setValue: setAuditSort,
+      resetValue: "newest",
+      activeWhen: (value) => value !== "newest",
+      serializeWhen: (value) => value !== "newest",
+    }),
+  ];
   const {
     savedViews,
     savedViewName,
@@ -256,29 +282,12 @@ function UsersPageContent() {
       `Saved user views merged. Total: ${total}. Replaced: ${replacedCount}. Skipped by limit: ${skippedCount}.`,
   });
   const activeFilterChips = buildFilterChipsFromDefinitions(primaryFilterDefinitions);
-  const activeAuditFilterChips = buildFilterChips([
-    auditQuery.trim()
-      ? {
-          key: "users-audit-search",
-          label: `Audit: ${auditQuery.trim()}`,
-          onRemove: () => setAuditQuery(""),
-          testId: "users-audit-filter-chip-query",
-        }
-      : null,
-    auditScopeFilter !== "all"
-      ? {
-          key: "users-audit-scope",
-          label: `Scope: ${auditScopeFilter}`,
-          onRemove: () => setAuditScopeFilter("all"),
-          testId: "users-audit-filter-chip-scope",
-        }
-      : null,
-  ]);
-  const currentAuditView = {
-    audit_q: auditQuery.trim(),
-    audit_scope: auditScopeFilter,
-    audit_sort: auditSort,
-  };
+  const activeAuditFilterChips = buildFilterChipsFromDefinitions(auditFilterDefinitions);
+  const {
+    currentFilters: currentAuditView,
+    hasActiveFilters: hasAuditFilters,
+    serializedParams: auditCopyParams,
+  } = buildFilterState(auditFilterDefinitions);
   const {
     auditViews,
     auditViewName,
@@ -298,26 +307,14 @@ function UsersPageContent() {
     formatViews: formatUserSavedViews,
     storageKey: usersAuditViewsStorageKey,
     currentFilters: currentAuditView,
-    canSaveWhen: auditQuery.trim() || auditScopeFilter !== "all" || auditSort !== "newest",
-    applyViewFilters: (filters) => {
-      setAuditQuery(filters.audit_q || "");
-      setAuditScopeFilter(filters.audit_scope || "all");
-      setAuditSort(filters.audit_sort || "newest");
-    },
+    canSaveWhen: hasAuditFilters,
+    applyViewFilters: (filters) => applyFilterDefinitions(auditFilterDefinitions, filters),
     pathname,
     copyText: copyTextToClipboard,
     setFeedback: setSuccess,
     setError,
-    resetViewFilters: () => {
-      setAuditQuery("");
-      setAuditScopeFilter("all");
-      setAuditSort("newest");
-    },
-    copyParams: {
-      audit_q: auditQuery.trim(),
-      audit_scope: auditScopeFilter !== "all" ? auditScopeFilter : undefined,
-      audit_sort: auditSort !== "newest" ? auditSort : undefined,
-    },
+    resetViewFilters: () => applyFilterDefinitions(auditFilterDefinitions, {}),
+    copyParams: auditCopyParams,
   });
   const visibleAuditEvents = sortItemsByDateMode(
     auditEvents.filter((item) => auditScopeFilter === "all" || item.target_type === auditScopeFilter),
@@ -328,15 +325,7 @@ function UsersPageContent() {
   );
   const { syncedSearchParams } = buildFilterState([
     ...primaryFilterDefinitions,
-    {
-      key: "audit_scope",
-      value: auditScopeFilter,
-    },
-    {
-      key: "audit_sort",
-      value: auditSort,
-      serializeWhen: (value) => value !== "newest",
-    },
+    ...auditFilterDefinitions.filter((definition) => definition.key !== "audit_q"),
   ]);
   const selectedVisibleUserIds = filteredUsers
     .map((user) => user.id)
@@ -422,11 +411,7 @@ function UsersPageContent() {
   }
 
   function applyViewFilters(filters) {
-    setQuery(filters.q || "");
-    setRoleFilter(filters.role || "all");
-    setPlanFilter(filters.plan || "all");
-    setMustChangeFilter(filters.must_change_password || "all");
-    setAuditQuery(filters.audit_q || "");
+    applyFilterDefinitions(primaryFilterDefinitions, filters);
   }
 
   async function refreshPageData() {
