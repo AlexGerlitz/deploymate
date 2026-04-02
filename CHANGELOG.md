@@ -28,6 +28,7 @@ Highlights:
 - moved deployment create/redeploy/delete mutation workflows into a dedicated service so deployment routes are now thin HTTP adapters over orchestration logic
 - moved deployment template list/create/update/duplicate/deploy/delete workflow into a dedicated service so routes no longer own template orchestration either
 - split the deployment HTTP layer into dedicated router modules for deployments, deployment templates, and deployment observability
+- moved shared frontend runtime smoke fixtures into a dedicated lib module so `/app` and `/deployments/[deploymentId]` no longer duplicate smoke data inline
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface

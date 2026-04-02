@@ -3,100 +3,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
+import {
+  smokeActivity,
+  smokeDeployment,
+  smokeDiagnostics,
+  smokeHealth,
+  smokeMode,
+  smokeUser,
+} from "../../lib/smoke-fixtures";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
-const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
-const smokeUser = {
-  id: "smoke-admin",
-  username: "smoke-admin",
-  is_admin: true,
-  role: "admin",
-  plan: "team",
-};
-const smokeDeployment = {
-  id: "smoke-deployment",
-  status: "running",
-  image: "nginx:alpine",
-  container_name: "smoke-runtime",
-  container_id: "container-smoke-1",
-  created_at: "2026-04-02T00:00:00Z",
-  error: null,
-  internal_port: 80,
-  external_port: 38080,
-  server_id: "smoke-server",
-  server_name: "Smoke VPS",
-  server_host: "smoke.example.com",
-  env: {
-    DEPLOYMATE_SMOKE: "1",
-  },
-};
-const smokeHealth = {
-  deployment_id: "smoke-deployment",
-  container_name: "smoke-runtime",
-  url: "http://smoke.example.com:38080",
-  status: "healthy",
-  status_code: 200,
-  error: null,
-  checked_at: "2026-04-02T00:03:00Z",
-  response_time_ms: 42,
-};
-const smokeDiagnostics = {
-  deployment_id: "smoke-deployment",
-  container_name: "smoke-runtime",
-  current_status: "running",
-  server_target: "deploy@smoke.example.com:22",
-  checked_at: "2026-04-02T00:03:00Z",
-  url: "http://smoke.example.com:38080",
-  health: smokeHealth,
-  activity: {
-    total_events: 2,
-    success_events: 2,
-    error_events: 0,
-    recent_failure_count: 0,
-    recent_failure_titles: [],
-    last_event_title: "Health check passed",
-    last_event_level: "success",
-    last_event_at: "2026-04-02T00:03:00Z",
-  },
-  log_excerpt: "nginx entered RUNNING state",
-  items: [
-    {
-      key: "deployment_status",
-      label: "Deployment status",
-      status: "ok",
-      summary: "Current status is running.",
-      details: null,
-    },
-    {
-      key: "health",
-      label: "HTTP health",
-      status: "ok",
-      summary: "Health check responded with 200 in 42 ms.",
-      details: "http://smoke.example.com:38080",
-    },
-  ],
-};
-const smokeActivity = [
-  {
-    id: "smoke-activity-1",
-    deployment_id: "smoke-deployment",
-    level: "success",
-    title: "Deployment succeeded",
-    message: "Deployment smoke-deployment is running in container smoke-runtime.",
-    created_at: "2026-04-02T00:01:00Z",
-    category: "deploy",
-  },
-  {
-    id: "smoke-activity-2",
-    deployment_id: "smoke-deployment",
-    level: "success",
-    title: "Health check passed",
-    message: "Deployment responded with HTTP 200.",
-    created_at: "2026-04-02T00:03:00Z",
-    category: "health",
-  },
-];
 
 function formatDate(value) {
   if (!value) {

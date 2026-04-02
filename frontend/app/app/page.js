@@ -3,182 +3,22 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  smokeDeployments,
+  smokeMode,
+  smokeNotifications,
+  smokeOpsOverview,
+  smokeServerDiagnostics,
+  smokeServerTestResults,
+  smokeServers,
+  smokeTemplates,
+  smokeUser,
+} from "../lib/smoke-fixtures";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
-const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
 const localDeploymentsEnabled =
   process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
-const smokeUser = {
-  id: "smoke-admin",
-  username: "smoke-admin",
-  is_admin: true,
-  role: "admin",
-  plan: "team",
-  limits: {
-    max_servers: 10,
-    max_deployments: 100,
-  },
-  usage: {
-    servers: 1,
-    deployments: 1,
-  },
-};
-const smokeDeployments = [
-  {
-    id: "smoke-deployment",
-    status: "running",
-    image: "nginx:alpine",
-    container_name: "smoke-runtime",
-    container_id: "container-smoke-1",
-    created_at: "2026-04-02T00:00:00Z",
-    error: null,
-    internal_port: 80,
-    external_port: 38080,
-    server_id: "smoke-server",
-    server_name: "Smoke VPS",
-    server_host: "smoke.example.com",
-    env: {
-      DEPLOYMATE_SMOKE: "1",
-    },
-  },
-];
-const smokeServers = [
-  {
-    id: "smoke-server",
-    name: "Smoke VPS",
-    host: "203.0.113.10",
-    port: 22,
-    username: "deploy",
-    auth_type: "ssh_key",
-    created_at: "2026-04-02T00:00:00Z",
-  },
-];
-const smokeServerTestResults = {
-  "smoke-server": {
-    status: "success",
-    message: "SSH and Docker look healthy on this target.",
-    tested_at: "2026-04-02T00:02:30Z",
-    target: "deploy@203.0.113.10:22",
-    ssh_ok: true,
-    docker_ok: true,
-    docker_version: "Docker 26.1.3",
-  },
-};
-const smokeServerDiagnostics = {
-  "smoke-server": {
-    checked_at: "2026-04-02T00:03:00Z",
-    overall_status: "success",
-    target: "deploy@203.0.113.10:22",
-    deployment_count: 1,
-    hostname: "smoke-vps",
-    operating_system: "Ubuntu 24.04",
-    uptime: "2 days",
-    disk_usage: "18%",
-    memory: "42%",
-    docker_compose_version: "v2.29.2",
-    listening_ports: [22, 80, 443, 38080],
-    items: [
-      {
-        key: "ssh",
-        label: "SSH",
-        status: "success",
-        summary: "SSH access is healthy.",
-        details: "Accepted a key-based connection and resolved the remote hostname.",
-      },
-      {
-        key: "docker",
-        label: "Docker",
-        status: "success",
-        summary: "Docker engine is available.",
-        details: "The daemon responded and compose support is installed.",
-      },
-      {
-        key: "ports",
-        label: "Ports",
-        status: "success",
-        summary: "Expected service ports are reachable.",
-        details: "Port 38080 is free for the smoke deployment.",
-      },
-    ],
-  },
-};
-const smokeNotifications = [
-  {
-    id: "smoke-notification-1",
-    deployment_id: "smoke-deployment",
-    level: "success",
-    title: "Deployment succeeded",
-    message: "Deployment smoke-deployment is running in container smoke-runtime.",
-    created_at: "2026-04-02T00:01:00Z",
-  },
-];
-const smokeTemplates = [
-  {
-    id: "smoke-template",
-    template_name: "Smoke template",
-    image: "nginx:alpine",
-    name: "smoke-runtime",
-    internal_port: 80,
-    external_port: 38080,
-    server_id: "smoke-server",
-    server_name: "Smoke VPS",
-    server_host: "smoke.example.com",
-    env: {
-      DEPLOYMATE_SMOKE: "1",
-    },
-    created_at: "2026-04-02T00:00:00Z",
-    updated_at: "2026-04-02T00:00:00Z",
-    last_used_at: "2026-04-02T00:00:00Z",
-    use_count: 1,
-  },
-];
-const smokeOpsOverview = {
-  generated_at: "2026-04-02T00:02:00Z",
-  user: {
-    username: "smoke-admin",
-    plan: "team",
-    role: "admin",
-  },
-  deployments: {
-    total: 1,
-    running: 1,
-    failed: 0,
-    pending: 0,
-    local: 0,
-    remote: 1,
-    exposed: 1,
-    public_urls: 1,
-  },
-  servers: {
-    total: 1,
-    password_auth: 0,
-    ssh_key_auth: 1,
-    unused: 0,
-  },
-  notifications: {
-    total: 1,
-    success: 1,
-    error: 0,
-    latest_error_title: null,
-    latest_error_at: null,
-  },
-  templates: {
-    total: 1,
-    unused: 0,
-    recently_used: 1,
-    top_template_name: "Smoke template",
-    top_template_use_count: 1,
-  },
-  capabilities: {
-    local_docker_enabled: false,
-    ssh_host_key_checking: "yes",
-    strict_known_hosts_configured: true,
-    server_credentials_key_configured: true,
-    remote_only_recommended: true,
-  },
-  attention_items: [],
-};
 
 function formatDate(value) {
   if (!value) {
