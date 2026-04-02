@@ -89,10 +89,12 @@ Current strengths:
 - restore flow is dry-run only
 - SSH host key checking now defaults to `accept-new` instead of `no`
 - host key policy is configurable through environment variables
+- production now defaults to a remote-only profile without Docker socket access in the backend
+- the production frontend can be built with local deployment controls disabled to match the backend capability boundary
 
 Current tradeoffs:
 - server credentials are still stored by the application to support remote deployment workflows
-- the production backend currently mounts Docker socket access when local-on-host deployment is enabled
+- local Docker control is still available as an opt-in capability when explicitly enabled
 - local Docker control and remote SSH control live in the same backend service
 
 These are conscious MVP tradeoffs, not hidden assumptions. If I were continuing the hardening track, the next steps would be:

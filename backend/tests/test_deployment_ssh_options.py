@@ -3,10 +3,24 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from app.services.deployments import _build_ssh_base_command
+from fastapi import HTTPException
+
+from app.services.deployments import _build_ssh_base_command, ensure_local_docker_runtime_enabled
 
 
 class DeploymentSshOptionsTests(unittest.TestCase):
+    def test_local_runtime_guard_blocks_when_disabled(self):
+        with patch.dict(os.environ, {"DEPLOYMATE_LOCAL_DOCKER_ENABLED": "false"}, clear=False):
+            with self.assertRaises(HTTPException) as context:
+                ensure_local_docker_runtime_enabled()
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn("Local host deployments are disabled", context.exception.detail)
+
+    def test_local_runtime_guard_allows_when_enabled(self):
+        with patch.dict(os.environ, {"DEPLOYMATE_LOCAL_DOCKER_ENABLED": "true"}, clear=False):
+            ensure_local_docker_runtime_enabled()
+
     def test_default_ssh_mode_is_accept_new(self):
         server = {"port": 22}
 

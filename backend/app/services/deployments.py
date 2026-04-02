@@ -32,6 +32,22 @@ def _run_local_command(command: List[str]) -> subprocess.CompletedProcess:
         ) from exc
 
 
+def local_docker_runtime_enabled() -> bool:
+    raw_value = os.getenv("DEPLOYMATE_LOCAL_DOCKER_ENABLED", "true").strip().lower()
+    return raw_value not in {"0", "false", "no", "off"}
+
+
+def ensure_local_docker_runtime_enabled() -> None:
+    if not local_docker_runtime_enabled():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Local host deployments are disabled in this environment. "
+                "Attach a remote server target to continue."
+            ),
+        )
+
+
 def _get_ssh_host_key_mode() -> str:
     mode = os.getenv("DEPLOYMATE_SSH_HOST_KEY_CHECKING", "accept-new").strip().lower()
     if mode in {"accept-new", "yes", "no"}:
@@ -122,6 +138,7 @@ def _run_remote_command(server: dict, command: List[str]) -> subprocess.Complete
 def _run_docker_command(command: List[str], server: Optional[dict]) -> subprocess.CompletedProcess:
     if server:
         return _run_remote_command(server, command)
+    ensure_local_docker_runtime_enabled()
     return _run_local_command(command)
 
 
@@ -131,6 +148,7 @@ def run_diagnostic_command(
 ) -> subprocess.CompletedProcess:
     if server:
         return _run_remote_command(server, command)
+    ensure_local_docker_runtime_enabled()
     return _run_local_command(command)
 
 

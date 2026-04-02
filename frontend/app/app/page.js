@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const localDeploymentsEnabled =
+  process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
 
 function formatDate(value) {
   if (!value) {
@@ -238,7 +240,9 @@ function buildOpsSnapshot({ currentUser, deployments, servers, notifications, te
     attentionItems.push({
       level: "info",
       title: "No saved servers",
-      detail: "Only local deploys are available until a VPS target is added.",
+      detail: localDeploymentsEnabled
+        ? "Only local deploys are available until a VPS target is added."
+        : "This environment is remote-only, so add a VPS target before the next deployment.",
     });
   }
 
@@ -1029,6 +1033,10 @@ export default function HomePage() {
       errors.push("Internal port and external port must be provided together.");
     }
 
+    if (!localDeploymentsEnabled && !draft.server_id) {
+      errors.push("This environment is remote-only. Choose a saved server target.");
+    }
+
     errors.push(...envIssues);
 
     const matchingDeployment = deployments.find((deployment) => {
@@ -1066,7 +1074,7 @@ export default function HomePage() {
       );
     }
 
-    if (!draft.server_id && externalPort) {
+    if (localDeploymentsEnabled && !draft.server_id && externalPort) {
       warnings.push(
         "This deploy/template targets Local. Make sure the external port is free on the DeployMate host.",
       );
@@ -1773,6 +1781,10 @@ export default function HomePage() {
   const templateFormPreflight = validateTemplateDraft(currentDraft, {
     ignoreTemplateId: editingTemplateId,
   });
+  const createDeploymentBlocked =
+    submitting ||
+    deploymentLimitReached ||
+    (!localDeploymentsEnabled && !form.server_id);
   const previewDiffRows = buildTemplateDiff(previewTemplate, currentDraft, servers);
 
   if (!authChecked) {
@@ -2163,7 +2175,11 @@ export default function HomePage() {
             ) : null}
 
             {!serversLoading && servers.length === 0 ? (
-              <div className="empty">No servers yet. Local deploy is still available.</div>
+              <div className="empty">
+                {localDeploymentsEnabled
+                  ? "No servers yet. Local deploy is still available."
+                  : "No servers yet. This environment is remote-only, so add a server target first."}
+              </div>
             ) : null}
 
             {!serversLoading && servers.length > 0 && filteredServers.length === 0 ? (
@@ -2670,6 +2686,11 @@ export default function HomePage() {
 
         <article className="card formCard">
           <h2>Create deployment</h2>
+          {!localDeploymentsEnabled ? (
+            <div className="banner subtle">
+              This environment is running in remote-only mode. Local host deployments are disabled.
+            </div>
+          ) : null}
           {editingTemplateId ? (
             <div className="banner subtle">
               <div>Editing template in the deploy form. Saving will update the selected template instead of creating a new one.</div>
@@ -2740,7 +2761,9 @@ export default function HomePage() {
                     : suggestedPorts.length > 0
                       ? `Suggested free ports on this server: ${formatSuggestedPorts(suggestedPorts)}.`
                       : "No suggested ports available right now. Try a free port above 8080."
-                  : "For local deploys, choose a free external port if you want direct access."}
+                  : localDeploymentsEnabled
+                    ? "For local deploys, choose a free external port if you want direct access."
+                    : "Choose a remote server to receive server-specific port suggestions."}
               </span>
               <div className="portSuggestions">
                 {suggestedPorts.map((port) => (
@@ -2798,7 +2821,9 @@ export default function HomePage() {
                 onChange={updateFormField}
                 disabled={submitting}
               >
-                <option value="">Local</option>
+                <option value="">
+                  {localDeploymentsEnabled ? "Local" : "Choose remote server"}
+                </option>
                 {servers.map((server) => (
                   <option key={server.id} value={server.id}>
                     {server.name} ({server.host})
@@ -2821,7 +2846,7 @@ export default function HomePage() {
             </label>
 
             <div className="formActions">
-              <button type="submit" disabled={submitting || deploymentLimitReached}>
+              <button type="submit" disabled={createDeploymentBlocked}>
                 {submitting ? "Creating..." : "Create deployment"}
               </button>
               <button
@@ -2831,7 +2856,8 @@ export default function HomePage() {
                   submitting ||
                   templateSubmitting ||
                   !templateName.trim() ||
-                  !form.image.trim()
+                  !form.image.trim() ||
+                  (!localDeploymentsEnabled && !form.server_id)
                 }
               >
                 {templateSubmitting
@@ -2862,7 +2888,11 @@ export default function HomePage() {
           ) : null}
           <div className="banner subtle">
             Current form snapshot: {countFilledEnvRows(envRows)} env vars,{" "}
-            {form.server_id ? "remote server selected" : "local target"},{" "}
+            {form.server_id
+              ? "remote server selected"
+              : localDeploymentsEnabled
+                ? "local target"
+                : "remote target required"},{" "}
             {form.internal_port.trim() && form.external_port.trim()
               ? `ports ${form.external_port}:${form.internal_port}`
               : "no port mapping"}.

@@ -224,6 +224,14 @@ bash scripts/post_deploy_smoke.sh
 # 9. delete the test deployment
 ```
 
+Remote-only production notes:
+
+```text
+- standard production runs with DEPLOYMATE_LOCAL_DOCKER_ENABLED=false
+- standard production frontend builds with NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
+- if either capability flag changes, rebuild both backend and frontend with the full stack update flow
+```
+
 Backup and restore dry-run:
 
 ```bash

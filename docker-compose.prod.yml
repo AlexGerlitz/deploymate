@@ -24,18 +24,19 @@ services:
       DEPLOYMATE_ADMIN_PASSWORD: ${DEPLOYMATE_ADMIN_PASSWORD}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      DEPLOYMATE_LOCAL_DOCKER_ENABLED: ${DEPLOYMATE_LOCAL_DOCKER_ENABLED:-false}
+      DEPLOYMATE_SSH_HOST_KEY_CHECKING: ${DEPLOYMATE_SSH_HOST_KEY_CHECKING:-accept-new}
+      DEPLOYMATE_SSH_KNOWN_HOSTS_FILE: ${DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:-/tmp/deploymate_known_hosts}
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      # Required only when DeployMate should manage Docker on the same VPS host.
-      - /var/run/docker.sock:/var/run/docker.sock
 
   frontend:
     build:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED: ${NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED:-0}
     restart: unless-stopped
     depends_on:
       - backend
