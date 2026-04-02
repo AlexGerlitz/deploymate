@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 360" role="img" aria-label="DeployMate architecture flow diagram">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f7f5ef" />
+      <stop offset="100%" stop-color="#efe9dc" />
+    </linearGradient>
+    <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f5f1e7" />
+    </linearGradient>
+    <style>
+      .title { font: 700 28px ui-sans-serif, system-ui, -apple-system, sans-serif; fill: #1f2937; }
+      .subtitle { font: 500 14px ui-sans-serif, system-ui, -apple-system, sans-serif; fill: #4b5563; }
+      .boxTitle { font: 700 18px ui-sans-serif, system-ui, -apple-system, sans-serif; fill: #111827; }
+      .body { font: 500 13px ui-sans-serif, system-ui, -apple-system, sans-serif; fill: #374151; }
+      .chip { font: 700 11px ui-sans-serif, system-ui, -apple-system, sans-serif; fill: #92400e; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9a3412" />
+    </marker>
+  </defs>
+
+  <rect width="980" height="360" rx="28" fill="url(#bg)" />
+  <text x="44" y="54" class="title">DeployMate Request Flow</text>
+  <text x="44" y="82" class="subtitle">Product UI, API, persistence, and runtime boundaries in the current architecture.</text>
+
+  <rect x="44" y="118" width="186" height="176" rx="22" fill="url(#panel)" stroke="#d6c7a8" />
+  <text x="68" y="154" class="boxTitle">Browser</text>
+  <text x="68" y="182" class="body">Landing, signup, login, dashboard,</text>
+  <text x="68" y="202" class="body">admin workspaces, backup dry-run UI,</text>
+  <text x="68" y="222" class="body">saved views, exports, bulk actions.</text>
+  <rect x="68" y="246" width="118" height="28" rx="14" fill="#fef3c7" />
+  <text x="86" y="264" class="chip">Trial signup enabled</text>
+
+  <rect x="274" y="118" width="196" height="176" rx="22" fill="url(#panel)" stroke="#d6c7a8" />
+  <text x="298" y="154" class="boxTitle">Next.js Frontend</text>
+  <text x="298" y="182" class="body">UI state, forms, dashboards,</text>
+  <text x="298" y="202" class="body">admin tooling, smoke anchors,</text>
+  <text x="298" y="222" class="body">remote-only capability handling.</text>
+  <rect x="298" y="246" width="130" height="28" rx="14" fill="#e0f2fe" />
+  <text x="324" y="264" class="chip">Next.js app router</text>
+
+  <rect x="514" y="118" width="198" height="176" rx="22" fill="url(#panel)" stroke="#d6c7a8" />
+  <text x="538" y="154" class="boxTitle">FastAPI Backend</text>
+  <text x="538" y="182" class="body">Auth, deployments, servers,</text>
+  <text x="538" y="202" class="body">ops overview, admin exports,</text>
+  <text x="538" y="222" class="body">backup bundle, restore dry-run.</text>
+  <rect x="538" y="246" width="118" height="28" rx="14" fill="#dcfce7" />
+  <text x="571" y="264" class="chip">Session auth</text>
+
+  <rect x="756" y="118" width="180" height="78" rx="22" fill="url(#panel)" stroke="#d6c7a8" />
+  <text x="780" y="152" class="boxTitle">PostgreSQL</text>
+  <text x="780" y="176" class="body">Users, sessions, servers,</text>
+  <text x="780" y="194" class="body">deployments, audit, templates.</text>
+
+  <rect x="756" y="216" width="180" height="78" rx="22" fill="url(#panel)" stroke="#d6c7a8" />
+  <text x="780" y="250" class="boxTitle">Runtime Targets</text>
+  <text x="780" y="274" class="body">Remote SSH hosts by default.</text>
+  <text x="780" y="292" class="body">Local Docker is opt-in only.</text>
+
+  <path d="M 230 206 L 274 206" stroke="#9a3412" stroke-width="4" marker-end="url(#arrow)" fill="none" />
+  <path d="M 470 206 L 514 206" stroke="#9a3412" stroke-width="4" marker-end="url(#arrow)" fill="none" />
+  <path d="M 712 174 L 756 174" stroke="#9a3412" stroke-width="4" marker-end="url(#arrow)" fill="none" />
+  <path d="M 712 256 L 756 256" stroke="#9a3412" stroke-width="4" marker-end="url(#arrow)" fill="none" />
+</svg>

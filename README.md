@@ -35,6 +35,8 @@ Reviewer path:
 3. open `/app/users` and `/app/upgrade-requests` to inspect the richer admin surface
 4. review saved views, bulk actions, audit trail, backup bundle, and restore dry-run tooling
 
+![Reviewer demo flow](docs/demo-flow.svg)
+
 ## Why This Project Is Interesting
 
 - one product surface covers deployments, servers, templates, activity, admin users, upgrade requests, backups, and restore dry-runs
@@ -102,6 +104,8 @@ Browser
 ```
 
 More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+![Architecture flow](docs/architecture-flow.svg)
 
 ## Repository Tour
 
@@ -216,6 +220,7 @@ Start here:
 - [SAFE-RELEASE.md](SAFE-RELEASE.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [SECURITY.md](SECURITY.md)
+- [CHANGELOG.md](CHANGELOG.md)
 
 ## Roadmap
 
