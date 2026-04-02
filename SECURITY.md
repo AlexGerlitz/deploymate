@@ -20,6 +20,7 @@ Current strengths:
 - admin audit trail exists for important admin actions
 - SSH host key checking defaults to `accept-new` instead of `no`
 - production can run as remote-only without Docker socket access in the backend
+- tracked-file security audit is part of the local preflight flow
 
 Current tradeoffs:
 
@@ -35,3 +36,18 @@ Planned improvements include:
 2. tightening SSH trust from `accept-new` toward pinned known-host workflows
 3. splitting Docker execution into a narrower capability boundary
 4. increasing automated coverage around runtime deployment paths
+
+## Local audit
+
+Run:
+
+```bash
+bash scripts/security_audit.sh
+```
+
+This currently checks tracked files for:
+
+- obvious committed token patterns
+- private key material
+- risky runtime markers such as `StrictHostKeyChecking=no`
+- accidental `docker.sock` references

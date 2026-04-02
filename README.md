@@ -126,6 +126,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 ## Production Readiness Signals
 
 - scripted preflight in [scripts/preflight.sh](scripts/preflight.sh)
+- tracked-file security audit in [scripts/security_audit.sh](scripts/security_audit.sh)
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
 - dedicated admin frontend smoke in [scripts/frontend_admin_smoke.sh](scripts/frontend_admin_smoke.sh)
 - backend unit tests for restore analysis, admin helpers, and SSH option policy

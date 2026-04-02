@@ -26,4 +26,9 @@ if [ -d "backend/app" ]; then
   fi
 fi
 
+if [ -f "scripts/security_audit.sh" ]; then
+  echo "[preflight] security audit"
+  bash scripts/security_audit.sh
+fi
+
 echo "[preflight] done"
