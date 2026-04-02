@@ -12,6 +12,7 @@ Highlights:
 - added a single local release workflow script for preflight, frontend smokes, build, and backend tests
 - added a single remote release helper to sync, rebuild, and run post-deploy smoke in one command
 - added GitHub Actions CI to run the release workflow on `develop` pushes and pull requests
+- added a staging GitHub Actions workflow to auto-deploy successful `develop` builds into a staging environment
 - added a manual GitHub Actions release workflow for guarded remote deploys and smoke checks
 - updated smoke checks to accept the authenticated `/app` redirect behavior now enforced by middleware
 

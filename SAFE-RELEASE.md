@@ -75,6 +75,8 @@ bash scripts/remote_release.sh \
 
 For teams that want a guarded click-to-release path, the repository also includes `.github/workflows/release.yml`, a manual GitHub Actions workflow that runs the same remote helper with repository secrets and an environment gate.
 
+If a separate staging host exists, prefer `.github/workflows/staging.yml` on `develop` first and keep `.github/workflows/release.yml` as the explicit production promotion step.
+
 This validates:
 
 - `/login`

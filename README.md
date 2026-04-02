@@ -129,6 +129,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - scripted local release gate in [scripts/release_workflow.sh](scripts/release_workflow.sh)
 - scripted remote release helper in [scripts/remote_release.sh](scripts/remote_release.sh)
 - GitHub Actions CI runs the same local release gate on `develop` pushes and pull requests
+- GitHub Actions staging workflow can auto-promote successful `develop` builds into a staging environment
 - GitHub Actions manual release workflow can run the remote release helper against a configured host
 - tracked-file security audit in [scripts/security_audit.sh](scripts/security_audit.sh)
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
@@ -206,6 +207,8 @@ bash scripts/remote_release.sh \
 ```
 
 There is also a manual GitHub Actions release workflow in [.github/workflows/release.yml](.github/workflows/release.yml) for teams that prefer a guarded repository-side trigger over running the remote helper from a workstation.
+
+For a safer promotion path, [.github/workflows/staging.yml](.github/workflows/staging.yml) can deploy `develop` to a dedicated staging environment after CI passes, then production can stay on the manual release gate.
 
 ## Security Posture
 

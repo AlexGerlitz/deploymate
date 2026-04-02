@@ -47,6 +47,12 @@ bash scripts/remote_release.sh \
 
 If you want the same flow from GitHub instead of a workstation shell, use the manual workflow in `.github/workflows/release.yml` after configuring repository secrets for the deploy host, deploy SSH key, pinned known_hosts contents, base URL, and admin smoke credentials.
 
+Recommended promotion order:
+
+1. `develop` passes CI in `.github/workflows/ci.yml`
+2. staging deploy runs through `.github/workflows/staging.yml`
+3. production deploy stays behind `.github/workflows/release.yml` or a manual `scripts/remote_release.sh` run
+
 Before the first deploy of encrypted server credentials, or before enabling remote server management on a fresh environment:
 
 ```bash
@@ -255,6 +261,8 @@ Optional GitHub Actions release workflow secrets:
 - `DEPLOY_REPO_DIR`
 - `DEPLOY_BRANCH`
 - `DEPLOY_ENV_FILE`
+
+The staging workflow uses the same secret names, but scoped under the `staging` environment instead of `production`.
 
 Runtime smoke notes:
 
