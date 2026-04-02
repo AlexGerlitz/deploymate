@@ -21,6 +21,15 @@ import {
   smokeUpgradeSavedViews,
   smokeUpgradeUsers as smokeUsers,
 } from "../../lib/admin-smoke-fixtures";
+import {
+  dedupeSavedViewsByName,
+  formatSavedViews,
+  mergeSavedViews,
+  normalizeSavedViewName,
+  normalizeSavedViewsForStorage,
+  parseImportedSavedViews,
+  sortSavedViews,
+} from "../../lib/admin-saved-views";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -110,10 +119,6 @@ function buildSelectedRequestsCsv(items) {
   return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }
 
-function normalizeSavedViewName(value) {
-  return value.trim().replaceAll(/\s+/g, " ");
-}
-
 async function copyTextToClipboard(value) {
   if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
     await navigator.clipboard.writeText(value);
@@ -131,95 +136,20 @@ async function copyTextToClipboard(value) {
   document.body.removeChild(textarea);
 }
 
-function formatSavedViews(items) {
-  if (!Array.isArray(items)) {
-    return [];
-  }
-
-  return items
-    .filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && item.filters)
-    .sort((left, right) => {
-      const leftTime = new Date(left.updatedAt || 0).getTime();
-      const rightTime = new Date(right.updatedAt || 0).getTime();
-      return rightTime - leftTime;
-    })
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      filters: item.filters,
-      updatedAt: item.updatedAt || new Date().toISOString(),
-      source: item.source || "local",
-      updatedAtLabel: formatDate(item.updatedAt || new Date().toISOString()),
-      sourceLabel: item.source === "imported" ? "Imported" : "Local",
-      summary: [
-        item.filters.status && item.filters.status !== "all" ? `status ${item.filters.status}` : null,
-        item.filters.plan && item.filters.plan !== "all" ? `plan ${item.filters.plan}` : null,
-        item.filters.linked_only ? "linked only" : null,
-        item.filters.q ? `search ${item.filters.q}` : null,
-        item.filters.audit_q ? `audit ${item.filters.audit_q}` : null,
+function formatUpgradeSavedViews(items) {
+  return formatSavedViews(items, {
+    formatDate,
+    summarizeFilters: (filters) =>
+      [
+        filters.status && filters.status !== "all" ? `status ${filters.status}` : null,
+        filters.plan && filters.plan !== "all" ? `plan ${filters.plan}` : null,
+        filters.linked_only ? "linked only" : null,
+        filters.q ? `search ${filters.q}` : null,
+        filters.audit_q ? `audit ${filters.audit_q}` : null,
       ]
         .filter(Boolean)
         .join(" · "),
-    }));
-}
-
-function normalizeSavedViewsForStorage(items) {
-  return items.map((item) => ({
-    id: item.id,
-    name: item.name,
-    filters: item.filters,
-    updatedAt: item.updatedAt,
-    source: item.source || "local",
-  }));
-}
-
-function parseImportedSavedViews(payload) {
-  if (Array.isArray(payload)) {
-    return { views: payload, meta: { source: "legacy-array" } };
-  }
-  if (payload && Array.isArray(payload.views)) {
-    return {
-      views: payload.views,
-      meta: {
-        source: "bundle",
-        version: payload.version,
-        scope: payload.scope,
-        exportedAt: payload.exported_at,
-      },
-    };
-  }
-  return { views: [], meta: null };
-}
-
-function dedupeSavedViewsByName(items) {
-  const seen = new Set();
-  return items.filter((item) => {
-    const key = normalizeSavedViewName(item.name).toLowerCase();
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
   });
-}
-
-function mergeSavedViews(existingItems, importedItems) {
-  return dedupeSavedViewsByName([...importedItems, ...existingItems]).slice(0, 8);
-}
-
-function sortSavedViews(items, mode) {
-  const nextItems = [...items];
-  if (mode === "oldest") {
-    return nextItems.sort(
-      (left, right) => new Date(left.updatedAt || 0).getTime() - new Date(right.updatedAt || 0).getTime(),
-    );
-  }
-  if (mode === "name") {
-    return nextItems.sort((left, right) => left.name.localeCompare(right.name));
-  }
-  return nextItems.sort(
-    (left, right) => new Date(right.updatedAt || 0).getTime() - new Date(left.updatedAt || 0).getTime(),
-  );
 }
 
 function UpgradeRequestsPageContent() {
@@ -233,7 +163,7 @@ function UpgradeRequestsPageContent() {
   const [auditEvents, setAuditEvents] = useState(smokeMode ? smokeAuditEvents : []);
   const [users, setUsers] = useState(smokeMode ? smokeUsers : []);
   const [savedViews, setSavedViews] = useState(
-    smokeMode ? formatSavedViews(smokeUpgradeSavedViews) : [],
+    smokeMode ? formatUpgradeSavedViews(smokeUpgradeSavedViews) : [],
   );
   const [savedViewName, setSavedViewName] = useState("");
   const [savedViewsMetaText, setSavedViewsMetaText] = useState(
@@ -256,7 +186,7 @@ function UpgradeRequestsPageContent() {
   );
   const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
   const [auditViews, setAuditViews] = useState(
-    smokeMode ? formatSavedViews(smokeUpgradeAuditViews) : [],
+    smokeMode ? formatUpgradeSavedViews(smokeUpgradeAuditViews) : [],
   );
   const [auditViewName, setAuditViewName] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -1176,7 +1106,7 @@ function UpgradeRequestsPageContent() {
           source: "imported",
         }));
         const normalized = normalizeSavedViewsForStorage(
-          mergeSavedViews(formatSavedViews(savedViews), importedViews),
+          mergeSavedViews(formatUpgradeSavedViews(savedViews), importedViews),
         );
         if (normalized.length === 0) {
           throw new Error("No valid saved inbox views found in this file.");
@@ -1184,10 +1114,10 @@ function UpgradeRequestsPageContent() {
         const importedNameSet = new Set(
           importedViews.map((item) => normalizeSavedViewName(item.name).toLowerCase()),
         );
-        const replacedCount = formatSavedViews(savedViews).filter((item) =>
+        const replacedCount = formatUpgradeSavedViews(savedViews).filter((item) =>
           importedNameSet.has(normalizeSavedViewName(item.name).toLowerCase()),
         ).length;
-        const mergedTotal = dedupeSavedViewsByName([...importedViews, ...formatSavedViews(savedViews)]).length;
+        const mergedTotal = dedupeSavedViewsByName([...importedViews, ...formatUpgradeSavedViews(savedViews)]).length;
         const skippedCount = Math.max(0, mergedTotal - normalized.length);
         persistSavedViews(normalized);
         setSavedViewsMetaText(

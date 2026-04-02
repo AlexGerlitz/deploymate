@@ -23,6 +23,15 @@ import {
   smokeUsers,
   smokeUserSavedViews,
 } from "../../lib/admin-smoke-fixtures";
+import {
+  dedupeSavedViewsByName,
+  formatSavedViews,
+  mergeSavedViews,
+  normalizeSavedViewName,
+  normalizeSavedViewsForStorage,
+  parseImportedSavedViews,
+  sortSavedViews,
+} from "../../lib/admin-saved-views";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -242,103 +251,24 @@ async function copyTextToClipboard(value) {
   document.body.removeChild(textarea);
 }
 
-function normalizeSavedViewName(value) {
-  return value.trim().replaceAll(/\s+/g, " ");
-}
-
-function formatSavedViews(items) {
-  if (!Array.isArray(items)) {
-    return [];
-  }
-
-  return items
-    .filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && item.filters)
-    .sort((left, right) => {
-      const leftTime = new Date(left.updatedAt || 0).getTime();
-      const rightTime = new Date(right.updatedAt || 0).getTime();
-      return rightTime - leftTime;
-    })
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      filters: item.filters,
-      updatedAt: item.updatedAt || new Date().toISOString(),
-      source: item.source || "local",
-      updatedAtLabel: formatDate(item.updatedAt || new Date().toISOString()),
-      sourceLabel: item.source === "imported" ? "Imported" : "Local",
-      summary: [
-        item.filters.role && item.filters.role !== "all" ? `role ${item.filters.role}` : null,
-        item.filters.plan && item.filters.plan !== "all" ? `plan ${item.filters.plan}` : null,
-        item.filters.must_change_password && item.filters.must_change_password !== "all"
-          ? item.filters.must_change_password === "required"
+function formatUserSavedViews(items) {
+  return formatSavedViews(items, {
+    formatDate,
+    summarizeFilters: (filters) =>
+      [
+        filters.role && filters.role !== "all" ? `role ${filters.role}` : null,
+        filters.plan && filters.plan !== "all" ? `plan ${filters.plan}` : null,
+        filters.must_change_password && filters.must_change_password !== "all"
+          ? filters.must_change_password === "required"
             ? "password change required"
             : "password ok"
           : null,
-        item.filters.q ? `search ${item.filters.q}` : null,
-        item.filters.audit_q ? `audit ${item.filters.audit_q}` : null,
+        filters.q ? `search ${filters.q}` : null,
+        filters.audit_q ? `audit ${filters.audit_q}` : null,
       ]
         .filter(Boolean)
         .join(" · "),
-    }));
-}
-
-function normalizeSavedViewsForStorage(items) {
-  return items.map((item) => ({
-    id: item.id,
-    name: item.name,
-    filters: item.filters,
-    updatedAt: item.updatedAt,
-    source: item.source || "local",
-  }));
-}
-
-function parseImportedSavedViews(payload) {
-  if (Array.isArray(payload)) {
-    return { views: payload, meta: { source: "legacy-array" } };
-  }
-  if (payload && Array.isArray(payload.views)) {
-    return {
-      views: payload.views,
-      meta: {
-        source: "bundle",
-        version: payload.version,
-        scope: payload.scope,
-        exportedAt: payload.exported_at,
-      },
-    };
-  }
-  return { views: [], meta: null };
-}
-
-function dedupeSavedViewsByName(items) {
-  const seen = new Set();
-  return items.filter((item) => {
-    const key = normalizeSavedViewName(item.name).toLowerCase();
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
   });
-}
-
-function mergeSavedViews(existingItems, importedItems) {
-  return dedupeSavedViewsByName([...importedItems, ...existingItems]).slice(0, 8);
-}
-
-function sortSavedViews(items, mode) {
-  const nextItems = [...items];
-  if (mode === "oldest") {
-    return nextItems.sort(
-      (left, right) => new Date(left.updatedAt || 0).getTime() - new Date(right.updatedAt || 0).getTime(),
-    );
-  }
-  if (mode === "name") {
-    return nextItems.sort((left, right) => left.name.localeCompare(right.name));
-  }
-  return nextItems.sort(
-    (left, right) => new Date(right.updatedAt || 0).getTime() - new Date(left.updatedAt || 0).getTime(),
-  );
 }
 
 function UsersPageContent() {
@@ -359,7 +289,7 @@ function UsersPageContent() {
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [restoreSectionFilter, setRestoreSectionFilter] = useState("all");
   const [savedViews, setSavedViews] = useState(
-    smokeMode ? formatSavedViews(smokeUserSavedViews) : [],
+    smokeMode ? formatUserSavedViews(smokeUserSavedViews) : [],
   );
   const [savedViewName, setSavedViewName] = useState("");
   const [savedViewsMetaText, setSavedViewsMetaText] = useState(
@@ -397,7 +327,7 @@ function UsersPageContent() {
   );
   const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
   const [auditViews, setAuditViews] = useState(
-    smokeMode ? formatSavedViews(smokeUserAuditViews) : [],
+    smokeMode ? formatUserSavedViews(smokeUserAuditViews) : [],
   );
   const [auditViewName, setAuditViewName] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -1509,7 +1439,7 @@ function UsersPageContent() {
           source: "imported",
         }));
         const normalized = normalizeSavedViewsForStorage(
-          mergeSavedViews(formatSavedViews(savedViews), importedViews),
+          mergeSavedViews(formatUserSavedViews(savedViews), importedViews),
         );
         if (normalized.length === 0) {
           throw new Error("No valid saved user views found in this file.");
@@ -1517,10 +1447,10 @@ function UsersPageContent() {
         const importedNameSet = new Set(
           importedViews.map((item) => normalizeSavedViewName(item.name).toLowerCase()),
         );
-        const replacedCount = formatSavedViews(savedViews).filter((item) =>
+        const replacedCount = formatUserSavedViews(savedViews).filter((item) =>
           importedNameSet.has(normalizeSavedViewName(item.name).toLowerCase()),
         ).length;
-        const mergedTotal = dedupeSavedViewsByName([...importedViews, ...formatSavedViews(savedViews)]).length;
+        const mergedTotal = dedupeSavedViewsByName([...importedViews, ...formatUserSavedViews(savedViews)]).length;
         const skippedCount = Math.max(0, mergedTotal - normalized.length);
         persistSavedViews(normalized);
         setSavedViewsMetaText(
