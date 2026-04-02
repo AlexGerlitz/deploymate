@@ -206,6 +206,25 @@ function formatSavedViews(items) {
     }));
 }
 
+function normalizeSavedViewsForStorage(items) {
+  return items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    filters: item.filters,
+    updatedAt: item.updatedAt,
+  }));
+}
+
+function parseImportedSavedViews(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (payload && Array.isArray(payload.views)) {
+    return payload.views;
+  }
+  return [];
+}
+
 function UsersPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -644,6 +663,38 @@ function UsersPageContent() {
     }
   }
 
+  async function handleCopySavedViewLink(viewId) {
+    const nextView = savedViews.find((item) => item.id === viewId);
+    if (!nextView) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (nextView.filters.q) {
+      params.set("q", nextView.filters.q);
+    }
+    if (nextView.filters.role && nextView.filters.role !== "all") {
+      params.set("role", nextView.filters.role);
+    }
+    if (nextView.filters.plan && nextView.filters.plan !== "all") {
+      params.set("plan", nextView.filters.plan);
+    }
+    if (
+      nextView.filters.must_change_password &&
+      nextView.filters.must_change_password !== "all"
+    ) {
+      params.set("must_change_password", nextView.filters.must_change_password);
+    }
+    if (nextView.filters.audit_q) {
+      params.set("audit_q", nextView.filters.audit_q);
+    }
+
+    const url = `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+    await copyTextToClipboard(url);
+    setSuccess(`Saved view link copied for ${nextView.name}.`);
+    setError("");
+  }
+
   async function handleDownloadBackupBundle() {
     setError("");
     try {
@@ -842,6 +893,64 @@ function UsersPageContent() {
       setSavedViewName("");
     }
     setSuccess("Saved user view removed.");
+    setError("");
+  }
+
+  function handleDownloadSavedViews() {
+    if (savedViews.length === 0) {
+      return;
+    }
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            version: 1,
+            exported_at: new Date().toISOString(),
+            scope: "admin-users",
+            views: normalizeSavedViewsForStorage(savedViews),
+          },
+          null,
+          2,
+        ),
+      ],
+      { type: "application/json;charset=utf-8" },
+    );
+    triggerFileDownload("deploymate-users-saved-views.json", blob);
+    setSuccess("Saved user views exported.");
+    setError("");
+  }
+
+  function handleImportSavedViews(event) {
+    const [file] = Array.from(event.target.files || []);
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(typeof reader.result === "string" ? reader.result : "[]");
+        const normalized = normalizeSavedViewsForStorage(
+          formatSavedViews(parseImportedSavedViews(parsed)),
+        ).slice(0, 8);
+        persistSavedViews(normalized);
+        setSuccess(`Imported ${normalized.length} saved user view${normalized.length === 1 ? "" : "s"}.`);
+        setError("");
+      } catch {
+        setError("Failed to import saved user views.");
+      }
+    };
+    reader.onerror = () => {
+      setError("Failed to read saved views file.");
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
+
+  function handleClearSavedViews() {
+    persistSavedViews([]);
+    setSavedViewName("");
+    setSuccess("Saved user views cleared.");
     setError("");
   }
 
@@ -1338,6 +1447,28 @@ function UsersPageContent() {
             views={savedViews}
             onApply={handleApplySavedView}
             onDelete={handleDeleteSavedView}
+            onCopy={handleCopySavedViewLink}
+            actions={[
+              {
+                label: "Export views",
+                testId: "users-export-saved-views-button",
+                onClick: handleDownloadSavedViews,
+                disabled: savedViews.length === 0,
+              },
+              {
+                label: "Import views",
+                testId: "users-import-saved-views-button",
+                kind: "file",
+                accept: "application/json,.json",
+                onChange: handleImportSavedViews,
+              },
+              {
+                label: "Clear all",
+                testId: "users-clear-saved-views-button",
+                onClick: handleClearSavedViews,
+                disabled: savedViews.length === 0,
+              },
+            ]}
             emptyText="No saved user views yet."
             listTestId="users-saved-views-list"
             activeViewId={activeSavedViewId}

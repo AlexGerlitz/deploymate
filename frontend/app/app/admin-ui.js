@@ -153,6 +153,8 @@ export function AdminSavedViews({
   views = [],
   onApply,
   onDelete,
+  onCopy,
+  actions = [],
   emptyText,
   listTestId,
   activeViewId = "",
@@ -184,6 +186,29 @@ export function AdminSavedViews({
           {saveLabel}
         </button>
       </div>
+      {actions.length > 0 ? (
+        <div className="adminSavedViewActions">
+          {actions.map((action) =>
+            action.kind === "file" ? (
+              <label key={action.label} className="secondaryButton adminActionLabel" data-testid={action.testId}>
+                {action.label}
+                <input type="file" accept={action.accept} onChange={action.onChange} />
+              </label>
+            ) : (
+              <button
+                key={action.label}
+                type="button"
+                className="secondaryButton"
+                data-testid={action.testId}
+                onClick={action.onClick}
+                disabled={action.disabled}
+              >
+                {action.label}
+              </button>
+            ),
+          )}
+        </div>
+      ) : null}
       {views.length === 0 ? (
         <div className="empty" data-testid={listTestId}>
           {emptyText}
@@ -203,6 +228,15 @@ export function AdminSavedViews({
                 <p className="formHint">Updated {view.updatedAtLabel}</p>
               </div>
               <div className="adminSavedViewActions">
+                {onCopy ? (
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => onCopy(view.id)}
+                  >
+                    Copy link
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="secondaryButton"

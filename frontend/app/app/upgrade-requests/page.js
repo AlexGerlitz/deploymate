@@ -156,6 +156,25 @@ function formatSavedViews(items) {
     }));
 }
 
+function normalizeSavedViewsForStorage(items) {
+  return items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    filters: item.filters,
+    updatedAt: item.updatedAt,
+  }));
+}
+
+function parseImportedSavedViews(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (payload && Array.isArray(payload.views)) {
+    return payload.views;
+  }
+  return [];
+}
+
 function UpgradeRequestsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -570,6 +589,35 @@ function UpgradeRequestsPageContent() {
     }
   }
 
+  async function handleCopySavedViewLink(viewId) {
+    const nextView = savedViews.find((item) => item.id === viewId);
+    if (!nextView) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (nextView.filters.q) {
+      params.set("q", nextView.filters.q);
+    }
+    if (nextView.filters.plan && nextView.filters.plan !== "all") {
+      params.set("plan", nextView.filters.plan);
+    }
+    if (nextView.filters.status && nextView.filters.status !== "all") {
+      params.set("status", nextView.filters.status);
+    }
+    if (nextView.filters.linked_only) {
+      params.set("linked_only", "true");
+    }
+    if (nextView.filters.audit_q) {
+      params.set("audit_q", nextView.filters.audit_q);
+    }
+
+    const url = `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+    await copyTextToClipboard(url);
+    setSaveFeedback(`Saved view link copied for ${nextView.name}.`);
+    setError("");
+  }
+
   function resetRequestFilters() {
     setQuery("");
     setPlanFilter("all");
@@ -634,6 +682,64 @@ function UpgradeRequestsPageContent() {
       setSavedViewName("");
     }
     setSaveFeedback("Saved inbox view removed.");
+    setError("");
+  }
+
+  function handleDownloadSavedViews() {
+    if (savedViews.length === 0) {
+      return;
+    }
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            version: 1,
+            exported_at: new Date().toISOString(),
+            scope: "admin-upgrade-requests",
+            views: normalizeSavedViewsForStorage(savedViews),
+          },
+          null,
+          2,
+        ),
+      ],
+      { type: "application/json;charset=utf-8" },
+    );
+    triggerFileDownload("deploymate-upgrade-saved-views.json", blob);
+    setSaveFeedback("Saved inbox views exported.");
+    setError("");
+  }
+
+  function handleImportSavedViews(event) {
+    const [file] = Array.from(event.target.files || []);
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(typeof reader.result === "string" ? reader.result : "[]");
+        const normalized = normalizeSavedViewsForStorage(
+          formatSavedViews(parseImportedSavedViews(parsed)),
+        ).slice(0, 8);
+        persistSavedViews(normalized);
+        setSaveFeedback(`Imported ${normalized.length} saved inbox view${normalized.length === 1 ? "" : "s"}.`);
+        setError("");
+      } catch {
+        setError("Failed to import saved inbox views.");
+      }
+    };
+    reader.onerror = () => {
+      setError("Failed to read saved views file.");
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
+
+  function handleClearSavedViews() {
+    persistSavedViews([]);
+    setSavedViewName("");
+    setSaveFeedback("Saved inbox views cleared.");
     setError("");
   }
 
@@ -931,6 +1037,28 @@ function UpgradeRequestsPageContent() {
             views={savedViews}
             onApply={handleApplySavedView}
             onDelete={handleDeleteSavedView}
+            onCopy={handleCopySavedViewLink}
+            actions={[
+              {
+                label: "Export views",
+                testId: "upgrade-export-saved-views-button",
+                onClick: handleDownloadSavedViews,
+                disabled: savedViews.length === 0,
+              },
+              {
+                label: "Import views",
+                testId: "upgrade-import-saved-views-button",
+                kind: "file",
+                accept: "application/json,.json",
+                onChange: handleImportSavedViews,
+              },
+              {
+                label: "Clear all",
+                testId: "upgrade-clear-saved-views-button",
+                onClick: handleClearSavedViews,
+                disabled: savedViews.length === 0,
+              },
+            ]}
             emptyText="No saved inbox views yet."
             listTestId="upgrade-saved-views-list"
             activeViewId={activeSavedViewId}

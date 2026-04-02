@@ -439,6 +439,15 @@ a {
   flex-wrap: wrap;
 }
 
+.adminActionLabel {
+  display: inline-flex;
+  align-items: center;
+}
+
+.adminActionLabel input {
+  display: none;
+}
+
 .fieldHint {
   color: #666;
   font-size: 13px;
