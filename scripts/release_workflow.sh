@@ -72,6 +72,9 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   echo "[release] frontend runtime smoke"
   npm --prefix frontend run smoke:runtime
 
+  echo "[release] frontend templates smoke"
+  npm --prefix frontend run smoke:templates
+
   echo "[release] frontend build"
   npm --prefix frontend run build
 fi

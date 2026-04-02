@@ -34,6 +34,14 @@ Or run the broader local release gate:
 bash scripts/release_workflow.sh --surface full
 ```
 
+For template-heavy frontend changes, also run:
+
+```bash
+npm --prefix frontend run smoke:templates
+```
+
+The full local release gate already includes this templates smoke alongside the admin and runtime frontend smokes.
+
 For a single remote deploy command that also runs post-deploy smoke:
 
 ```bash

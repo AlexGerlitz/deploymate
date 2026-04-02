@@ -538,7 +538,7 @@ export default function HomePage() {
   const [notificationQuery, setNotificationQuery] = useState("");
   const [templateQuery, setTemplateQuery] = useState("");
   const [templateFilter, setTemplateFilter] = useState("all");
-  const [templatePreviewId, setTemplatePreviewId] = useState("");
+  const [templatePreviewId, setTemplatePreviewId] = useState(smokeMode ? "smoke-template" : "");
   const [editingTemplateId, setEditingTemplateId] = useState("");
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
@@ -2636,20 +2636,21 @@ export default function HomePage() {
           ) : null}
         </article>
 
-        <article className="card formCard">
-          <div className="sectionHeader">
+        <article className="card formCard" data-testid="templates-card">
+          <div className="sectionHeader" data-testid="templates-section-header">
             <div>
-              <h2>Deployment templates</h2>
+              <h2 data-testid="templates-section-title">Deployment templates</h2>
               <p className="formHint">
                 Save common image, ports, server, and env settings once, then deploy directly or apply them back to the create form.
               </p>
             </div>
           </div>
-          <div className="filterTabs historyFilters" role="tablist" aria-label="Template filters">
+          <div className="filterTabs historyFilters" role="tablist" aria-label="Template filters" data-testid="templates-filter-tabs">
             <button
               type="button"
               className={templateFilter === "all" ? "active" : ""}
               onClick={() => setTemplateFilter("all")}
+              data-testid="templates-filter-all"
             >
               All
             </button>
@@ -2657,6 +2658,7 @@ export default function HomePage() {
               type="button"
               className={templateFilter === "unused" ? "active" : ""}
               onClick={() => setTemplateFilter("unused")}
+              data-testid="templates-filter-unused"
             >
               Unused
             </button>
@@ -2664,6 +2666,7 @@ export default function HomePage() {
               type="button"
               className={templateFilter === "recent" ? "active" : ""}
               onClick={() => setTemplateFilter("recent")}
+              data-testid="templates-filter-recent"
             >
               Used in 7d
             </button>
@@ -2671,6 +2674,7 @@ export default function HomePage() {
               type="button"
               className={templateFilter === "popular" ? "active" : ""}
               onClick={() => setTemplateFilter("popular")}
+              data-testid="templates-filter-popular"
             >
               Popular
             </button>
@@ -2682,17 +2686,18 @@ export default function HomePage() {
               onChange={(event) => setTemplateQuery(event.target.value)}
               placeholder="template name, image, server, env key"
               disabled={templatesLoading}
+              data-testid="templates-search-input"
             />
           </label>
 
           {templatesLoading ? (
-            <div className="empty">Loading templates...</div>
+            <div className="empty" data-testid="templates-loading-state">Loading templates...</div>
           ) : filteredTemplates.length === 0 ? (
-            <div className="empty">No templates yet. Save the current create form as your first template.</div>
+            <div className="empty" data-testid="templates-empty-state">No templates yet. Save the current create form as your first template.</div>
           ) : (
-            <div className="list compactList">
+            <div className="list compactList" data-testid="templates-list">
               {filteredTemplates.map((template) => (
-                <div key={template.id} className="card compactCard">
+                <div key={template.id} className="card compactCard" data-testid={`template-card-${template.id}`}>
                   <div className="row">
                     <span className="label">Template</span>
                     <span>{template.template_name}</span>
@@ -2741,6 +2746,7 @@ export default function HomePage() {
                           currentId === template.id ? "" : template.id,
                         )
                       }
+                      data-testid={`template-preview-button-${template.id}`}
                     >
                       {templatePreviewId === template.id ? "Hide preview" : "Preview"}
                     </button>
@@ -2748,16 +2754,22 @@ export default function HomePage() {
                       type="button"
                       onClick={() => handleDeployTemplate(template.id)}
                       disabled={deployingTemplateId === template.id || deploymentLimitReached}
+                      data-testid={`template-deploy-button-${template.id}`}
                     >
                       {deployingTemplateId === template.id ? "Deploying..." : "Deploy now"}
                     </button>
-                    <button type="button" onClick={() => applyTemplateToForm(template, { startEditing: true })}>
+                    <button
+                      type="button"
+                      onClick={() => applyTemplateToForm(template, { startEditing: true })}
+                      data-testid={`template-edit-button-${template.id}`}
+                    >
                       Edit in form
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDuplicateTemplate(template)}
                       disabled={duplicatingTemplateId === template.id}
+                      data-testid={`template-duplicate-button-${template.id}`}
                     >
                       {duplicatingTemplateId === template.id ? "Duplicating..." : "Duplicate"}
                     </button>
@@ -2766,6 +2778,7 @@ export default function HomePage() {
                       className="dangerButton"
                       onClick={() => handleDeleteTemplate(template.id)}
                       disabled={deletingTemplateId === template.id}
+                      data-testid={`template-delete-button-${template.id}`}
                     >
                       {deletingTemplateId === template.id ? "Deleting..." : "Delete"}
                     </button>
@@ -2776,21 +2789,21 @@ export default function HomePage() {
           )}
 
           {previewTemplate ? (
-            <div className="card compactCard previewCard">
-              <div className="sectionHeader">
+            <div className="card compactCard previewCard" data-testid="template-preview-card">
+              <div className="sectionHeader" data-testid="template-preview-header">
                 <div>
-                  <h3>Template preview</h3>
+                  <h3 data-testid="template-preview-title">Template preview</h3>
                   <p className="formHint">
                     Review the selected template against the current create form before apply or deploy.
                   </p>
                 </div>
               </div>
               {previewDiffRows.length === 0 ? (
-                <div className="banner subtle">
+                <div className="banner subtle" data-testid="template-preview-match-banner">
                   Current create form already matches "{previewTemplate.template_name}".
                 </div>
               ) : (
-                <div className="list compactList">
+                <div className="list compactList" data-testid="template-preview-diff-list">
                   {previewDiffRows.map((row) => (
                     <div key={`${previewTemplate.id}-${row.label}`} className="card compactCard diffCard">
                       <div className="row">
@@ -2804,13 +2817,14 @@ export default function HomePage() {
                   ))}
                 </div>
               )}
-              <div className="actions">
-                <button type="button" onClick={() => applyTemplate(previewTemplate)}>
+              <div className="actions" data-testid="template-preview-actions">
+                <button type="button" onClick={() => applyTemplate(previewTemplate)} data-testid="template-preview-apply-button">
                   Apply to form
                 </button>
                 <button
                   type="button"
                   onClick={() => applyTemplateToForm(previewTemplate, { startEditing: true })}
+                  data-testid="template-preview-edit-button"
                 >
                   Edit in form
                 </button>
@@ -2818,6 +2832,7 @@ export default function HomePage() {
                   type="button"
                   onClick={() => handleDeployTemplate(previewTemplate.id)}
                   disabled={deployingTemplateId === previewTemplate.id || deploymentLimitReached}
+                  data-testid="template-preview-deploy-button"
                 >
                   {deployingTemplateId === previewTemplate.id ? "Deploying..." : "Deploy from preview"}
                 </button>
@@ -2826,7 +2841,7 @@ export default function HomePage() {
           ) : null}
 
           {templateDeploySuccess ? (
-            <div className="banner success inlineBanner">
+            <div className="banner success inlineBanner" data-testid="template-deploy-success-banner">
               <div>{templateDeploySuccess}</div>
               {templateCreatedDeployment?.id || buildDeploymentUrl(templateCreatedDeployment) ? (
                 <div className="successActions">
@@ -2852,12 +2867,12 @@ export default function HomePage() {
               ) : null}
             </div>
           ) : null}
-          {templateDuplicateError ? <div className="banner error">{templateDuplicateError}</div> : null}
-          {templateDuplicateSuccess ? <div className="banner success">{templateDuplicateSuccess}</div> : null}
+          {templateDuplicateError ? <div className="banner error" data-testid="template-duplicate-error-banner">{templateDuplicateError}</div> : null}
+          {templateDuplicateSuccess ? <div className="banner success" data-testid="template-duplicate-success-banner">{templateDuplicateSuccess}</div> : null}
         </article>
 
-        <article className="card formCard">
-          <h2>Create deployment</h2>
+        <article className="card formCard" data-testid="create-deployment-card">
+          <h2 data-testid="create-deployment-title">Create deployment</h2>
           {!localDeploymentsEnabled ? (
             <div className="banner subtle">
               This environment is running in remote-only mode. Local host deployments are disabled.
@@ -3011,6 +3026,7 @@ export default function HomePage() {
                 onChange={(event) => setTemplateName(event.target.value)}
                 placeholder="Save current form as..."
                 disabled={submitting || templateSubmitting}
+                data-testid="create-template-name-input"
               />
               <span className="fieldHint">
                 Save the current image, name, ports, server, and env vars as a reusable preset.
@@ -3018,7 +3034,7 @@ export default function HomePage() {
             </label>
 
             <div className="formActions">
-              <button type="submit" disabled={createDeploymentBlocked}>
+              <button type="submit" disabled={createDeploymentBlocked} data-testid="create-deployment-submit-button">
                 {submitting ? "Creating..." : "Create deployment"}
               </button>
               <button
@@ -3031,6 +3047,7 @@ export default function HomePage() {
                   !form.image.trim() ||
                   (!localDeploymentsEnabled && !form.server_id)
                 }
+                data-testid="create-save-template-button"
               >
                 {templateSubmitting
                   ? editingTemplateId
@@ -3041,7 +3058,7 @@ export default function HomePage() {
                     : "Save as template"}
               </button>
               {editingTemplateId ? (
-                <button type="button" className="linkButton" onClick={cancelTemplateEditing}>
+                <button type="button" className="linkButton" onClick={cancelTemplateEditing} data-testid="create-cancel-template-editing-button">
                   Cancel template editing
                 </button>
               ) : null}
@@ -3069,8 +3086,8 @@ export default function HomePage() {
               ? `ports ${form.external_port}:${form.internal_port}`
               : "no port mapping"}.
           </div>
-          {templateSubmitError ? <div className="banner error">{templateSubmitError}</div> : null}
-          {templateSubmitSuccess ? <div className="banner success">{templateSubmitSuccess}</div> : null}
+          {templateSubmitError ? <div className="banner error" data-testid="create-template-submit-error-banner">{templateSubmitError}</div> : null}
+          {templateSubmitSuccess ? <div className="banner success" data-testid="create-template-submit-success-banner">{templateSubmitSuccess}</div> : null}
           {submitSuccess ? (
             <div className="banner success">
               <div>{submitSuccess}</div>

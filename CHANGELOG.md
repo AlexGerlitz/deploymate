@@ -10,6 +10,8 @@ Highlights:
 - added an HTTP-level admin API flow test for users, upgrade requests, exports, backup bundle, restore dry-run, and audit history
 - added an HTTP-level deployment template API flow test for create, filter, update, duplicate, deploy, and delete
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
+- added dedicated frontend templates smoke coverage for the templates panel and create-form template controls
+- extended the local release gate to run the frontend templates smoke alongside admin and runtime smokes
 - extended post-deploy smoke with optional create -> health -> diagnostics -> logs -> activity -> delete runtime flow
 - added a single local release workflow script for preflight, frontend smokes, build, and backend tests
 - added a single remote release helper to sync, rebuild, and run post-deploy smoke in one command
