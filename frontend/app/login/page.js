@@ -10,9 +10,9 @@ export default async function LoginPage({ searchParams }) {
   return (
     <main className="page">
       <div className="container narrowContainer">
-        <article className="card formCard">
-          <h1>Login</h1>
-          <form className="form" method="post" action="/login/submit">
+        <article className="card formCard" data-testid="auth-login-card">
+          <h1 data-testid="auth-login-title">Login</h1>
+          <form className="form" method="post" action="/login/submit" data-testid="auth-login-form">
             <label className="field">
               <span>Username</span>
               <input
@@ -20,6 +20,7 @@ export default async function LoginPage({ searchParams }) {
                 autoComplete="username"
                 defaultValue={username}
                 required
+                data-testid="auth-login-username-input"
               />
             </label>
 
@@ -30,23 +31,24 @@ export default async function LoginPage({ searchParams }) {
                 type="password"
                 autoComplete="current-password"
                 required
+                data-testid="auth-login-password-input"
               />
             </label>
 
             <div className="formActions">
-              <button type="submit">Login</button>
+              <button type="submit" data-testid="auth-login-submit-button">Login</button>
             </div>
           </form>
 
-          {error ? <div className="banner error">{error}</div> : null}
-          <div className="banner subtle">
+          {error ? <div className="banner error" data-testid="auth-login-error-banner">{error}</div> : null}
+          <div className="banner subtle" data-testid="auth-login-help-banner">
             If this is the first run with the default admin account, you will be asked to
             change the password after login.
           </div>
           {publicSignupEnabled ? (
-            <div className="banner subtle">
+            <div className="banner subtle" data-testid="auth-login-signup-banner">
               New here?{" "}
-              <Link href="/register" className="inlineLink">
+              <Link href="/register" className="inlineLink" data-testid="auth-login-register-link">
                 Create a trial account
               </Link>
               .

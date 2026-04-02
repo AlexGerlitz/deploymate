@@ -6,6 +6,14 @@ import { useEffect, useState } from "react";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
+const smokeUser = {
+  id: "smoke-admin",
+  username: "smoke-admin",
+  plan: "team",
+  role: "admin",
+  must_change_password: true,
+};
 
 async function readJsonOrError(response, fallbackMessage) {
   const contentType = response.headers.get("content-type") || "";
@@ -28,9 +36,9 @@ async function readJsonOrError(response, fallbackMessage) {
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!smokeMode);
   const [submitting, setSubmitting] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({
@@ -40,6 +48,10 @@ export default function ChangePasswordPage() {
   });
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
+
     async function checkAuth() {
       try {
         const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -75,6 +87,17 @@ export default function ChangePasswordPage() {
 
     if (form.new_password !== form.confirm_password) {
       setError("New password and confirmation must match.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (smokeMode) {
+      setSuccess("Password updated successfully. Redirecting to DeployMate...");
+      setForm({
+        current_password: "",
+        new_password: "",
+        confirm_password: "",
+      });
       setSubmitting(false);
       return;
     }
@@ -116,6 +139,11 @@ export default function ChangePasswordPage() {
   }
 
   async function handleLogout() {
+    if (smokeMode) {
+      router.replace("/login");
+      return;
+    }
+
     try {
       await fetch(`${apiBaseUrl}/auth/logout`, {
         method: "POST",
@@ -139,37 +167,37 @@ export default function ChangePasswordPage() {
   return (
     <main className="page">
       <div className="container narrowContainer">
-        <article className="card formCard">
+        <article className="card formCard" data-testid="auth-change-password-card">
           <div className="header">
             <div>
-              <h1>Change Password</h1>
-              <p>
+              <h1 data-testid="auth-change-password-title">Change Password</h1>
+              <p data-testid="auth-change-password-user">
                 {currentUser ? `Logged in as ${currentUser.username}` : "DeployMate"}
               </p>
             </div>
             <div className="buttonRow">
               {!currentUser?.must_change_password ? (
-                <Link href="/app" className="linkButton">
+                <Link href="/app" className="linkButton" data-testid="auth-change-password-back-link">
                   Back
                 </Link>
               ) : null}
-              <button type="button" onClick={handleLogout}>
+              <button type="button" onClick={handleLogout} data-testid="auth-change-password-logout-button">
                 Logout
               </button>
             </div>
           </div>
 
           {currentUser?.must_change_password ? (
-            <div className="banner error">
+            <div className="banner error" data-testid="auth-change-password-required-banner">
               You are still using the default admin password. Change it before continuing.
             </div>
           ) : (
-            <div className="banner subtle">
+            <div className="banner subtle" data-testid="auth-change-password-help-banner">
               Update your current password. Your existing session will continue to work.
             </div>
           )}
 
-          <form className="form" onSubmit={handleSubmit}>
+          <form className="form" onSubmit={handleSubmit} data-testid="auth-change-password-form">
             <label className="field">
               <span>Current password</span>
               <input
@@ -179,6 +207,7 @@ export default function ChangePasswordPage() {
                 onChange={updateFormField}
                 disabled={submitting}
                 required
+                data-testid="auth-change-password-current-input"
               />
             </label>
 
@@ -191,6 +220,7 @@ export default function ChangePasswordPage() {
                 onChange={updateFormField}
                 disabled={submitting}
                 required
+                data-testid="auth-change-password-new-input"
               />
             </label>
 
@@ -203,18 +233,19 @@ export default function ChangePasswordPage() {
                 onChange={updateFormField}
                 disabled={submitting}
                 required
+                data-testid="auth-change-password-confirm-input"
               />
             </label>
 
             <div className="formActions">
-              <button type="submit" disabled={submitting}>
+              <button type="submit" disabled={submitting} data-testid="auth-change-password-submit-button">
                 {submitting ? "Saving..." : "Change password"}
               </button>
             </div>
           </form>
 
-          {error ? <div className="banner error">{error}</div> : null}
-          {success ? <div className="banner success">{success}</div> : null}
+          {error ? <div className="banner error" data-testid="auth-change-password-error-banner">{error}</div> : null}
+          {success ? <div className="banner success" data-testid="auth-change-password-success-banner">{success}</div> : null}
         </article>
       </div>
     </main>

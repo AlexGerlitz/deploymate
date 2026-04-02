@@ -66,6 +66,9 @@ echo "[release] preflight"
 bash scripts/preflight.sh
 
 if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
+  echo "[release] frontend auth smoke"
+  npm --prefix frontend run smoke:auth
+
   echo "[release] frontend admin smoke"
   npm --prefix frontend run smoke:admin
 

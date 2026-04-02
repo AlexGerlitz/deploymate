@@ -11,13 +11,13 @@ export default async function RegisterPage({ searchParams }) {
     return (
       <main className="page">
         <div className="container narrowContainer">
-          <article className="card formCard">
-            <h1>Create Trial Account</h1>
-            <div className="banner subtle">
+          <article className="card formCard" data-testid="auth-register-card">
+            <h1 data-testid="auth-register-title">Create Trial Account</h1>
+            <div className="banner subtle" data-testid="auth-register-disabled-banner">
               Public signup is not enabled in this environment.
             </div>
             <div className="formActions">
-              <Link href="/login" className="linkButton">
+              <Link href="/login" className="linkButton" data-testid="auth-register-back-link">
                 Back to login
               </Link>
             </div>
@@ -30,14 +30,14 @@ export default async function RegisterPage({ searchParams }) {
   return (
     <main className="page">
       <div className="container narrowContainer">
-        <article className="card formCard">
-          <h1>Create Trial Account</h1>
-          <div className="banner subtle">
+        <article className="card formCard" data-testid="auth-register-card">
+          <h1 data-testid="auth-register-title">Create Trial Account</h1>
+          <div className="banner subtle" data-testid="auth-register-help-banner">
             Public signup creates a `member` account on the `trial` plan so you can
             explore the product safely.
           </div>
 
-          <form className="form" method="post" action="/register/submit">
+          <form className="form" method="post" action="/register/submit" data-testid="auth-register-form">
             <label className="field">
               <span>Username</span>
               <input
@@ -48,6 +48,7 @@ export default async function RegisterPage({ searchParams }) {
                 minLength={3}
                 maxLength={32}
                 pattern="[a-zA-Z0-9_.-]+"
+                data-testid="auth-register-username-input"
               />
               <span className="fieldHint">
                 Use 3-32 characters: letters, numbers, dots, dashes, or underscores.
@@ -62,6 +63,7 @@ export default async function RegisterPage({ searchParams }) {
                 autoComplete="new-password"
                 required
                 minLength={8}
+                data-testid="auth-register-password-input"
               />
               <span className="fieldHint">Use at least 8 characters.</span>
             </label>
@@ -74,18 +76,19 @@ export default async function RegisterPage({ searchParams }) {
                 autoComplete="new-password"
                 required
                 minLength={8}
+                data-testid="auth-register-confirm-password-input"
               />
             </label>
 
             <div className="formActions">
-              <button type="submit">Create account</button>
-              <Link href="/login" className="linkButton">
+              <button type="submit" data-testid="auth-register-submit-button">Create account</button>
+              <Link href="/login" className="linkButton" data-testid="auth-register-back-link">
                 Back to login
               </Link>
             </div>
           </form>
 
-          {error ? <div className="banner error">{error}</div> : null}
+          {error ? <div className="banner error" data-testid="auth-register-error-banner">{error}</div> : null}
         </article>
       </div>
     </main>
