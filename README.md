@@ -8,9 +8,32 @@
   Self-hosted Docker deployment control panel with admin tooling, operational visibility, backup dry-runs, and release safety checks.
 </p>
 
+<p align="center">
+  <a href="https://deploymatecloud.ru">Live App</a>
+  ·
+  <a href="https://deploymatecloud.ru/register">Create Trial Account</a>
+  ·
+  <a href="https://deploymatecloud.ru/login">Login</a>
+</p>
+
 DeployMate is a self-hosted deployment control panel for small teams that need a fast way to ship Docker containers, manage reusable templates, track operational state, and handle lightweight admin workflows from one UI.
 
 It is built for pragmatic operator experience rather than platform complexity.
+
+## Try It Live
+
+Public trial signup is enabled on the live instance:
+
+- app: `https://deploymatecloud.ru`
+- signup: `https://deploymatecloud.ru/register`
+- login: `https://deploymatecloud.ru/login`
+
+Reviewer path:
+
+1. create a trial account
+2. land in the app immediately after signup
+3. open `/app/users` and `/app/upgrade-requests` to inspect the richer admin surface
+4. review saved views, bulk actions, audit trail, backup bundle, and restore dry-run tooling
 
 ## Why This Project Is Interesting
 
