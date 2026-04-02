@@ -10,6 +10,7 @@
     "smoke:auth": "bash ../scripts/frontend_auth_smoke.sh",
     "smoke:ops": "bash ../scripts/frontend_ops_smoke.sh",
     "smoke:runtime": "bash ../scripts/frontend_runtime_smoke.sh",
+    "smoke:servers": "bash ../scripts/frontend_servers_smoke.sh",
     "smoke:templates": "bash ../scripts/frontend_templates_smoke.sh"
   },
   "dependencies": {

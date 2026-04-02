@@ -54,6 +54,12 @@ For auth-surface frontend changes, also run:
 npm --prefix frontend run smoke:auth
 ```
 
+For server-management frontend changes, also run:
+
+```bash
+npm --prefix frontend run smoke:servers
+```
+
 For a single remote deploy command that also runs post-deploy smoke:
 
 ```bash

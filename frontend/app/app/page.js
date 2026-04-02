@@ -47,13 +47,62 @@ const smokeServers = [
   {
     id: "smoke-server",
     name: "Smoke VPS",
-    host: "smoke.example.com",
+    host: "203.0.113.10",
     port: 22,
     username: "deploy",
     auth_type: "ssh_key",
     created_at: "2026-04-02T00:00:00Z",
   },
 ];
+const smokeServerTestResults = {
+  "smoke-server": {
+    status: "success",
+    message: "SSH and Docker look healthy on this target.",
+    tested_at: "2026-04-02T00:02:30Z",
+    target: "deploy@203.0.113.10:22",
+    ssh_ok: true,
+    docker_ok: true,
+    docker_version: "Docker 26.1.3",
+  },
+};
+const smokeServerDiagnostics = {
+  "smoke-server": {
+    checked_at: "2026-04-02T00:03:00Z",
+    overall_status: "success",
+    target: "deploy@203.0.113.10:22",
+    deployment_count: 1,
+    hostname: "smoke-vps",
+    operating_system: "Ubuntu 24.04",
+    uptime: "2 days",
+    disk_usage: "18%",
+    memory: "42%",
+    docker_compose_version: "v2.29.2",
+    listening_ports: [22, 80, 443, 38080],
+    items: [
+      {
+        key: "ssh",
+        label: "SSH",
+        status: "success",
+        summary: "SSH access is healthy.",
+        details: "Accepted a key-based connection and resolved the remote hostname.",
+      },
+      {
+        key: "docker",
+        label: "Docker",
+        status: "success",
+        summary: "Docker engine is available.",
+        details: "The daemon responded and compose support is installed.",
+      },
+      {
+        key: "ports",
+        label: "Ports",
+        status: "success",
+        summary: "Expected service ports are reachable.",
+        details: "Port 38080 is free for the smoke deployment.",
+      },
+    ],
+  },
+};
 const smokeNotifications = [
   {
     id: "smoke-notification-1",
@@ -527,8 +576,12 @@ export default function HomePage() {
   const [deployingTemplateId, setDeployingTemplateId] = useState("");
   const [duplicatingTemplateId, setDuplicatingTemplateId] = useState("");
   const [testingServerId, setTestingServerId] = useState("");
-  const [serverTestResults, setServerTestResults] = useState({});
-  const [serverDiagnostics, setServerDiagnostics] = useState({});
+  const [serverTestResults, setServerTestResults] = useState(
+    smokeMode ? smokeServerTestResults : {},
+  );
+  const [serverDiagnostics, setServerDiagnostics] = useState(
+    smokeMode ? smokeServerDiagnostics : {},
+  );
   const [serverDiagnosticsError, setServerDiagnosticsError] = useState({});
   const [diagnosingServerId, setDiagnosingServerId] = useState("");
   const [deploymentFilter, setDeploymentFilter] = useState("all");
@@ -2236,10 +2289,10 @@ export default function HomePage() {
         ) : null}
 
         {currentUser?.is_admin ? (
-        <article className="card formCard">
-          <div className="sectionHeader">
+        <article className="card formCard" data-testid="servers-card">
+          <div className="sectionHeader" data-testid="servers-header">
             <div>
-              <h2>Servers</h2>
+              <h2 data-testid="servers-title">Servers</h2>
               <p className="formHint">
                 Search saved targets, run diagnostics, and watch for unused entries before the next rollout.
               </p>
@@ -2251,10 +2304,11 @@ export default function HomePage() {
                 onChange={(event) => setServerQuery(event.target.value)}
                 placeholder="demo-vps, 203.0.113.10, root"
                 disabled={serversLoading}
+                data-testid="servers-search-input"
               />
             </label>
           </div>
-          <form className="form" onSubmit={handleCreateServer}>
+          <form className="form" onSubmit={handleCreateServer} data-testid="servers-create-form">
             <label className="field">
               <span>Name</span>
               <input
@@ -2264,6 +2318,7 @@ export default function HomePage() {
                 placeholder="demo-vps"
                 disabled={serverSubmitting}
                 required
+                data-testid="servers-create-name-input"
               />
             </label>
 
@@ -2276,6 +2331,7 @@ export default function HomePage() {
                 placeholder="203.0.113.10"
                 disabled={serverSubmitting}
                 required
+                data-testid="servers-create-host-input"
               />
             </label>
 
@@ -2290,6 +2346,7 @@ export default function HomePage() {
                 onChange={updateServerFormField}
                 disabled={serverSubmitting}
                 required
+                data-testid="servers-create-port-input"
               />
             </label>
 
@@ -2302,12 +2359,13 @@ export default function HomePage() {
                 placeholder="root"
                 disabled={serverSubmitting}
                 required
+                data-testid="servers-create-username-input"
               />
             </label>
 
             <label className="field">
               <span>Auth type</span>
-              <input value="ssh_key" disabled />
+              <input value="ssh_key" disabled data-testid="servers-create-auth-type-input" />
               <span className="fieldHint">
                 New server targets use SSH keys only. Password-based SSH is kept only for
                 legacy records.
@@ -2322,26 +2380,27 @@ export default function HomePage() {
                 onChange={updateServerFormField}
                 disabled={serverSubmitting}
                 required
+                data-testid="servers-create-ssh-key-input"
               />
             </label>
 
             <div className="formActions">
-              <button type="submit" disabled={serverSubmitting || serverLimitReached}>
+              <button type="submit" disabled={serverSubmitting || serverLimitReached} data-testid="servers-create-submit-button">
                 {serverSubmitting ? "Adding..." : "Add server"}
               </button>
             </div>
           </form>
 
-          {serverSubmitError ? <div className="banner error">{serverSubmitError}</div> : null}
-          {serverSubmitSuccess ? <div className="banner success">{serverSubmitSuccess}</div> : null}
+          {serverSubmitError ? <div className="banner error" data-testid="servers-submit-error-banner">{serverSubmitError}</div> : null}
+          {serverSubmitSuccess ? <div className="banner success" data-testid="servers-submit-success-banner">{serverSubmitSuccess}</div> : null}
 
-          <div className="list compactList">
+          <div className="list compactList" data-testid="servers-list">
             {serversLoading && servers.length === 0 ? (
-              <div className="empty">Loading servers...</div>
+              <div className="empty" data-testid="servers-loading-state">Loading servers...</div>
             ) : null}
 
             {!serversLoading && servers.length === 0 ? (
-              <div className="empty">
+              <div className="empty" data-testid="servers-empty-state">
                 {localDeploymentsEnabled
                   ? "No servers yet. Local deploy is still available."
                   : "No servers yet. This environment is remote-only, so add a server target first."}
@@ -2349,11 +2408,11 @@ export default function HomePage() {
             ) : null}
 
             {!serversLoading && servers.length > 0 && filteredServers.length === 0 ? (
-              <div className="empty">No servers match this search.</div>
+              <div className="empty" data-testid="servers-filter-empty-state">No servers match this search.</div>
             ) : null}
 
             {filteredServers.map((server) => (
-              <article className="card compactCard" key={server.id}>
+              <article className="card compactCard" key={server.id} data-testid={`server-card-${server.id}`}>
                 <div className="row">
                   <span className="label">Name</span>
                   <span>{server.name}</span>
@@ -2435,6 +2494,7 @@ export default function HomePage() {
                     type="button"
                     onClick={() => handleTestServer(server.id)}
                     disabled={testingServerId === server.id}
+                    data-testid={`server-test-button-${server.id}`}
                   >
                     {testingServerId === server.id ? "Testing..." : "Test connection"}
                   </button>
@@ -2442,6 +2502,7 @@ export default function HomePage() {
                     type="button"
                     onClick={() => handleRunServerDiagnostics(server.id)}
                     disabled={diagnosingServerId === server.id}
+                    data-testid={`server-diagnostics-button-${server.id}`}
                   >
                     {diagnosingServerId === server.id
                       ? "Running diagnostics..."
@@ -2452,6 +2513,7 @@ export default function HomePage() {
                     className="dangerButton"
                     onClick={() => handleDeleteServer(server.id)}
                     disabled={deletingServerId === server.id}
+                    data-testid={`server-delete-button-${server.id}`}
                   >
                     {deletingServerId === server.id ? "Deleting..." : "Delete"}
                   </button>
@@ -2475,8 +2537,8 @@ export default function HomePage() {
                   </div>
                 ) : null}
                 {serverDiagnostics[server.id] ? (
-                  <div className="diagnosticsGrid">
-                    <div className="diagnosticItem">
+                  <div className="diagnosticsGrid" data-testid={`server-diagnostics-grid-${server.id}`}>
+                    <div className="diagnosticItem" data-testid={`server-diagnostics-summary-${server.id}`}>
                       <div className="row">
                         <span className="label">Overall</span>
                         <span
@@ -2493,7 +2555,7 @@ export default function HomePage() {
                       </div>
                     </div>
                     {(serverDiagnostics[server.id].items || []).map((item) => (
-                      <div className="diagnosticItem" key={`${server.id}-${item.key}`}>
+                      <div className="diagnosticItem" key={`${server.id}-${item.key}`} data-testid={`server-diagnostic-item-${server.id}-${item.key}`}>
                         <div className="row">
                           <span className="label">{item.label}</span>
                           <span className={`status ${item.status || "unknown"}`}>
@@ -2504,7 +2566,7 @@ export default function HomePage() {
                         {item.details ? <div className="diagnosticDetails">{item.details}</div> : null}
                       </div>
                     ))}
-                    <div className="diagnosticMeta">
+                    <div className="diagnosticMeta" data-testid={`server-diagnostics-meta-${server.id}`}>
                       <span>Hostname: {serverDiagnostics[server.id].hostname || "-"}</span>
                       <span>OS: {serverDiagnostics[server.id].operating_system || "-"}</span>
                       <span>Uptime: {serverDiagnostics[server.id].uptime || "-"}</span>
@@ -2528,9 +2590,9 @@ export default function HomePage() {
           </div>
         </article>
         ) : (
-          <article className="card formCard">
-            <h2>Servers</h2>
-            <div className="banner subtle">
+          <article className="card formCard" data-testid="servers-card">
+            <h2 data-testid="servers-title">Servers</h2>
+            <div className="banner subtle" data-testid="servers-restricted-banner">
               Server management is restricted to admin users. Trial accounts can explore
               the dashboard, admin workspaces, saved views, exports, and restore dry-run
               flows without touching shared infrastructure.
