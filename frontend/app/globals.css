@@ -1,6 +1,18 @@
 :root {
   color-scheme: light;
   font-family: var(--font-sans), sans-serif;
+  --page-bg-top: #f7f1e8;
+  --page-bg-mid: #eef3f7;
+  --page-bg-bottom: #fbfcfd;
+  --surface-card: rgba(255, 255, 255, 0.84);
+  --surface-card-strong: rgba(255, 255, 255, 0.94);
+  --surface-border: rgba(18, 34, 56, 0.08);
+  --surface-shadow: 0 24px 60px rgba(17, 24, 39, 0.08);
+  --text-primary: #132238;
+  --text-secondary: #556070;
+  --accent-gold: #c99338;
+  --accent-deep: #16324d;
+  --accent-forest: #204d40;
 }
 
 * {
@@ -10,12 +22,18 @@
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.88), transparent 36%),
-    linear-gradient(180deg, #f6f3ec 0%, #eef2f6 42%, #f9fbfd 100%);
-  color: #111827;
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.9), transparent 34%),
+    radial-gradient(circle at 85% 12%, rgba(201, 147, 56, 0.12), transparent 18%),
+    radial-gradient(circle at 10% 100%, rgba(32, 77, 64, 0.09), transparent 22%),
+    linear-gradient(180deg, var(--page-bg-top) 0%, var(--page-bg-mid) 42%, var(--page-bg-bottom) 100%);
+  color: var(--text-primary);
   font-family: var(--font-sans), sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(201, 147, 56, 0.22);
 }
 
 ul {
@@ -36,6 +54,30 @@ button:disabled {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.92),
+    0 0 0 5px rgba(201, 147, 56, 0.34);
 }
 
 .page {
@@ -1308,6 +1350,40 @@ code {
   margin-top: 18px;
 }
 
+.landingSignalRail {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.landingSignalCard {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px solid var(--surface-border);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 251, 253, 0.74) 100%);
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.landingSignalCard span {
+  color: var(--accent-gold);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.landingSignalCard strong {
+  color: var(--text-primary);
+  font-family: var(--font-display), sans-serif;
+  font-size: 21px;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+}
+
 .landingMetaBadge {
   display: inline-flex;
   align-items: center;
@@ -1381,6 +1457,76 @@ code {
   border: 1px solid rgba(34, 49, 73, 0.08);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.9);
+}
+
+.showcaseCommandDeck {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(34, 49, 73, 0.08);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(247, 248, 250, 0.98) 0%, rgba(238, 243, 248, 0.98) 100%);
+}
+
+.showcaseCommandHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.showcaseCommandHeader strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.showcaseCommandStatus {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(32, 77, 64, 0.12);
+  padding: 8px 12px;
+  color: var(--accent-forest);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.showcaseCommandList {
+  display: grid;
+  gap: 12px;
+}
+
+.showcaseCommandItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.showcaseCommandItem p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.showcaseCommandDot {
+  width: 10px;
+  height: 10px;
+  margin-top: 7px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-deep) 100%);
+  box-shadow: 0 0 0 6px rgba(201, 147, 56, 0.12);
+  flex: 0 0 auto;
 }
 
 .showcaseMetric span,
@@ -2006,6 +2152,7 @@ button.landingButton.primaryButton:disabled {
 .workspaceStatusStrip {
   display: grid;
   gap: 12px;
+  margin-bottom: 18px;
 }
 
 .workspaceStatusCard {
@@ -2036,6 +2183,24 @@ button.landingButton.primaryButton:disabled {
 .workspaceStatusCard p {
   margin: 8px 0 0;
   color: #455164;
+}
+
+.workspaceStatusCardElevated {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(246, 249, 252, 0.97) 100%);
+  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.06);
+}
+
+.workspaceStatusCardElevated::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(201, 147, 56, 0.92), rgba(22, 50, 77, 0.88));
+  opacity: 0.9;
 }
 
 .workspaceMetaLine {

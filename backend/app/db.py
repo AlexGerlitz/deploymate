@@ -998,7 +998,8 @@ def create_session(token: str, user_id: str) -> None:
 
 def get_session_user_by_token(token: str) -> dict[str, Any] | None:
     select_sql = """
-    SELECT u.id, u.username, u.plan, u.role, u.must_change_password, u.created_at
+    SELECT u.id, u.username, u.plan, u.role, u.must_change_password, u.created_at,
+           s.created_at AS session_created_at
     FROM sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.token = %s;

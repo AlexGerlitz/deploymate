@@ -5,11 +5,13 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.auth import SESSION_COOKIE_NAME, hash_password
+from app.services.auth import SESSION_COOKIE_NAME, hash_password, reset_auth_rate_limit_state
 
 
 class AuthApiFlowTests(unittest.TestCase):
     def setUp(self):
+        reset_auth_rate_limit_state()
+        self.addCleanup(reset_auth_rate_limit_state)
         self.users = {
             "admin-1": {
                 "id": "admin-1",

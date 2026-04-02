@@ -2,6 +2,25 @@ import Link from "next/link";
 
 const publicSignupEnabled =
   process.env.NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED === "1";
+const landingOperatingPrinciples = [
+  {
+    label: "See the state",
+    title: "One reading pass should reveal what is live, what is risky, and what comes next.",
+  },
+  {
+    label: "Move deliberately",
+    title: "Guided rollout paths reduce improvisation without hiding deeper operational controls.",
+  },
+  {
+    label: "Keep handoff visible",
+    title: "Admin review, exports, diagnostics, and recovery signals stay in the same product surface.",
+  },
+];
+const landingProofPoints = [
+  "Workspace hero with live operational totals",
+  "Templates, servers, diagnostics, and admin review flows",
+  "Recovery prep and release checks around the app",
+];
 
 export default function LandingPage() {
   return (
@@ -86,6 +105,15 @@ export default function LandingPage() {
                 <span className="landingMetaBadge">Admin review flows</span>
                 <span className="landingMetaBadge">Runtime visibility</span>
               </div>
+
+              <div className="landingSignalRail" data-testid="landing-signal-rail">
+                {landingOperatingPrinciples.map((item) => (
+                  <article key={item.label} className="landingSignalCard">
+                    <span>{item.label}</span>
+                    <strong>{item.title}</strong>
+                  </article>
+                ))}
+              </div>
             </div>
 
             <div className="landingShowcase">
@@ -141,6 +169,24 @@ export default function LandingPage() {
                         <p>Templates, diagnostics, exports, recovery prep, and audit views give the product weight.</p>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                <div className="showcaseCommandDeck">
+                  <div className="showcaseCommandHeader">
+                    <div>
+                      <span className="heroSummaryLabel">Operating posture</span>
+                      <strong>Built to read like a composed product, not a loose control panel.</strong>
+                    </div>
+                    <span className="showcaseCommandStatus">Surface ready</span>
+                  </div>
+                  <div className="showcaseCommandList">
+                    {landingProofPoints.map((item) => (
+                      <div key={item} className="showcaseCommandItem">
+                        <span className="showcaseCommandDot" aria-hidden="true" />
+                        <p>{item}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </article>

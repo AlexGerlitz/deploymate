@@ -1,6 +1,9 @@
 import hashlib
 import os
 import secrets
+import time
+from collections import deque
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Cookie, Depends, HTTPException
@@ -14,6 +17,9 @@ from app.db import (
 
 
 SESSION_COOKIE_NAME = "deploymate_session"
+DEFAULT_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7
+DEFAULT_AUTH_RATE_LIMIT_ATTEMPTS = 5
+DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS = 60
 PLAN_LIMITS = {
     "trial": {
         "max_servers": 1,
@@ -28,6 +34,7 @@ PLAN_LIMITS = {
         "max_deployments": 100,
     },
 }
+_AUTH_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
 
 
 def hash_password(password: str, salt: Optional[str] = None) -> str:
@@ -55,6 +62,107 @@ def create_session_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def _read_int_env(name: str, default: int, minimum: int) -> int:
+    raw_value = os.getenv(name, "").strip()
+    if not raw_value:
+        return default
+
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return default
+
+    return max(value, minimum)
+
+
+def get_session_ttl_seconds() -> int:
+    return _read_int_env(
+        "DEPLOYMATE_SESSION_TTL_SECONDS",
+        DEFAULT_SESSION_TTL_SECONDS,
+        300,
+    )
+
+
+def get_auth_rate_limit_config() -> tuple[int, int]:
+    return (
+        _read_int_env(
+            "DEPLOYMATE_AUTH_RATE_LIMIT_ATTEMPTS",
+            DEFAULT_AUTH_RATE_LIMIT_ATTEMPTS,
+            1,
+        ),
+        _read_int_env(
+            "DEPLOYMATE_AUTH_RATE_LIMIT_WINDOW_SECONDS",
+            DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS,
+            1,
+        ),
+    )
+
+
+def session_is_expired(created_at: str | datetime | None, now: datetime | None = None) -> bool:
+    if not created_at:
+        return False
+
+    if isinstance(created_at, str):
+        try:
+            created_at = datetime.fromisoformat(created_at)
+        except ValueError:
+            return False
+
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+
+    current_time = now or datetime.now(timezone.utc)
+    return (current_time - created_at).total_seconds() > get_session_ttl_seconds()
+
+
+def build_auth_rate_limit_key(action: str, *parts: str | None) -> str:
+    normalized_parts = [action]
+    for part in parts:
+        normalized_parts.append((part or "unknown").strip().lower() or "unknown")
+    return "::".join(normalized_parts)
+
+
+def reset_auth_rate_limit_state() -> None:
+    _AUTH_RATE_LIMIT_BUCKETS.clear()
+
+
+def _get_auth_rate_limit_bucket(action: str, *parts: str | None) -> deque[float]:
+    bucket_key = build_auth_rate_limit_key(action, *parts)
+    return _AUTH_RATE_LIMIT_BUCKETS.setdefault(bucket_key, deque())
+
+
+def _prune_auth_rate_limit_bucket(bucket: deque[float], window_seconds: int, now: float) -> None:
+    window_start = now - window_seconds
+    while bucket and bucket[0] < window_start:
+        bucket.popleft()
+
+
+def enforce_auth_rate_limit(action: str, *parts: str | None) -> None:
+    max_attempts, window_seconds = get_auth_rate_limit_config()
+    bucket = _get_auth_rate_limit_bucket(action, *parts)
+    now = time.monotonic()
+    _prune_auth_rate_limit_bucket(bucket, window_seconds, now)
+
+    if len(bucket) >= max_attempts:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many authentication attempts. Please wait a minute and try again.",
+        )
+
+
+def record_auth_rate_limit_failure(action: str, *parts: str | None) -> None:
+    _, window_seconds = get_auth_rate_limit_config()
+    bucket = _get_auth_rate_limit_bucket(action, *parts)
+    now = time.monotonic()
+    _prune_auth_rate_limit_bucket(bucket, window_seconds, now)
+    bucket.append(now)
+
+
+def clear_auth_rate_limit(action: str, *parts: str | None) -> None:
+    bucket_key = build_auth_rate_limit_key(action, *parts)
+    _AUTH_RATE_LIMIT_BUCKETS.pop(bucket_key, None)
+
+
 def get_current_user(
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
 ):
@@ -64,6 +172,10 @@ def get_current_user(
     user = get_session_user_by_token(session_token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid session.")
+
+    if session_is_expired(user.get("session_created_at")):
+        delete_session(session_token)
+        raise HTTPException(status_code=401, detail="Session expired.")
 
     return user
 

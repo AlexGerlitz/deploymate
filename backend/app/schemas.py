@@ -251,7 +251,7 @@ class ServerSuggestedPortsResponse(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_.-]+$")
     password: str = Field(..., min_length=1)
 
 
@@ -274,7 +274,7 @@ class UserResponse(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=10, max_length=128)
 
 
 class UpgradeRequestCreate(BaseModel):
@@ -316,8 +316,8 @@ class UpgradeRequestUpdateRequest(BaseModel):
 
 
 class AdminUserCreateRequest(BaseModel):
-    username: str = Field(..., min_length=1)
-    password: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_.-]+$")
+    password: str = Field(..., min_length=10, max_length=128)
     role: UserRole = "member"
 
 

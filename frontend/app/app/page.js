@@ -685,6 +685,35 @@ export default function HomePage() {
   const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
     opsSnapshot.attention_items.length === 1 ? "" : "s"
   }`;
+  const workspaceFocusItems = [
+    {
+      label: "Priority",
+      value:
+        opsSnapshot.attention_items[0]?.title ||
+        (deployments.length === 0 ? "Start first rollout" : "Workspace is stable"),
+      detail:
+        opsSnapshot.attention_items[0]?.detail ||
+        "No blocking signal is leading the workspace right now.",
+    },
+    {
+      label: "Security",
+      value: currentUser?.must_change_password ? "Password update required" : "Session posture normal",
+      detail: currentUser?.must_change_password
+        ? "Default admin password is still active and should be changed before further rollout work."
+        : "Account access can stay in flow while admin controls remain separate.",
+    },
+    {
+      label: "Readiness",
+      value:
+        templates.length > 0
+          ? `${templates.length} template${templates.length === 1 ? "" : "s"} ready`
+          : "Guided form ready",
+      detail:
+        servers.length > 0
+          ? `${servers.length} target${servers.length === 1 ? "" : "s"} saved for remote rollout and diagnostics.`
+          : "Add a target when you want repeatable remote rollout paths.",
+    },
+  ];
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -2021,6 +2050,16 @@ export default function HomePage() {
               </p>
             </div>
           </div>
+        </section>
+
+        <section className="workspaceStatusStrip" data-testid="workspace-status-strip">
+          {workspaceFocusItems.map((item) => (
+            <article key={item.label} className="workspaceStatusCard workspaceStatusCardElevated">
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <p>{item.detail}</p>
+            </article>
+          ))}
         </section>
 
         <div className="workspaceBannerStack">
