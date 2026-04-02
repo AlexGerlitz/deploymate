@@ -3,17 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { smokeChangePasswordUser, smokeMode } from "../lib/admin-smoke-fixtures";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
-const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
-const smokeUser = {
-  id: "smoke-admin",
-  username: "smoke-admin",
-  plan: "team",
-  role: "admin",
-  must_change_password: true,
-};
 
 async function readJsonOrError(response, fallbackMessage) {
   const contentType = response.headers.get("content-type") || "";
@@ -38,7 +31,9 @@ export default function ChangePasswordPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(!smokeMode);
   const [submitting, setSubmitting] = useState(false);
-  const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
+  const [currentUser, setCurrentUser] = useState(
+    smokeMode ? smokeChangePasswordUser : null,
+  );
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({

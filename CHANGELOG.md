@@ -30,6 +30,7 @@ Highlights:
 - split the deployment HTTP layer into dedicated router modules for deployments, deployment templates, and deployment observability
 - moved shared frontend runtime smoke fixtures into a dedicated lib module so `/app` and `/deployments/[deploymentId]` no longer duplicate smoke data inline
 - moved shared frontend admin smoke fixtures into a dedicated lib module so `users` and `upgrade-requests` pages no longer keep large sample datasets inline
+- moved auth change-password smoke fixtures into the shared frontend smoke fixture layer
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface

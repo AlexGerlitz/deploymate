@@ -10,6 +10,11 @@ export const smokeAdminUser = {
   plan: "team",
 };
 
+export const smokeChangePasswordUser = {
+  ...smokeAdminUser,
+  must_change_password: true,
+};
+
 export const smokeUsers = [
   {
     id: "smoke-admin",
