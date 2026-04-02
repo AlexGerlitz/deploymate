@@ -54,6 +54,12 @@ For auth-surface frontend changes, also run:
 npm --prefix frontend run smoke:auth
 ```
 
+For admin interaction changes around saved views, audit filters, or bulk actions, also run:
+
+```bash
+npm --prefix frontend run smoke:admin-interactions
+```
+
 For server-management frontend changes, also run:
 
 ```bash

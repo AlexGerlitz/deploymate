@@ -58,12 +58,34 @@ const smokeAuditEvents = [
     action_type: "upgrade_request.updated",
     actor_username: "smoke-admin",
     target_label: "Smoke Team",
-    details: "Smoke test event",
+    details: "Smoke Team approved during smoke verification.",
     created_at: "2026-04-02T00:06:00Z",
   },
 ];
 const smokeUsers = [
   { id: "smoke-admin", username: "smoke-admin", plan: "team" },
+];
+const smokeUpgradeSavedViews = [
+  {
+    id: "upgrade-smoke-view",
+    name: "In review queue",
+    filters: {
+      q: "",
+      plan: "all",
+      status: "in_review",
+      linked_only: false,
+      audit_q: "",
+    },
+    updatedAt: "2026-04-02T00:12:00Z",
+  },
+];
+const smokeUpgradeAuditViews = [
+  {
+    id: "upgrade-audit-smoke-view",
+    name: "Newest approvals",
+    filters: { audit_q: "approved", audit_sort: "newest" },
+    updatedAt: "2026-04-02T00:22:00Z",
+  },
 ];
 const upgradeSavedViewsStorageKey = "deploymate.admin.upgradeRequests.savedViews";
 const upgradeAuditViewsStorageKey = "deploymate.admin.upgradeRequests.auditViews";
@@ -273,9 +295,13 @@ function UpgradeRequestsPageContent() {
   const [adminOverview, setAdminOverview] = useState(smokeMode ? smokeOverview : null);
   const [auditEvents, setAuditEvents] = useState(smokeMode ? smokeAuditEvents : []);
   const [users, setUsers] = useState(smokeMode ? smokeUsers : []);
-  const [savedViews, setSavedViews] = useState([]);
+  const [savedViews, setSavedViews] = useState(
+    smokeMode ? formatSavedViews(smokeUpgradeSavedViews) : [],
+  );
   const [savedViewName, setSavedViewName] = useState("");
-  const [savedViewsMetaText, setSavedViewsMetaText] = useState("Using local browser storage.");
+  const [savedViewsMetaText, setSavedViewsMetaText] = useState(
+    smokeMode ? "Loaded from local browser storage." : "Using local browser storage.",
+  );
   const [savedViewsSearch, setSavedViewsSearch] = useState("");
   const [savedViewsSourceFilter, setSavedViewsSourceFilter] = useState("all");
   const [savedViewsSort, setSavedViewsSort] = useState("newest");
@@ -284,18 +310,26 @@ function UpgradeRequestsPageContent() {
   const [accessDenied, setAccessDenied] = useState(false);
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
   const [planFilter, setPlanFilter] = useState(() => searchParams.get("plan") || "all");
-  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") || "all");
+  const [statusFilter, setStatusFilter] = useState(
+    () => searchParams.get("status") || (smokeMode ? "in_review" : "all"),
+  );
   const [linkedOnly, setLinkedOnly] = useState(() => searchParams.get("linked_only") === "true");
-  const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
+  const [auditQuery, setAuditQuery] = useState(
+    () => searchParams.get("audit_q") || (smokeMode ? "approved" : ""),
+  );
   const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
-  const [auditViews, setAuditViews] = useState([]);
+  const [auditViews, setAuditViews] = useState(
+    smokeMode ? formatSavedViews(smokeUpgradeAuditViews) : [],
+  );
   const [auditViewName, setAuditViewName] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
   const [savingId, setSavingId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
-  const [selectedRequestIds, setSelectedRequestIds] = useState([]);
-  const [bulkStatusValue, setBulkStatusValue] = useState("");
+  const [selectedRequestIds, setSelectedRequestIds] = useState(
+    smokeMode ? ["smoke-request-1"] : [],
+  );
+  const [bulkStatusValue, setBulkStatusValue] = useState(smokeMode ? "closed" : "");
   const [saveFeedback, setSaveFeedback] = useState("");
   const [drafts, setDrafts] = useState({});
   const filteredRequests = requests;
@@ -805,32 +839,6 @@ function UpgradeRequestsPageContent() {
 
   useEffect(() => {
     if (smokeMode) {
-      setAuditViews(
-        formatSavedViews([
-          {
-            id: "upgrade-audit-smoke-view",
-            name: "Newest approvals",
-            filters: { audit_q: "approved", audit_sort: "newest" },
-            updatedAt: "2026-04-02T00:22:00Z",
-          },
-        ]),
-      );
-      setSavedViews(
-        formatSavedViews([
-          {
-            id: "upgrade-smoke-view",
-            name: "In review queue",
-            filters: {
-              q: "",
-              plan: "all",
-              status: "in_review",
-              linked_only: false,
-              audit_q: "",
-            },
-            updatedAt: "2026-04-02T00:12:00Z",
-          },
-        ]),
-      );
       return;
     }
 

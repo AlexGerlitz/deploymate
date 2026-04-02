@@ -72,6 +72,9 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   echo "[release] frontend admin smoke"
   npm --prefix frontend run smoke:admin
 
+  echo "[release] frontend admin interactions smoke"
+  npm --prefix frontend run smoke:admin-interactions
+
   echo "[release] frontend ops smoke"
   npm --prefix frontend run smoke:ops
 

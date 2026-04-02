@@ -31,16 +31,24 @@ const smokeUsers = [
     must_change_password: false,
     created_at: "2026-04-02T00:00:00Z",
   },
+  {
+    id: "smoke-member",
+    username: "smoke-member",
+    role: "member",
+    plan: "trial",
+    must_change_password: true,
+    created_at: "2026-04-02T00:03:00Z",
+  },
 ];
 const smokeAdminOverview = {
   users: {
-    total: 1,
+    total: 2,
     admins: 1,
-    members: 0,
-    trial: 0,
+    members: 1,
+    trial: 1,
     solo: 0,
     team: 1,
-    must_change_password: 0,
+    must_change_password: 1,
   },
   attention_items: [],
 };
@@ -53,6 +61,28 @@ const smokeAuditEvents = [
     target_label: "smoke-admin",
     details: "Smoke test event",
     created_at: "2026-04-02T00:05:00Z",
+  },
+];
+const smokeUserSavedViews = [
+  {
+    id: "users-smoke-view",
+    name: "Admins only",
+    filters: {
+      q: "",
+      role: "admin",
+      plan: "all",
+      must_change_password: "all",
+      audit_q: "",
+    },
+    updatedAt: "2026-04-02T00:10:00Z",
+  },
+];
+const smokeUserAuditViews = [
+  {
+    id: "users-audit-smoke-view",
+    name: "User actions",
+    filters: { audit_q: "", audit_scope: "user", audit_sort: "newest" },
+    updatedAt: "2026-04-02T00:20:00Z",
   },
 ];
 const usersSavedViewsStorageKey = "deploymate.admin.users.savedViews";
@@ -347,9 +377,13 @@ function UsersPageContent() {
   const [restoreDryRun, setRestoreDryRun] = useState(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [restoreSectionFilter, setRestoreSectionFilter] = useState("all");
-  const [savedViews, setSavedViews] = useState([]);
+  const [savedViews, setSavedViews] = useState(
+    smokeMode ? formatSavedViews(smokeUserSavedViews) : [],
+  );
   const [savedViewName, setSavedViewName] = useState("");
-  const [savedViewsMetaText, setSavedViewsMetaText] = useState("Using local browser storage.");
+  const [savedViewsMetaText, setSavedViewsMetaText] = useState(
+    smokeMode ? "Loaded from local browser storage." : "Using local browser storage.",
+  );
   const [savedViewsSearch, setSavedViewsSearch] = useState("");
   const [savedViewsSourceFilter, setSavedViewsSourceFilter] = useState("all");
   const [savedViewsSort, setSavedViewsSort] = useState("newest");
@@ -361,11 +395,13 @@ function UsersPageContent() {
   const [updatingUserId, setUpdatingUserId] = useState("");
   const [deletingUserId, setDeletingUserId] = useState("");
   const [bulkUpdating, setBulkUpdating] = useState(false);
-  const [selectedUserIds, setSelectedUserIds] = useState([]);
-  const [bulkRoleValue, setBulkRoleValue] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState(smokeMode ? ["smoke-admin"] : []);
+  const [bulkRoleValue, setBulkRoleValue] = useState(smokeMode ? "admin" : "");
   const [bulkPlanValue, setBulkPlanValue] = useState("");
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
-  const [roleFilter, setRoleFilter] = useState(() => searchParams.get("role") || "all");
+  const [roleFilter, setRoleFilter] = useState(
+    () => searchParams.get("role") || (smokeMode ? "admin" : "all"),
+  );
   const [planFilter, setPlanFilter] = useState(() => searchParams.get("plan") || "all");
   const [mustChangeFilter, setMustChangeFilter] = useState(() => {
     const value = searchParams.get("must_change_password");
@@ -375,9 +411,13 @@ function UsersPageContent() {
     return "all";
   });
   const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
-  const [auditScopeFilter, setAuditScopeFilter] = useState(() => searchParams.get("audit_scope") || "all");
+  const [auditScopeFilter, setAuditScopeFilter] = useState(
+    () => searchParams.get("audit_scope") || (smokeMode ? "user" : "all"),
+  );
   const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
-  const [auditViews, setAuditViews] = useState([]);
+  const [auditViews, setAuditViews] = useState(
+    smokeMode ? formatSavedViews(smokeUserAuditViews) : [],
+  );
   const [auditViewName, setAuditViewName] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
@@ -675,32 +715,6 @@ function UsersPageContent() {
 
   useEffect(() => {
     if (smokeMode) {
-      setAuditViews(
-        formatSavedViews([
-          {
-            id: "users-audit-smoke-view",
-            name: "User actions",
-            filters: { audit_q: "", audit_scope: "user", audit_sort: "newest" },
-            updatedAt: "2026-04-02T00:20:00Z",
-          },
-        ]),
-      );
-      setSavedViews(
-        formatSavedViews([
-          {
-            id: "users-smoke-view",
-            name: "Admins only",
-            filters: {
-              q: "",
-              role: "admin",
-              plan: "all",
-              must_change_password: "all",
-              audit_q: "",
-            },
-            updatedAt: "2026-04-02T00:10:00Z",
-          },
-        ]),
-      );
       return;
     }
 
