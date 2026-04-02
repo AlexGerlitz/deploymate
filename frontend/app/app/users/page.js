@@ -15,6 +15,7 @@ import {
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
+const smokeRestoreReportMode = process.env.NEXT_PUBLIC_SMOKE_RESTORE_REPORT === "1";
 const smokeUser = {
   id: "smoke-admin",
   username: "smoke-admin",
@@ -85,6 +86,100 @@ const smokeUserAuditViews = [
     updatedAt: "2026-04-02T00:20:00Z",
   },
 ];
+const smokeRestoreBundle = {
+  manifest: {
+    version: "2026-04-01.backup-bundle.v1",
+    bundle_name: "deploymate-backup-smoke",
+    generated_at: "2026-04-02T00:30:00Z",
+    sections: {
+      users: 2,
+      upgrade_requests: 1,
+      audit_events: 3,
+      servers: 1,
+      deployment_templates: 1,
+      deployments: 1,
+    },
+  },
+  data: {
+    users: [{ id: "smoke-admin" }, { id: "smoke-member" }],
+    upgrade_requests: [{ id: "smoke-request-1" }],
+    audit_events: [{ id: "smoke-audit-1" }],
+    servers: [{ id: "smoke-server" }],
+    deployment_templates: [{ id: "smoke-template" }],
+    deployments: [{ id: "smoke-deployment" }],
+  },
+};
+const smokeRestoreDryRun = {
+  manifest: smokeRestoreBundle.manifest,
+  summary: {
+    total_sections: 6,
+    total_records: 9,
+    blocker_count: 2,
+    warning_count: 3,
+    ok_sections: 2,
+    review_required_sections: 2,
+    blocked_sections: 2,
+  },
+  sections: [
+    {
+      name: "users",
+      status: "warn",
+      incoming_count: 2,
+      current_count: 2,
+      blockers: [],
+      warnings: [{ severity: "warn", code: "user-conflicts", message: "Two users already exist and need merge review." }],
+      notes: ["Users can be validated safely before any controlled import."],
+    },
+    {
+      name: "upgrade_requests",
+      status: "ok",
+      incoming_count: 1,
+      current_count: 1,
+      blockers: [],
+      warnings: [],
+      notes: ["Upgrade requests look low-risk for a future import plan."],
+    },
+    {
+      name: "audit_events",
+      status: "ok",
+      incoming_count: 3,
+      current_count: 4,
+      blockers: [],
+      warnings: [],
+      notes: ["Audit history is append-only and mostly informational."],
+    },
+    {
+      name: "servers",
+      status: "error",
+      incoming_count: 1,
+      current_count: 1,
+      blockers: [{ severity: "error", code: "server-credentials-changed", message: "Server credentials and host trust must be reviewed before any import." }],
+      warnings: [],
+      notes: ["Remote targets are sensitive because infrastructure may have changed."],
+    },
+    {
+      name: "deployment_templates",
+      status: "warn",
+      incoming_count: 1,
+      current_count: 2,
+      blockers: [],
+      warnings: [
+        { severity: "warn", code: "template-name-conflict", message: "One template name already exists and needs cleanup." },
+        { severity: "warn", code: "template-server-drift", message: "Template server bindings should be reviewed against current targets." },
+      ],
+      notes: ["Templates are good import candidates after conflict cleanup."],
+    },
+    {
+      name: "deployments",
+      status: "error",
+      incoming_count: 1,
+      current_count: 1,
+      blockers: [{ severity: "error", code: "runtime-sensitive", message: "Deployment restore stays dry-run only because runtime state cannot be replayed safely." }],
+      warnings: [],
+      notes: ["Deployment restore remains the riskiest section in the bundle."],
+    },
+  ],
+};
 const usersSavedViewsStorageKey = "deploymate.admin.users.savedViews";
 const usersAuditViewsStorageKey = "deploymate.admin.users.auditViews";
 
@@ -185,6 +280,42 @@ function buildRestoreDryRunCsv(report) {
   }
 
   return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
+function buildRestoreIssuesCsv(report) {
+  const rows = [["section", "severity", "issue_type", "code", "message"]];
+
+  for (const section of report.sections || []) {
+    for (const issue of section.blockers || []) {
+      rows.push([section.name, issue.severity || "error", "blocker", issue.code, issue.message]);
+    }
+    for (const issue of section.warnings || []) {
+      rows.push([section.name, issue.severity || "warn", "warning", issue.code, issue.message]);
+    }
+  }
+
+  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
+function buildRestoreReportDigest(report) {
+  if (!report) {
+    return "";
+  }
+
+  const attentionSections = (report.sections || []).filter(
+    (section) => section.status === "warn" || section.status === "error",
+  );
+  const topNames = attentionSections.slice(0, 3).map((section) => section.name).join(", ");
+
+  return [
+    `Bundle ${report.manifest.bundle_name}`,
+    `${report.summary.blocked_sections} blocked`,
+    `${report.summary.review_required_sections} review`,
+    `${report.summary.ok_sections} safe`,
+    topNames ? `priority: ${topNames}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function analyzeBackupBundleText(bundleText) {
@@ -373,8 +504,12 @@ function UsersPageContent() {
   const [users, setUsers] = useState(smokeMode ? smokeUsers : []);
   const [adminOverview, setAdminOverview] = useState(smokeMode ? smokeAdminOverview : null);
   const [auditEvents, setAuditEvents] = useState(smokeMode ? smokeAuditEvents : []);
-  const [backupBundleText, setBackupBundleText] = useState("");
-  const [restoreDryRun, setRestoreDryRun] = useState(null);
+  const [backupBundleText, setBackupBundleText] = useState(
+    smokeRestoreReportMode ? JSON.stringify(smokeRestoreBundle, null, 2) : "",
+  );
+  const [restoreDryRun, setRestoreDryRun] = useState(
+    smokeRestoreReportMode ? smokeRestoreDryRun : null,
+  );
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [restoreSectionFilter, setRestoreSectionFilter] = useState("all");
   const [savedViews, setSavedViews] = useState(
@@ -429,6 +564,7 @@ function UsersPageContent() {
   const filteredUsers = users;
   const bundleLineCount = backupBundleText ? backupBundleText.split("\n").length : 0;
   const bundleAnalysis = analyzeBackupBundleText(backupBundleText);
+  const restoreReportDigest = buildRestoreReportDigest(restoreDryRun);
   const visibleRestoreSections = restoreDryRun
     ? restoreDryRun.sections.filter(
         (section) => restoreSectionFilter === "all" || section.status === restoreSectionFilter,
@@ -1360,6 +1496,25 @@ function UsersPageContent() {
     setSuccess("Validation report CSV downloaded.");
   }
 
+  async function handleCopyRestoreSummary() {
+    if (!restoreDryRun) {
+      return;
+    }
+    await copyTextToClipboard(restoreReportDigest);
+    setSuccess("Validation summary copied.");
+  }
+
+  function handleDownloadRestoreIssuesCsv() {
+    if (!restoreDryRun) {
+      return;
+    }
+    const blob = new Blob([buildRestoreIssuesCsv(restoreDryRun)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-restore-dry-run-issues.csv", blob);
+    setSuccess("Validation issues CSV downloaded.");
+  }
+
   function resetUserFilters() {
     setQuery("");
     setRoleFilter("all");
@@ -1881,6 +2036,12 @@ function UsersPageContent() {
             <button type="button" data-testid="restore-report-csv-button" onClick={handleDownloadRestoreReportCsv} disabled={!restoreDryRun}>
               Report CSV
             </button>
+            <button type="button" data-testid="restore-copy-summary-button" onClick={handleCopyRestoreSummary} disabled={!restoreDryRun}>
+              Copy summary
+            </button>
+            <button type="button" data-testid="restore-report-issues-csv-button" onClick={handleDownloadRestoreIssuesCsv} disabled={!restoreDryRun}>
+              Issues CSV
+            </button>
           </div>
           <label className="field">
             <span>Bundle JSON</span>
@@ -1919,7 +2080,7 @@ function UsersPageContent() {
             </div>
           ) : null}
           {restoreDryRun ? (
-            <div className="backupReport">
+            <div className="backupReport" data-testid="restore-report">
               <div className="overviewGrid">
                 <div className="overviewCard">
                   <span className="overviewLabel">Bundle</span>
@@ -1939,10 +2100,35 @@ function UsersPageContent() {
                   </div>
                 </div>
               </div>
-              <div className="backupSummaryBadges">
+              <div className="backupSummaryBadges" data-testid="restore-summary-badges">
                 <span className="status healthy">safe {restoreDryRun.summary.ok_sections}</span>
                 <span className="status warn">review {restoreDryRun.summary.review_required_sections}</span>
                 <span className="status error">blocked {restoreDryRun.summary.blocked_sections}</span>
+              </div>
+              <div className="banner subtle" data-testid="restore-summary-digest">
+                {restoreReportDigest}
+              </div>
+              <div className="overviewGrid" data-testid="restore-attention-overview">
+                <div className="overviewCard">
+                  <span className="overviewLabel">Attention sections</span>
+                  <strong className="overviewValue">
+                    {restoreDryRun.summary.blocked_sections + restoreDryRun.summary.review_required_sections}
+                  </strong>
+                  <div className="overviewMeta">
+                    <span>Blocked {restoreDryRun.summary.blocked_sections}</span>
+                    <span>Review {restoreDryRun.summary.review_required_sections}</span>
+                  </div>
+                </div>
+                <div className="overviewCard">
+                  <span className="overviewLabel">Issue volume</span>
+                  <strong className="overviewValue">
+                    {restoreDryRun.summary.blocker_count + restoreDryRun.summary.warning_count}
+                  </strong>
+                  <div className="overviewMeta">
+                    <span>Blockers {restoreDryRun.summary.blocker_count}</span>
+                    <span>Warnings {restoreDryRun.summary.warning_count}</span>
+                  </div>
+                </div>
               </div>
               <div className="adminSavedViewsComposer">
                 <label className="field">
@@ -1980,7 +2166,7 @@ function UsersPageContent() {
               </div>
               <div className="overviewAttentionList">
                 {visibleRestoreSections.map((section) => (
-                  <div className="overviewAttentionItem" key={section.name}>
+                  <div className="overviewAttentionItem" key={section.name} data-testid={`restore-section-${section.name}`}>
                     <div className="row">
                       <span className="label">Section</span>
                       <span>{section.name}</span>

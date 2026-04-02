@@ -60,6 +60,12 @@ For admin interaction changes around saved views, audit filters, or bulk actions
 npm --prefix frontend run smoke:admin-interactions
 ```
 
+For backup / restore dry-run workflow changes, also run:
+
+```bash
+npm --prefix frontend run smoke:restore
+```
+
 For server-management frontend changes, also run:
 
 ```bash

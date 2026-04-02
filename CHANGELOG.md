@@ -13,11 +13,13 @@ Highlights:
 - added an HTTP-level auth API flow test for register, me, change-password, logout, and login
 - added dedicated frontend auth smoke coverage for login, register, and change-password pages
 - added dedicated frontend admin-interactions smoke coverage for saved views and bulk-action surfaces on admin pages
+- improved restore dry-run reporting with digest copy, issues CSV export, and attention overview cards
+- added dedicated frontend restore-report smoke coverage for backup / restore validation workflows
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface
 - added dedicated frontend templates smoke coverage for the templates panel and create-form template controls
-- extended the local release gate to run auth, admin, admin-interactions, ops, runtime, servers, and templates frontend smokes before build
+- extended the local release gate to run auth, admin, admin-interactions, ops, restore, runtime, servers, and templates frontend smokes before build
 - extended post-deploy smoke with optional create -> health -> diagnostics -> logs -> activity -> delete runtime flow
 - added a single local release workflow script for preflight, frontend smokes, build, and backend tests
 - added a single remote release helper to sync, rebuild, and run post-deploy smoke in one command
