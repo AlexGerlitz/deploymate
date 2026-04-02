@@ -10,6 +10,6 @@
 	}
 }
 
-www.deploymatecloud.ru {
-	redir https://deploymatecloud.ru{uri} permanent
+www.{$DOMAIN:localhost} {
+	redir https://{$DOMAIN:localhost}{uri} permanent
 }

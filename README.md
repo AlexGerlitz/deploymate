@@ -65,7 +65,7 @@ Typical release flow:
 npm --prefix frontend run smoke:admin
 npm --prefix frontend run build
 git push origin develop
-ssh deploymate
+ssh <deploy-host>
 cd /opt/deploymate
 git pull --ff-only origin develop
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps frontend
