@@ -128,6 +128,21 @@ To verify that the repo still keeps local Docker execution behind an explicit op
 bash scripts/local_runtime_audit.sh
 ```
 
+To verify that production frontend and backend runtime capability flags are still aligned:
+
+```bash
+bash scripts/runtime_capability_audit.sh
+```
+
+This audit checks:
+
+- `frontend/Dockerfile` production default
+- `docker-compose.prod.yml` production build and runtime defaults
+- `.env.production.example`
+- `.env.production` when it exists on the workstation or deployment host
+
+If `.env.production` sets `DEPLOYMATE_LOCAL_DOCKER_ENABLED=false`, then `NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED` must be `0`. If backend local runtime is explicitly enabled, the frontend flag must be `1`.
+
 ## Frontend-only deploy
 
 Local:

@@ -40,6 +40,7 @@ Do not bundle unrelated UI, API, and deployment changes unless a full stack rele
 ```
 
 If preflight fails, stop there.
+This now includes the runtime capability contract audit so frontend local-deploy controls cannot drift away from backend runtime policy unnoticed.
 
 For a single local gate that also runs the frontend smokes and backend test suite:
 

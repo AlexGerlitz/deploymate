@@ -95,6 +95,11 @@ if [ -f "scripts/local_runtime_audit.sh" ]; then
   bash scripts/local_runtime_audit.sh
 fi
 
+if [ -f "scripts/runtime_capability_audit.sh" ]; then
+  echo "[security-audit] runtime capability audit"
+  bash scripts/runtime_capability_audit.sh
+fi
+
 if [ "$WARNINGS" -eq 0 ]; then
   echo "[security-audit] no high-risk findings"
 else

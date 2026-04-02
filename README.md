@@ -126,6 +126,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 ## Production Readiness Signals
 
 - scripted preflight in [scripts/preflight.sh](scripts/preflight.sh)
+- runtime capability contract audit in [scripts/runtime_capability_audit.sh](scripts/runtime_capability_audit.sh)
 - scripted local release gate in [scripts/release_workflow.sh](scripts/release_workflow.sh)
 - scripted remote release helper in [scripts/remote_release.sh](scripts/remote_release.sh)
 - GitHub Actions CI runs the same local release gate on `develop` pushes and pull requests
@@ -146,6 +147,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - deployment detail now includes quick reference, attention overview, and copyable runtime summary ergonomics
 - backend local Docker execution is now explicit opt-in; remote-only is the default runtime posture
 - operations overview now exposes backend runtime capability posture, including local Docker, SSH trust mode, and credential-key readiness
+- preflight and security audit now check that production frontend and backend local-runtime flags stay aligned
 - the local release gate now runs auth, admin, admin-interactions, ops, restore, runtime, servers, and templates frontend smokes before build
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)
@@ -236,6 +238,7 @@ Current strengths:
 - SSH host key behavior is configurable through environment variables
 - production now defaults to a remote-only profile without Docker socket access in the backend
 - the production frontend can be built with local deployment controls disabled to match the backend capability boundary
+- production checks now fail if `.env.production` leaves backend local-runtime policy and frontend deployment controls out of sync
 
 Current tradeoffs:
 

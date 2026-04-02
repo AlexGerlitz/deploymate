@@ -31,4 +31,9 @@ if [ -f "scripts/security_audit.sh" ]; then
   bash scripts/security_audit.sh
 fi
 
+if [ -f "scripts/runtime_capability_audit.sh" ]; then
+  echo "[preflight] runtime capability audit"
+  bash scripts/runtime_capability_audit.sh
+fi
+
 echo "[preflight] done"
