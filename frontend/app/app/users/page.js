@@ -1200,52 +1200,61 @@ function UsersPageContent() {
           />
         </article>
 
-        <article className="card formCard">
+        <article className="card formCard backupPanel">
           <div className="sectionHeader">
             <div>
               <h2 data-testid="backup-panel-title">Backup and restore dry run</h2>
               <p className="formHint">
-                Export a full admin backup bundle, then validate a restore bundle without applying any changes.
+                Export the current admin state, then validate a restore bundle without applying live changes.
               </p>
             </div>
           </div>
-          <div className="backupActions">
-            <button type="button" data-testid="backup-download-bundle-button" onClick={handleDownloadBackupBundle}>
-              Download backup bundle
-            </button>
-            <button type="button" data-testid="backup-paste-sample-button" onClick={handleLoadSampleBundle}>
-              Paste sample
-            </button>
-            <label className="linkButton backupUploadButton">
-              Load backup file
-              <input data-testid="backup-upload-file-input" type="file" accept="application/json,.json" onChange={handleBackupFileChange} />
-            </label>
-            <button type="button" data-testid="backup-clear-bundle-button" onClick={handleClearBundle} disabled={!backupBundleText.trim()}>
-              Clear bundle
-            </button>
+          <div className="backupActionGroup">
             <button
               type="button"
+              className="landingButton primaryButton"
+              data-testid="backup-download-bundle-button"
+              onClick={handleDownloadBackupBundle}
+            >
+              Export backup bundle
+            </button>
+            <button type="button" className="softButton" data-testid="backup-paste-sample-button" onClick={handleLoadSampleBundle}>
+              Load sample bundle
+            </button>
+            <label className="linkButton backupUploadButton">
+              Load bundle file
+              <input data-testid="backup-upload-file-input" type="file" accept="application/json,.json" onChange={handleBackupFileChange} />
+            </label>
+            <button type="button" className="secondaryButton" data-testid="backup-clear-bundle-button" onClick={handleClearBundle} disabled={!backupBundleText.trim()}>
+              Clear bundle
+            </button>
+          </div>
+          <div className="backupActionGroup">
+            <button
+              type="button"
+              className="landingButton primaryButton"
               data-testid="restore-dry-run-button"
               onClick={handleRunRestoreDryRun}
               disabled={restoreLoading || bundleAnalysis.status !== "ready"}
             >
-              {restoreLoading ? "Validating..." : "Run restore dry-run"}
+              {restoreLoading ? "Validating..." : "Validate restore bundle"}
             </button>
             <button
               type="button"
+              className="softButton"
               data-testid="restore-report-json-button"
               onClick={handleDownloadRestoreReportJson}
               disabled={!restoreDryRun}
             >
               Report JSON
             </button>
-            <button type="button" data-testid="restore-report-csv-button" onClick={handleDownloadRestoreReportCsv} disabled={!restoreDryRun}>
+            <button type="button" className="softButton" data-testid="restore-report-csv-button" onClick={handleDownloadRestoreReportCsv} disabled={!restoreDryRun}>
               Report CSV
             </button>
-            <button type="button" data-testid="restore-copy-summary-button" onClick={handleCopyRestoreSummary} disabled={!restoreDryRun}>
+            <button type="button" className="softButton" data-testid="restore-copy-summary-button" onClick={handleCopyRestoreSummary} disabled={!restoreDryRun}>
               Copy summary
             </button>
-            <button type="button" data-testid="restore-report-issues-csv-button" onClick={handleDownloadRestoreIssuesCsv} disabled={!restoreDryRun}>
+            <button type="button" className="secondaryButton" data-testid="restore-report-issues-csv-button" onClick={handleDownloadRestoreIssuesCsv} disabled={!restoreDryRun}>
               Issues CSV
             </button>
           </div>
@@ -1257,7 +1266,7 @@ function UsersPageContent() {
               placeholder='{"manifest": {...}, "data": {...}}'
             />
           </label>
-          <p className="formHint">Paste an exported bundle JSON here or load a saved `.json` file before running validation.</p>
+          <p className="formHint">Paste an exported bundle here or load a saved `.json` file before running validation.</p>
           <p className="formHint">Bundle size: {backupBundleText.length} chars · {bundleLineCount} lines.</p>
           <div
             data-testid="backup-preflight-banner"
@@ -1959,7 +1968,7 @@ function UsersPageContent() {
                 <span className="label">Created</span>
                 <span>{formatDate(user.created_at)}</span>
               </div>
-              <div className="actions">
+              <div className="actionCluster">
                 <select
                   value={user.role}
                   onChange={(event) => handleRoleChange(user.id, event.target.value)}

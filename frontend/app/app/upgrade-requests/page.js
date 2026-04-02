@@ -1411,7 +1411,7 @@ function UpgradeRequestsPageContent() {
                   placeholder="Next step, pricing context, follow-up owner"
                 />
               </label>
-              <p className="formHint">Use internal notes for follow-up context visible to admins only.</p>
+              <p className="formHint">Use internal notes to capture next step, pricing context, or ownership for the review.</p>
               <label className="field">
                 <span>Target user</span>
                 <select
@@ -1439,9 +1439,10 @@ function UpgradeRequestsPageContent() {
                   <option value="team">team</option>
                 </select>
               </label>
-              <div className="actions">
+              <div className="actionCluster">
                 <button
                   type="button"
+                  className="landingButton primaryButton"
                   onClick={() =>
                     applyRequestUpdate(
                       item.id,
@@ -1459,6 +1460,7 @@ function UpgradeRequestsPageContent() {
                 </button>
                 <button
                   type="button"
+                  className="softButton"
                   onClick={() =>
                     applyRequestUpdate(
                       item.id,
@@ -1476,6 +1478,7 @@ function UpgradeRequestsPageContent() {
                 </button>
                 <button
                   type="button"
+                  className="softButton"
                   onClick={() =>
                     applyRequestUpdate(
                       item.id,
@@ -1512,6 +1515,7 @@ function UpgradeRequestsPageContent() {
                 </button>
                 <button
                   type="button"
+                  className="secondaryButton"
                   onClick={() =>
                     applyRequestUpdate(
                       item.id,

@@ -226,6 +226,28 @@ a {
   margin-bottom: 14px;
 }
 
+.backupPanel {
+  display: grid;
+  gap: 18px;
+}
+
+.backupActionGroup {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background: rgba(247, 250, 252, 0.92);
+}
+
+.actionCluster {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .backupUploadButton {
   position: relative;
   overflow: hidden;
@@ -674,6 +696,18 @@ a {
   background: rgba(255, 255, 255, 0.94);
   padding: 11px 15px;
   color: #132238;
+  font-weight: 600;
+}
+
+.softButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.96);
+  padding: 11px 15px;
+  color: #304255;
   font-weight: 600;
 }
 
