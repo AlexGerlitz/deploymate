@@ -32,9 +32,6 @@ class DeploymentApiFlowTests(unittest.TestCase):
             patch("app.routes.deployments.ensure_external_port_is_available", return_value=None),
             patch("app.routes.deployments.ensure_container_name_is_available", return_value=None),
             patch("app.routes.deployments.run_container", side_effect=self._run_container),
-            patch("app.routes.deployments.get_container_logs", side_effect=self._get_container_logs),
-            patch("app.routes.deployments.inspect_container_state", side_effect=self._inspect_container_state),
-            patch("app.routes.deployments.probe_http_endpoint", side_effect=self._probe_http_endpoint),
             patch("app.routes.deployments.remove_container_if_exists", return_value=None),
             patch("app.routes.deployments.insert_deployment_record", side_effect=self._insert_deployment_record),
             patch("app.routes.deployments.update_deployment_record", side_effect=self._update_deployment_record),
@@ -44,6 +41,13 @@ class DeploymentApiFlowTests(unittest.TestCase):
             patch("app.routes.deployments.create_notification", side_effect=self._create_notification),
             patch("app.routes.deployments.create_activity_event", side_effect=self._create_activity_event),
             patch("app.routes.deployments.list_deployment_activity", side_effect=self._list_deployment_activity),
+            patch("app.routes.deployment_observability.get_container_logs", side_effect=self._get_container_logs),
+            patch("app.routes.deployment_observability.get_container_logs_tail", side_effect=self._get_container_logs),
+            patch("app.routes.deployment_observability.inspect_container_state", side_effect=self._inspect_container_state),
+            patch("app.routes.deployment_observability.probe_http_endpoint", side_effect=self._probe_http_endpoint),
+            patch("app.routes.deployment_observability.get_deployment_record_or_404", side_effect=self._get_deployment_record_or_404),
+            patch("app.routes.deployment_observability.get_server_or_404", return_value=None),
+            patch("app.routes.deployment_observability.list_deployment_activity", side_effect=self._list_deployment_activity),
         ]
 
         for patcher in self.patchers:
@@ -124,9 +128,11 @@ class DeploymentApiFlowTests(unittest.TestCase):
             stderr="",
         )
 
-    def _get_container_logs(self, container_name, server=None):
+    def _get_container_logs(self, container_name, server=None, tail=None):
         self.assertIsNone(server)
         self.assertEqual(container_name, self.deployment["container_name"])
+        if tail is not None:
+            self.assertEqual(tail, 30)
         return CompletedProcess(
             args=["docker", "logs"],
             returncode=0,

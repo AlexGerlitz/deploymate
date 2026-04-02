@@ -26,14 +26,15 @@ class TemplateApiFlowTests(unittest.TestCase):
 
         self.patchers = [
             patch("app.main.init_db", return_value=None),
-            patch("app.routes.deployments.insert_deployment_template", side_effect=self._insert_template),
-            patch("app.routes.deployments.list_deployment_templates", side_effect=self._list_templates),
-            patch("app.routes.deployments.get_deployment_template_or_404", side_effect=self._get_template_or_404),
-            patch("app.routes.deployments.update_deployment_template", side_effect=self._update_template),
-            patch("app.routes.deployments.delete_deployment_template_record", side_effect=self._delete_template),
-            patch("app.routes.deployments.mark_deployment_template_used", side_effect=self._mark_template_used),
-            patch("app.routes.deployments._create_deployment", side_effect=self._create_deployment),
-            patch("app.routes.deployments.get_server_or_404", side_effect=self._get_server_or_404),
+            patch("app.routes.deployment_templates.insert_deployment_template", side_effect=self._insert_template),
+            patch("app.routes.deployment_templates.list_deployment_templates", side_effect=self._list_templates),
+            patch("app.routes.deployment_templates.get_deployment_template_or_404", side_effect=self._get_template_or_404),
+            patch("app.routes.deployment_templates.update_deployment_template", side_effect=self._update_template),
+            patch("app.routes.deployment_templates.delete_deployment_template_record", side_effect=self._delete_template),
+            patch("app.routes.deployment_templates.mark_deployment_template_used", side_effect=self._mark_template_used),
+            patch("app.routes.deployment_templates.get_server_or_404", side_effect=self._get_server_or_404),
+            patch("app.routes.deployment_templates._validate_template_payload", side_effect=self._validate_template_payload),
+            patch("app.routes.deployment_templates._create_deployment", side_effect=self._create_deployment),
         ]
 
         for patcher in self.patchers:
@@ -129,6 +130,9 @@ class TemplateApiFlowTests(unittest.TestCase):
 
     def _get_server_or_404(self, server_id):
         raise AssertionError(f"Unexpected server lookup for template flow: {server_id}")
+
+    def _validate_template_payload(self, payload):
+        return None
 
     def test_full_template_http_flow(self):
         create_response = self.client.post(
