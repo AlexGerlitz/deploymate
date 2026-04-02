@@ -171,10 +171,11 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 - scripted preflight in [scripts/preflight.sh](scripts/preflight.sh)
 - runtime capability contract audit in [scripts/runtime_capability_audit.sh](scripts/runtime_capability_audit.sh)
 - scripted local release gate in [scripts/release_workflow.sh](scripts/release_workflow.sh)
-- scripted remote release helper in [scripts/remote_release.sh](scripts/remote_release.sh)
+- scripted remote release helper in [scripts/remote_release.sh](scripts/remote_release.sh), with branch plus exact commit deployment support
 - GitHub Actions CI runs the same local release gate on `develop` pushes and pull requests
 - GitHub Actions staging workflow can auto-promote successful `develop` builds into a staging environment
 - GitHub Actions manual release workflow can run the remote release helper against a configured host
+- GitHub Actions staging and production releases now pin the exact checked-out commit SHA during remote deploy instead of relying on branch drift alone
 - both repository-side deploy workflows share a reusable composite action instead of duplicating shell logic
 - tracked-file security audit in [scripts/security_audit.sh](scripts/security_audit.sh)
 - release workflow secret-contract audit in [scripts/release_workflow_audit.sh](scripts/release_workflow_audit.sh)

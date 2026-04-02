@@ -92,6 +92,7 @@ Recommended promotion order:
 3. production deploy stays behind `.github/workflows/release.yml` or a manual `scripts/remote_release.sh` run
 
 The staging and production GitHub workflows both call the same reusable composite action in `.github/actions/remote-release/action.yml`, so deploy behavior stays aligned with `scripts/remote_release.sh`.
+Those workflows pass the exact checked-out commit SHA into the remote helper, so the release host deploys the reviewed commit rather than whichever newer commit happens to land on the branch later.
 
 To verify that the release workflows and the documented GitHub secret contract still match:
 

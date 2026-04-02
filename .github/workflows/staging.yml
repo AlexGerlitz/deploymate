@@ -52,6 +52,7 @@ jobs:
           runtime_smoke_enabled: ${{ github.event_name == 'workflow_dispatch' && (inputs.runtime_smoke && '1' || '0') || '1' }}
           deploy_repo_dir: ${{ secrets.DEPLOY_REPO_DIR }}
           deploy_branch: ${{ secrets.DEPLOY_BRANCH }}
+          deploy_ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           deploy_env_file: ${{ secrets.DEPLOY_ENV_FILE }}
           runtime_smoke_ssh_private_key: ${{ secrets.RUNTIME_SMOKE_SSH_PRIVATE_KEY }}
           runtime_smoke_server_id: ${{ secrets.RUNTIME_SMOKE_SERVER_ID }}

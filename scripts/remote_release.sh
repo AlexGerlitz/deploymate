@@ -7,6 +7,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY_HOST="${DEPLOYMATE_DEPLOY_HOST:-}"
 DEPLOY_REPO_DIR="${DEPLOYMATE_DEPLOY_REPO_DIR:-/opt/deploymate}"
 DEPLOY_BRANCH="${DEPLOYMATE_DEPLOY_BRANCH:-develop}"
+DEPLOY_REF="${DEPLOYMATE_DEPLOY_REF:-}"
 DEPLOY_ENV_FILE="${DEPLOYMATE_DEPLOY_ENV_FILE:-.env.production}"
 DEPLOY_SURFACE="${DEPLOYMATE_DEPLOY_SURFACE:-full}"
 BASE_URL="${DEPLOYMATE_BASE_URL:-}"
@@ -26,6 +27,7 @@ Options:
                               Release surface to rebuild on the remote host. Default: full
   --repo-dir <path>           Remote checkout path. Default: /opt/deploymate
   --branch <name>             Git branch to deploy. Default: develop
+  --ref <git-ref>             Exact Git ref or commit SHA to deploy after switching branch
   --env-file <path>           Compose env file on the remote host. Default: .env.production
   --base-url <url>            Base URL for post-deploy smoke
   --admin-username <user>     Admin username for post-deploy smoke
@@ -97,6 +99,10 @@ while [ "$#" -gt 0 ]; do
       DEPLOY_BRANCH="${2:-}"
       shift 2
       ;;
+    --ref)
+      DEPLOY_REF="${2:-}"
+      shift 2
+      ;;
     --env-file)
       DEPLOY_ENV_FILE="${2:-}"
       shift 2
@@ -157,6 +163,9 @@ echo "[remote-release] repo: $ROOT_DIR"
 echo "[remote-release] host: $DEPLOY_HOST"
 echo "[remote-release] surface: $DEPLOY_SURFACE"
 echo "[remote-release] branch: $DEPLOY_BRANCH"
+if [ -n "$DEPLOY_REF" ]; then
+  echo "[remote-release] ref: $DEPLOY_REF"
+fi
 echo "[remote-release] remote repo: $DEPLOY_REPO_DIR"
 echo "[remote-release] remote env file: $DEPLOY_ENV_FILE"
 
@@ -172,7 +181,11 @@ case "$DEPLOY_SURFACE" in
     ;;
 esac
 
-REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin && git switch $DEPLOY_BRANCH && git pull --ff-only origin $DEPLOY_BRANCH && $REMOTE_COMPOSE_CMD"
+if [ -n "$DEPLOY_REF" ]; then
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && git switch $DEPLOY_BRANCH && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_COMPOSE_CMD"
+else
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && git switch $DEPLOY_BRANCH && git merge --ff-only origin/$DEPLOY_BRANCH && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_COMPOSE_CMD"
+fi
 
 echo "[remote-release] remote deploy"
 run_cmd ssh "$DEPLOY_HOST" "$REMOTE_CMD"

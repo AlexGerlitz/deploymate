@@ -39,6 +39,10 @@ inputs:
     description: Remote Git branch
     required: false
     default: ""
+  deploy_ref:
+    description: Exact Git ref or commit SHA to deploy
+    required: false
+    default: ""
   deploy_env_file:
     description: Remote compose env file
     required: false
@@ -132,6 +136,7 @@ runs:
         DEPLOYMATE_ADMIN_PASSWORD: ${{ inputs.admin_password }}
         DEPLOYMATE_DEPLOY_REPO_DIR: ${{ inputs.deploy_repo_dir }}
         DEPLOYMATE_DEPLOY_BRANCH: ${{ inputs.deploy_branch }}
+        DEPLOYMATE_DEPLOY_REF: ${{ inputs.deploy_ref }}
         DEPLOYMATE_DEPLOY_ENV_FILE: ${{ inputs.deploy_env_file }}
         DEPLOYMATE_SMOKE_RUNTIME_ENABLED: ${{ inputs.runtime_smoke_enabled }}
         DEPLOYMATE_SMOKE_SERVER_ID: ${{ inputs.runtime_smoke_server_id }}
@@ -165,6 +170,10 @@ runs:
 
         if [ -n "${DEPLOYMATE_DEPLOY_BRANCH:-}" ]; then
           args+=(--branch "$DEPLOYMATE_DEPLOY_BRANCH")
+        fi
+
+        if [ -n "${DEPLOYMATE_DEPLOY_REF:-}" ]; then
+          args+=(--ref "$DEPLOYMATE_DEPLOY_REF")
         fi
 
         if [ -n "${DEPLOYMATE_DEPLOY_ENV_FILE:-}" ]; then
