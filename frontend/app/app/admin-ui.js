@@ -51,22 +51,22 @@ export function AdminPageHeader({
         <div className="workspaceHeroMetric">
           <span>Control</span>
           <strong>Admin</strong>
-          <p>Bulk actions, exports, saved views, and higher-trust workflows live here.</p>
+          <p>Manage shared access, exports, and operational changes from one controlled surface.</p>
         </div>
         <div className="workspaceHeroMetric">
           <span>Review</span>
           <strong>Audit</strong>
-          <p>Filterable audit trails and current-view exports support handoff and triage.</p>
+          <p>Searchable audit history keeps reviews, handoff, and decision trails easy to follow.</p>
         </div>
         <div className="workspaceHeroMetric">
           <span>Speed</span>
           <strong>Saved views</strong>
-          <p>Keep browser-local presets for repeated inbox and admin review routines.</p>
+          <p>Keep local presets for repeat review patterns, shared handoffs, and daily check-ins.</p>
         </div>
         <div className="workspaceHeroBadge workspaceHeroSpotlight">
           <span>What matters now</span>
           <strong>{title}</strong>
-          <p>Use this surface to review data quickly, make controlled changes, and keep admin work shareable.</p>
+          <p>Use this surface to review signals quickly, make deliberate changes, and share the same view with others.</p>
         </div>
       </div>
     </section>
@@ -135,7 +135,7 @@ export function AdminFilterFooter({
           onClick={onReset}
           disabled={resetDisabled}
         >
-          Reset filters
+          Clear filters
         </button>
       </div>
     </div>
@@ -221,9 +221,9 @@ export function AdminSavedViews({
       <div className="sectionHeader">
         <div>
           <h3>{title}</h3>
-          <p className="formHint">Saved locally in this browser for faster admin workflows.</p>
+          <p className="formHint">Saved in this browser so recurring reviews and handoffs are one click away.</p>
           <p className="formHint">
-          {views.length === 0 ? "No saved views yet." : `${views.length} saved view${views.length === 1 ? "" : "s"} · max 8.`}
+          {views.length === 0 ? "No saved views yet." : `${views.length} saved view${views.length === 1 ? "" : "s"} ready here · max 8.`}
           </p>
           {views.length > 0 ? (
             <p className="formHint">
@@ -231,10 +231,10 @@ export function AdminSavedViews({
             </p>
           ) : null}
           {views.length >= 8 ? (
-            <p className="formHint">View limit reached. Saving a matching name will replace the existing preset.</p>
+            <p className="formHint">View limit reached. Reusing a matching name will replace the existing preset.</p>
           ) : null}
           {importedCount > 0 ? (
-            <p className="formHint">Imported presets can be removed with `Clear imported` without touching local ones.</p>
+            <p className="formHint">Imported presets can be removed with `Clear imported` without touching your local ones.</p>
           ) : null}
         </div>
       </div>
@@ -341,7 +341,7 @@ export function AdminSavedViews({
                 <div className="adminSavedViewTitle">
                   <strong>{view.name}</strong>
                   {activeViewId === view.id ? (
-                    <span className="status healthy">Current</span>
+                    <span className="status healthy">Live view</span>
                   ) : null}
                   {view.sourceLabel ? (
                     <span className="status unknown">{view.sourceLabel}</span>
@@ -357,7 +357,7 @@ export function AdminSavedViews({
                     className="secondaryButton"
                     onClick={() => onCopy(view.id)}
                   >
-                    Copy link
+                    Share link
                   </button>
                 ) : null}
                 <button
@@ -366,7 +366,7 @@ export function AdminSavedViews({
                   onClick={() => onApply(view.id)}
                   disabled={activeViewId === view.id}
                 >
-                  {activeViewId === view.id ? "Applied" : "Apply"}
+                  {activeViewId === view.id ? "Applied" : "Use view"}
                 </button>
                 <button type="button" className="secondaryButton" onClick={() => onDelete(view.id)}>
                   Remove
@@ -412,7 +412,7 @@ export function AdminAuditToolbar({
         </div>
       </div>
       <label className="field deploymentSearch">
-        <span>Search audit</span>
+        <span>Search activity</span>
         <input data-testid={queryTestId} value={query} onChange={onQueryChange} placeholder={queryPlaceholder} />
       </label>
       {filterOptions.length > 0 || onSortChange ? (
@@ -440,7 +440,7 @@ export function AdminAuditToolbar({
           ) : null}
         </div>
       ) : null}
-      <p className="formHint">Recent audit events shown: {totalCount}</p>
+      <p className="formHint">Recent activity items shown: {totalCount}</p>
       <p className="formHint">{summary}</p>
       <AdminActiveFilters filters={filters} />
       {actions.length > 0 ? (

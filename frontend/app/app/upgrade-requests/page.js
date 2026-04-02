@@ -1099,7 +1099,7 @@ function UpgradeRequestsPageContent() {
             ]}
             emptyText={
               savedViews.length === 0
-                ? "No saved inbox views yet."
+                ? "No saved inbox views yet. Save one to keep a repeatable review queue."
                 : "No saved inbox views match this search or source filter."
             }
             listTestId="upgrade-saved-views-list"
@@ -1108,11 +1108,11 @@ function UpgradeRequestsPageContent() {
         </article>
 
         {loading && requests.length === 0 ? (
-          <div className="empty">Loading upgrade requests...</div>
+          <div className="empty">Loading review queue...</div>
         ) : null}
 
         {!loading && requests.length === 0 ? (
-          <div className="empty" data-testid="upgrade-empty-state">No upgrade requests found for the current filters.</div>
+          <div className="empty" data-testid="upgrade-empty-state">No requests match this view yet. Clear a filter or wait for new demand.</div>
         ) : null}
 
         <article className="card formCard adminToolCard" data-testid="upgrade-bulk-card">
@@ -1120,7 +1120,7 @@ function UpgradeRequestsPageContent() {
             <div>
               <span className="adminToolEyebrow">Review actions</span>
               <h2 data-testid="upgrade-bulk-title">Bulk inbox actions</h2>
-              <p className="formHint">Bulk selection follows the current server-side inbox filters.</p>
+              <p className="formHint">Bulk selection follows the current review queue, so status changes stay tied to what is on screen.</p>
               <p className="formHint" data-testid="upgrade-bulk-selection-summary">
                 Selected {selectedRequestIds.length} · Visible {filteredRequests.length}
               </p>
@@ -1173,7 +1173,7 @@ function UpgradeRequestsPageContent() {
                 onClick={handleDownloadFilteredRequestsExport}
                 disabled={filteredRequests.length === 0 || bulkSaving}
               >
-                Export current filter
+                Export this view
               </button>
               <button
                 type="button"
@@ -1209,7 +1209,7 @@ function UpgradeRequestsPageContent() {
                 onClick={handleSelectCurrentInboxFilter}
                 disabled={bulkSaving || filteredRequests.length === 0}
               >
-                Select current filter
+                Select this view
               </button>
               <button
                 type="button"
@@ -1218,7 +1218,7 @@ function UpgradeRequestsPageContent() {
                 onClick={handleResetBulkRequestTools}
                 disabled={!bulkRequestsDirty || bulkSaving}
               >
-                Reset bulk tools
+                Reset bulk panel
               </button>
             </div>
           </div>
@@ -1265,7 +1265,7 @@ function UpgradeRequestsPageContent() {
                   onChange={(event) => setBulkStatusValue(event.target.value)}
                   disabled={bulkSaving}
                 >
-                  <option value="">Keep current status</option>
+                  <option value="">Leave status unchanged</option>
                   <option value="new">new</option>
                   <option value="in_review">in_review</option>
                   <option value="approved">approved</option>
@@ -1289,13 +1289,13 @@ function UpgradeRequestsPageContent() {
               Bulk inbox actions only update lifecycle status and reuse the existing single-request admin write path.
             </p>
             <p className="formHint">
-              Fast selectors respect the current inbox filters so you can stage status changes without disturbing the current triage view.
+              Quick selectors respect the current queue so you can stage next steps without disturbing the review context.
             </p>
             <p className="formHint" data-testid="upgrade-bulk-action-summary">
               {hasSelectedRequests
                 ? bulkStatusValue
                   ? `Ready to apply: status -> ${bulkStatusValue}.`
-                  : "Pick a lifecycle status to enable bulk apply."
+                  : "Choose a lifecycle status to enable the apply action."
                 : "Select at least one request to enable bulk actions."}
             </p>
           </div>
@@ -1303,7 +1303,7 @@ function UpgradeRequestsPageContent() {
 
         <div className="list">
           {!loading && requests.length > 0 && filteredRequests.length === 0 ? (
-            <div className="empty" data-testid="upgrade-filter-empty-state">No upgrade requests match this filter or search.</div>
+            <div className="empty" data-testid="upgrade-filter-empty-state">No requests match this filter or search. Try a broader queue view.</div>
           ) : null}
 
           {filteredRequests.map((item) => (

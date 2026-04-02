@@ -1519,13 +1519,13 @@ function UsersPageContent() {
           </div>
           <AdminFilterFooter
             summary={`Showing ${filteredUsers.length} user${filteredUsers.length === 1 ? "" : "s"} for the current filters.`}
-            hint="User and audit filters stay in the URL, so this view can be shared or saved locally."
+            hint="Filters stay in the URL, so this exact view can be shared or saved for the next review."
             onReset={resetUserFilters}
             resetDisabled={!hasUserFilters}
             resetTestId="users-reset-filters-button"
             actions={[
               {
-                label: "Copy filter link",
+                label: "Share this view",
                 testId: "users-copy-filter-link-button",
                 onClick: handleCopyCurrentView,
               },
@@ -1564,15 +1564,15 @@ function UsersPageContent() {
             sortTestId="users-saved-views-sort"
             statusText={
               !hasUserFilters
-                ? "Set at least one user or audit filter before saving a view."
+                ? "Set at least one user or activity filter before saving a view."
                 : reachedViewLimitWithoutReplace
-                ? "Saved views are full. Use an existing name or clear some presets first."
+                ? "Saved views are full. Reuse an existing name or clear a few presets first."
                 : activeSavedViewHasChanges
-                ? `Current saved view "${activeSavedView?.name || ""}" has unsaved filter changes.`
+                ? `Saved view "${activeSavedView?.name || ""}" has unapplied filter changes.`
                 : hasSavedViewNameMatch
                 ? hasSavedViewChanges
-                  ? "This will update the existing saved view with the current filters."
-                  : "Saved view name matches the current filter state."
+                  ? "This will refresh the existing saved view with what is on screen now."
+                  : "This saved view already matches what is on screen now."
                 : ""
             }
             metaText={savedViewsMetaText}
@@ -1615,7 +1615,7 @@ function UsersPageContent() {
             ]}
             emptyText={
               savedViews.length === 0
-                ? "No saved user views yet."
+                ? "No saved user views yet. Save one to keep a repeatable team-access review."
                 : "No saved user views match this search or source filter."
             }
             listTestId="users-saved-views-list"
@@ -1628,7 +1628,7 @@ function UsersPageContent() {
             <span className="adminToolEyebrow">Access setup</span>
             <h2>Create user</h2>
             <p className="adminToolMeta">
-              Add a new operator account with a temporary password, then adjust role and plan after creation.
+              Add a teammate with a temporary password, then tighten access and plan after the account is created.
             </p>
           </div>
           <form className="form" onSubmit={handleCreateUser}>
@@ -1675,7 +1675,7 @@ function UsersPageContent() {
                 {submitting ? "Creating..." : "Create user"}
               </button>
             </div>
-            <p className="formHint">New users start on the `trial` plan and can be updated immediately after creation.</p>
+            <p className="formHint">New accounts start on the `trial` plan and can be upgraded or restricted immediately after creation.</p>
           </form>
         </article>
 
@@ -1685,7 +1685,7 @@ function UsersPageContent() {
               <span className="adminToolEyebrow">Admin actions</span>
               <h2 data-testid="users-bulk-title">Bulk user actions</h2>
               <p className="formHint">
-                Bulk selection follows the current server-side user filters.
+                Bulk selection follows the current server-side list, so every change stays aligned with the view above.
               </p>
               <p className="formHint" data-testid="users-bulk-selection-summary">
                 Selected {selectedUserIds.length} · Visible {filteredUsers.length}
@@ -1739,7 +1739,7 @@ function UsersPageContent() {
                 onClick={handleDownloadFilteredUsersExport}
                 disabled={filteredUsers.length === 0 || bulkUpdating}
               >
-                Export current filter
+                Export this view
               </button>
               <button
                 type="button"
@@ -1766,7 +1766,7 @@ function UsersPageContent() {
                 onClick={handleSelectUsersNeedingPasswordChange}
                 disabled={bulkUpdating || !filteredUsers.some((user) => user.must_change_password)}
               >
-                Select password required
+                  Select security follow-up
               </button>
               <button
                 type="button"
@@ -1775,7 +1775,7 @@ function UsersPageContent() {
                 onClick={handleSelectVisibleUsersWithAuditFilter}
                 disabled={bulkUpdating || filteredUsers.length === 0}
               >
-                Select current filter
+                  Select this view
               </button>
               <button
                 type="button"
@@ -1784,7 +1784,7 @@ function UsersPageContent() {
                 onClick={handleResetBulkUsersTools}
                 disabled={!bulkUsersDirty || bulkUpdating}
               >
-                Reset bulk tools
+                  Reset bulk panel
               </button>
             </div>
           </div>
@@ -1818,7 +1818,7 @@ function UsersPageContent() {
                   onClick={() => handleApplyBulkUserPreset("reset_to_trial")}
                   disabled={bulkUpdating}
                 >
-                  Move to trial
+                  Move to starter
                 </button>
               </div>
             </div>
@@ -1831,7 +1831,7 @@ function UsersPageContent() {
                   onChange={(event) => setBulkRoleValue(event.target.value)}
                   disabled={bulkUpdating}
                 >
-                  <option value="">Keep current role</option>
+                  <option value="">Leave roles unchanged</option>
                   <option value="member">member</option>
                   <option value="admin">admin</option>
                 </select>
@@ -1856,7 +1856,7 @@ function UsersPageContent() {
                   onChange={(event) => setBulkPlanValue(event.target.value)}
                   disabled={bulkUpdating}
                 >
-                  <option value="">Keep current plan</option>
+                  <option value="">Leave plans unchanged</option>
                   <option value="trial">trial</option>
                   <option value="solo">solo</option>
                   <option value="team">team</option>
@@ -1878,29 +1878,29 @@ function UsersPageContent() {
               Bulk user actions use the current selection only and reuse the existing single-user admin update path.
             </p>
             <p className="formHint">
-              Fast selectors respect the current server-side filters and let you stage a role or plan update without changing the current list view.
+              Quick selectors respect the current list and let you stage access changes without breaking the review context.
             </p>
             <p className="formHint" data-testid="users-bulk-action-summary">
               {hasSelectedUsers
                 ? bulkUsersActionSummary
                   ? `Ready to apply: ${bulkUsersActionSummary}.`
-                  : "Pick a role or plan target to enable bulk apply."
-                : "Select at least one user to enable bulk actions."}
+                  : "Choose a role or plan target to enable the apply action."
+                : "Select at least one teammate to enable bulk actions."}
             </p>
           </div>
         </article>
 
         {loading && users.length === 0 ? (
-          <div className="empty">Loading users...</div>
+          <div className="empty">Loading team access view...</div>
         ) : null}
 
         {!loading && users.length === 0 ? (
-          <div className="empty" data-testid="users-empty-state">No users found for the current filters.</div>
+          <div className="empty" data-testid="users-empty-state">No people match this view yet. Clear a filter or add a teammate.</div>
         ) : null}
 
         <div className="list">
           {!loading && users.length > 0 && filteredUsers.length === 0 ? (
-            <div className="empty" data-testid="users-filter-empty-state">No users match this filter or search.</div>
+            <div className="empty" data-testid="users-filter-empty-state">No teammates match this filter or search. Try a broader view.</div>
           ) : null}
 
           {filteredUsers.map((user) => (
