@@ -133,6 +133,11 @@ function formatSavedViews(items) {
 
   return items
     .filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && item.filters)
+    .sort((left, right) => {
+      const leftTime = new Date(left.updatedAt || 0).getTime();
+      const rightTime = new Date(right.updatedAt || 0).getTime();
+      return rightTime - leftTime;
+    })
     .map((item) => ({
       id: item.id,
       name: item.name,
@@ -615,6 +620,7 @@ function UpgradeRequestsPageContent() {
   }
 
   function handleDeleteSavedView(viewId) {
+    const deletedView = savedViews.find((item) => item.id === viewId);
     const nextViews = savedViews
       .filter((item) => item.id !== viewId)
       .map((item) => ({
@@ -624,6 +630,9 @@ function UpgradeRequestsPageContent() {
         updatedAt: item.updatedAt,
       }));
     persistSavedViews(nextViews);
+    if (deletedView && deletedView.name === savedViewName) {
+      setSavedViewName("");
+    }
     setSaveFeedback("Saved inbox view removed.");
     setError("");
   }
@@ -911,7 +920,9 @@ function UpgradeRequestsPageContent() {
             saveTestId="upgrade-save-view-button"
             saveLabel={hasSavedViewNameMatch ? "Update saved view" : "Save current view"}
             statusText={
-              hasSavedViewNameMatch
+              !hasRequestFilters
+                ? "Set at least one inbox or audit filter before saving a view."
+                : hasSavedViewNameMatch
                 ? hasSavedViewChanges
                   ? "This will update the existing saved view with the current filters."
                   : "Saved view name matches the current filter state."
