@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   AdminActiveFilters,
+  AdminAuditToolbar,
   AdminFeedbackBanners,
   AdminFilterFooter,
   AdminPageHeader,
@@ -55,6 +56,7 @@ const smokeAuditEvents = [
   },
 ];
 const usersSavedViewsStorageKey = "deploymate.admin.users.savedViews";
+const usersAuditViewsStorageKey = "deploymate.admin.users.auditViews";
 
 function formatDate(value) {
   if (!value) {
@@ -152,6 +154,67 @@ function buildRestoreDryRunCsv(report) {
     }
   }
 
+  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
+function analyzeBackupBundleText(bundleText) {
+  if (!bundleText.trim()) {
+    return { status: "empty", message: "Load or paste a backup bundle to inspect it." };
+  }
+
+  try {
+    const parsed = JSON.parse(bundleText);
+    const manifest = parsed && typeof parsed === "object" ? parsed.manifest : null;
+    const sections = manifest && typeof manifest.sections === "object" ? manifest.sections : null;
+
+    if (!manifest || !sections) {
+      return {
+        status: "invalid",
+        message: "Bundle JSON is valid, but the expected manifest or sections block is missing.",
+      };
+    }
+
+    return {
+      status: "ready",
+      message: "Bundle JSON parsed successfully and looks ready for dry-run validation.",
+      manifest,
+      sectionCount: Object.keys(sections).length,
+      recordCount: Object.values(sections).reduce((total, value) => total + Number(value || 0), 0),
+    };
+  } catch (error) {
+    return {
+      status: "invalid",
+      message: error instanceof Error ? error.message : "Bundle JSON could not be parsed.",
+    };
+  }
+}
+
+function buildAuditEventsCsv(items) {
+  const rows = [["action_type", "actor_username", "target_type", "target_label", "details", "created_at"]];
+  for (const item of items) {
+    rows.push([
+      item.action_type || "",
+      item.actor_username || "",
+      item.target_type || "",
+      item.target_label || item.target_id || "",
+      item.details || "",
+      item.created_at || "",
+    ]);
+  }
+  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
+function buildSelectedUsersCsv(items) {
+  const rows = [["username", "role", "plan", "must_change_password", "created_at"]];
+  for (const item of items) {
+    rows.push([
+      item.username || "",
+      item.role || "",
+      item.plan || "",
+      item.must_change_password ? "true" : "false",
+      item.created_at || "",
+    ]);
+  }
   return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }
 
@@ -283,6 +346,7 @@ function UsersPageContent() {
   const [backupBundleText, setBackupBundleText] = useState("");
   const [restoreDryRun, setRestoreDryRun] = useState(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
+  const [restoreSectionFilter, setRestoreSectionFilter] = useState("all");
   const [savedViews, setSavedViews] = useState([]);
   const [savedViewName, setSavedViewName] = useState("");
   const [savedViewsMetaText, setSavedViewsMetaText] = useState("Using local browser storage.");
@@ -296,6 +360,10 @@ function UsersPageContent() {
   const [submitting, setSubmitting] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState("");
   const [deletingUserId, setDeletingUserId] = useState("");
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [bulkRoleValue, setBulkRoleValue] = useState("");
+  const [bulkPlanValue, setBulkPlanValue] = useState("");
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
   const [roleFilter, setRoleFilter] = useState(() => searchParams.get("role") || "all");
   const [planFilter, setPlanFilter] = useState(() => searchParams.get("plan") || "all");
@@ -307,6 +375,10 @@ function UsersPageContent() {
     return "all";
   });
   const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
+  const [auditScopeFilter, setAuditScopeFilter] = useState(() => searchParams.get("audit_scope") || "all");
+  const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
+  const [auditViews, setAuditViews] = useState([]);
+  const [auditViewName, setAuditViewName] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
   const [form, setForm] = useState({
@@ -316,6 +388,12 @@ function UsersPageContent() {
   });
   const filteredUsers = users;
   const bundleLineCount = backupBundleText ? backupBundleText.split("\n").length : 0;
+  const bundleAnalysis = analyzeBackupBundleText(backupBundleText);
+  const visibleRestoreSections = restoreDryRun
+    ? restoreDryRun.sections.filter(
+        (section) => restoreSectionFilter === "all" || section.status === restoreSectionFilter,
+      )
+    : [];
   const hasUserFilters =
     query.trim() !== "" ||
     roleFilter !== "all" ||
@@ -386,6 +464,47 @@ function UsersPageContent() {
         }
       : null,
   ];
+  const activeAuditFilterChips = auditQuery.trim()
+    ? [
+        {
+          key: "users-audit-search",
+          label: `Audit: ${auditQuery.trim()}`,
+          onRemove: () => setAuditQuery(""),
+          testId: "users-audit-filter-chip-query",
+        },
+      ]
+    : [];
+  if (auditScopeFilter !== "all") {
+    activeAuditFilterChips.push({
+      key: "users-audit-scope",
+      label: `Scope: ${auditScopeFilter}`,
+      onRemove: () => setAuditScopeFilter("all"),
+      testId: "users-audit-filter-chip-scope",
+    });
+  }
+  const currentAuditView = {
+    audit_q: auditQuery.trim(),
+    audit_scope: auditScopeFilter,
+    audit_sort: auditSort,
+  };
+  const currentAuditViewSignature = JSON.stringify(currentAuditView);
+  const normalizedAuditViewName = normalizeSavedViewName(auditViewName);
+  const matchedAuditViewByName = auditViews.find(
+    (item) => normalizeSavedViewName(item.name).toLowerCase() === normalizedAuditViewName.toLowerCase(),
+  );
+  const activeAuditViewId =
+    auditViews.find((item) => JSON.stringify(item.filters) === currentAuditViewSignature)?.id || "";
+  const activeAuditView = auditViews.find((item) => item.id === activeAuditViewId) || null;
+  const hasAuditViewNameMatch = Boolean(matchedAuditViewByName);
+  const canSaveAuditView =
+    normalizedAuditViewName !== "" && (auditQuery.trim() || auditScopeFilter !== "all" || auditSort !== "newest");
+  const visibleAuditEvents = [...auditEvents]
+    .filter((item) => auditScopeFilter === "all" || item.target_type === auditScopeFilter)
+    .sort((left, right) => {
+      const leftTime = new Date(left.created_at || 0).getTime();
+      const rightTime = new Date(right.created_at || 0).getTime();
+      return auditSort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+    });
   const canSaveCurrentView = normalizedSavedViewName !== "" && hasUserFilters;
   const reachedViewLimitWithoutReplace =
     savedViews.length >= 8 && !hasSavedViewNameMatch;
@@ -411,6 +530,21 @@ function UsersPageContent() {
     savedViews.length === 0
       ? ""
       : `Showing ${visibleSavedViews.length} of ${savedViews.length} saved user view${savedViews.length === 1 ? "" : "s"}.`;
+  const selectedVisibleUserIds = filteredUsers
+    .map((user) => user.id)
+    .filter((userId) => selectedUserIds.includes(userId));
+  const selectedUsers = filteredUsers.filter((user) => selectedUserIds.includes(user.id));
+  const selectedUsersPreview = selectedUsers.slice(0, 3).map((user) => user.username).join(", ");
+  const allVisibleUsersSelected =
+    filteredUsers.length > 0 && selectedVisibleUserIds.length === filteredUsers.length;
+  const hasSelectedUsers = selectedUserIds.length > 0;
+  const bulkUsersDirty = hasSelectedUsers || bulkRoleValue !== "" || bulkPlanValue !== "";
+  const bulkUsersActionSummary = [
+    bulkRoleValue ? `role -> ${bulkRoleValue}` : null,
+    bulkPlanValue ? `plan -> ${bulkPlanValue}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   async function loadAdminOverview() {
     const response = await fetch(`${apiBaseUrl}/admin/overview`, {
@@ -541,6 +675,16 @@ function UsersPageContent() {
 
   useEffect(() => {
     if (smokeMode) {
+      setAuditViews(
+        formatSavedViews([
+          {
+            id: "users-audit-smoke-view",
+            name: "User actions",
+            filters: { audit_q: "", audit_scope: "user", audit_sort: "newest" },
+            updatedAt: "2026-04-02T00:20:00Z",
+          },
+        ]),
+      );
       setSavedViews(
         formatSavedViews([
           {
@@ -571,6 +715,16 @@ function UsersPageContent() {
     } catch {
       setSavedViews([]);
       setSavedViewsMetaText("Using local browser storage.");
+    }
+
+    try {
+      const storedAudit = window.localStorage.getItem(usersAuditViewsStorageKey);
+      if (!storedAudit) {
+        return;
+      }
+      setAuditViews(formatSavedViews(JSON.parse(storedAudit)));
+    } catch {
+      setAuditViews([]);
     }
   }, []);
 
@@ -705,6 +859,176 @@ function UsersPageContent() {
     }
   }
 
+  function handleToggleUserSelection(userId) {
+    setSelectedUserIds((currentIds) =>
+      currentIds.includes(userId)
+        ? currentIds.filter((item) => item !== userId)
+        : [...currentIds, userId],
+    );
+  }
+
+  function handleToggleVisibleUsers() {
+    const visibleIds = filteredUsers.map((user) => user.id);
+    if (visibleIds.length === 0) {
+      return;
+    }
+    setSelectedUserIds((currentIds) => {
+      if (visibleIds.every((userId) => currentIds.includes(userId))) {
+        return currentIds.filter((userId) => !visibleIds.includes(userId));
+      }
+      return Array.from(new Set([...currentIds, ...visibleIds]));
+    });
+  }
+
+  function handleSelectUsersByRole(role) {
+    const matchingIds = filteredUsers
+      .filter((user) => user.role === role)
+      .map((user) => user.id);
+    setSelectedUserIds(matchingIds);
+    setSuccess(`${matchingIds.length} ${role} user${matchingIds.length === 1 ? "" : "s"} selected.`);
+    setError("");
+  }
+
+  function handleSelectUsersNeedingPasswordChange() {
+    const matchingIds = filteredUsers
+      .filter((user) => user.must_change_password)
+      .map((user) => user.id);
+    setSelectedUserIds(matchingIds);
+    setSuccess(
+      `${matchingIds.length} user${matchingIds.length === 1 ? "" : "s"} requiring a password change selected.`,
+    );
+    setError("");
+  }
+
+  function handleSelectVisibleUsersWithAuditFilter() {
+    const matchingIds = filteredUsers.map((user) => user.id);
+    setSelectedUserIds(matchingIds);
+    setSuccess(
+      `${matchingIds.length} visible user${matchingIds.length === 1 ? "" : "s"} selected from the current user filter view.`,
+    );
+    setError("");
+  }
+
+  function handleClearSelectedUsers() {
+    setSelectedUserIds([]);
+    setSuccess("Selection cleared.");
+    setError("");
+  }
+
+  function handleResetBulkUsersTools() {
+    setSelectedUserIds([]);
+    setBulkRoleValue("");
+    setBulkPlanValue("");
+    setSuccess("Bulk tools reset.");
+    setError("");
+  }
+
+  async function handleBulkUserPatch(patch, successMessage, fallbackMessage) {
+    if (!selectedUserIds.length) {
+      return;
+    }
+
+    setBulkUpdating(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      for (const userId of selectedUserIds) {
+        await readJsonOrError(
+          await fetch(`${apiBaseUrl}/admin/users/${userId}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify(patch),
+          }),
+          fallbackMessage,
+        );
+      }
+      setSelectedUserIds([]);
+      setSuccess(successMessage);
+      await refreshPageData();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : fallbackMessage,
+      );
+    } finally {
+      setBulkUpdating(false);
+    }
+  }
+
+  async function handleBulkRoleChange() {
+    if (!bulkRoleValue || !selectedUserIds.length) {
+      return;
+    }
+    await handleBulkUserPatch(
+      { role: bulkRoleValue },
+      `Updated role to ${bulkRoleValue} for ${selectedUserIds.length} user${selectedUserIds.length === 1 ? "" : "s"}.`,
+      "Failed to update user roles.",
+    );
+    setBulkRoleValue("");
+  }
+
+  async function handleBulkPlanChange() {
+    if (!bulkPlanValue || !selectedUserIds.length) {
+      return;
+    }
+    await handleBulkUserPatch(
+      { plan: bulkPlanValue },
+      `Updated plan to ${bulkPlanValue} for ${selectedUserIds.length} user${selectedUserIds.length === 1 ? "" : "s"}.`,
+      "Failed to update user plans.",
+    );
+    setBulkPlanValue("");
+  }
+
+  function handleApplyBulkUserPreset(kind) {
+    if (kind === "promote_admins") {
+      setBulkRoleValue("admin");
+      setBulkPlanValue("");
+      setSuccess("Preset loaded: promote selected users to admin.");
+      setError("");
+      return;
+    }
+    if (kind === "move_to_team") {
+      setBulkRoleValue("");
+      setBulkPlanValue("team");
+      setSuccess("Preset loaded: move selected users to team.");
+      setError("");
+      return;
+    }
+    if (kind === "reset_to_trial") {
+      setBulkRoleValue("");
+      setBulkPlanValue("trial");
+      setSuccess("Preset loaded: move selected users to trial.");
+      setError("");
+    }
+  }
+
+  function handleDownloadSelectedUsersExport() {
+    if (!selectedUsers.length) {
+      return;
+    }
+    const blob = new Blob([buildSelectedUsersCsv(selectedUsers)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-selected-users.csv", blob);
+    setSuccess("Selected users export downloaded.");
+    setError("");
+  }
+
+  function handleDownloadFilteredUsersExport() {
+    if (!filteredUsers.length) {
+      return;
+    }
+    const blob = new Blob([buildSelectedUsersCsv(filteredUsers)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-filtered-users.csv", blob);
+    setSuccess("Filtered users export downloaded.");
+    setError("");
+  }
+
   async function handleDownloadUsersExport() {
     setError("");
     try {
@@ -741,6 +1065,104 @@ function UsersPageContent() {
         requestError instanceof Error ? requestError.message : "Failed to download admin audit export.",
       );
     }
+  }
+
+  function handleDownloadVisibleAuditExport() {
+    const blob = new Blob([buildAuditEventsCsv(visibleAuditEvents)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-admin-audit-current-view.csv", blob);
+    setSuccess("Current audit view exported.");
+    setError("");
+  }
+
+  async function handleCopyAuditViewLink() {
+    const params = new URLSearchParams();
+    if (auditQuery.trim()) {
+      params.set("audit_q", auditQuery.trim());
+    }
+    if (auditScopeFilter !== "all") {
+      params.set("audit_scope", auditScopeFilter);
+    }
+    if (auditSort !== "newest") {
+      params.set("audit_sort", auditSort);
+    }
+    const url = `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+    await copyTextToClipboard(url);
+    setSuccess("Audit view link copied.");
+    setError("");
+  }
+
+  function handleResetAuditTools() {
+    setAuditQuery("");
+    setAuditScopeFilter("all");
+    setAuditSort("newest");
+    setSuccess("Audit tools reset.");
+    setError("");
+  }
+
+  function persistAuditViews(nextViews) {
+    const normalized = formatSavedViews(nextViews);
+    setAuditViews(normalized);
+    if (!smokeMode) {
+      window.localStorage.setItem(usersAuditViewsStorageKey, JSON.stringify(nextViews));
+    }
+  }
+
+  function handleSaveAuditView() {
+    if (!canSaveAuditView) {
+      return;
+    }
+    const matchedView = matchedAuditViewByName;
+    const nextViews = [
+      {
+        id: matchedView ? matchedView.id : `${Date.now()}`,
+        name: normalizedAuditViewName,
+        filters: currentAuditView,
+        updatedAt: new Date().toISOString(),
+        source: "local",
+      },
+      ...auditViews
+        .filter((item) => normalizeSavedViewName(item.name).toLowerCase() !== normalizedAuditViewName.toLowerCase())
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          filters: item.filters,
+          updatedAt: item.updatedAt,
+          source: item.source,
+        })),
+    ].slice(0, 8);
+    persistAuditViews(nextViews);
+    setAuditViewName("");
+    setSuccess("Audit view saved.");
+    setError("");
+  }
+
+  function handleApplyAuditView(viewId) {
+    const nextView = auditViews.find((item) => item.id === viewId);
+    if (!nextView) {
+      return;
+    }
+    setAuditQuery(nextView.filters.audit_q || "");
+    setAuditScopeFilter(nextView.filters.audit_scope || "all");
+    setAuditSort(nextView.filters.audit_sort || "newest");
+    setAuditViewName(nextView.name);
+    setSuccess(`Applied audit view ${nextView.name}.`);
+    setError("");
+  }
+
+  function handleDeleteAuditView(viewId) {
+    persistAuditViews(
+      auditViews.filter((item) => item.id !== viewId).map((item) => ({
+        id: item.id,
+        name: item.name,
+        filters: item.filters,
+        updatedAt: item.updatedAt,
+        source: item.source,
+      })),
+    );
+    setSuccess("Audit view removed.");
+    setError("");
   }
 
   async function handleCopyCurrentView() {
@@ -816,6 +1238,7 @@ function UsersPageContent() {
     reader.onload = () => {
       setBackupBundleText(typeof reader.result === "string" ? reader.result : "");
       setRestoreDryRun(null);
+      setRestoreSectionFilter("all");
       setSuccess(`Loaded backup file ${file.name}.`);
       setError("");
     };
@@ -846,6 +1269,7 @@ function UsersPageContent() {
       });
       const data = await readJsonOrError(response, "Failed to run restore dry-run.");
       setRestoreDryRun(data);
+      setRestoreSectionFilter("all");
       setSuccess("Restore dry-run completed.");
     } catch (requestError) {
       setRestoreDryRun(null);
@@ -895,6 +1319,7 @@ function UsersPageContent() {
   function handleClearBundle() {
     setBackupBundleText("");
     setRestoreDryRun(null);
+    setRestoreSectionFilter("all");
     setSuccess("Backup bundle editor cleared.");
     setError("");
   }
@@ -1160,12 +1585,24 @@ function UsersPageContent() {
     if (auditQuery.trim()) {
       params.set("audit_q", auditQuery.trim());
     }
+    if (auditScopeFilter !== "all") {
+      params.set("audit_scope", auditScopeFilter);
+    }
+    if (auditSort !== "newest") {
+      params.set("audit_sort", auditSort);
+    }
     const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
     const currentUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
     if (nextUrl !== currentUrl) {
       router.replace(nextUrl, { scroll: false });
     }
-  }, [smokeMode, pathname, router, searchParams, query, roleFilter, planFilter, mustChangeFilter, auditQuery]);
+  }, [smokeMode, pathname, router, searchParams, query, roleFilter, planFilter, mustChangeFilter, auditQuery, auditScopeFilter, auditSort]);
+
+  useEffect(() => {
+    setSelectedUserIds((currentIds) =>
+      currentIds.filter((userId) => users.some((user) => user.id === userId)),
+    );
+  }, [users]);
 
   useEffect(() => {
     if (smokeMode) {
@@ -1309,56 +1746,83 @@ function UsersPageContent() {
           </article>
         ) : null}
 
-        <article className="card formCard">
-          <div className="sectionHeader">
-            <div>
-              <h2>Admin audit trail</h2>
-              <p className="formHint">Recent admin actions across users and upgrade handling.</p>
-            </div>
-          </div>
-          <label className="field deploymentSearch">
-            <span>Search audit</span>
-            <input
-              value={auditQuery}
-              onChange={(event) => setAuditQuery(event.target.value)}
-              placeholder="user.updated, alice, approved"
-            />
-          </label>
-          <p className="formHint">Recent audit events shown: {auditEvents.length}</p>
-          <p className="formHint">Audit search updates after a short pause.</p>
-          <AdminActiveFilters filters={activeFilterChips} />
-          {auditEvents.length === 0 ? (
-            <div className="empty" data-testid="users-audit-empty-state">
-              {auditQuery.trim() ? "No admin audit events match this search." : "No admin audit events yet."}
-            </div>
-          ) : (
-            <div className="timeline">
-              {auditEvents.map((item) => (
-                <div className="timelineItem" key={item.id}>
-                  <div className="row">
-                    <span className="label">Action</span>
-                    <span>{item.action_type}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Actor</span>
-                    <span>{item.actor_username || "-"}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Target</span>
-                    <span>{item.target_type} · {item.target_label || item.target_id || "-"}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Details</span>
-                    <span>{item.details || "-"}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Created</span>
-                    <span>{formatDate(item.created_at)}</span>
-                  </div>
+        <AdminAuditToolbar
+          title="Admin audit trail"
+          description="Recent admin actions across users and upgrade handling."
+          query={auditQuery}
+          onQueryChange={(event) => setAuditQuery(event.target.value)}
+          queryPlaceholder="user.updated, alice, approved"
+          queryTestId="users-audit-search"
+          filterLabel="Scope"
+          filterValue={auditScopeFilter}
+          onFilterChange={(event) => setAuditScopeFilter(event.target.value)}
+          filterOptions={[
+            { label: "All targets", value: "all" },
+            { label: "Users", value: "user" },
+            { label: "Upgrade requests", value: "upgrade_request" },
+          ]}
+          filterTestId="users-audit-scope-filter"
+          sortValue={auditSort}
+          onSortChange={(event) => setAuditSort(event.target.value)}
+          sortTestId="users-audit-sort"
+          totalCount={visibleAuditEvents.length}
+          summary="Audit search updates after a short pause."
+          filters={activeAuditFilterChips}
+          actions={[
+            { label: "Copy audit link", testId: "users-audit-copy-link-button", onClick: handleCopyAuditViewLink },
+            { label: "Export current CSV", testId: "users-audit-current-export-button", onClick: handleDownloadVisibleAuditExport, disabled: visibleAuditEvents.length === 0 },
+            { label: "Reset audit", testId: "users-audit-reset-button", onClick: handleResetAuditTools, disabled: !(auditQuery.trim() || auditScopeFilter !== "all" || auditSort !== "newest") },
+          ]}
+          emptyTestId="users-audit-empty-state"
+          emptyText={auditQuery.trim() ? "No admin audit events match this search." : "No admin audit events yet."}
+        >
+          <div className="timeline">
+            {visibleAuditEvents.map((item) => (
+              <div className="timelineItem" key={item.id}>
+                <div className="row">
+                  <span className="label">Action</span>
+                  <span>{item.action_type}</span>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="row">
+                  <span className="label">Actor</span>
+                  <span>{item.actor_username || "-"}</span>
+                </div>
+                <div className="row">
+                  <span className="label">Target</span>
+                  <span>{item.target_type} · {item.target_label || item.target_id || "-"}</span>
+                </div>
+                <div className="row">
+                  <span className="label">Details</span>
+                  <span>{item.details || "-"}</span>
+                </div>
+                <div className="row">
+                  <span className="label">Created</span>
+                  <span>{formatDate(item.created_at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </AdminAuditToolbar>
+
+        <article className="card formCard">
+          <AdminSavedViews
+            title="Saved audit views"
+            inputLabel="Audit view name"
+            inputValue={auditViewName}
+            onInputChange={(event) => setAuditViewName(event.target.value)}
+            onSave={handleSaveAuditView}
+            saveDisabled={!canSaveAuditView}
+            saveTestId="users-save-audit-view-button"
+            saveLabel={hasAuditViewNameMatch ? "Update audit view" : "Save audit view"}
+            inputHint="Save the current audit query, scope, and sort. Audit presets are stored separately from the main users saved views."
+            inputCountText={`${normalizedAuditViewName.length}/40 characters`}
+            views={auditViews}
+            onApply={handleApplyAuditView}
+            onDelete={handleDeleteAuditView}
+            emptyText="No saved audit views yet."
+            listTestId="users-audit-views-list"
+            activeViewId={activeAuditViewId}
+          />
         </article>
 
         <article className="card formCard">
@@ -1371,24 +1835,24 @@ function UsersPageContent() {
             </div>
           </div>
           <div className="backupActions">
-            <button type="button" onClick={handleDownloadBackupBundle}>
+            <button type="button" data-testid="backup-download-bundle-button" onClick={handleDownloadBackupBundle}>
               Download backup bundle
             </button>
-            <button type="button" onClick={handleLoadSampleBundle}>
+            <button type="button" data-testid="backup-paste-sample-button" onClick={handleLoadSampleBundle}>
               Paste sample
             </button>
             <label className="linkButton backupUploadButton">
               Load backup file
-              <input type="file" accept="application/json,.json" onChange={handleBackupFileChange} />
+              <input data-testid="backup-upload-file-input" type="file" accept="application/json,.json" onChange={handleBackupFileChange} />
             </label>
-            <button type="button" onClick={handleClearBundle} disabled={!backupBundleText.trim()}>
+            <button type="button" data-testid="backup-clear-bundle-button" onClick={handleClearBundle} disabled={!backupBundleText.trim()}>
               Clear bundle
             </button>
             <button
               type="button"
               data-testid="restore-dry-run-button"
               onClick={handleRunRestoreDryRun}
-              disabled={restoreLoading || !backupBundleText.trim()}
+              disabled={restoreLoading || bundleAnalysis.status !== "ready"}
             >
               {restoreLoading ? "Validating..." : "Run restore dry-run"}
             </button>
@@ -1414,6 +1878,32 @@ function UsersPageContent() {
           </label>
           <p className="formHint">Paste an exported bundle JSON here or load a saved `.json` file before running validation.</p>
           <p className="formHint">Bundle size: {backupBundleText.length} chars · {bundleLineCount} lines.</p>
+          <div
+            data-testid="backup-preflight-banner"
+            className={`banner ${bundleAnalysis.status === "invalid" ? "error" : bundleAnalysis.status === "ready" ? "success" : "subtle"}`}
+          >
+            {bundleAnalysis.message}
+          </div>
+          {bundleAnalysis.manifest ? (
+            <div className="backupManifestGrid" data-testid="backup-manifest-preview">
+              <div className="backupManifestItem">
+                <span className="label">Bundle</span>
+                <strong>{bundleAnalysis.manifest.bundle_name || "N/A"}</strong>
+              </div>
+              <div className="backupManifestItem">
+                <span className="label">Version</span>
+                <strong>{bundleAnalysis.manifest.version || "N/A"}</strong>
+              </div>
+              <div className="backupManifestItem">
+                <span className="label">Sections</span>
+                <strong>{bundleAnalysis.sectionCount}</strong>
+              </div>
+              <div className="backupManifestItem">
+                <span className="label">Records</span>
+                <strong>{bundleAnalysis.recordCount}</strong>
+              </div>
+            </div>
+          ) : null}
           {restoreDryRun ? (
             <div className="backupReport">
               <div className="overviewGrid">
@@ -1440,7 +1930,18 @@ function UsersPageContent() {
                 <span className="status warn">review {restoreDryRun.summary.review_required_sections}</span>
                 <span className="status error">blocked {restoreDryRun.summary.blocked_sections}</span>
               </div>
-              <div className="backupManifestGrid">
+              <div className="adminSavedViewsComposer">
+                <label className="field">
+                  <span>Section status</span>
+                  <select data-testid="restore-section-filter" value={restoreSectionFilter} onChange={(event) => setRestoreSectionFilter(event.target.value)}>
+                    <option value="all">All sections</option>
+                    <option value="ok">Safe</option>
+                    <option value="warn">Review</option>
+                    <option value="error">Blocked</option>
+                  </select>
+                </label>
+              </div>
+              <div className="backupManifestGrid" data-testid="restore-manifest-counts">
                 {Object.entries(restoreDryRun.manifest.sections || {}).map(([name, count]) => (
                   <div key={name} className="backupManifestItem">
                     <span className="label">{name}</span>
@@ -1448,8 +1949,23 @@ function UsersPageContent() {
                   </div>
                 ))}
               </div>
-              <div className="overviewAttentionList">
+              <div className="backupSectionChips" data-testid="restore-section-chips">
                 {restoreDryRun.sections.map((section) => (
+                  <button
+                    key={section.name}
+                    type="button"
+                    className="adminFilterChip"
+                    onClick={() => setRestoreSectionFilter(section.status)}
+                  >
+                    <span>{section.name}</span>
+                    <span className={`status ${section.status === "ok" ? "healthy" : section.status}`}>
+                      {section.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="overviewAttentionList">
+                {visibleRestoreSections.map((section) => (
                   <div className="overviewAttentionItem" key={section.name}>
                     <div className="row">
                       <span className="label">Section</span>
@@ -1751,6 +2267,210 @@ function UsersPageContent() {
           </form>
         </article>
 
+        <article className="card formCard">
+          <div className="sectionHeader">
+            <div>
+              <h2>Bulk user actions</h2>
+              <p className="formHint">
+                Bulk selection follows the current server-side user filters.
+              </p>
+              <p className="formHint" data-testid="users-bulk-selection-summary">
+                Selected {selectedUserIds.length} · Visible {filteredUsers.length}
+              </p>
+              {hasSelectedUsers ? (
+                <p className="formHint">
+                  {selectedUsers.length > 3
+                    ? `${selectedUsersPreview} +${selectedUsers.length - 3} more`
+                    : selectedUsersPreview}
+                </p>
+              ) : null}
+              <div className="backupSummaryBadges" data-testid="users-bulk-stats">
+                <span className="status info">selected {selectedUserIds.length}</span>
+                <span className="status unknown">visible {filteredUsers.length}</span>
+                <span className="status unknown">admins {filteredUsers.filter((user) => user.role === "admin").length}</span>
+                <span className="status unknown">members {filteredUsers.filter((user) => user.role === "member").length}</span>
+              </div>
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-select-visible-button"
+                onClick={handleToggleVisibleUsers}
+                disabled={filteredUsers.length === 0 || bulkUpdating}
+              >
+                {allVisibleUsersSelected ? "Unselect visible" : `Select visible (${filteredUsers.length})`}
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-clear-selection-button"
+                onClick={handleClearSelectedUsers}
+                disabled={!hasSelectedUsers || bulkUpdating}
+              >
+                Clear selection
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-export-selection-button"
+                onClick={handleDownloadSelectedUsersExport}
+                disabled={!hasSelectedUsers || bulkUpdating}
+              >
+                Export selection
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-export-filtered-button"
+                onClick={handleDownloadFilteredUsersExport}
+                disabled={filteredUsers.length === 0 || bulkUpdating}
+              >
+                Export current filter
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-select-admins-button"
+                onClick={() => handleSelectUsersByRole("admin")}
+                disabled={bulkUpdating || !filteredUsers.some((user) => user.role === "admin")}
+              >
+                Select admins
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-select-members-button"
+                onClick={() => handleSelectUsersByRole("member")}
+                disabled={bulkUpdating || !filteredUsers.some((user) => user.role === "member")}
+              >
+                Select members
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-select-password-required-button"
+                onClick={handleSelectUsersNeedingPasswordChange}
+                disabled={bulkUpdating || !filteredUsers.some((user) => user.must_change_password)}
+              >
+                Select password required
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-select-current-filter-button"
+                onClick={handleSelectVisibleUsersWithAuditFilter}
+                disabled={bulkUpdating || filteredUsers.length === 0}
+              >
+                Select current filter
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-reset-tools-button"
+                onClick={handleResetBulkUsersTools}
+                disabled={!bulkUsersDirty || bulkUpdating}
+              >
+                Reset bulk tools
+              </button>
+            </div>
+          </div>
+
+          <div className="bulkActionsGrid">
+            <div className="field" data-testid="users-bulk-presets">
+              <span>Quick presets</span>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid="users-bulk-preset-admin-button"
+                  onClick={() => handleApplyBulkUserPreset("promote_admins")}
+                  disabled={bulkUpdating}
+                >
+                  Promote to admin
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid="users-bulk-preset-team-button"
+                  onClick={() => handleApplyBulkUserPreset("move_to_team")}
+                  disabled={bulkUpdating}
+                >
+                  Move to team
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid="users-bulk-preset-trial-button"
+                  onClick={() => handleApplyBulkUserPreset("reset_to_trial")}
+                  disabled={bulkUpdating}
+                >
+                  Move to trial
+                </button>
+              </div>
+            </div>
+            <label className="field">
+              <span>Bulk role</span>
+              <select
+                data-testid="users-bulk-role-select"
+                value={bulkRoleValue}
+                onChange={(event) => setBulkRoleValue(event.target.value)}
+                disabled={bulkUpdating}
+              >
+                <option value="">Keep current role</option>
+                <option value="member">member</option>
+                <option value="admin">admin</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="users-bulk-role-apply-button"
+              onClick={handleBulkRoleChange}
+              disabled={!hasSelectedUsers || !bulkRoleValue || bulkUpdating}
+            >
+              {bulkUpdating ? "Applying..." : "Apply role"}
+            </button>
+
+            <label className="field">
+              <span>Bulk plan</span>
+              <select
+                data-testid="users-bulk-plan-select"
+                value={bulkPlanValue}
+                onChange={(event) => setBulkPlanValue(event.target.value)}
+                disabled={bulkUpdating}
+              >
+                <option value="">Keep current plan</option>
+                <option value="trial">trial</option>
+                <option value="solo">solo</option>
+                <option value="team">team</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="users-bulk-plan-apply-button"
+              onClick={handleBulkPlanChange}
+              disabled={!hasSelectedUsers || !bulkPlanValue || bulkUpdating}
+            >
+              {bulkUpdating ? "Applying..." : "Apply plan"}
+            </button>
+          </div>
+          <p className="formHint">
+            Bulk user actions use the current selection only and reuse the existing single-user admin update path.
+          </p>
+          <p className="formHint">
+            Fast selectors respect the current server-side filters and let you stage a role or plan update without changing the current list view.
+          </p>
+          <p className="formHint" data-testid="users-bulk-action-summary">
+            {hasSelectedUsers
+              ? bulkUsersActionSummary
+                ? `Ready to apply: ${bulkUsersActionSummary}.`
+                : "Pick a role or plan target to enable bulk apply."
+              : "Select at least one user to enable bulk actions."}
+          </p>
+        </article>
+
         {loading && users.length === 0 ? (
           <div className="empty">Loading users...</div>
         ) : null}
@@ -1766,6 +2486,18 @@ function UsersPageContent() {
 
           {filteredUsers.map((user) => (
             <article className="card compactCard" key={user.id}>
+              <div className="row">
+                <label className="bulkSelectLabel">
+                  <input
+                    type="checkbox"
+                    data-testid={`users-select-${user.id}`}
+                    checked={selectedUserIds.includes(user.id)}
+                    onChange={() => handleToggleUserSelection(user.id)}
+                    disabled={bulkUpdating}
+                  />
+                  <span>Select user</span>
+                </label>
+              </div>
               <div className="row">
                 <span className="label">Username</span>
                 <span>{user.username}</span>
@@ -1790,7 +2522,7 @@ function UsersPageContent() {
                 <select
                   value={user.role}
                   onChange={(event) => handleRoleChange(user.id, event.target.value)}
-                  disabled={updatingUserId === user.id || deletingUserId === user.id}
+                  disabled={updatingUserId === user.id || deletingUserId === user.id || bulkUpdating}
                 >
                   <option value="member">member</option>
                   <option value="admin">admin</option>
@@ -1798,7 +2530,7 @@ function UsersPageContent() {
                 <select
                   value={user.plan}
                   onChange={(event) => handlePlanChange(user.id, event.target.value)}
-                  disabled={updatingUserId === user.id || deletingUserId === user.id}
+                  disabled={updatingUserId === user.id || deletingUserId === user.id || bulkUpdating}
                 >
                   <option value="trial">trial</option>
                   <option value="solo">solo</option>
@@ -1808,7 +2540,7 @@ function UsersPageContent() {
                   type="button"
                   className="dangerButton"
                   onClick={() => handleDeleteUser(user.id)}
-                  disabled={deletingUserId === user.id || updatingUserId === user.id}
+                  disabled={deletingUserId === user.id || updatingUserId === user.id || bulkUpdating}
                 >
                   {deletingUserId === user.id ? "Deleting..." : "Delete"}
                 </button>

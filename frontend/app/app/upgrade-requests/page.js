@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   AdminActiveFilters,
+  AdminAuditToolbar,
   AdminFeedbackBanners,
   AdminFilterFooter,
   AdminPageHeader,
@@ -65,6 +66,7 @@ const smokeUsers = [
   { id: "smoke-admin", username: "smoke-admin", plan: "team" },
 ];
 const upgradeSavedViewsStorageKey = "deploymate.admin.upgradeRequests.savedViews";
+const upgradeAuditViewsStorageKey = "deploymate.admin.upgradeRequests.auditViews";
 
 function formatDate(value) {
   if (!value) {
@@ -107,6 +109,46 @@ function triggerFileDownload(filename, blob) {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+function escapeCsvCell(value) {
+  const normalized =
+    value === null || value === undefined ? "" : String(value);
+  if (/[",\n]/.test(normalized)) {
+    return `"${normalized.replaceAll("\"", "\"\"")}"`;
+  }
+  return normalized;
+}
+
+function buildAuditEventsCsv(items) {
+  const rows = [["action_type", "actor_username", "target_label", "details", "created_at"]];
+  for (const item of items) {
+    rows.push([
+      item.action_type || "",
+      item.actor_username || "",
+      item.target_label || item.target_id || "",
+      item.details || "",
+      item.created_at || "",
+    ]);
+  }
+  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
+function buildSelectedRequestsCsv(items) {
+  const rows = [["status", "name", "email", "current_plan", "target_username", "reviewed_at", "updated_at", "created_at"]];
+  for (const item of items) {
+    rows.push([
+      item.status || "",
+      item.name || "",
+      item.email || "",
+      item.current_plan || "",
+      item.target_username || "",
+      item.reviewed_at || "",
+      item.updated_at || "",
+      item.created_at || "",
+    ]);
+  }
+  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }
 
 function normalizeSavedViewName(value) {
@@ -245,9 +287,15 @@ function UpgradeRequestsPageContent() {
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") || "all");
   const [linkedOnly, setLinkedOnly] = useState(() => searchParams.get("linked_only") === "true");
   const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
+  const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
+  const [auditViews, setAuditViews] = useState([]);
+  const [auditViewName, setAuditViewName] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
   const [savingId, setSavingId] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [selectedRequestIds, setSelectedRequestIds] = useState([]);
+  const [bulkStatusValue, setBulkStatusValue] = useState("");
   const [saveFeedback, setSaveFeedback] = useState("");
   const [drafts, setDrafts] = useState({});
   const filteredRequests = requests;
@@ -321,6 +369,47 @@ function UpgradeRequestsPageContent() {
         }
       : null,
   ];
+  const activeAuditFilterChips = auditQuery.trim()
+    ? [
+        {
+          key: "upgrade-audit-search",
+          label: `Audit: ${auditQuery.trim()}`,
+          onRemove: () => setAuditQuery(""),
+          testId: "upgrade-audit-filter-chip-query",
+        },
+      ]
+    : [];
+  const visibleAuditEvents = [...auditEvents].sort((left, right) => {
+    const leftTime = new Date(left.created_at || 0).getTime();
+    const rightTime = new Date(right.created_at || 0).getTime();
+    return auditSort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+  });
+  const currentAuditView = {
+    audit_q: auditQuery.trim(),
+    audit_sort: auditSort,
+  };
+  const currentAuditViewSignature = JSON.stringify(currentAuditView);
+  const normalizedAuditViewName = normalizeSavedViewName(auditViewName);
+  const matchedAuditViewByName = auditViews.find(
+    (item) => normalizeSavedViewName(item.name).toLowerCase() === normalizedAuditViewName.toLowerCase(),
+  );
+  const activeAuditViewId =
+    auditViews.find((item) => JSON.stringify(item.filters) === currentAuditViewSignature)?.id || "";
+  const hasAuditViewNameMatch = Boolean(matchedAuditViewByName);
+  const canSaveAuditView =
+    normalizedAuditViewName !== "" && (auditQuery.trim() || auditSort !== "newest");
+  const selectedVisibleRequestIds = filteredRequests
+    .map((item) => item.id)
+    .filter((requestId) => selectedRequestIds.includes(requestId));
+  const selectedRequests = filteredRequests.filter((item) => selectedRequestIds.includes(item.id));
+  const selectedRequestsPreview = selectedRequests
+    .slice(0, 3)
+    .map((item) => item.name || item.email || item.id)
+    .join(", ");
+  const allVisibleRequestsSelected =
+    filteredRequests.length > 0 && selectedVisibleRequestIds.length === filteredRequests.length;
+  const hasSelectedRequests = selectedRequestIds.length > 0;
+  const bulkRequestsDirty = hasSelectedRequests || bulkStatusValue !== "";
   const canSaveCurrentView = normalizedSavedViewName !== "" && hasRequestFilters;
   const reachedViewLimitWithoutReplace =
     savedViews.length >= 8 && !hasSavedViewNameMatch;
@@ -523,6 +612,168 @@ function UpgradeRequestsPageContent() {
     }
   }
 
+  function handleToggleRequestSelection(requestId) {
+    setSelectedRequestIds((currentIds) =>
+      currentIds.includes(requestId)
+        ? currentIds.filter((item) => item !== requestId)
+        : [...currentIds, requestId],
+    );
+  }
+
+  function handleToggleVisibleRequests() {
+    const visibleIds = filteredRequests.map((item) => item.id);
+    if (visibleIds.length === 0) {
+      return;
+    }
+    setSelectedRequestIds((currentIds) => {
+      if (visibleIds.every((requestId) => currentIds.includes(requestId))) {
+        return currentIds.filter((requestId) => !visibleIds.includes(requestId));
+      }
+      return Array.from(new Set([...currentIds, ...visibleIds]));
+    });
+  }
+
+  function handleSelectRequestsByStatus(status) {
+    const matchingIds = filteredRequests
+      .filter((item) => item.status === status)
+      .map((item) => item.id);
+    setSelectedRequestIds(matchingIds);
+    setSaveFeedback(
+      `${matchingIds.length} ${status.replace("_", " ")} request${matchingIds.length === 1 ? "" : "s"} selected.`,
+    );
+    setError("");
+  }
+
+  function handleSelectLinkedRequests() {
+    const matchingIds = filteredRequests
+      .filter((item) => item.target_user_id)
+      .map((item) => item.id);
+    setSelectedRequestIds(matchingIds);
+    setSaveFeedback(
+      `${matchingIds.length} linked request${matchingIds.length === 1 ? "" : "s"} selected.`,
+    );
+    setError("");
+  }
+
+  function handleSelectCurrentInboxFilter() {
+    const matchingIds = filteredRequests.map((item) => item.id);
+    setSelectedRequestIds(matchingIds);
+    setSaveFeedback(
+      `${matchingIds.length} visible request${matchingIds.length === 1 ? "" : "s"} selected from the current inbox filter view.`,
+    );
+    setError("");
+  }
+
+  function handleClearSelectedRequests() {
+    setSelectedRequestIds([]);
+    setSaveFeedback("Selection cleared.");
+    setError("");
+  }
+
+  function handleResetBulkRequestTools() {
+    setSelectedRequestIds([]);
+    setBulkStatusValue("");
+    setSaveFeedback("Bulk tools reset.");
+    setError("");
+  }
+
+  async function handleBulkStatusApply() {
+    if (!bulkStatusValue || !selectedRequestIds.length) {
+      return;
+    }
+
+    setBulkSaving(true);
+    setError("");
+    setSaveFeedback("");
+
+    try {
+      for (const requestId of selectedRequestIds) {
+        const currentDraft = drafts[requestId] || {};
+        const response = await fetch(`${apiBaseUrl}/admin/upgrade-requests/${requestId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            status: bulkStatusValue,
+            internal_note: currentDraft.internal_note || "",
+            target_user_id: currentDraft.target_user_id || null,
+          }),
+        });
+        const updatedItem = await readJsonOrError(response, "Failed to bulk update upgrade requests.");
+        setRequests((current) =>
+          current.map((item) => (item.id === requestId ? updatedItem : item)),
+        );
+        setDrafts((current) => ({
+          ...current,
+          [requestId]: buildDraft(updatedItem),
+        }));
+      }
+      setSelectedRequestIds([]);
+      setBulkStatusValue("");
+      setSaveFeedback(
+        `Updated status to ${bulkStatusValue} for ${selectedRequestIds.length} request${selectedRequestIds.length === 1 ? "" : "s"}.`,
+      );
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to bulk update upgrade requests.",
+      );
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  function handleDownloadSelectedRequestsExport() {
+    if (!selectedRequests.length) {
+      return;
+    }
+    const blob = new Blob([buildSelectedRequestsCsv(selectedRequests)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-selected-upgrade-requests.csv", blob);
+    setSaveFeedback("Selected upgrade requests export downloaded.");
+    setError("");
+  }
+
+  function handleDownloadFilteredRequestsExport() {
+    if (!filteredRequests.length) {
+      return;
+    }
+    const blob = new Blob([buildSelectedRequestsCsv(filteredRequests)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-filtered-upgrade-requests.csv", blob);
+    setSaveFeedback("Filtered upgrade requests export downloaded.");
+    setError("");
+  }
+
+  function handleApplyBulkRequestPreset(kind) {
+    if (kind === "review") {
+      setBulkStatusValue("in_review");
+      setSaveFeedback("Preset loaded: mark selected requests as in review.");
+      setError("");
+      return;
+    }
+    if (kind === "close") {
+      setBulkStatusValue("closed");
+      setSaveFeedback("Preset loaded: close selected requests.");
+      setError("");
+      return;
+    }
+    if (kind === "reject") {
+      setBulkStatusValue("rejected");
+      setSaveFeedback("Preset loaded: reject selected requests.");
+      setError("");
+    }
+  }
+
   useEffect(() => {
     if (smokeMode) {
       return;
@@ -554,6 +805,16 @@ function UpgradeRequestsPageContent() {
 
   useEffect(() => {
     if (smokeMode) {
+      setAuditViews(
+        formatSavedViews([
+          {
+            id: "upgrade-audit-smoke-view",
+            name: "Newest approvals",
+            filters: { audit_q: "approved", audit_sort: "newest" },
+            updatedAt: "2026-04-02T00:22:00Z",
+          },
+        ]),
+      );
       setSavedViews(
         formatSavedViews([
           {
@@ -585,6 +846,16 @@ function UpgradeRequestsPageContent() {
       setSavedViews([]);
       setSavedViewsMetaText("Using local browser storage.");
     }
+
+    try {
+      const storedAudit = window.localStorage.getItem(upgradeAuditViewsStorageKey);
+      if (!storedAudit) {
+        return;
+      }
+      setAuditViews(formatSavedViews(JSON.parse(storedAudit)));
+    } catch {
+      setAuditViews([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -607,12 +878,21 @@ function UpgradeRequestsPageContent() {
     if (auditQuery.trim()) {
       params.set("audit_q", auditQuery.trim());
     }
+    if (auditSort !== "newest") {
+      params.set("audit_sort", auditSort);
+    }
     const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
     const currentUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
     if (nextUrl !== currentUrl) {
       router.replace(nextUrl, { scroll: false });
     }
-  }, [smokeMode, pathname, router, searchParams, query, planFilter, statusFilter, linkedOnly, auditQuery]);
+  }, [smokeMode, pathname, router, searchParams, query, planFilter, statusFilter, linkedOnly, auditQuery, auditSort]);
+
+  useEffect(() => {
+    setSelectedRequestIds((currentIds) =>
+      currentIds.filter((requestId) => requests.some((item) => item.id === requestId)),
+    );
+  }, [requests]);
 
   useEffect(() => {
     if (smokeMode) {
@@ -707,6 +987,99 @@ function UpgradeRequestsPageContent() {
     const url = `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
     await copyTextToClipboard(url);
     setSaveFeedback(`Saved view link copied for ${nextView.name}.`);
+    setError("");
+  }
+
+  function handleDownloadVisibleAuditExport() {
+    const blob = new Blob([buildAuditEventsCsv(visibleAuditEvents)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-upgrade-audit-current-view.csv", blob);
+    setSaveFeedback("Current audit view exported.");
+    setError("");
+  }
+
+  async function handleCopyAuditViewLink() {
+    const params = new URLSearchParams();
+    if (auditQuery.trim()) {
+      params.set("audit_q", auditQuery.trim());
+    }
+    if (auditSort !== "newest") {
+      params.set("audit_sort", auditSort);
+    }
+    const url = `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+    await copyTextToClipboard(url);
+    setSaveFeedback("Audit view link copied.");
+    setError("");
+  }
+
+  function handleResetAuditTools() {
+    setAuditQuery("");
+    setAuditSort("newest");
+    setSaveFeedback("Audit tools reset.");
+    setError("");
+  }
+
+  function persistAuditViews(nextViews) {
+    const normalized = formatSavedViews(nextViews);
+    setAuditViews(normalized);
+    if (!smokeMode) {
+      window.localStorage.setItem(upgradeAuditViewsStorageKey, JSON.stringify(nextViews));
+    }
+  }
+
+  function handleSaveAuditView() {
+    if (!canSaveAuditView) {
+      return;
+    }
+    const matchedView = matchedAuditViewByName;
+    const nextViews = [
+      {
+        id: matchedView ? matchedView.id : `${Date.now()}`,
+        name: normalizedAuditViewName,
+        filters: currentAuditView,
+        updatedAt: new Date().toISOString(),
+        source: "local",
+      },
+      ...auditViews
+        .filter((item) => normalizeSavedViewName(item.name).toLowerCase() !== normalizedAuditViewName.toLowerCase())
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          filters: item.filters,
+          updatedAt: item.updatedAt,
+          source: item.source,
+        })),
+    ].slice(0, 8);
+    persistAuditViews(nextViews);
+    setAuditViewName("");
+    setSaveFeedback("Audit view saved.");
+    setError("");
+  }
+
+  function handleApplyAuditView(viewId) {
+    const nextView = auditViews.find((item) => item.id === viewId);
+    if (!nextView) {
+      return;
+    }
+    setAuditQuery(nextView.filters.audit_q || "");
+    setAuditSort(nextView.filters.audit_sort || "newest");
+    setAuditViewName(nextView.name);
+    setSaveFeedback(`Applied audit view ${nextView.name}.`);
+    setError("");
+  }
+
+  function handleDeleteAuditView(viewId) {
+    persistAuditViews(
+      auditViews.filter((item) => item.id !== viewId).map((item) => ({
+        id: item.id,
+        name: item.name,
+        filters: item.filters,
+        updatedAt: item.updatedAt,
+        source: item.source,
+      })),
+    );
+    setSaveFeedback("Audit view removed.");
     setError("");
   }
 
@@ -1036,56 +1409,74 @@ function UpgradeRequestsPageContent() {
           </article>
         ) : null}
 
-        <article className="card formCard">
-          <div className="sectionHeader">
-            <div>
-              <h2>Upgrade audit trail</h2>
-              <p className="formHint">Recent admin actions taken on upgrade requests.</p>
-            </div>
-          </div>
-          <label className="field deploymentSearch">
-            <span>Search audit</span>
-            <input
-              value={auditQuery}
-              onChange={(event) => setAuditQuery(event.target.value)}
-              placeholder="approved, in_review, target user"
-            />
-          </label>
-          <p className="formHint">Recent audit events shown: {auditEvents.length}</p>
-          <p className="formHint">Audit search updates after a short pause.</p>
-          <AdminActiveFilters filters={activeFilterChips} />
-          {auditEvents.length === 0 ? (
-            <div className="empty" data-testid="upgrade-audit-empty-state">
-              {auditQuery.trim() ? "No upgrade audit events match this search." : "No upgrade audit events yet."}
-            </div>
-          ) : (
-            <div className="timeline">
-              {auditEvents.map((item) => (
-                <div className="timelineItem" key={item.id}>
-                  <div className="row">
-                    <span className="label">Action</span>
-                    <span>{item.action_type}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Actor</span>
-                    <span>{item.actor_username || "-"}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Target</span>
-                    <span>{item.target_label || item.target_id || "-"}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Details</span>
-                    <span>{item.details || "-"}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Created</span>
-                    <span>{formatDate(item.created_at)}</span>
-                  </div>
+        <AdminAuditToolbar
+          title="Upgrade audit trail"
+          description="Recent admin actions taken on upgrade requests."
+          query={auditQuery}
+          onQueryChange={(event) => setAuditQuery(event.target.value)}
+          queryPlaceholder="approved, in_review, target user"
+          queryTestId="upgrade-audit-search"
+          sortValue={auditSort}
+          onSortChange={(event) => setAuditSort(event.target.value)}
+          sortTestId="upgrade-audit-sort"
+          totalCount={visibleAuditEvents.length}
+          summary="Audit search updates after a short pause."
+          filters={activeAuditFilterChips}
+          actions={[
+            { label: "Copy audit link", testId: "upgrade-audit-copy-link-button", onClick: handleCopyAuditViewLink },
+            { label: "Export current CSV", testId: "upgrade-audit-current-export-button", onClick: handleDownloadVisibleAuditExport, disabled: visibleAuditEvents.length === 0 },
+            { label: "Reset audit", testId: "upgrade-audit-reset-button", onClick: handleResetAuditTools, disabled: !(auditQuery.trim() || auditSort !== "newest") },
+          ]}
+          emptyTestId="upgrade-audit-empty-state"
+          emptyText={auditQuery.trim() ? "No upgrade audit events match this search." : "No upgrade audit events yet."}
+        >
+          <div className="timeline">
+            {visibleAuditEvents.map((item) => (
+              <div className="timelineItem" key={item.id}>
+                <div className="row">
+                  <span className="label">Action</span>
+                  <span>{item.action_type}</span>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="row">
+                  <span className="label">Actor</span>
+                  <span>{item.actor_username || "-"}</span>
+                </div>
+                <div className="row">
+                  <span className="label">Target</span>
+                  <span>{item.target_label || item.target_id || "-"}</span>
+                </div>
+                <div className="row">
+                  <span className="label">Details</span>
+                  <span>{item.details || "-"}</span>
+                </div>
+                <div className="row">
+                  <span className="label">Created</span>
+                  <span>{formatDate(item.created_at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </AdminAuditToolbar>
+
+        <article className="card formCard">
+          <AdminSavedViews
+            title="Saved audit views"
+            inputLabel="Audit view name"
+            inputValue={auditViewName}
+            onInputChange={(event) => setAuditViewName(event.target.value)}
+            onSave={handleSaveAuditView}
+            saveDisabled={!canSaveAuditView}
+            saveTestId="upgrade-save-audit-view-button"
+            saveLabel={hasAuditViewNameMatch ? "Update audit view" : "Save audit view"}
+            inputHint="Save the current audit query and sort. Audit presets are stored separately from the main inbox saved views."
+            inputCountText={`${normalizedAuditViewName.length}/40 characters`}
+            views={auditViews}
+            onApply={handleApplyAuditView}
+            onDelete={handleDeleteAuditView}
+            emptyText="No saved audit views yet."
+            listTestId="upgrade-audit-views-list"
+            activeViewId={activeAuditViewId}
+          />
         </article>
 
         <article className="card formCard">
@@ -1299,6 +1690,187 @@ function UpgradeRequestsPageContent() {
           <div className="empty" data-testid="upgrade-empty-state">No upgrade requests found for the current filters.</div>
         ) : null}
 
+        <article className="card formCard">
+          <div className="sectionHeader">
+            <div>
+              <h2>Bulk inbox actions</h2>
+              <p className="formHint">Bulk selection follows the current server-side inbox filters.</p>
+              <p className="formHint" data-testid="upgrade-bulk-selection-summary">
+                Selected {selectedRequestIds.length} · Visible {filteredRequests.length}
+              </p>
+              {hasSelectedRequests ? (
+                <p className="formHint">
+                  {selectedRequests.length > 3
+                    ? `${selectedRequestsPreview} +${selectedRequests.length - 3} more`
+                    : selectedRequestsPreview}
+                </p>
+              ) : null}
+              <div className="backupSummaryBadges" data-testid="upgrade-bulk-stats">
+                <span className="status info">selected {selectedRequestIds.length}</span>
+                <span className="status unknown">visible {filteredRequests.length}</span>
+                <span className="status unknown">new {filteredRequests.filter((item) => item.status === "new").length}</span>
+                <span className="status unknown">review {filteredRequests.filter((item) => item.status === "in_review").length}</span>
+              </div>
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-select-visible-button"
+                onClick={handleToggleVisibleRequests}
+                disabled={filteredRequests.length === 0 || bulkSaving}
+              >
+                {allVisibleRequestsSelected ? "Unselect visible" : `Select visible (${filteredRequests.length})`}
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-clear-selection-button"
+                onClick={handleClearSelectedRequests}
+                disabled={!hasSelectedRequests || bulkSaving}
+              >
+                Clear selection
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-export-selection-button"
+                onClick={handleDownloadSelectedRequestsExport}
+                disabled={!hasSelectedRequests || bulkSaving}
+              >
+                Export selection
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-export-filtered-button"
+                onClick={handleDownloadFilteredRequestsExport}
+                disabled={filteredRequests.length === 0 || bulkSaving}
+              >
+                Export current filter
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-select-new-button"
+                onClick={() => handleSelectRequestsByStatus("new")}
+                disabled={bulkSaving || !filteredRequests.some((item) => item.status === "new")}
+              >
+                Select new
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-select-review-button"
+                onClick={() => handleSelectRequestsByStatus("in_review")}
+                disabled={bulkSaving || !filteredRequests.some((item) => item.status === "in_review")}
+              >
+                Select in review
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-select-linked-button"
+                onClick={handleSelectLinkedRequests}
+                disabled={bulkSaving || !filteredRequests.some((item) => item.target_user_id)}
+              >
+                Select linked
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-select-current-filter-button"
+                onClick={handleSelectCurrentInboxFilter}
+                disabled={bulkSaving || filteredRequests.length === 0}
+              >
+                Select current filter
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-reset-tools-button"
+                onClick={handleResetBulkRequestTools}
+                disabled={!bulkRequestsDirty || bulkSaving}
+              >
+                Reset bulk tools
+              </button>
+            </div>
+          </div>
+
+          <div className="bulkActionsGrid">
+            <div className="field" data-testid="upgrade-bulk-presets">
+              <span>Quick presets</span>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid="upgrade-bulk-preset-review-button"
+                  onClick={() => handleApplyBulkRequestPreset("review")}
+                  disabled={bulkSaving}
+                >
+                  Mark in review
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid="upgrade-bulk-preset-close-button"
+                  onClick={() => handleApplyBulkRequestPreset("close")}
+                  disabled={bulkSaving}
+                >
+                  Close selected
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid="upgrade-bulk-preset-reject-button"
+                  onClick={() => handleApplyBulkRequestPreset("reject")}
+                  disabled={bulkSaving}
+                >
+                  Reject selected
+                </button>
+              </div>
+            </div>
+            <label className="field">
+              <span>Bulk lifecycle status</span>
+              <select
+                data-testid="upgrade-bulk-status-select"
+                value={bulkStatusValue}
+                onChange={(event) => setBulkStatusValue(event.target.value)}
+                disabled={bulkSaving}
+              >
+                <option value="">Keep current status</option>
+                <option value="new">new</option>
+                <option value="in_review">in_review</option>
+                <option value="approved">approved</option>
+                <option value="rejected">rejected</option>
+                <option value="closed">closed</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="upgrade-bulk-status-apply-button"
+              onClick={handleBulkStatusApply}
+              disabled={!hasSelectedRequests || !bulkStatusValue || bulkSaving}
+            >
+              {bulkSaving ? "Applying..." : "Apply status"}
+            </button>
+          </div>
+          <p className="formHint">
+            Bulk inbox actions only update lifecycle status and reuse the existing single-request admin write path.
+          </p>
+          <p className="formHint">
+            Fast selectors respect the current inbox filters so you can stage status changes without disturbing the current triage view.
+          </p>
+          <p className="formHint" data-testid="upgrade-bulk-action-summary">
+            {hasSelectedRequests
+              ? bulkStatusValue
+                ? `Ready to apply: status -> ${bulkStatusValue}.`
+                : "Pick a lifecycle status to enable bulk apply."
+              : "Select at least one request to enable bulk actions."}
+          </p>
+        </article>
+
         <div className="list">
           {!loading && requests.length > 0 && filteredRequests.length === 0 ? (
             <div className="empty" data-testid="upgrade-filter-empty-state">No upgrade requests match this filter or search.</div>
@@ -1306,6 +1878,18 @@ function UpgradeRequestsPageContent() {
 
           {filteredRequests.map((item) => (
             <article className="card compactCard" key={item.id}>
+              <div className="row">
+                <label className="bulkSelectLabel">
+                  <input
+                    type="checkbox"
+                    data-testid={`upgrade-select-${item.id}`}
+                    checked={selectedRequestIds.includes(item.id)}
+                    onChange={() => handleToggleRequestSelection(item.id)}
+                    disabled={bulkSaving}
+                  />
+                  <span>Select request</span>
+                </label>
+              </div>
               <div className="row">
                 <span className="label">Status</span>
                 <span className={`status ${(item.status || "unknown").replace("_", "-")}`}>
@@ -1357,7 +1941,7 @@ function UpgradeRequestsPageContent() {
                 <select
                   value={drafts[item.id]?.status || "new"}
                   onChange={(event) => updateDraft(item.id, "status", event.target.value)}
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || bulkSaving}
                 >
                   <option value="new">new</option>
                   <option value="in_review">in_review</option>
@@ -1371,7 +1955,7 @@ function UpgradeRequestsPageContent() {
                 <textarea
                   value={drafts[item.id]?.internal_note || ""}
                   onChange={(event) => updateDraft(item.id, "internal_note", event.target.value)}
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || bulkSaving}
                   placeholder="Next step, pricing context, follow-up owner"
                 />
               </label>
@@ -1381,7 +1965,7 @@ function UpgradeRequestsPageContent() {
                 <select
                   value={drafts[item.id]?.target_user_id || ""}
                   onChange={(event) => updateDraft(item.id, "target_user_id", event.target.value)}
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || bulkSaving}
                 >
                   <option value="">Not linked</option>
                   {users.map((user) => (
@@ -1396,7 +1980,7 @@ function UpgradeRequestsPageContent() {
                 <select
                   value={drafts[item.id]?.plan || "trial"}
                   onChange={(event) => updateDraft(item.id, "plan", event.target.value)}
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || bulkSaving}
                 >
                   <option value="trial">trial</option>
                   <option value="solo">solo</option>
@@ -1417,7 +2001,7 @@ function UpgradeRequestsPageContent() {
                       "Upgrade request updated.",
                     )
                   }
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || bulkSaving}
                 >
                   {savingId === item.id ? "Saving..." : "Save"}
                 </button>
@@ -1434,7 +2018,7 @@ function UpgradeRequestsPageContent() {
                       "Upgrade request marked as in review.",
                     )
                   }
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || bulkSaving}
                 >
                   Mark in review
                 </button>
@@ -1452,7 +2036,7 @@ function UpgradeRequestsPageContent() {
                       "Upgrade request approved.",
                     )
                   }
-                  disabled={savingId === item.id || !drafts[item.id]?.target_user_id}
+                  disabled={savingId === item.id || bulkSaving || !drafts[item.id]?.target_user_id}
                 >
                   Approve
                 </button>

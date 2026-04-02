@@ -232,6 +232,9 @@ curl -sS -b "<cookie jar>" https://deploymatecloud.ru/api/admin/backup-bundle
 
 # or from UI:
 # App -> Users -> Backup and restore dry run -> Download backup bundle
+# bulk admin actions
+# App -> Users -> Bulk user actions uses the existing single-user PATCH path in a loop
+# App -> Upgrade Requests -> Bulk inbox actions currently changes lifecycle status only
 
 # validate a bundle without applying changes
 curl -sS -b "<cookie jar>" \

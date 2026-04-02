@@ -245,6 +245,13 @@ a {
   margin-top: 10px;
 }
 
+.backupSectionChips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
 .sectionHeader {
   margin-bottom: 16px;
 }
@@ -476,6 +483,26 @@ a {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 12px;
+}
+
+.bulkActionsGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.bulkSelectLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #555;
+  font-size: 14px;
+}
+
+.bulkSelectLabel input {
+  width: 16px;
+  height: 16px;
 }
 
 .previewCard,

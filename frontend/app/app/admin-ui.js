@@ -346,3 +346,93 @@ export function AdminSavedViews({
     </div>
   );
 }
+
+export function AdminAuditToolbar({
+  title,
+  description,
+  query,
+  onQueryChange,
+  queryPlaceholder,
+  queryTestId,
+  filterLabel,
+  filterValue,
+  onFilterChange,
+  filterOptions = [],
+  filterTestId,
+  sortValue = "newest",
+  onSortChange,
+  sortTestId,
+  totalCount,
+  summary,
+  filters = [],
+  actions = [],
+  emptyTestId,
+  emptyText,
+  children,
+}) {
+  return (
+    <article className="card formCard">
+      <div className="sectionHeader">
+        <div>
+          <h2>{title}</h2>
+          <p className="formHint">{description}</p>
+        </div>
+      </div>
+      <label className="field deploymentSearch">
+        <span>Search audit</span>
+        <input data-testid={queryTestId} value={query} onChange={onQueryChange} placeholder={queryPlaceholder} />
+      </label>
+      {filterOptions.length > 0 || onSortChange ? (
+        <div className="adminSavedViewsComposer">
+          {filterOptions.length > 0 ? (
+            <label className="field">
+              <span>{filterLabel}</span>
+              <select data-testid={filterTestId} value={filterValue} onChange={onFilterChange}>
+                {filterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {onSortChange ? (
+            <label className="field">
+              <span>Sort</span>
+              <select data-testid={sortTestId} value={sortValue} onChange={onSortChange}>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </label>
+          ) : null}
+        </div>
+      ) : null}
+      <p className="formHint">Recent audit events shown: {totalCount}</p>
+      <p className="formHint">{summary}</p>
+      <AdminActiveFilters filters={filters} />
+      {actions.length > 0 ? (
+        <div className="adminFilterActions">
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              className="secondaryButton"
+              data-testid={action.testId}
+              onClick={action.onClick}
+              disabled={action.disabled}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {totalCount === 0 ? (
+        <div className="empty" data-testid={emptyTestId}>
+          {emptyText}
+        </div>
+      ) : (
+        children
+      )}
+    </article>
+  );
+}
