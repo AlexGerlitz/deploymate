@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AdminFeedbackBanners, AdminFilterFooter, AdminPageHeader } from "../admin-ui";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -178,6 +179,11 @@ export default function UsersPage() {
   });
   const filteredUsers = users;
   const bundleLineCount = backupBundleText ? backupBundleText.split("\n").length : 0;
+  const hasUserFilters =
+    query.trim() !== "" ||
+    roleFilter !== "all" ||
+    planFilter !== "all" ||
+    mustChangeFilter !== "all";
 
   async function loadAdminOverview() {
     const response = await fetch(`${apiBaseUrl}/admin/overview`, {
@@ -578,6 +584,13 @@ export default function UsersPage() {
     setSuccess("Validation report CSV downloaded.");
   }
 
+  function resetUserFilters() {
+    setQuery("");
+    setRoleFilter("all");
+    setPlanFilter("all");
+    setMustChangeFilter("all");
+  }
+
   useEffect(() => {
     if (smokeMode) {
       return;
@@ -645,39 +658,26 @@ export default function UsersPage() {
   return (
     <main className="page">
       <div className="container">
-        <div className="header">
-          <div>
-            <h1 data-testid="users-page-title">Users</h1>
-            <p>{currentUser ? `Admin users management · ${currentUser.username}` : "Users"}</p>
-          </div>
-          <div className="buttonRow">
-            <Link href="/app" className="linkButton">
-              Back
-            </Link>
-            <button
-              type="button"
-              data-testid="users-refresh-button"
-              onClick={() => Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()])}
-              disabled={loading}
-            >
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
-            <button type="button" data-testid="users-export-button" onClick={handleDownloadUsersExport}>
-              Export CSV
-            </button>
-            <button type="button" data-testid="users-audit-export-button" onClick={handleDownloadAuditExport}>
-              Audit CSV
-            </button>
-          </div>
-        </div>
+        <AdminPageHeader
+          title="Users"
+          titleTestId="users-page-title"
+          subtitle={currentUser ? `Admin users management · ${currentUser.username}` : "Users"}
+          loading={loading}
+          onRefresh={() => Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()])}
+          refreshTestId="users-refresh-button"
+          actions={[
+            { label: "Export CSV", testId: "users-export-button", onClick: handleDownloadUsersExport },
+            { label: "Audit CSV", testId: "users-audit-export-button", onClick: handleDownloadAuditExport },
+          ]}
+        />
 
-        {smokeMode ? (
-          <div className="banner subtle" data-testid="admin-smoke-banner">
-            Smoke mode active
-          </div>
-        ) : null}
-        {error ? <div className="banner error" data-testid="users-error-banner">{error}</div> : null}
-        {success ? <div className="banner success" data-testid="users-success-banner">{success}</div> : null}
+        <AdminFeedbackBanners
+          smokeMode={smokeMode}
+          error={error}
+          success={success}
+          errorTestId="users-error-banner"
+          successTestId="users-success-banner"
+        />
 
         {adminOverview ? (
           <article className="card formCard">
@@ -1017,8 +1017,13 @@ export default function UsersPage() {
               />
             </label>
           </div>
-          <p className="formHint">Showing {filteredUsers.length} user{filteredUsers.length === 1 ? "" : "s"} for the current filters.</p>
-          <p className="formHint">User search updates after a short pause.</p>
+          <AdminFilterFooter
+            summary={`Showing ${filteredUsers.length} user${filteredUsers.length === 1 ? "" : "s"} for the current filters.`}
+            hint="User search updates after a short pause."
+            onReset={resetUserFilters}
+            resetDisabled={!hasUserFilters}
+            resetTestId="users-reset-filters-button"
+          />
         </article>
 
         <article className="card formCard">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AdminFeedbackBanners, AdminFilterFooter, AdminPageHeader } from "../admin-ui";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -123,6 +124,11 @@ export default function UpgradeRequestsPage() {
   const [saveFeedback, setSaveFeedback] = useState("");
   const [drafts, setDrafts] = useState({});
   const filteredRequests = requests;
+  const hasRequestFilters =
+    query.trim() !== "" ||
+    planFilter !== "all" ||
+    statusFilter !== "all" ||
+    linkedOnly;
 
   function buildDraft(item) {
     return {
@@ -353,6 +359,13 @@ export default function UpgradeRequestsPage() {
     }
   }
 
+  function resetRequestFilters() {
+    setQuery("");
+    setPlanFilter("all");
+    setStatusFilter("all");
+    setLinkedOnly(false);
+  }
+
   if (!authChecked) {
     return (
       <main className="page">
@@ -386,36 +399,25 @@ export default function UpgradeRequestsPage() {
   return (
     <main className="page">
       <div className="container">
-        <div className="header">
-          <div>
-            <h1 data-testid="upgrade-requests-page-title">Upgrade Requests</h1>
-            <p>{currentUser ? `Admin inbox · ${currentUser.username}` : "Admin inbox"}</p>
-          </div>
-          <div className="buttonRow">
-            <Link href="/app" className="linkButton">
-              Back
-            </Link>
-            <button
-              type="button"
-              data-testid="upgrade-refresh-button"
-              onClick={() => Promise.all([loadUsers(), loadRequests(), loadAdminOverview(), loadAuditEvents()])}
-              disabled={loading}
-            >
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
-            <button type="button" data-testid="upgrade-export-button" onClick={handleDownloadUpgradeExport}>
-              Export CSV
-            </button>
-          </div>
-        </div>
+        <AdminPageHeader
+          title="Upgrade Requests"
+          titleTestId="upgrade-requests-page-title"
+          subtitle={currentUser ? `Admin inbox · ${currentUser.username}` : "Admin inbox"}
+          loading={loading}
+          onRefresh={() => Promise.all([loadUsers(), loadRequests(), loadAdminOverview(), loadAuditEvents()])}
+          refreshTestId="upgrade-refresh-button"
+          actions={[
+            { label: "Export CSV", testId: "upgrade-export-button", onClick: handleDownloadUpgradeExport },
+          ]}
+        />
 
-        {smokeMode ? (
-          <div className="banner subtle" data-testid="admin-smoke-banner">
-            Smoke mode active
-          </div>
-        ) : null}
-        {error ? <div className="banner error" data-testid="upgrade-error-banner">{error}</div> : null}
-        {saveFeedback ? <div className="banner success" data-testid="upgrade-success-banner">{saveFeedback}</div> : null}
+        <AdminFeedbackBanners
+          smokeMode={smokeMode}
+          error={error}
+          success={saveFeedback}
+          errorTestId="upgrade-error-banner"
+          successTestId="upgrade-success-banner"
+        />
 
         {adminOverview ? (
           <article className="card formCard">
@@ -618,8 +620,13 @@ export default function UpgradeRequestsPage() {
               />
             </label>
           </div>
-          <p className="formHint">Showing {filteredRequests.length} request{filteredRequests.length === 1 ? "" : "s"} for the current filters.</p>
-          <p className="formHint">Request search updates after a short pause.</p>
+          <AdminFilterFooter
+            summary={`Showing ${filteredRequests.length} request${filteredRequests.length === 1 ? "" : "s"} for the current filters.`}
+            hint="Request search updates after a short pause."
+            onReset={resetRequestFilters}
+            resetDisabled={!hasRequestFilters}
+            resetTestId="upgrade-reset-filters-button"
+          />
         </article>
 
         {loading && requests.length === 0 ? (

@@ -77,6 +77,13 @@ a {
   flex-wrap: wrap;
 }
 
+.secondaryButton {
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+  background: #f8f9fb;
+  padding: 10px 14px;
+}
+
 .banner {
   margin-bottom: 16px;
   padding: 12px 14px;
@@ -345,6 +352,19 @@ a {
 .formHint {
   color: #666;
   font-size: 14px;
+}
+
+.adminFilterFooter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.adminFilterCopy {
+  display: grid;
+  gap: 4px;
 }
 
 .fieldHint {
