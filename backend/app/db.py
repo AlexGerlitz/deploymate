@@ -9,6 +9,11 @@ from typing import Any
 import psycopg
 from fastapi import HTTPException
 
+from app.services.server_credentials import (
+    ServerCredentialCryptoError,
+    encrypt_server_credential,
+    server_credentials_encryption_enabled,
+)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -264,6 +269,7 @@ def init_db() -> None:
             cur.execute(alter_templates_add_updated_at_sql)
             cur.execute(alter_templates_add_last_used_at_sql)
             cur.execute(alter_templates_add_use_count_sql)
+            _migrate_server_credentials_in_place(cur)
         conn.commit()
 
     ensure_default_user()
@@ -599,10 +605,48 @@ def insert_server(server_record: dict[str, Any]) -> None:
     );
     """
 
+    prepared_record = {
+        **server_record,
+        "password": _encrypt_server_credential_value(server_record.get("password")),
+        "ssh_key": _encrypt_server_credential_value(server_record.get("ssh_key")),
+    }
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(insert_sql, server_record)
+            cur.execute(insert_sql, prepared_record)
         conn.commit()
+
+
+def _encrypt_server_credential_value(value: str | None) -> str | None:
+    try:
+        return encrypt_server_credential(value)
+    except ServerCredentialCryptoError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+def _migrate_server_credentials_in_place(cur: psycopg.Cursor) -> None:
+    if not server_credentials_encryption_enabled():
+        return
+
+    cur.execute("SELECT id, password, ssh_key FROM servers;")
+    rows = cur.fetchall()
+    for row in rows:
+        server_id, password, ssh_key = row
+        encrypted_password = _encrypt_server_credential_value(password)
+        encrypted_ssh_key = _encrypt_server_credential_value(ssh_key)
+
+        if encrypted_password == password and encrypted_ssh_key == ssh_key:
+            continue
+
+        cur.execute(
+            """
+            UPDATE servers
+            SET password = %s,
+                ssh_key = %s
+            WHERE id = %s;
+            """,
+            (encrypted_password, encrypted_ssh_key, server_id),
+        )
 
 
 def list_servers() -> list[dict[str, Any]]:

@@ -195,6 +195,7 @@ This project is production-usable, but still intentionally closer to a strong MV
 Current strengths:
 
 - user passwords are hashed
+- server SSH credentials are encrypted at rest when persisted by the application
 - admin audit trail exists for user and upgrade actions
 - restore flow is dry-run only
 - SSH host key checking now defaults to `accept-new` instead of `no`
@@ -204,7 +205,7 @@ Current strengths:
 
 Current tradeoffs:
 
-- server credentials are still stored by the application to support remote deployment workflows
+- server credentials are still application-managed and require a stable `DEPLOYMATE_SERVER_CREDENTIALS_KEY`
 - local Docker control is still available as an opt-in capability when explicitly enabled
 - legacy password-based SSH records may still exist until they are rotated to SSH keys
 - local Docker control and remote SSH control still live in the same backend service boundary

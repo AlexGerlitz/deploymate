@@ -9,6 +9,7 @@ from shutil import which
 
 from fastapi import HTTPException
 
+from app.services.server_credentials import ServerCredentialCryptoError, decrypt_server_credential
 
 def build_container_name(request_name: Optional[str], deployment_id: str) -> str:
     if request_name:
@@ -90,21 +91,26 @@ def _build_ssh_base_command(server: dict) -> list[str]:
 def _run_remote_command(server: dict, command: List[str]) -> subprocess.CompletedProcess:
     ssh_command: List[str] = []
     temp_key_path = None
+    try:
+        password = decrypt_server_credential(server.get("password"))
+        ssh_key = decrypt_server_credential(server.get("ssh_key"))
+    except ServerCredentialCryptoError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     if server["auth_type"] == "password":
-        if not server.get("password"):
+        if not password:
             raise HTTPException(status_code=400, detail="Password is required for this server.")
         if which("sshpass") is None:
             raise HTTPException(
                 status_code=500,
                 detail="sshpass is required for password-based SSH servers.",
             )
-        ssh_command.extend(["sshpass", "-p", server["password"]])
+        ssh_command.extend(["sshpass", "-p", password])
     elif server["auth_type"] == "ssh_key":
-        if not server.get("ssh_key"):
+        if not ssh_key:
             raise HTTPException(status_code=400, detail="SSH key is required for this server.")
         with tempfile.NamedTemporaryFile("w", delete=False) as temp_key:
-            temp_key.write(server["ssh_key"])
+            temp_key.write(ssh_key)
             temp_key_path = temp_key.name
         os.chmod(temp_key_path, 0o600)
     else:
