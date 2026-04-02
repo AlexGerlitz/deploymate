@@ -13,11 +13,17 @@ function isProtectedPath(pathname) {
 
 
 export function middleware(request) {
+  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+
+  if (request.nextUrl.pathname === "/") {
+    return NextResponse.redirect(new URL(sessionCookie ? "/app" : "/login", request.url));
+  }
+
   if (!isProtectedPath(request.nextUrl.pathname)) {
     return NextResponse.next();
   }
 
-  if (request.cookies.get(SESSION_COOKIE_NAME)?.value) {
+  if (sessionCookie) {
     return NextResponse.next();
   }
 
@@ -30,5 +36,5 @@ export function middleware(request) {
 
 
 export const config = {
-  matcher: ["/app/:path*", "/deployments/:path*", "/change-password"],
+  matcher: ["/", "/app/:path*", "/deployments/:path*", "/change-password"],
 };
