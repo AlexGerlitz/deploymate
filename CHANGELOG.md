@@ -15,6 +15,7 @@ Highlights:
 - added dedicated frontend admin-interactions smoke coverage for saved views and bulk-action surfaces on admin pages
 - improved restore dry-run reporting with digest copy, issues CSV export, and attention overview cards
 - added dedicated frontend restore-report smoke coverage for backup / restore validation workflows
+- improved deployment detail ergonomics with quick overview cards, attention surface, and copyable runtime summary
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface

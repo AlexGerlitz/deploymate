@@ -118,6 +118,83 @@ function buildDeploymentUrl(deployment) {
   return `http://${deployment.server_host}:${deployment.external_port}`;
 }
 
+function buildAttentionItems(deployment, health, diagnostics) {
+  const items = [];
+
+  if (deployment?.error) {
+    items.push({
+      key: "deployment-error",
+      label: "Deployment error",
+      status: "error",
+      message: deployment.error,
+    });
+  }
+
+  if (health?.status && health.status !== "healthy") {
+    items.push({
+      key: "health-status",
+      label: "Health check",
+      status: health.status === "unavailable" ? "warn" : "error",
+      message: health.error || `Current health status is ${health.status}.`,
+    });
+  }
+
+  if (diagnostics?.activity?.recent_failure_titles?.length > 0) {
+    items.push({
+      key: "recent-failures",
+      label: "Recent failures",
+      status: "error",
+      message: diagnostics.activity.recent_failure_titles.join(" | "),
+    });
+  }
+
+  for (const item of diagnostics?.items || []) {
+    if (item.status && item.status !== "ok") {
+      items.push({
+        key: `diagnostic-${item.key}`,
+        label: item.label,
+        status: item.status === "warn" ? "warn" : "error",
+        message: item.summary || item.details || "Diagnostics attention needed.",
+      });
+    }
+  }
+
+  return items;
+}
+
+function buildRuntimeSummaryText(deployment, health, diagnostics, activity) {
+  if (!deployment) {
+    return "";
+  }
+
+  const lines = [
+    `Deployment ${deployment.id}`,
+    `Status: ${deployment.status || "unknown"}`,
+    `Image: ${deployment.image || "n/a"}`,
+    `Container: ${deployment.container_name || "n/a"}`,
+    `Server: ${
+      deployment.server_name && deployment.server_host
+        ? `${deployment.server_name} (${deployment.server_host})`
+        : "Local"
+    }`,
+    `URL: ${buildDeploymentUrl(deployment) || "n/a"}`,
+    `Ports: ${deployment.internal_port || "-"} -> ${deployment.external_port || "-"}`,
+    `Health: ${health?.status || "unknown"}${
+      health?.response_time_ms || health?.response_time_ms === 0
+        ? ` in ${health.response_time_ms} ms`
+        : ""
+    }`,
+    `Diagnostics target: ${diagnostics?.server_target || "n/a"}`,
+    `Activity events: ${Array.isArray(activity) ? activity.length : 0}`,
+  ];
+
+  if (diagnostics?.activity?.last_event_title) {
+    lines.push(`Last event: ${diagnostics.activity.last_event_title}`);
+  }
+
+  return lines.join("\n");
+}
+
 function formatSuggestedPorts(ports) {
   if (!Array.isArray(ports) || ports.length === 0) {
     return "";
@@ -199,6 +276,14 @@ export default function DeploymentDetailsPage({ params }) {
     external_port: "",
   });
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
+  const deploymentUrl = buildDeploymentUrl(deployment);
+  const attentionItems = buildAttentionItems(deployment, health, diagnostics);
+  const runtimeSummaryText = buildRuntimeSummaryText(
+    deployment,
+    health,
+    diagnostics,
+    activity,
+  );
 
   async function loadDeploymentDiagnostics() {
     setDiagnosticsLoading(true);
@@ -671,21 +756,25 @@ export default function DeploymentDetailsPage({ params }) {
                 : deploymentId}
             </p>
           </div>
-          <div className="buttonRow">
+          <div className="buttonRow" data-testid="runtime-detail-header-actions">
             <Link href="/app" className="linkButton">
               Back
             </Link>
-            {buildDeploymentUrl(deployment) ? (
+            {deploymentUrl ? (
               <a
-                href={buildDeploymentUrl(deployment)}
+                href={deploymentUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="linkButton"
+                data-testid="runtime-detail-open-app-button"
               >
                 Open app
               </a>
             ) : null}
-            <button type="button" onClick={() => loadDeploymentDetails()} disabled={loading}>
+            <button type="button" onClick={() => copyText(runtimeSummaryText, "Runtime summary")} disabled={!runtimeSummaryText} data-testid="runtime-detail-copy-summary-button">
+              Copy summary
+            </button>
+            <button type="button" onClick={() => loadDeploymentDetails()} disabled={loading} data-testid="runtime-detail-refresh-button">
               {loading ? "Refreshing..." : "Refresh"}
             </button>
             <button type="button" onClick={handleLogout}>
@@ -731,6 +820,16 @@ export default function DeploymentDetailsPage({ params }) {
         </div>
 
         {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
+
+        {attentionItems.length > 0 ? (
+          <div className="banner error" data-testid="runtime-detail-attention-banner">
+            {attentionItems.length} runtime attention item{attentionItems.length === 1 ? "" : "s"} need review.
+          </div>
+        ) : (
+          <div className="banner subtle" data-testid="runtime-detail-attention-banner">
+            No active runtime warnings right now.
+          </div>
+        )}
 
         <article className="card formCard">
           <h2>Save as template</h2>
@@ -887,6 +986,45 @@ export default function DeploymentDetailsPage({ params }) {
 
         {deployment ? (
           <>
+            <div className="overviewGrid" data-testid="runtime-detail-overview-grid">
+              <div className="overviewCard" data-testid="runtime-detail-endpoint-card">
+                <span className="overviewLabel">Endpoint</span>
+                <strong className="overviewValue">{deploymentUrl || "No public URL"}</strong>
+                <div className="overviewMeta">
+                  <span>Internal {deployment.internal_port || "-"}</span>
+                  <span>External {deployment.external_port || "-"}</span>
+                </div>
+              </div>
+              <div className="overviewCard" data-testid="runtime-detail-runtime-card">
+                <span className="overviewLabel">Runtime</span>
+                <strong className="overviewValue">{deployment.container_name || "Container pending"}</strong>
+                <div className="overviewMeta">
+                  <span>Status {deployment.status || "unknown"}</span>
+                  <span>Server {deployment.server_name || "Local"}</span>
+                </div>
+              </div>
+              <div className="overviewCard" data-testid="runtime-detail-health-overview-card">
+                <span className="overviewLabel">Health</span>
+                <strong className="overviewValue">{health?.status || "unknown"}</strong>
+                <div className="overviewMeta">
+                  <span>Checked {formatDate(health?.checked_at)}</span>
+                  <span>
+                    {health?.response_time_ms || health?.response_time_ms === 0
+                      ? `${health.response_time_ms} ms`
+                      : "No latency yet"}
+                  </span>
+                </div>
+              </div>
+              <div className="overviewCard" data-testid="runtime-detail-attention-card">
+                <span className="overviewLabel">Attention</span>
+                <strong className="overviewValue">{attentionItems.length}</strong>
+                <div className="overviewMeta">
+                  <span>Errors {attentionItems.filter((item) => item.status === "error").length}</span>
+                  <span>Warnings {attentionItems.filter((item) => item.status === "warn").length}</span>
+                </div>
+              </div>
+            </div>
+
             <article className="card" data-testid="runtime-detail-summary-card">
               <div className="row">
                 <span className="label">Status</span>
@@ -914,6 +1052,21 @@ export default function DeploymentDetailsPage({ params }) {
                 <span>{deployment.container_name || "N/A"}</span>
               </div>
               <div className="row">
+                <span className="label">Container ID</span>
+                <span className="valueWithActions">
+                  <span>{deployment.container_id || "N/A"}</span>
+                  {deployment.container_id ? (
+                    <button
+                      type="button"
+                      className="smallButton"
+                      onClick={() => copyText(deployment.container_id, "Container ID")}
+                    >
+                      Copy
+                    </button>
+                  ) : null}
+                </span>
+              </div>
+              <div className="row">
                 <span className="label">Server</span>
                 <span>
                   {deployment.server_name
@@ -930,22 +1083,26 @@ export default function DeploymentDetailsPage({ params }) {
                 <span>{deployment.error || "-"}</span>
               </div>
               <div className="row">
+                <span className="label">Ports</span>
+                <span>{deployment.internal_port || "-"} {"->"} {deployment.external_port || "-"}</span>
+              </div>
+              <div className="row">
                 <span className="label">URL</span>
                 <span className="valueWithActions">
-                  {buildDeploymentUrl(deployment) ? (
+                  {deploymentUrl ? (
                     <>
                       <a
-                        href={buildDeploymentUrl(deployment)}
+                        href={deploymentUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="inlineLink"
                       >
-                        {buildDeploymentUrl(deployment)}
+                        {deploymentUrl}
                       </a>
                       <button
                         type="button"
                         className="smallButton"
-                        onClick={() => copyText(buildDeploymentUrl(deployment), "URL")}
+                        onClick={() => copyText(deploymentUrl, "URL")}
                       >
                         Copy
                       </button>
@@ -987,6 +1144,82 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
+            <article className="card" data-testid="runtime-detail-quick-reference-card">
+              <div className="sectionHeader">
+                <h2 data-testid="runtime-detail-quick-reference-title">Quick reference</h2>
+              </div>
+              <div className="row">
+                <span className="label">Runtime summary</span>
+                <span className="valueWithActions">
+                  <span>Copyable deployment snapshot for incidents and handoff.</span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeSummaryText, "Runtime summary")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row">
+                <span className="label">Diagnostics target</span>
+                <span className="valueWithActions">
+                  <span>{diagnostics?.server_target || "N/A"}</span>
+                  {diagnostics?.server_target ? (
+                    <button
+                      type="button"
+                      className="smallButton"
+                      onClick={() => copyText(diagnostics.server_target, "Diagnostics target")}
+                    >
+                      Copy
+                    </button>
+                  ) : null}
+                </span>
+              </div>
+              <div className="row">
+                <span className="label">Suggested ports</span>
+                <span>{suggestedPorts.length > 0 ? formatSuggestedPorts(suggestedPorts) : "-"}</span>
+              </div>
+              <div className="row">
+                <span className="label">Activity heartbeat</span>
+                <span>
+                  {diagnostics?.activity?.last_event_title
+                    ? `${diagnostics.activity.last_event_title} · ${formatDate(diagnostics.activity.last_event_at)}`
+                    : "No activity heartbeat yet."}
+                </span>
+              </div>
+            </article>
+
+            <article className="card" data-testid="runtime-detail-attention-list-card">
+              <div className="sectionHeader">
+                <h2 data-testid="runtime-detail-attention-list-title">Attention items</h2>
+              </div>
+              {attentionItems.length === 0 ? (
+                <div className="empty" data-testid="runtime-detail-attention-empty-state">
+                  No runtime warnings or failures are active.
+                </div>
+              ) : (
+                <div className="overviewAttentionList" data-testid="runtime-detail-attention-list">
+                  {attentionItems.map((item) => (
+                    <div className="overviewAttentionItem" key={item.key}>
+                      <div className="row">
+                        <span className="label">Area</span>
+                        <span>{item.label}</span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Severity</span>
+                        <span className={`status ${item.status}`}>{item.status}</span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Message</span>
+                        <span>{item.message}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+
             <article className="card" data-testid="runtime-detail-diagnostics-card">
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-diagnostics-title">Diagnostics</h2>
@@ -1016,6 +1249,17 @@ export default function DeploymentDetailsPage({ params }) {
                       {diagnostics.activity.total_events} events,{" "}
                       {diagnostics.activity.error_events} errors,{" "}
                       {diagnostics.activity.success_events} successes
+                    </span>
+                  </div>
+                  <div className="backupSummaryBadges" data-testid="runtime-detail-diagnostics-badges">
+                    <span className="status healthy">
+                      success {diagnostics.activity.success_events}
+                    </span>
+                    <span className="status warn">
+                      recent failures {diagnostics.activity.recent_failure_count}
+                    </span>
+                    <span className="status unknown">
+                      total {diagnostics.activity.total_events}
                     </span>
                   </div>
                   <div className="diagnosticsGrid">
