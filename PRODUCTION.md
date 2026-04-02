@@ -32,5 +32,6 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 - Remote server deployments over SSH still require reachable target hosts and valid SSH credentials stored in DeployMate.
 - SSH host key handling is configurable through `DEPLOYMATE_SSH_HOST_KEY_CHECKING`. The safer default is now `accept-new`. Use `yes` for pinned host keys or `no` only for throwaway lab environments.
 - When `DEPLOYMATE_SSH_HOST_KEY_CHECKING=yes`, `DEPLOYMATE_SSH_KNOWN_HOSTS_FILE` must point to an existing non-empty `known_hosts` file or remote SSH actions will fail fast.
+- Use `bash scripts/prepare_known_hosts.sh --host <host> --port <port>` to populate a pinned `known_hosts` file before switching production to strict host checking.
 - Optionally set `DEPLOYMATE_SSH_KNOWN_HOSTS_FILE` to a persistent path if the backend container should retain known hosts across restarts.
 - Set `DEPLOYMATE_LOCAL_DOCKER_ENABLED=true` only if you intentionally want local-on-host Docker control and have reviewed the extra security tradeoff.

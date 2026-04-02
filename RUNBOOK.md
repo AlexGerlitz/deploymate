@@ -35,6 +35,14 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 # store the value in .env.production as DEPLOYMATE_SERVER_CREDENTIALS_KEY
 ```
 
+Before switching SSH host verification to strict pinned mode:
+
+```bash
+bash scripts/prepare_known_hosts.sh --host <target-host> --port 22
+# store the resulting path in .env.production as DEPLOYMATE_SSH_KNOWN_HOSTS_FILE
+# then set DEPLOYMATE_SSH_HOST_KEY_CHECKING=yes
+```
+
 Do not rotate `DEPLOYMATE_SERVER_CREDENTIALS_KEY` casually. Existing stored server credentials depend on it for decryption.
 
 ## Frontend-only deploy
