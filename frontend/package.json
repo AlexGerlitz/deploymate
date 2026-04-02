@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "smoke:admin": "bash ../scripts/frontend_admin_smoke.sh"
   },
   "dependencies": {
     "next": "^15.3.6",

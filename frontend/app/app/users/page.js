@@ -6,6 +6,47 @@ import { useEffect, useState } from "react";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
+const smokeUser = {
+  id: "smoke-admin",
+  username: "smoke-admin",
+  is_admin: true,
+  role: "admin",
+  plan: "team",
+};
+const smokeUsers = [
+  {
+    id: "smoke-admin",
+    username: "smoke-admin",
+    role: "admin",
+    plan: "team",
+    must_change_password: false,
+    created_at: "2026-04-02T00:00:00Z",
+  },
+];
+const smokeAdminOverview = {
+  users: {
+    total: 1,
+    admins: 1,
+    members: 0,
+    trial: 0,
+    solo: 0,
+    team: 1,
+    must_change_password: 0,
+  },
+  attention_items: [],
+};
+const smokeAuditEvents = [
+  {
+    id: "smoke-audit-1",
+    action_type: "user.created",
+    actor_username: "smoke-admin",
+    target_type: "user",
+    target_label: "smoke-admin",
+    details: "Smoke test event",
+    created_at: "2026-04-02T00:05:00Z",
+  },
+];
 
 function formatDate(value) {
   if (!value) {
@@ -108,15 +149,15 @@ function buildRestoreDryRunCsv(report) {
 
 export default function UsersPage() {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [adminOverview, setAdminOverview] = useState(null);
-  const [auditEvents, setAuditEvents] = useState([]);
+  const [authChecked, setAuthChecked] = useState(smokeMode);
+  const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
+  const [users, setUsers] = useState(smokeMode ? smokeUsers : []);
+  const [adminOverview, setAdminOverview] = useState(smokeMode ? smokeAdminOverview : null);
+  const [auditEvents, setAuditEvents] = useState(smokeMode ? smokeAuditEvents : []);
   const [backupBundleText, setBackupBundleText] = useState("");
   const [restoreDryRun, setRestoreDryRun] = useState(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
@@ -206,6 +247,9 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
     async function checkAuthAndLoad() {
       try {
         const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -535,6 +579,9 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       setDebouncedQuery(query);
     }, 250);
@@ -542,6 +589,9 @@ export default function UsersPage() {
   }, [query]);
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       setDebouncedAuditQuery(auditQuery);
     }, 250);
@@ -549,14 +599,14 @@ export default function UsersPage() {
   }, [auditQuery]);
 
   useEffect(() => {
-    if (!authChecked || accessDenied) {
+    if (smokeMode || !authChecked || accessDenied) {
       return;
     }
     loadUsers();
   }, [authChecked, accessDenied, debouncedQuery, roleFilter, planFilter, mustChangeFilter]);
 
   useEffect(() => {
-    if (!authChecked || accessDenied) {
+    if (smokeMode || !authChecked || accessDenied) {
       return;
     }
     loadAuditEvents();
@@ -597,7 +647,7 @@ export default function UsersPage() {
       <div className="container">
         <div className="header">
           <div>
-            <h1>Users</h1>
+            <h1 data-testid="users-page-title">Users</h1>
             <p>{currentUser ? `Admin users management · ${currentUser.username}` : "Users"}</p>
           </div>
           <div className="buttonRow">
@@ -730,7 +780,7 @@ export default function UsersPage() {
         <article className="card formCard">
           <div className="sectionHeader">
             <div>
-              <h2>Backup and restore dry run</h2>
+              <h2 data-testid="backup-panel-title">Backup and restore dry run</h2>
               <p className="formHint">
                 Export a full admin backup bundle, then validate a restore bundle without applying any changes.
               </p>
@@ -750,10 +800,20 @@ export default function UsersPage() {
             <button type="button" onClick={handleClearBundle} disabled={!backupBundleText.trim()}>
               Clear bundle
             </button>
-            <button type="button" onClick={handleRunRestoreDryRun} disabled={restoreLoading || !backupBundleText.trim()}>
+            <button
+              type="button"
+              data-testid="restore-dry-run-button"
+              onClick={handleRunRestoreDryRun}
+              disabled={restoreLoading || !backupBundleText.trim()}
+            >
               {restoreLoading ? "Validating..." : "Run restore dry-run"}
             </button>
-            <button type="button" onClick={handleDownloadRestoreReportJson} disabled={!restoreDryRun}>
+            <button
+              type="button"
+              data-testid="restore-report-json-button"
+              onClick={handleDownloadRestoreReportJson}
+              disabled={!restoreDryRun}
+            >
               Report JSON
             </button>
             <button type="button" onClick={handleDownloadRestoreReportCsv} disabled={!restoreDryRun}>

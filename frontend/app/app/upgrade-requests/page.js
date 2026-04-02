@@ -6,6 +6,57 @@ import { useEffect, useState } from "react";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
+const smokeUser = {
+  id: "smoke-admin",
+  username: "smoke-admin",
+  is_admin: true,
+  role: "admin",
+  plan: "team",
+};
+const smokeRequests = [
+  {
+    id: "smoke-request-1",
+    status: "in_review",
+    name: "Smoke Team",
+    email: "ops@example.com",
+    company_or_team: "Smoke Team",
+    use_case: "Smoke validation",
+    current_plan: "trial",
+    handled_by_username: "smoke-admin",
+    target_username: "smoke-admin",
+    target_user_id: "smoke-admin",
+    reviewed_at: "2026-04-02T00:05:00Z",
+    updated_at: "2026-04-02T00:05:00Z",
+    created_at: "2026-04-02T00:00:00Z",
+    internal_note: "Smoke test note",
+  },
+];
+const smokeOverview = {
+  upgrade_requests: {
+    total: 1,
+    new: 0,
+    in_review: 1,
+    approved: 0,
+    rejected: 0,
+    closed: 0,
+    linked_users: 1,
+  },
+  attention_items: [],
+};
+const smokeAuditEvents = [
+  {
+    id: "smoke-upgrade-audit-1",
+    action_type: "upgrade_request.updated",
+    actor_username: "smoke-admin",
+    target_label: "Smoke Team",
+    details: "Smoke test event",
+    created_at: "2026-04-02T00:06:00Z",
+  },
+];
+const smokeUsers = [
+  { id: "smoke-admin", username: "smoke-admin", plan: "team" },
+];
 
 function formatDate(value) {
   if (!value) {
@@ -52,13 +103,13 @@ function triggerFileDownload(filename, blob) {
 
 export default function UpgradeRequestsPage() {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [requests, setRequests] = useState([]);
-  const [adminOverview, setAdminOverview] = useState(null);
-  const [auditEvents, setAuditEvents] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(smokeMode);
+  const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
+  const [requests, setRequests] = useState(smokeMode ? smokeRequests : []);
+  const [adminOverview, setAdminOverview] = useState(smokeMode ? smokeOverview : null);
+  const [auditEvents, setAuditEvents] = useState(smokeMode ? smokeAuditEvents : []);
+  const [users, setUsers] = useState(smokeMode ? smokeUsers : []);
+  const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
   const [query, setQuery] = useState("");
@@ -219,6 +270,9 @@ export default function UpgradeRequestsPage() {
   }
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
     async function checkAuthAndLoad() {
       try {
         const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -245,6 +299,9 @@ export default function UpgradeRequestsPage() {
   }, [router]);
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       setDebouncedQuery(query);
     }, 250);
@@ -252,6 +309,9 @@ export default function UpgradeRequestsPage() {
   }, [query]);
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       setDebouncedAuditQuery(auditQuery);
     }, 250);
@@ -259,14 +319,14 @@ export default function UpgradeRequestsPage() {
   }, [auditQuery]);
 
   useEffect(() => {
-    if (!authChecked || accessDenied) {
+    if (smokeMode || !authChecked || accessDenied) {
       return;
     }
     loadRequests();
   }, [authChecked, accessDenied, debouncedQuery, planFilter, statusFilter, linkedOnly]);
 
   useEffect(() => {
-    if (!authChecked || accessDenied) {
+    if (smokeMode || !authChecked || accessDenied) {
       return;
     }
     loadAuditEvents();
@@ -328,7 +388,7 @@ export default function UpgradeRequestsPage() {
       <div className="container">
         <div className="header">
           <div>
-            <h1>Upgrade Requests</h1>
+            <h1 data-testid="upgrade-requests-page-title">Upgrade Requests</h1>
             <p>{currentUser ? `Admin inbox · ${currentUser.username}` : "Admin inbox"}</p>
           </div>
           <div className="buttonRow">
