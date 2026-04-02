@@ -129,6 +129,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - tracked-file security audit in [scripts/security_audit.sh](scripts/security_audit.sh)
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
 - dedicated admin frontend smoke in [scripts/frontend_admin_smoke.sh](scripts/frontend_admin_smoke.sh)
+- dedicated runtime frontend smoke in [scripts/frontend_runtime_smoke.sh](scripts/frontend_runtime_smoke.sh)
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)
 
@@ -179,6 +180,7 @@ Typical release flow:
 ```bash
 ./scripts/preflight.sh
 npm --prefix frontend run smoke:admin
+npm --prefix frontend run smoke:runtime
 npm --prefix frontend run build
 git push origin develop
 ssh <deploy-host>

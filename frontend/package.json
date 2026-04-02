@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "smoke:admin": "bash ../scripts/frontend_admin_smoke.sh"
+    "smoke:admin": "bash ../scripts/frontend_admin_smoke.sh",
+    "smoke:runtime": "bash ../scripts/frontend_runtime_smoke.sh"
   },
   "dependencies": {
     "next": "^15.3.6",

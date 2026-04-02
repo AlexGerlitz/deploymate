@@ -43,6 +43,7 @@ Local:
 
 ```bash
 npm --prefix frontend run smoke:admin
+npm --prefix frontend run smoke:runtime
 npm --prefix frontend run build
 git status --short
 git add frontend
@@ -135,6 +136,24 @@ DEPLOYMATE_ADMIN_PASSWORD='<secret>' \
 bash scripts/post_deploy_smoke.sh
 ```
 
+Optional runtime coverage can be enabled when you want the smoke to create and remove a real test deployment:
+
+```bash
+DEPLOYMATE_BASE_URL=https://your-domain \
+DEPLOYMATE_ADMIN_USERNAME=admin \
+DEPLOYMATE_ADMIN_PASSWORD='<secret>' \
+DEPLOYMATE_SMOKE_RUNTIME_ENABLED=1 \
+DEPLOYMATE_SMOKE_SERVER_ID='<server-id>' \
+bash scripts/post_deploy_smoke.sh
+```
+
+Runtime smoke notes:
+
+- if `DEPLOYMATE_SMOKE_SERVER_ID` is set, the script asks `/servers/{server_id}/suggested-ports` for a free external port
+- if `DEPLOYMATE_SMOKE_SERVER_ID` is not set, provide `DEPLOYMATE_SMOKE_EXTERNAL_PORT` explicitly
+- production can keep runtime smoke disabled when running in remote-only mode without a preconfigured smoke target
+- the script always attempts to delete the temporary smoke deployment before exit
+
 The scripted smoke currently validates:
 
 - `/login`
@@ -144,6 +163,7 @@ The scripted smoke currently validates:
 - `/api/auth/me`
 - backup bundle download
 - restore dry-run
+- optional create -> health -> diagnostics -> logs -> activity -> delete deployment flow
 - logout and session invalidation
 
 ## Backup and restore dry-run

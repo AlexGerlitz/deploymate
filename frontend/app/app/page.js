@@ -6,8 +6,123 @@ import { useEffect, useState } from "react";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
 const localDeploymentsEnabled =
   process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
+const smokeUser = {
+  id: "smoke-admin",
+  username: "smoke-admin",
+  is_admin: true,
+  role: "admin",
+  plan: "team",
+  limits: {
+    max_servers: 10,
+    max_deployments: 100,
+  },
+  usage: {
+    servers: 1,
+    deployments: 1,
+  },
+};
+const smokeDeployments = [
+  {
+    id: "smoke-deployment",
+    status: "running",
+    image: "nginx:alpine",
+    container_name: "smoke-runtime",
+    container_id: "container-smoke-1",
+    created_at: "2026-04-02T00:00:00Z",
+    error: null,
+    internal_port: 80,
+    external_port: 38080,
+    server_id: "smoke-server",
+    server_name: "Smoke VPS",
+    server_host: "smoke.example.com",
+    env: {
+      DEPLOYMATE_SMOKE: "1",
+    },
+  },
+];
+const smokeServers = [
+  {
+    id: "smoke-server",
+    name: "Smoke VPS",
+    host: "smoke.example.com",
+    port: 22,
+    username: "deploy",
+    auth_type: "ssh_key",
+    created_at: "2026-04-02T00:00:00Z",
+  },
+];
+const smokeNotifications = [
+  {
+    id: "smoke-notification-1",
+    deployment_id: "smoke-deployment",
+    level: "success",
+    title: "Deployment succeeded",
+    message: "Deployment smoke-deployment is running in container smoke-runtime.",
+    created_at: "2026-04-02T00:01:00Z",
+  },
+];
+const smokeTemplates = [
+  {
+    id: "smoke-template",
+    template_name: "Smoke template",
+    image: "nginx:alpine",
+    name: "smoke-runtime",
+    internal_port: 80,
+    external_port: 38080,
+    server_id: "smoke-server",
+    server_name: "Smoke VPS",
+    server_host: "smoke.example.com",
+    env: {
+      DEPLOYMATE_SMOKE: "1",
+    },
+    created_at: "2026-04-02T00:00:00Z",
+    updated_at: "2026-04-02T00:00:00Z",
+    last_used_at: "2026-04-02T00:00:00Z",
+    use_count: 1,
+  },
+];
+const smokeOpsOverview = {
+  generated_at: "2026-04-02T00:02:00Z",
+  user: {
+    username: "smoke-admin",
+    plan: "team",
+    role: "admin",
+  },
+  deployments: {
+    total: 1,
+    running: 1,
+    failed: 0,
+    pending: 0,
+    local: 0,
+    remote: 1,
+    exposed: 1,
+    public_urls: 1,
+  },
+  servers: {
+    total: 1,
+    password_auth: 0,
+    ssh_key_auth: 1,
+    unused: 0,
+  },
+  notifications: {
+    total: 1,
+    success: 1,
+    error: 0,
+    latest_error_title: null,
+    latest_error_at: null,
+  },
+  templates: {
+    total: 1,
+    unused: 0,
+    recently_used: 1,
+    top_template_name: "Smoke template",
+    top_template_use_count: 1,
+  },
+  attention_items: [],
+};
 
 function formatDate(value) {
   if (!value) {
@@ -369,18 +484,18 @@ function triggerFileDownload(filename, blob) {
 
 export default function HomePage() {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
+  const [authChecked, setAuthChecked] = useState(smokeMode);
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
 
-  const [deployments, setDeployments] = useState([]);
-  const [servers, setServers] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [serversLoading, setServersLoading] = useState(true);
-  const [notificationsLoading, setNotificationsLoading] = useState(true);
-  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [deployments, setDeployments] = useState(smokeMode ? smokeDeployments : []);
+  const [servers, setServers] = useState(smokeMode ? smokeServers : []);
+  const [notifications, setNotifications] = useState(smokeMode ? smokeNotifications : []);
+  const [templates, setTemplates] = useState(smokeMode ? smokeTemplates : []);
+  const [loading, setLoading] = useState(!smokeMode);
+  const [serversLoading, setServersLoading] = useState(!smokeMode);
+  const [notificationsLoading, setNotificationsLoading] = useState(!smokeMode);
+  const [templatesLoading, setTemplatesLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [serversError, setServersError] = useState("");
   const [notificationsError, setNotificationsError] = useState("");
@@ -427,8 +542,8 @@ export default function HomePage() {
   const [editingTemplateId, setEditingTemplateId] = useState("");
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
-  const [opsOverview, setOpsOverview] = useState(null);
-  const [opsOverviewLoading, setOpsOverviewLoading] = useState(true);
+  const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeOpsOverview : null);
+  const [opsOverviewLoading, setOpsOverviewLoading] = useState(!smokeMode);
   const [opsActionMessage, setOpsActionMessage] = useState("");
   const [opsActionError, setOpsActionError] = useState("");
 
@@ -802,6 +917,9 @@ export default function HomePage() {
   }
 
   async function refreshPage(silent = false) {
+    if (smokeMode) {
+      return;
+    }
     await Promise.all([
       loadCurrentUser(),
       loadDeployments(silent),
@@ -813,6 +931,10 @@ export default function HomePage() {
   }
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
+
     async function checkAuthAndLoad() {
       try {
         await loadCurrentUser();
@@ -828,7 +950,7 @@ export default function HomePage() {
   }, [router]);
 
   useEffect(() => {
-    if (authChecked) {
+    if (smokeMode || authChecked) {
       return;
     }
 
@@ -842,7 +964,7 @@ export default function HomePage() {
   }, [authChecked]);
 
   useEffect(() => {
-    if (!authChecked) {
+    if (smokeMode || !authChecked) {
       return;
     }
 
@@ -856,21 +978,21 @@ export default function HomePage() {
   }, [authChecked]);
 
   useEffect(() => {
-    if (!authChecked) {
+    if (smokeMode || !authChecked) {
       return;
     }
     loadDeployments();
   }, [authChecked, deploymentFilter, deploymentQuery]);
 
   useEffect(() => {
-    if (!authChecked) {
+    if (smokeMode || !authChecked) {
       return;
     }
     loadNotifications();
   }, [authChecked, notificationFilter, notificationQuery]);
 
   useEffect(() => {
-    if (!authChecked) {
+    if (smokeMode || !authChecked) {
       return;
     }
     loadTemplates();
@@ -878,6 +1000,12 @@ export default function HomePage() {
 
   useEffect(() => {
     async function loadSuggestedPorts() {
+      if (smokeMode) {
+        setSuggestedPorts([38080, 38081, 38082]);
+        setSuggestedPortsLoading(false);
+        return;
+      }
+
       if (!form.server_id) {
         setSuggestedPorts([]);
         setSuggestedPortsLoading(false);
@@ -1841,7 +1969,7 @@ export default function HomePage() {
       <div className="container">
         <div className="header">
           <div>
-            <h1>DeployMate</h1>
+            <h1 data-testid="runtime-page-title">DeployMate</h1>
             <p>{currentUser ? `Logged in as ${currentUser.username}` : "Deployments"}</p>
           </div>
           <div className="buttonRow">
@@ -1892,6 +2020,12 @@ export default function HomePage() {
         <div className="banner">
           Backend: <code>{apiBaseUrl}</code>
         </div>
+
+        {smokeMode ? (
+          <div className="banner subtle" data-testid="runtime-smoke-banner">
+            Runtime smoke mode uses fixture data for the operations and deployment detail surfaces.
+          </div>
+        ) : null}
 
         {currentUser ? (
           <div className="banner">
@@ -2966,9 +3100,9 @@ export default function HomePage() {
           ) : null}
         </article>
 
-          <div className="sectionHeader deploymentsHeader">
+          <div className="sectionHeader deploymentsHeader" data-testid="runtime-deployments-section">
           <div>
-            <h2>Deployments</h2>
+            <h2 data-testid="runtime-deployments-title">Deployments</h2>
             <p className="formHint">
               Filter current deployments by status or search by image, container, or server.
             </p>
@@ -3011,7 +3145,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="list">
+        <div className="list" data-testid="runtime-deployments-list">
           {loading && deployments.length === 0 ? (
             <div className="empty">Loading deployments...</div>
           ) : null}
@@ -3027,7 +3161,7 @@ export default function HomePage() {
           ) : null}
 
           {filteredDeployments.map((deployment) => (
-            <article className="card" key={deployment.id}>
+            <article className="card" key={deployment.id} data-testid={`runtime-deployment-card-${deployment.id}`}>
               <div className="row">
                 <span className="label">Status</span>
                 <span className={`status ${deployment.status || "unknown"}`}>
@@ -3063,7 +3197,11 @@ export default function HomePage() {
                 <span>{buildDeploymentUrl(deployment) || "-"}</span>
               </div>
               <div className="actions">
-                <Link href={`/deployments/${deployment.id}`} className="linkButton">
+                <Link
+                  href={`/deployments/${deployment.id}`}
+                  className="linkButton"
+                  data-testid={`runtime-deployment-details-link-${deployment.id}`}
+                >
                   View details
                 </Link>
                 {buildDeploymentUrl(deployment) ? (

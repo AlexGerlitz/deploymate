@@ -6,6 +6,97 @@ import { use, useEffect, useState } from "react";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
+const smokeUser = {
+  id: "smoke-admin",
+  username: "smoke-admin",
+  is_admin: true,
+  role: "admin",
+  plan: "team",
+};
+const smokeDeployment = {
+  id: "smoke-deployment",
+  status: "running",
+  image: "nginx:alpine",
+  container_name: "smoke-runtime",
+  container_id: "container-smoke-1",
+  created_at: "2026-04-02T00:00:00Z",
+  error: null,
+  internal_port: 80,
+  external_port: 38080,
+  server_id: "smoke-server",
+  server_name: "Smoke VPS",
+  server_host: "smoke.example.com",
+  env: {
+    DEPLOYMATE_SMOKE: "1",
+  },
+};
+const smokeHealth = {
+  deployment_id: "smoke-deployment",
+  container_name: "smoke-runtime",
+  url: "http://smoke.example.com:38080",
+  status: "healthy",
+  status_code: 200,
+  error: null,
+  checked_at: "2026-04-02T00:03:00Z",
+  response_time_ms: 42,
+};
+const smokeDiagnostics = {
+  deployment_id: "smoke-deployment",
+  container_name: "smoke-runtime",
+  current_status: "running",
+  server_target: "deploy@smoke.example.com:22",
+  checked_at: "2026-04-02T00:03:00Z",
+  url: "http://smoke.example.com:38080",
+  health: smokeHealth,
+  activity: {
+    total_events: 2,
+    success_events: 2,
+    error_events: 0,
+    recent_failure_count: 0,
+    recent_failure_titles: [],
+    last_event_title: "Health check passed",
+    last_event_level: "success",
+    last_event_at: "2026-04-02T00:03:00Z",
+  },
+  log_excerpt: "nginx entered RUNNING state",
+  items: [
+    {
+      key: "deployment_status",
+      label: "Deployment status",
+      status: "ok",
+      summary: "Current status is running.",
+      details: null,
+    },
+    {
+      key: "health",
+      label: "HTTP health",
+      status: "ok",
+      summary: "Health check responded with 200 in 42 ms.",
+      details: "http://smoke.example.com:38080",
+    },
+  ],
+};
+const smokeActivity = [
+  {
+    id: "smoke-activity-1",
+    deployment_id: "smoke-deployment",
+    level: "success",
+    title: "Deployment succeeded",
+    message: "Deployment smoke-deployment is running in container smoke-runtime.",
+    created_at: "2026-04-02T00:01:00Z",
+    category: "deploy",
+  },
+  {
+    id: "smoke-activity-2",
+    deployment_id: "smoke-deployment",
+    level: "success",
+    title: "Health check passed",
+    message: "Deployment responded with HTTP 200.",
+    created_at: "2026-04-02T00:03:00Z",
+    category: "health",
+  },
+];
 
 function formatDate(value) {
   if (!value) {
@@ -76,14 +167,14 @@ async function readJsonOrError(response, fallbackMessage) {
 export default function DeploymentDetailsPage({ params }) {
   const { deploymentId } = use(params);
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [deployment, setDeployment] = useState(null);
-  const [logs, setLogs] = useState("");
-  const [health, setHealth] = useState(null);
-  const [diagnostics, setDiagnostics] = useState(null);
-  const [activity, setActivity] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(smokeMode);
+  const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
+  const [deployment, setDeployment] = useState(smokeMode ? smokeDeployment : null);
+  const [logs, setLogs] = useState(smokeMode ? "nginx entered RUNNING state" : "");
+  const [health, setHealth] = useState(smokeMode ? smokeHealth : null);
+  const [diagnostics, setDiagnostics] = useState(smokeMode ? smokeDiagnostics : null);
+  const [activity, setActivity] = useState(smokeMode ? smokeActivity : []);
+  const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [redeploying, setRedeploying] = useState(false);
@@ -261,6 +352,10 @@ export default function DeploymentDetailsPage({ params }) {
   }
 
   useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
+
     async function checkAuthAndLoad() {
       try {
         const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -280,7 +375,7 @@ export default function DeploymentDetailsPage({ params }) {
   }, [deploymentId, router]);
 
   useEffect(() => {
-    if (!authChecked) {
+    if (smokeMode || !authChecked) {
       return;
     }
 
@@ -295,6 +390,12 @@ export default function DeploymentDetailsPage({ params }) {
 
   useEffect(() => {
     async function loadSuggestedPorts() {
+      if (smokeMode) {
+        setSuggestedPorts([38080, 38081, 38082]);
+        setSuggestedPortsLoading(false);
+        return;
+      }
+
       if (!deployment?.server_id) {
         setSuggestedPorts([]);
         setSuggestedPortsLoading(false);
@@ -563,7 +664,7 @@ export default function DeploymentDetailsPage({ params }) {
       <div className="container">
         <div className="header">
           <div>
-            <h1>Deployment Details</h1>
+            <h1 data-testid="runtime-detail-page-title">Deployment Details</h1>
             <p>
               {currentUser
                 ? `${deploymentId} · ${currentUser.username}`
@@ -618,6 +719,12 @@ export default function DeploymentDetailsPage({ params }) {
         <div className="banner">
           Backend: <code>{apiBaseUrl}</code>
         </div>
+
+        {smokeMode ? (
+          <div className="banner subtle" data-testid="runtime-detail-smoke-banner">
+            Runtime detail smoke mode uses fixture deployment data.
+          </div>
+        ) : null}
 
         <div className="banner subtle">
           Deployment, health, and activity refresh automatically every 8 seconds.
@@ -780,7 +887,7 @@ export default function DeploymentDetailsPage({ params }) {
 
         {deployment ? (
           <>
-            <article className="card">
+            <article className="card" data-testid="runtime-detail-summary-card">
               <div className="row">
                 <span className="label">Status</span>
                 <span className={`status ${deployment.status || "unknown"}`}>
@@ -880,9 +987,9 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
-            <article className="card">
+            <article className="card" data-testid="runtime-detail-diagnostics-card">
               <div className="sectionHeader">
-                <h2>Diagnostics</h2>
+                <h2 data-testid="runtime-detail-diagnostics-title">Diagnostics</h2>
                 <div className="actions">
                   <button
                     type="button"
@@ -975,7 +1082,7 @@ export default function DeploymentDetailsPage({ params }) {
               )}
             </article>
 
-            <article className="card">
+            <article className="card" data-testid="runtime-detail-health-card">
               <div className="row">
                 <span className="label">Health status</span>
                 <span className={`status ${health?.status || "unknown"}`}>
@@ -1021,7 +1128,7 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
-            <article className="card">
+            <article className="card" data-testid="runtime-detail-logs-card">
               <div className="row">
                 <span className="label">Logs</span>
                 <div className="stackedValue">
@@ -1048,9 +1155,9 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
-            <article className="card">
+            <article className="card" data-testid="runtime-detail-activity-card">
               <div className="sectionHeader">
-                <h2>Activity</h2>
+                <h2 data-testid="runtime-detail-activity-title">Activity</h2>
               </div>
 
               {activity.length === 0 ? (
