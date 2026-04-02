@@ -1690,10 +1690,10 @@ function UpgradeRequestsPageContent() {
           <div className="empty" data-testid="upgrade-empty-state">No upgrade requests found for the current filters.</div>
         ) : null}
 
-        <article className="card formCard">
+        <article className="card formCard" data-testid="upgrade-bulk-card">
           <div className="sectionHeader">
             <div>
-              <h2>Bulk inbox actions</h2>
+              <h2 data-testid="upgrade-bulk-title">Bulk inbox actions</h2>
               <p className="formHint">Bulk selection follows the current server-side inbox filters.</p>
               <p className="formHint" data-testid="upgrade-bulk-selection-summary">
                 Selected {selectedRequestIds.length} · Visible {filteredRequests.length}
@@ -2054,7 +2054,7 @@ function UpgradeRequestsPageContent() {
                       "Upgrade request rejected.",
                     )
                   }
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || bulkSaving}
                 >
                   Reject
                 </button>
@@ -2071,7 +2071,7 @@ function UpgradeRequestsPageContent() {
                       "Upgrade request closed.",
                     )
                   }
-                  disabled={savingId === item.id}
+                  disabled={savingId === item.id || bulkSaving}
                 >
                   Close
                 </button>

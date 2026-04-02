@@ -2267,10 +2267,10 @@ function UsersPageContent() {
           </form>
         </article>
 
-        <article className="card formCard">
+        <article className="card formCard" data-testid="users-bulk-card">
           <div className="sectionHeader">
             <div>
-              <h2>Bulk user actions</h2>
+              <h2 data-testid="users-bulk-title">Bulk user actions</h2>
               <p className="formHint">
                 Bulk selection follows the current server-side user filters.
               </p>
