@@ -1907,13 +1907,16 @@ export default function HomePage() {
               </p>
             </div>
             <div className="buttonRow workspaceHeroActions">
+              <Link href="#create-deployment" className="landingButton primaryButton workspacePrimaryAction">
+                Create deployment
+              </Link>
               {currentUser?.is_admin ? (
-                <Link href="/app/users" className="linkButton workspaceSecondaryAction">
+                <Link href="/app/users" className="workspaceGhostAction">
                   Users
                 </Link>
               ) : null}
               {currentUser?.is_admin ? (
-                <Link href="/app/upgrade-requests" className="linkButton workspaceSecondaryAction">
+                <Link href="/app/upgrade-requests" className="workspaceGhostAction">
                   Upgrade inbox
                 </Link>
               ) : null}
@@ -1921,7 +1924,7 @@ export default function HomePage() {
                 type="button"
                 onClick={refreshPage}
                 disabled={loading || serversLoading || notificationsLoading || templatesLoading}
-                className="landingButton primaryButton workspacePrimaryAction"
+                className="linkButton workspaceSecondaryAction"
               >
                 {loading || serversLoading || notificationsLoading || templatesLoading
                   ? "Refreshing..."
@@ -1964,8 +1967,7 @@ export default function HomePage() {
               <span>What matters now</span>
               <strong>{workspacePriority}</strong>
               <p>
-                Exports, diagnostics, rollout history, and admin surfaces are available from this
-                workspace without leaving the dashboard.
+                Start with deployment status and the next rollout. Advanced workspace tools stay available below when needed.
               </p>
             </div>
           </div>
@@ -2032,6 +2034,14 @@ export default function HomePage() {
                 High-signal summary, attention items, and export actions built from the current dashboard state.
               </p>
             </div>
+          </div>
+
+          <AdminDisclosureSection
+            title="Exports and reports"
+            subtitle="Copy the current summary or export deployment, server, template, and activity data when you need a handoff or audit artifact."
+            badge="Reports"
+            testId="ops-overview-exports-disclosure"
+          >
             <div className="actions overviewActionRail" data-testid="ops-overview-actions">
               <button type="button" onClick={handleCopyOpsSummary} data-testid="ops-copy-summary-button">
                 Copy summary
@@ -2088,7 +2098,7 @@ export default function HomePage() {
                 Export activity CSV
               </button>
             </div>
-          </div>
+          </AdminDisclosureSection>
 
           {opsOverviewLoading ? (
             <div className="banner subtle" data-testid="ops-overview-loading-banner">Refreshing server-side operations overview...</div>
@@ -2893,7 +2903,7 @@ export default function HomePage() {
         </article>
         </AdminDisclosureSection>
 
-        <article className="card formCard" data-testid="create-deployment-card">
+        <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
           <h2 data-testid="create-deployment-title">Create deployment</h2>
           {!localDeploymentsEnabled ? (
             <div className="banner subtle">
