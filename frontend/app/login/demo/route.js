@@ -22,7 +22,7 @@ export async function POST(request) {
   const password =
     process.env.DEPLOYMATE_DEMO_PASSWORD ||
     process.env.DEPLOYMATE_ADMIN_PASSWORD ||
-    "";
+    "DeployMateDemo2026";
 
   if (!password) {
     return redirectWithError(request, "Demo access is not configured right now.");
