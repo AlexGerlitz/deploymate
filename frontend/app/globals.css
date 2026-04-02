@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-sans), sans-serif;
 }
 
 * {
@@ -11,6 +11,7 @@ body {
   margin: 0;
   background: #f5f5f5;
   color: #111;
+  font-family: var(--font-sans), sans-serif;
 }
 
 ul {
@@ -738,47 +739,289 @@ code {
 .landingPage {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(255, 209, 102, 0.22), transparent 28%),
-    linear-gradient(180deg, #fffdf8 0%, #f4f6fb 100%);
+    radial-gradient(circle at 0% 0%, rgba(239, 172, 84, 0.24), transparent 24%),
+    radial-gradient(circle at 100% 12%, rgba(22, 101, 52, 0.16), transparent 20%),
+    linear-gradient(180deg, #f8f4eb 0%, #eef2f6 28%, #fbfcfe 100%);
+}
+
+.landingTopbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 16px;
+  backdrop-filter: blur(18px);
+}
+
+.landingTopbarInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 1px solid rgba(28, 37, 54, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 252, 247, 0.72);
+  box-shadow: 0 12px 30px rgba(35, 45, 66, 0.08);
+}
+
+.landingBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.landingBrandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, #1b3c32 0%, #28594a 40%, #f0b55a 100%);
+  color: #fffaf0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.landingBrandText {
+  display: grid;
+  gap: 2px;
+}
+
+.landingBrandText strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 19px;
+  letter-spacing: -0.03em;
+}
+
+.landingBrandSub {
+  color: #5f6675;
+  font-size: 13px;
 }
 
 .landingHero {
-  padding: 40px 16px 24px;
+  padding: 28px 16px 24px;
 }
 
 .landingShell {
   display: grid;
-  gap: 24px;
+  gap: 28px;
 }
 
-.landingHeader {
+.landingHeroGrid {
   display: grid;
-  gap: 18px;
+  gap: 24px;
+  align-items: start;
 }
 
-.landingHeader h1 {
+.landingHeroCopy h1 {
   margin: 0;
-  max-width: 760px;
-  font-size: clamp(40px, 7vw, 72px);
-  line-height: 0.95;
+  max-width: 780px;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(46px, 7vw, 86px);
+  line-height: 0.92;
   letter-spacing: -0.04em;
+  text-wrap: balance;
 }
 
 .landingLead {
   margin: 0;
-  max-width: 700px;
-  color: #475467;
-  font-size: 18px;
-  line-height: 1.6;
+  max-width: 720px;
+  color: #4d5564;
+  font-size: 20px;
+  line-height: 1.7;
 }
 
 .eyebrow {
-  margin-bottom: 10px;
-  color: #9a6700;
+  margin-bottom: 12px;
+  color: #8f5e0d;
   font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.landingHeroSummary {
+  display: grid;
+  gap: 12px;
+  margin: 28px 0 22px;
+}
+
+.heroSummaryCard {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid rgba(32, 45, 64, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 8px 24px rgba(31, 41, 55, 0.06);
+}
+
+.heroSummaryLabel,
+.cardKicker,
+.capabilityLabel,
+.timelineLabel {
+  color: #8f5e0d;
+  font-size: 12px;
+  font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.landingMetaRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.landingMetaBadge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(39, 54, 79, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  padding: 8px 12px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.landingShowcase {
+  position: relative;
+  min-height: 100%;
+}
+
+.showcaseFrame {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid rgba(34, 49, 73, 0.08);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(245, 248, 251, 0.96) 100%);
+  box-shadow: 0 28px 80px rgba(21, 30, 46, 0.12);
+  animation: landingFloatIn 700ms ease both;
+}
+
+.showcaseTopline,
+.showcasePanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.showcaseChip,
+.showcaseLive {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.showcaseChip {
+  background: #eef3f8;
+  color: #22324a;
+}
+
+.showcaseLive {
+  background: #1f5f46;
+  color: #f5fff9;
+}
+
+.showcaseScoreboard,
+.showcasePanels,
+.capabilityGrid,
+.proofGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.showcaseMetric,
+.capabilityCard,
+.proofCard {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid rgba(34, 49, 73, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.showcaseMetric span,
+.showcaseMetric small {
+  color: #5d6574;
+}
+
+.showcaseMetric strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 32px;
+  letter-spacing: -0.04em;
+}
+
+.showcasePanel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: #122034;
+  color: #edf2f9;
+}
+
+.showcaseList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 18px;
+  color: #d7dfeb;
+}
+
+.showcaseTimeline {
+  display: grid;
+  gap: 14px;
+}
+
+.showcaseTimeline p,
+.capabilityCard p,
+.proofCard p,
+.sectionLead {
+  margin: 0;
+  color: #5a6170;
+  line-height: 1.7;
+}
+
+.showcaseTimeline p {
+  color: #cfdae8;
+}
+
+.floatingProofCard {
+  position: absolute;
+  display: none;
+  max-width: 240px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  box-shadow: 0 18px 42px rgba(21, 30, 46, 0.16);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.floatingProofCardPrimary {
+  right: -18px;
+  bottom: 92px;
+  background: #f0b55a;
+  color: #2d2110;
+}
+
+.floatingProofCardSecondary {
+  left: -18px;
+  bottom: -20px;
+  background: #1b3c32;
+  color: #effaf4;
 }
 
 .landingGrid,
@@ -791,10 +1034,11 @@ code {
 .landingCard,
 .stepCard,
 .pricingCard {
-  padding: 22px;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 24px;
+  border: 1px solid rgba(34, 49, 73, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 10px 30px rgba(21, 30, 46, 0.05);
 }
 
 .landingCard h2,
@@ -802,22 +1046,43 @@ code {
 .pricingCard h3,
 .sectionIntro h2 {
   margin: 0 0 10px;
+  font-family: var(--font-display), sans-serif;
+  letter-spacing: -0.03em;
 }
 
 .landingCard p,
 .stepCard p,
 .pricingCard p {
   margin: 0;
-  color: #555;
-  line-height: 1.6;
+  color: #596171;
+  line-height: 1.7;
+}
+
+.landingCardAccent {
+  background:
+    linear-gradient(135deg, rgba(25, 63, 50, 0.96) 0%, rgba(22, 47, 83, 0.96) 100%);
+  color: #f7fbff;
+}
+
+.landingCardAccent .cardKicker,
+.landingCardAccent p {
+  color: rgba(244, 248, 255, 0.82);
 }
 
 .landingSection {
-  padding: 24px 16px 48px;
+  padding: 34px 16px 60px;
 }
 
 .sectionIntro {
-  margin-bottom: 18px;
+  margin-bottom: 22px;
+}
+
+.sectionIntroWide {
+  max-width: 820px;
+}
+
+.sectionLead {
+  font-size: 18px;
 }
 
 .stepNumber {
@@ -836,7 +1101,8 @@ code {
 
 .priceLine {
   margin-bottom: 12px;
-  font-size: 32px;
+  font-family: var(--font-display), sans-serif;
+  font-size: 36px;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
@@ -849,32 +1115,42 @@ code {
 }
 
 .pricingCardFeatured {
-  border-color: #f0b429;
-  box-shadow: 0 14px 40px rgba(17, 24, 39, 0.08);
+  border-color: rgba(240, 181, 90, 0.95);
+  box-shadow: 0 20px 60px rgba(17, 24, 39, 0.12);
 }
 
 .pricingBadge {
   display: inline-flex;
   margin-bottom: 12px;
   border-radius: 999px;
-  background: #111;
+  background: #132238;
   color: #fff;
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-size: 12px;
+  font-weight: 800;
 }
 
 .landingButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 18px;
   font-weight: 600;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.landingButton:hover {
+  transform: translateY(-1px);
 }
 
 .primaryButton {
-  background: #111;
+  background: #132238;
   color: #fff;
+  box-shadow: 0 14px 28px rgba(19, 34, 56, 0.18);
 }
 
 .secondaryButton {
@@ -883,7 +1159,71 @@ code {
   color: #111;
 }
 
+.ghostButton {
+  border: 1px solid rgba(34, 49, 73, 0.08);
+  background: rgba(255, 255, 255, 0.36);
+  color: #334155;
+}
+
+.darkBand {
+  background:
+    radial-gradient(circle at top right, rgba(240, 181, 90, 0.14), transparent 24%),
+    linear-gradient(180deg, #152338 0%, #101927 100%);
+  color: #eef4fb;
+}
+
+.darkBand .eyebrow,
+.darkBand .sectionLead,
+.darkBand .proofCard p {
+  color: rgba(231, 239, 248, 0.82);
+}
+
+.darkBand .sectionIntro h2 {
+  color: #f5f9ff;
+}
+
+.proofCard {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.proofCard strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+
+.landingClosingCta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+  padding: 26px;
+  border: 1px solid rgba(34, 49, 73, 0.08);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 250, 241, 0.92) 0%, rgba(255, 255, 255, 0.92) 100%);
+}
+
+@keyframes landingFloatIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 640px) {
+  .landingTopbar {
+    position: static;
+  }
+
+  .landingTopbarInner,
   .header {
     flex-direction: column;
     align-items: flex-start;
@@ -908,5 +1248,28 @@ code {
   .stepsGrid,
   .pricingGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .capabilityGrid,
+  .proofGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 920px) {
+  .landingHeroGrid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  }
+
+  .showcaseScoreboard {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .showcasePanels {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .floatingProofCard {
+    display: block;
   }
 }
