@@ -1,4 +1,5 @@
 import Link from "next/link";
+
 const publicSignupEnabled =
   process.env.NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED === "1";
 
@@ -9,11 +10,16 @@ export default async function RegisterPage({ searchParams }) {
 
   if (!publicSignupEnabled) {
     return (
-      <main className="page">
-        <div className="container narrowContainer">
-          <article className="card formCard" data-testid="auth-register-card">
-            <h1 data-testid="auth-register-title">Create Trial Account</h1>
-            <div className="banner subtle" data-testid="auth-register-disabled-banner">
+      <main className="page authPage">
+        <div className="container authShell authShellSingle">
+          <article className="card formCard authCard" data-testid="auth-register-card">
+            <div className="authCardHeader">
+              <div>
+                <div className="eyebrow">Trial access</div>
+                <h1 data-testid="auth-register-title">Create Trial Account</h1>
+              </div>
+            </div>
+            <div className="banner subtle authBanner" data-testid="auth-register-disabled-banner">
               Public signup is not enabled in this environment.
             </div>
             <div className="formActions">
@@ -28,11 +34,44 @@ export default async function RegisterPage({ searchParams }) {
   }
 
   return (
-    <main className="page">
-      <div className="container narrowContainer">
-        <article className="card formCard" data-testid="auth-register-card">
-          <h1 data-testid="auth-register-title">Create Trial Account</h1>
-          <div className="banner subtle" data-testid="auth-register-help-banner">
+    <main className="page authPage">
+      <div className="container authShell">
+        <section className="authMarketingPanel">
+          <div className="eyebrow">Trial onboarding</div>
+          <h1>Spin up a trial account and inspect the product from the inside.</h1>
+          <p className="landingLead authLead">
+            Public signup creates a safe `member` account on the `trial` plan so the
+            live product can be explored without exposing the full admin surface.
+          </p>
+
+          <div className="authChecklist">
+            <div className="authChecklistItem">
+              <strong>Immediate app access</strong>
+              <p>Land directly in the workspace after registration and review the product flow end to end.</p>
+            </div>
+            <div className="authChecklistItem">
+              <strong>Controlled limits</strong>
+              <p>Trial usage stays constrained while still communicating the shape of the product.</p>
+            </div>
+            <div className="authChecklistItem">
+              <strong>B2B-first framing</strong>
+              <p>The trial is meant to demonstrate a serious operations product, not a toy demo page.</p>
+            </div>
+          </div>
+        </section>
+
+        <article className="card formCard authCard" data-testid="auth-register-card">
+          <div className="authCardHeader">
+            <div>
+              <div className="eyebrow">Create account</div>
+              <h1 data-testid="auth-register-title">Create Trial Account</h1>
+              <p className="formHint">
+                Use a simple account name and get into the live workspace immediately.
+              </p>
+            </div>
+          </div>
+
+          <div className="banner subtle authBanner" data-testid="auth-register-help-banner">
             Public signup creates a `member` account on the `trial` plan so you can
             explore the product safely.
           </div>
@@ -80,8 +119,14 @@ export default async function RegisterPage({ searchParams }) {
               />
             </label>
 
-            <div className="formActions">
-              <button type="submit" data-testid="auth-register-submit-button">Create account</button>
+            <div className="formActions authActions">
+              <button
+                type="submit"
+                className="landingButton primaryButton"
+                data-testid="auth-register-submit-button"
+              >
+                Create account
+              </button>
               <Link href="/login" className="linkButton" data-testid="auth-register-back-link">
                 Back to login
               </Link>

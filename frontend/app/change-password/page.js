@@ -160,11 +160,12 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <main className="page">
-      <div className="container narrowContainer">
-        <article className="card formCard" data-testid="auth-change-password-card">
+    <main className="page authPage">
+      <div className="container authShell authShellSingle">
+        <article className="card formCard authCard" data-testid="auth-change-password-card">
           <div className="header">
             <div>
+              <div className="eyebrow">Account security</div>
               <h1 data-testid="auth-change-password-title">Change Password</h1>
               <p data-testid="auth-change-password-user">
                 {currentUser ? `Logged in as ${currentUser.username}` : "DeployMate"}
@@ -183,11 +184,11 @@ export default function ChangePasswordPage() {
           </div>
 
           {currentUser?.must_change_password ? (
-            <div className="banner error" data-testid="auth-change-password-required-banner">
+            <div className="banner error authBanner" data-testid="auth-change-password-required-banner">
               You are still using the default admin password. Change it before continuing.
             </div>
           ) : (
-            <div className="banner subtle" data-testid="auth-change-password-help-banner">
+            <div className="banner subtle authBanner" data-testid="auth-change-password-help-banner">
               Update your current password. Your existing session will continue to work.
             </div>
           )}
@@ -232,8 +233,13 @@ export default function ChangePasswordPage() {
               />
             </label>
 
-            <div className="formActions">
-              <button type="submit" disabled={submitting} data-testid="auth-change-password-submit-button">
+            <div className="formActions authActions">
+              <button
+                type="submit"
+                className="landingButton primaryButton"
+                disabled={submitting}
+                data-testid="auth-change-password-submit-button"
+              >
                 {submitting ? "Saving..." : "Change password"}
               </button>
             </div>

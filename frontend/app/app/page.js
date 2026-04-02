@@ -1867,37 +1867,53 @@ export default function HomePage() {
   return (
     <main className="page">
       <div className="container">
-        <div className="header">
-          <div>
-            <h1 data-testid="runtime-page-title">DeployMate</h1>
-            <p>{currentUser ? `Logged in as ${currentUser.username}` : "Deployments"}</p>
+        <section className="workspaceHero">
+          <div className="workspaceHeroBackdrop" />
+          <div className="header workspaceHeroHeader">
+            <div>
+              <div className="eyebrow">Live workspace</div>
+              <h1 data-testid="runtime-page-title">DeployMate</h1>
+              <p>{currentUser ? `Logged in as ${currentUser.username}` : "Deployments"}</p>
+            </div>
+            <div className="buttonRow">
+              {currentUser?.is_admin ? (
+                <Link href="/app/users" className="linkButton">
+                  Users
+                </Link>
+              ) : null}
+              {currentUser?.is_admin ? (
+                <Link href="/app/upgrade-requests" className="linkButton">
+                  Upgrade inbox
+                </Link>
+              ) : null}
+              <button
+                type="button"
+                onClick={refreshPage}
+                disabled={loading || serversLoading || notificationsLoading || templatesLoading}
+              >
+                {loading || serversLoading || notificationsLoading || templatesLoading
+                  ? "Refreshing..."
+                  : "Refresh"}
+              </button>
+              <button type="button" onClick={handleLogout}>
+                Logout
+              </button>
+            </div>
           </div>
-          <div className="buttonRow">
-            {currentUser?.is_admin ? (
-              <Link href="/app/users" className="linkButton">
-                Users
-              </Link>
-            ) : null}
-            {currentUser?.is_admin ? (
-              <Link href="/app/upgrade-requests" className="linkButton">
-                Upgrade inbox
-              </Link>
-            ) : null}
-            <button
-              type="button"
-              onClick={refreshPage}
-              disabled={loading || serversLoading || notificationsLoading || templatesLoading}
-            >
-              {loading || serversLoading || notificationsLoading || templatesLoading
-                ? "Refreshing..."
-                : "Refresh"}
-            </button>
-            <button type="button" onClick={handleLogout}>
-              Logout
-            </button>
-          </div>
-        </div>
 
+          <div className="workspaceHeroSummary">
+            <div className="workspaceHeroBadge">
+              <span>Focus</span>
+              <strong>Operations, deploys, and internal admin control</strong>
+            </div>
+            <div className="workspaceHeroBadge">
+              <span>Entry point</span>
+              <strong>Dashboard, exports, diagnostics, and rollout visibility</strong>
+            </div>
+          </div>
+        </section>
+
+        <div className="workspaceBannerStack">
         {error ? <div className="banner error">{error}</div> : null}
         {serversError ? <div className="banner error">{serversError}</div> : null}
         {deleteError ? <div className="banner error">{deleteError}</div> : null}
@@ -1944,6 +1960,7 @@ export default function HomePage() {
 
         <div className="banner subtle">
           Deployments and notifications refresh automatically every 8 seconds.
+        </div>
         </div>
 
         <article className="card formCard" data-testid="ops-overview-card">
