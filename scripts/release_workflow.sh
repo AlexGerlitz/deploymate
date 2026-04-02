@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SURFACE="full"
+BACKEND_PYTHON="${BACKEND_PYTHON:-}"
 
 usage() {
   cat <<'EOF'
@@ -49,8 +50,17 @@ esac
 
 cd "$ROOT_DIR"
 
+if [ -z "$BACKEND_PYTHON" ]; then
+  if [ -x "backend/venv/bin/python" ]; then
+    BACKEND_PYTHON="backend/venv/bin/python"
+  else
+    BACKEND_PYTHON="python3"
+  fi
+fi
+
 echo "[release] repo: $ROOT_DIR"
 echo "[release] surface: $SURFACE"
+echo "[release] backend python: $BACKEND_PYTHON"
 
 echo "[release] preflight"
 bash scripts/preflight.sh
@@ -68,7 +78,7 @@ fi
 
 if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
   echo "[release] backend test suite"
-  PYTHONPATH=backend backend/venv/bin/python -m unittest discover -s backend/tests -p 'test_*.py'
+  PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest discover -s backend/tests -p 'test_*.py'
 fi
 
 echo "[release] checks passed"

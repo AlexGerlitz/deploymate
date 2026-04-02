@@ -127,6 +127,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 - scripted preflight in [scripts/preflight.sh](scripts/preflight.sh)
 - scripted local release gate in [scripts/release_workflow.sh](scripts/release_workflow.sh)
+- GitHub Actions CI runs the same local release gate on `develop` pushes and pull requests
 - tracked-file security audit in [scripts/security_audit.sh](scripts/security_audit.sh)
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
 - dedicated admin frontend smoke in [scripts/frontend_admin_smoke.sh](scripts/frontend_admin_smoke.sh)
