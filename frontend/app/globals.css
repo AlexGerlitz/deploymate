@@ -344,6 +344,41 @@ a {
   letter-spacing: -0.03em;
 }
 
+.adminToolCard {
+  display: grid;
+  gap: 18px;
+}
+
+.adminToolHeader {
+  display: grid;
+  gap: 8px;
+}
+
+.adminToolEyebrow {
+  display: inline-block;
+  color: #8f5e0d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.adminToolHeader p,
+.adminToolMeta,
+.adminHintStack p {
+  margin: 0;
+  color: #5f6675;
+}
+
+.adminToolMeta {
+  font-size: 14px;
+}
+
+.adminHintStack {
+  display: grid;
+  gap: 8px;
+}
+
 .form {
   display: grid;
   gap: 12px;
@@ -557,6 +592,31 @@ a {
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   align-items: end;
+}
+
+.bulkActionToolbar {
+  padding: 16px 18px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background: rgba(247, 250, 252, 0.92);
+}
+
+.bulkQuickActions {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.bulkApplyPanel {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .bulkSelectLabel {

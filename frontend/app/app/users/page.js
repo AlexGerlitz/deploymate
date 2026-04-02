@@ -1623,8 +1623,14 @@ function UsersPageContent() {
           />
         </article>
 
-        <article className="card formCard">
-          <h2>Create user</h2>
+        <article className="card formCard adminToolCard">
+          <div className="adminToolHeader">
+            <span className="adminToolEyebrow">Access setup</span>
+            <h2>Create user</h2>
+            <p className="adminToolMeta">
+              Add a new operator account with a temporary password, then adjust role and plan after creation.
+            </p>
+          </div>
           <form className="form" onSubmit={handleCreateUser}>
             <label className="field">
               <span>Username</span>
@@ -1673,9 +1679,10 @@ function UsersPageContent() {
           </form>
         </article>
 
-        <article className="card formCard" data-testid="users-bulk-card">
+        <article className="card formCard adminToolCard" data-testid="users-bulk-card">
           <div className="sectionHeader">
             <div>
+              <span className="adminToolEyebrow">Admin actions</span>
               <h2 data-testid="users-bulk-title">Bulk user actions</h2>
               <p className="formHint">
                 Bulk selection follows the current server-side user filters.
@@ -1697,7 +1704,7 @@ function UsersPageContent() {
                 <span className="status unknown">members {filteredUsers.filter((user) => user.role === "member").length}</span>
               </div>
             </div>
-            <div className="actions">
+            <div className="actions bulkActionToolbar">
               <button
                 type="button"
                 className="secondaryButton"
@@ -1783,7 +1790,7 @@ function UsersPageContent() {
           </div>
 
           <div className="bulkActionsGrid">
-            <div className="field" data-testid="users-bulk-presets">
+            <div className="field bulkQuickActions" data-testid="users-bulk-presets">
               <span>Quick presets</span>
               <div className="actions">
                 <button
@@ -1815,66 +1822,72 @@ function UsersPageContent() {
                 </button>
               </div>
             </div>
-            <label className="field">
-              <span>Bulk role</span>
-              <select
-                data-testid="users-bulk-role-select"
-                value={bulkRoleValue}
-                onChange={(event) => setBulkRoleValue(event.target.value)}
-                disabled={bulkUpdating}
+            <div className="bulkApplyPanel">
+              <label className="field">
+                <span>Bulk role</span>
+                <select
+                  data-testid="users-bulk-role-select"
+                  value={bulkRoleValue}
+                  onChange={(event) => setBulkRoleValue(event.target.value)}
+                  disabled={bulkUpdating}
+                >
+                  <option value="">Keep current role</option>
+                  <option value="member">member</option>
+                  <option value="admin">admin</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-role-apply-button"
+                onClick={handleBulkRoleChange}
+                disabled={!hasSelectedUsers || !bulkRoleValue || bulkUpdating}
               >
-                <option value="">Keep current role</option>
-                <option value="member">member</option>
-                <option value="admin">admin</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="secondaryButton"
-              data-testid="users-bulk-role-apply-button"
-              onClick={handleBulkRoleChange}
-              disabled={!hasSelectedUsers || !bulkRoleValue || bulkUpdating}
-            >
-              {bulkUpdating ? "Applying..." : "Apply role"}
-            </button>
+                {bulkUpdating ? "Applying..." : "Apply role"}
+              </button>
+            </div>
 
-            <label className="field">
-              <span>Bulk plan</span>
-              <select
-                data-testid="users-bulk-plan-select"
-                value={bulkPlanValue}
-                onChange={(event) => setBulkPlanValue(event.target.value)}
-                disabled={bulkUpdating}
+            <div className="bulkApplyPanel">
+              <label className="field">
+                <span>Bulk plan</span>
+                <select
+                  data-testid="users-bulk-plan-select"
+                  value={bulkPlanValue}
+                  onChange={(event) => setBulkPlanValue(event.target.value)}
+                  disabled={bulkUpdating}
+                >
+                  <option value="">Keep current plan</option>
+                  <option value="trial">trial</option>
+                  <option value="solo">solo</option>
+                  <option value="team">team</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="users-bulk-plan-apply-button"
+                onClick={handleBulkPlanChange}
+                disabled={!hasSelectedUsers || !bulkPlanValue || bulkUpdating}
               >
-                <option value="">Keep current plan</option>
-                <option value="trial">trial</option>
-                <option value="solo">solo</option>
-                <option value="team">team</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="secondaryButton"
-              data-testid="users-bulk-plan-apply-button"
-              onClick={handleBulkPlanChange}
-              disabled={!hasSelectedUsers || !bulkPlanValue || bulkUpdating}
-            >
-              {bulkUpdating ? "Applying..." : "Apply plan"}
-            </button>
+                {bulkUpdating ? "Applying..." : "Apply plan"}
+              </button>
+            </div>
           </div>
-          <p className="formHint">
-            Bulk user actions use the current selection only and reuse the existing single-user admin update path.
-          </p>
-          <p className="formHint">
-            Fast selectors respect the current server-side filters and let you stage a role or plan update without changing the current list view.
-          </p>
-          <p className="formHint" data-testid="users-bulk-action-summary">
-            {hasSelectedUsers
-              ? bulkUsersActionSummary
-                ? `Ready to apply: ${bulkUsersActionSummary}.`
-                : "Pick a role or plan target to enable bulk apply."
-              : "Select at least one user to enable bulk actions."}
-          </p>
+          <div className="adminHintStack">
+            <p className="formHint">
+              Bulk user actions use the current selection only and reuse the existing single-user admin update path.
+            </p>
+            <p className="formHint">
+              Fast selectors respect the current server-side filters and let you stage a role or plan update without changing the current list view.
+            </p>
+            <p className="formHint" data-testid="users-bulk-action-summary">
+              {hasSelectedUsers
+                ? bulkUsersActionSummary
+                  ? `Ready to apply: ${bulkUsersActionSummary}.`
+                  : "Pick a role or plan target to enable bulk apply."
+                : "Select at least one user to enable bulk actions."}
+            </p>
+          </div>
         </article>
 
         {loading && users.length === 0 ? (

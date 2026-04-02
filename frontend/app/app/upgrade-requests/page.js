@@ -1115,9 +1115,10 @@ function UpgradeRequestsPageContent() {
           <div className="empty" data-testid="upgrade-empty-state">No upgrade requests found for the current filters.</div>
         ) : null}
 
-        <article className="card formCard" data-testid="upgrade-bulk-card">
+        <article className="card formCard adminToolCard" data-testid="upgrade-bulk-card">
           <div className="sectionHeader">
             <div>
+              <span className="adminToolEyebrow">Review actions</span>
               <h2 data-testid="upgrade-bulk-title">Bulk inbox actions</h2>
               <p className="formHint">Bulk selection follows the current server-side inbox filters.</p>
               <p className="formHint" data-testid="upgrade-bulk-selection-summary">
@@ -1137,7 +1138,7 @@ function UpgradeRequestsPageContent() {
                 <span className="status unknown">review {filteredRequests.filter((item) => item.status === "in_review").length}</span>
               </div>
             </div>
-            <div className="actions">
+            <div className="actions bulkActionToolbar">
               <button
                 type="button"
                 className="secondaryButton"
@@ -1223,7 +1224,7 @@ function UpgradeRequestsPageContent() {
           </div>
 
           <div className="bulkActionsGrid">
-            <div className="field" data-testid="upgrade-bulk-presets">
+            <div className="field bulkQuickActions" data-testid="upgrade-bulk-presets">
               <span>Quick presets</span>
               <div className="actions">
                 <button
@@ -1255,45 +1256,49 @@ function UpgradeRequestsPageContent() {
                 </button>
               </div>
             </div>
-            <label className="field">
-              <span>Bulk lifecycle status</span>
-              <select
-                data-testid="upgrade-bulk-status-select"
-                value={bulkStatusValue}
-                onChange={(event) => setBulkStatusValue(event.target.value)}
-                disabled={bulkSaving}
+            <div className="bulkApplyPanel">
+              <label className="field">
+                <span>Bulk lifecycle status</span>
+                <select
+                  data-testid="upgrade-bulk-status-select"
+                  value={bulkStatusValue}
+                  onChange={(event) => setBulkStatusValue(event.target.value)}
+                  disabled={bulkSaving}
+                >
+                  <option value="">Keep current status</option>
+                  <option value="new">new</option>
+                  <option value="in_review">in_review</option>
+                  <option value="approved">approved</option>
+                  <option value="rejected">rejected</option>
+                  <option value="closed">closed</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="upgrade-bulk-status-apply-button"
+                onClick={handleBulkStatusApply}
+                disabled={!hasSelectedRequests || !bulkStatusValue || bulkSaving}
               >
-                <option value="">Keep current status</option>
-                <option value="new">new</option>
-                <option value="in_review">in_review</option>
-                <option value="approved">approved</option>
-                <option value="rejected">rejected</option>
-                <option value="closed">closed</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="secondaryButton"
-              data-testid="upgrade-bulk-status-apply-button"
-              onClick={handleBulkStatusApply}
-              disabled={!hasSelectedRequests || !bulkStatusValue || bulkSaving}
-            >
-              {bulkSaving ? "Applying..." : "Apply status"}
-            </button>
+                {bulkSaving ? "Applying..." : "Apply status"}
+              </button>
+            </div>
           </div>
-          <p className="formHint">
-            Bulk inbox actions only update lifecycle status and reuse the existing single-request admin write path.
-          </p>
-          <p className="formHint">
-            Fast selectors respect the current inbox filters so you can stage status changes without disturbing the current triage view.
-          </p>
-          <p className="formHint" data-testid="upgrade-bulk-action-summary">
-            {hasSelectedRequests
-              ? bulkStatusValue
-                ? `Ready to apply: status -> ${bulkStatusValue}.`
-                : "Pick a lifecycle status to enable bulk apply."
-              : "Select at least one request to enable bulk actions."}
-          </p>
+          <div className="adminHintStack">
+            <p className="formHint">
+              Bulk inbox actions only update lifecycle status and reuse the existing single-request admin write path.
+            </p>
+            <p className="formHint">
+              Fast selectors respect the current inbox filters so you can stage status changes without disturbing the current triage view.
+            </p>
+            <p className="formHint" data-testid="upgrade-bulk-action-summary">
+              {hasSelectedRequests
+                ? bulkStatusValue
+                  ? `Ready to apply: status -> ${bulkStatusValue}.`
+                  : "Pick a lifecycle status to enable bulk apply."
+                : "Select at least one request to enable bulk actions."}
+            </p>
+          </div>
         </article>
 
         <div className="list">
