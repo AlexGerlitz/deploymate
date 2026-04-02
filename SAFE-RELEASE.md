@@ -41,6 +41,12 @@ Do not bundle unrelated UI, API, and deployment changes unless a full stack rele
 
 If preflight fails, stop there.
 
+For a single local gate that also runs the frontend smokes and backend test suite:
+
+```bash
+bash scripts/release_workflow.sh --surface full
+```
+
 ## 4. Deploy the smallest surface
 
 - frontend-only deploy when only `frontend/` changed

@@ -28,6 +28,12 @@ Before any release from the workstation:
 ./scripts/preflight.sh
 ```
 
+Or run the broader local release gate:
+
+```bash
+bash scripts/release_workflow.sh --surface full
+```
+
 Before the first deploy of encrypted server credentials, or before enabling remote server management on a fresh environment:
 
 ```bash
