@@ -608,6 +608,32 @@ export default function HomePage() {
     templates,
   });
   const opsSnapshot = opsOverview || derivedOpsSnapshot;
+  const workspacePriority =
+    opsSnapshot.attention_items[0]?.title ||
+    (opsSnapshot.deployments.failed > 0
+      ? "Failed deployments need review before the next rollout."
+      : "Workspace is clear enough for the next deployment batch.");
+  const workspaceStatusItems = [
+    {
+      label: "Environment",
+      value: opsSnapshot.capabilities?.local_docker_enabled ? "Hybrid runtime" : "Remote runtime",
+      detail: `${opsSnapshot.deployments.remote} remote deploys · ${opsSnapshot.deployments.public_urls} public URLs`,
+    },
+    {
+      label: "Plan",
+      value: currentUser ? `${currentUser.plan} workspace` : "Signed-in workspace",
+      detail: currentUser
+        ? `${currentUser.usage?.deployments ?? 0}/${currentUser.limits?.max_deployments ?? 0} deploy slots in use`
+        : "Deployments, servers, exports, and activity history",
+    },
+    {
+      label: "Cadence",
+      value: "8-second sync loop",
+      detail: smokeMode
+        ? "Fixture-backed smoke mode is active for runtime surfaces"
+        : "Deployments and activity cards keep refreshing automatically",
+    },
+  ];
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -1873,16 +1899,20 @@ export default function HomePage() {
             <div>
               <div className="eyebrow">Live workspace</div>
               <h1 data-testid="runtime-page-title">DeployMate</h1>
-              <p>{currentUser ? `Logged in as ${currentUser.username}` : "Deployments"}</p>
+              <p>
+                {currentUser
+                  ? `Logged in as ${currentUser.username}. ${workspacePriority}`
+                  : "Deployments, exports, diagnostics, and rollout visibility."}
+              </p>
             </div>
-            <div className="buttonRow">
+            <div className="buttonRow workspaceHeroActions">
               {currentUser?.is_admin ? (
-                <Link href="/app/users" className="linkButton">
+                <Link href="/app/users" className="linkButton workspaceSecondaryAction">
                   Users
                 </Link>
               ) : null}
               {currentUser?.is_admin ? (
-                <Link href="/app/upgrade-requests" className="linkButton">
+                <Link href="/app/upgrade-requests" className="linkButton workspaceSecondaryAction">
                   Upgrade inbox
                 </Link>
               ) : null}
@@ -1890,77 +1920,107 @@ export default function HomePage() {
                 type="button"
                 onClick={refreshPage}
                 disabled={loading || serversLoading || notificationsLoading || templatesLoading}
+                className="landingButton primaryButton workspacePrimaryAction"
               >
                 {loading || serversLoading || notificationsLoading || templatesLoading
                   ? "Refreshing..."
                   : "Refresh"}
               </button>
-              <button type="button" onClick={handleLogout}>
+              <button type="button" onClick={handleLogout} className="workspaceGhostAction">
                 Logout
               </button>
             </div>
           </div>
 
           <div className="workspaceHeroSummary">
-            <div className="workspaceHeroBadge">
-              <span>Focus</span>
-              <strong>Operations, deploys, and internal admin control</strong>
+            <div className="workspaceHeroMetric">
+              <span>Deployments</span>
+              <strong>{opsSnapshot.deployments.running}</strong>
+              <p>
+                Running now · {opsSnapshot.deployments.total} total ·{" "}
+                {opsSnapshot.deployments.failed} failed
+              </p>
             </div>
-            <div className="workspaceHeroBadge">
-              <span>Entry point</span>
-              <strong>Dashboard, exports, diagnostics, and rollout visibility</strong>
+            <div className="workspaceHeroMetric">
+              <span>Targets</span>
+              <strong>{opsSnapshot.servers.total}</strong>
+              <p>
+                Server targets · {opsSnapshot.servers.ssh_key_auth} SSH key ·{" "}
+                {opsSnapshot.servers.unused} idle
+              </p>
+            </div>
+            <div className="workspaceHeroMetric">
+              <span>Activity</span>
+              <strong>{opsSnapshot.notifications.error}</strong>
+              <p>
+                Error events · {opsSnapshot.notifications.success} success · latest{" "}
+                {opsSnapshot.notifications.latest_error_at
+                  ? formatDate(opsSnapshot.notifications.latest_error_at)
+                  : "clean"}
+              </p>
+            </div>
+            <div className="workspaceHeroBadge workspaceHeroSpotlight">
+              <span>What matters now</span>
+              <strong>{workspacePriority}</strong>
+              <p>
+                Exports, diagnostics, rollout history, and admin surfaces are available from this
+                workspace without leaving the dashboard.
+              </p>
             </div>
           </div>
         </section>
 
         <div className="workspaceBannerStack">
-        {error ? <div className="banner error">{error}</div> : null}
-        {serversError ? <div className="banner error">{serversError}</div> : null}
-        {deleteError ? <div className="banner error">{deleteError}</div> : null}
-        {serverDeleteError ? <div className="banner error">{serverDeleteError}</div> : null}
-        {templatesError ? <div className="banner error">{templatesError}</div> : null}
-        {templateDeleteError ? <div className="banner error">{templateDeleteError}</div> : null}
-        {templateDeployError ? <div className="banner error">{templateDeployError}</div> : null}
-        {opsActionError ? <div className="banner error">{opsActionError}</div> : null}
-        {opsActionMessage ? <div className="banner success">{opsActionMessage}</div> : null}
-        {currentUser?.must_change_password ? (
-          <div className="banner error">
-            You are still using the default admin password.{" "}
-            <Link href="/change-password" className="inlineLink">
-              Change it now
-            </Link>
-            .
+          {error ? <div className="banner error">{error}</div> : null}
+          {serversError ? <div className="banner error">{serversError}</div> : null}
+          {deleteError ? <div className="banner error">{deleteError}</div> : null}
+          {serverDeleteError ? <div className="banner error">{serverDeleteError}</div> : null}
+          {templatesError ? <div className="banner error">{templatesError}</div> : null}
+          {templateDeleteError ? <div className="banner error">{templateDeleteError}</div> : null}
+          {templateDeployError ? <div className="banner error">{templateDeployError}</div> : null}
+          {opsActionError ? <div className="banner error">{opsActionError}</div> : null}
+          {opsActionMessage ? <div className="banner success">{opsActionMessage}</div> : null}
+          {currentUser?.must_change_password ? (
+            <div className="banner error">
+              You are still using the default admin password.{" "}
+              <Link href="/change-password" className="inlineLink">
+                Change it now
+              </Link>
+              .
+            </div>
+          ) : null}
+
+          <div className="workspaceStatusStrip">
+            {workspaceStatusItems.map((item) => (
+              <div key={item.label} className="workspaceStatusCard">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <p>{item.detail}</p>
+              </div>
+            ))}
           </div>
-        ) : null}
 
-        <div className="banner">
-          Backend: <code>{apiBaseUrl}</code>
-        </div>
-
-        {smokeMode ? (
-          <div className="banner subtle" data-testid="runtime-smoke-banner">
-            Runtime smoke mode uses fixture data for the operations and deployment detail surfaces.
+          <div className="workspaceMetaLine">
+            <span>
+              Backend: <code>{apiBaseUrl}</code>
+            </span>
+            {currentUser ? (
+              <span>
+                Usage {currentUser.usage?.servers ?? 0}/{currentUser.limits?.max_servers ?? 0} servers ·{" "}
+                {currentUser.usage?.deployments ?? 0}/{currentUser.limits?.max_deployments ?? 0} deployments ·{" "}
+                <Link href="/upgrade" className="inlineLink">
+                  Upgrade
+                </Link>
+              </span>
+            ) : null}
+            {smokeMode ? (
+              <span data-testid="runtime-smoke-banner">
+                Smoke mode uses fixture data for runtime surfaces.
+              </span>
+            ) : (
+              <span>Deployments and notifications refresh automatically every 8 seconds.</span>
+            )}
           </div>
-        ) : null}
-
-        {currentUser ? (
-          <div className="banner">
-            Plan: <strong>{currentUser.plan}</strong>
-            {" · "}
-            Servers {currentUser.usage?.servers ?? 0}/{currentUser.limits?.max_servers ?? 0}
-            {" · "}
-            Deployments {currentUser.usage?.deployments ?? 0}/
-            {currentUser.limits?.max_deployments ?? 0}
-            {" · "}
-            <Link href="/upgrade" className="inlineLink">
-              Upgrade
-            </Link>
-          </div>
-        ) : null}
-
-        <div className="banner subtle">
-          Deployments and notifications refresh automatically every 8 seconds.
-        </div>
         </div>
 
         <article className="card formCard" data-testid="ops-overview-card">
@@ -1971,7 +2031,7 @@ export default function HomePage() {
                 High-signal summary, attention items, and export actions built from the current dashboard state.
               </p>
             </div>
-            <div className="actions" data-testid="ops-overview-actions">
+            <div className="actions overviewActionRail" data-testid="ops-overview-actions">
               <button type="button" onClick={handleCopyOpsSummary} data-testid="ops-copy-summary-button">
                 Copy summary
               </button>
@@ -2101,20 +2161,13 @@ export default function HomePage() {
             <div className="overviewAttentionList" data-testid="ops-attention-list">
               {opsSnapshot.attention_items.map((item, index) => (
                 <div key={`${item.title}-${index}`} className="overviewAttentionItem" data-testid={`ops-attention-item-${index}`}>
-                  <div className="row">
-                    <span className="label">Level</span>
+                  <div className="overviewAttentionHeader">
                     <span className={`status ${item.level === "info" ? "unknown" : item.level}`}>
                       {item.level}
                     </span>
+                    <strong>{item.title}</strong>
                   </div>
-                  <div className="row">
-                    <span className="label">Title</span>
-                    <span>{item.title}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Action</span>
-                    <span>{item.detail}</span>
-                  </div>
+                  <p>{item.detail}</p>
                 </div>
               ))}
             </div>

@@ -156,30 +156,37 @@ a {
 }
 
 .overviewCard {
-  padding: 14px;
-  border: 1px solid #eee;
-  border-radius: 10px;
-  background: #fcfcfd;
+  padding: 16px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.96) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .overviewLabel {
   display: block;
   margin-bottom: 8px;
-  color: #666;
-  font-size: 14px;
+  color: #5f6675;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .overviewValue {
   display: block;
   margin-bottom: 10px;
-  font-size: 28px;
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 34px;
   letter-spacing: -0.03em;
 }
 
 .overviewMeta {
   display: grid;
   gap: 6px;
-  color: #555;
+  color: #455164;
   font-size: 14px;
 }
 
@@ -189,10 +196,27 @@ a {
 }
 
 .overviewAttentionItem {
-  padding: 14px;
-  border: 1px solid #eee;
-  border-radius: 10px;
-  background: #fff;
+  padding: 16px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.overviewAttentionItem p {
+  margin: 10px 0 0;
+  color: #455164;
+}
+
+.overviewAttentionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.overviewAttentionHeader strong {
+  font-size: 16px;
+  letter-spacing: -0.02em;
 }
 
 .backupActions {
@@ -1404,12 +1428,12 @@ button.landingButton.primaryButton:disabled {
   position: relative;
   overflow: hidden;
   margin-bottom: 18px;
-  padding: 24px;
+  padding: 28px;
   border: 1px solid rgba(24, 38, 59, 0.08);
-  border-radius: 26px;
+  border-radius: 30px;
   background:
-    linear-gradient(135deg, rgba(255, 250, 241, 0.94) 0%, rgba(245, 249, 252, 0.94) 100%);
-  box-shadow: 0 14px 36px rgba(17, 24, 39, 0.08);
+    linear-gradient(135deg, rgba(255, 250, 241, 0.96) 0%, rgba(242, 248, 252, 0.97) 100%);
+  box-shadow: 0 18px 50px rgba(17, 24, 39, 0.1);
 }
 
 .workspaceHeroBackdrop {
@@ -1417,7 +1441,8 @@ button.landingButton.primaryButton:disabled {
   inset: 0;
   background:
     radial-gradient(circle at top right, rgba(240, 181, 90, 0.22), transparent 20%),
-    radial-gradient(circle at bottom left, rgba(27, 60, 50, 0.12), transparent 22%);
+    radial-gradient(circle at bottom left, rgba(27, 60, 50, 0.12), transparent 22%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0));
   pointer-events: none;
 }
 
@@ -1429,8 +1454,8 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceHeroSummary {
   display: grid;
-  gap: 12px;
-  margin-top: 18px;
+  gap: 14px;
+  margin-top: 22px;
 }
 
 .workspaceHeroBadge span {
@@ -1447,10 +1472,137 @@ button.landingButton.primaryButton:disabled {
   letter-spacing: -0.03em;
 }
 
+.workspaceHeroBadge p {
+  margin: 10px 0 0;
+  color: #455164;
+}
+
+.workspaceHeroMetric,
+.workspaceHeroBadge {
+  padding: 16px 18px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.workspaceHeroMetric span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workspaceHeroMetric strong {
+  display: block;
+  margin-top: 10px;
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 38px;
+  letter-spacing: -0.05em;
+}
+
+.workspaceHeroMetric p {
+  margin: 8px 0 0;
+  color: #455164;
+  line-height: 1.5;
+}
+
+.workspaceHeroSpotlight {
+  display: grid;
+  gap: 4px;
+}
+
 .workspaceBannerStack {
   display: grid;
   gap: 12px;
   margin-bottom: 18px;
+}
+
+.workspaceStatusStrip {
+  display: grid;
+  gap: 12px;
+}
+
+.workspaceStatusCard {
+  padding: 16px 18px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.workspaceStatusCard span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workspaceStatusCard strong {
+  display: block;
+  margin-top: 8px;
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.workspaceStatusCard p {
+  margin: 8px 0 0;
+  color: #455164;
+}
+
+.workspaceMetaLine {
+  display: flex;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0 2px;
+  color: #5f6675;
+  font-size: 14px;
+}
+
+.workspaceMetaLine code {
+  color: #132238;
+}
+
+.workspaceHeroActions {
+  justify-content: flex-end;
+}
+
+.workspacePrimaryAction {
+  min-width: 124px;
+}
+
+.workspaceSecondaryAction {
+  border: 1px solid rgba(19, 34, 56, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 12px 16px;
+}
+
+.workspaceGhostAction {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: rgba(19, 34, 56, 0.06);
+  padding: 12px 16px;
+  color: #132238;
+}
+
+.overviewActionRail {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.overviewActionRail button {
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px 14px;
 }
 
 @keyframes landingFloatIn {
@@ -1513,7 +1665,11 @@ button.landingButton.primaryButton:disabled {
   }
 
   .workspaceHeroSummary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .workspaceStatusStrip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
