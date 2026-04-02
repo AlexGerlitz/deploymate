@@ -4,11 +4,11 @@ Updated: 2026-04-02
 
 ## Current State
 
-- Branch: `develop`
-- Working tree: dirty
-- Latest commit: `0d049e3` `Add session handoff`
-- `origin/develop` is up to date
-- Remote checkout on `deploymate` is synced to the same commit in `/opt/deploymate`
+- Branch: `main`
+- Working tree: clean
+- Latest commit: `e2e9d2a` `Refine shared admin filter helpers`
+- `origin/main` and `origin/develop` are aligned to the same commit
+- Remote checkout on `deploymate` is still behind at `d4cf16a`
 
 ## What Was Already Completed
 
@@ -86,7 +86,7 @@ The previous cleanup commit sequence in git was:
 - `4c5a0ea` `Extract admin page utilities`
 - `7009c09` `Extract admin export utilities`
 
-The current uncommitted frontend refactor built on top of that and already moved the remaining repeated admin-page state into shared helpers:
+The recent frontend refactor moved the remaining repeated admin-page state into shared helpers:
 
 - shared debounced value hook
 - shared localStorage load helpers
@@ -101,6 +101,13 @@ Current file sizes after the refactor:
 
 - [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js) -> `1983` lines
 - [upgrade requests page](/Users/alexgerlitz/deploymate/frontend/app/app/upgrade-requests/page.js) -> `1525` lines
+
+GitHub/repository presentation posture now matters explicitly:
+
+- keep `main` as the presentation branch
+- keep `main` and `develop` aligned when a batch is stable enough for public review
+- prefer reviewer-friendly commit history over noisy incremental push history
+- update docs/changelog together with meaningful product or architecture changes
 
 ## What Was Verified Recently
 
@@ -131,33 +138,30 @@ Practical rule:
 
 ## Best Next Step
 
-The biggest repeated saved-views/query-sync block is already extracted.
+The admin-page shared-state cleanup is already merged and both main branches are aligned.
 
 The next high-value step is one of these:
 
-- commit the current frontend refactor
-- do a final cleanup pass on helper naming / API shape in:
-  - [admin-page-hooks.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-hooks.js)
-  - [admin-page-utils.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-utils.js)
-  - [admin-saved-views.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-saved-views.js)
-- or continue shrinking the pages by extracting config-driven admin filter definitions / fetch parameter builders
+- update the production VPS checkout from `d4cf16a` to `e2e9d2a` if you want server checkout parity with GitHub
+- improve public repo presentation further:
+  - screenshots / GIFs in [README.md](/Users/alexgerlitz/deploymate/README.md)
+  - stronger release notes in [CHANGELOG.md](/Users/alexgerlitz/deploymate/CHANGELOG.md)
+  - optional GitHub Release for `v0.1.0`
+- continue product/security depth in reviewer-friendly batches
 
-If continuing code cleanup before commit, the best concrete target is:
+If continuing implementation work, keep this rule:
 
-- remove remaining page-local filter config duplication between:
-  - [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js)
-  - [upgrade requests page](/Users/alexgerlitz/deploymate/frontend/app/app/upgrade-requests/page.js)
-- consider a tiny shared helper for admin filter definitions / fetch params
-- then re-run build + admin smoke and commit
-
-If you want to stop cleanup work and ship, this is already at a good commit point.
+- `develop` is the active integration branch
+- `main` is the public presentation branch
+- once a batch is stable and tells a coherent story, align `main` again
 
 ## If You Need To Resume Fast
 
 1. Open [HANDOFF.md](/Users/alexgerlitz/deploymate/HANDOFF.md)
 2. Confirm current commit with `git rev-parse --short HEAD`
-3. Check current frontend edits with `git status --short`
-4. Either commit the refactor or continue from the next step above
-5. Re-run:
+3. Confirm both public branches are still aligned if presentation matters:
+   - `git log --oneline --decorate -n 4 --all --simplify-by-decoration`
+4. If deploying from git, update `/opt/deploymate` as needed
+5. Re-run when touching frontend/admin surfaces:
    - `FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:admin`
    - `npm --prefix frontend run build`
