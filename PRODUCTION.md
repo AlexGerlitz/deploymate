@@ -1,6 +1,6 @@
 # DeployMate Production
 
-1. Copy `.env.production.example` to `.env.production` and set a real domain, admin password, and database password.
+1. Copy `.env.production.example` to `.env.production` and set a real domain, admin password, database password, and a stable `DEPLOYMATE_SERVER_CREDENTIALS_KEY`.
 2. Point your domain's DNS A record to the VPS.
 3. Make sure Docker Engine with Docker Compose is installed on the VPS.
 4. Start DeployMate:
@@ -18,6 +18,13 @@ The stack includes:
 
 Notes:
 
+- Generate `DEPLOYMATE_SERVER_CREDENTIALS_KEY` once and keep it stable for the lifetime of the environment. Example:
+
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+- If the key changes later, previously stored server SSH credentials will no longer decrypt until the original key is restored.
 - Production now defaults to a `remote-only` profile. The backend does not need `/var/run/docker.sock` for the standard production setup.
 - Keep `NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0` in production so the UI matches the remote-only backend policy and does not offer local host deployment paths.
 - Public demo signup can be enabled with `DEPLOYMATE_PUBLIC_SIGNUP_ENABLED=true` and `NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED=1`. New users are created as `member` on the `trial` plan.

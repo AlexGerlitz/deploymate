@@ -28,6 +28,15 @@ Before any release from the workstation:
 ./scripts/preflight.sh
 ```
 
+Before the first deploy of encrypted server credentials, or before enabling remote server management on a fresh environment:
+
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# store the value in .env.production as DEPLOYMATE_SERVER_CREDENTIALS_KEY
+```
+
+Do not rotate `DEPLOYMATE_SERVER_CREDENTIALS_KEY` casually. Existing stored server credentials depend on it for decryption.
+
 ## Frontend-only deploy
 
 Local:
@@ -61,6 +70,8 @@ Local:
 ```bash
 python3 -m py_compile backend/app/main.py backend/app/routes/*.py backend/app/services/*.py backend/app/db.py backend/app/schemas.py
 PYTHONPATH=backend backend/venv/bin/python -m unittest discover -s backend/tests -p 'test_*.py'
+PYTHONPATH=backend backend/venv/bin/python -m unittest backend.tests.test_server_credentials -v
+bash scripts/security_audit.sh
 git status --short
 git add backend
 git commit -m "Describe the backend change"
@@ -72,6 +83,7 @@ Host:
 ```bash
 ssh <deploy-host>
 cd /opt/deploymate
+grep '^DEPLOYMATE_SERVER_CREDENTIALS_KEY=' .env.production
 git fetch origin
 git switch develop
 git pull --ff-only origin develop
@@ -79,6 +91,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 docker compose -f docker-compose.prod.yml --env-file .env.production ps backend
 curl -I https://your-domain/api/health
 ```
+
+If this release introduces encrypted server credentials and production already has existing server records, the backend startup path will migrate any plaintext records to encrypted form after boot as long as `DEPLOYMATE_SERVER_CREDENTIALS_KEY` is present.
 
 ## Full stack deploy
 
