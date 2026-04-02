@@ -33,10 +33,10 @@ import {
 import {
   buildAuditEventsCsv,
   copyTextToClipboard,
-  escapeCsvCell,
   readJsonOrError,
   triggerFileDownload,
 } from "../../lib/admin-page-utils";
+import { buildSelectedRequestsCsv } from "../../lib/admin-export-utils";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -54,23 +54,6 @@ function formatDate(value) {
   }
 
   return date.toLocaleString();
-}
-
-function buildSelectedRequestsCsv(items) {
-  const rows = [["status", "name", "email", "current_plan", "target_username", "reviewed_at", "updated_at", "created_at"]];
-  for (const item of items) {
-    rows.push([
-      item.status || "",
-      item.name || "",
-      item.email || "",
-      item.current_plan || "",
-      item.target_username || "",
-      item.reviewed_at || "",
-      item.updated_at || "",
-      item.created_at || "",
-    ]);
-  }
-  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }
 
 function formatUpgradeSavedViews(items) {
