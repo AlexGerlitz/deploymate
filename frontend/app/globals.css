@@ -461,10 +461,12 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid #eee;
-  border-radius: 10px;
-  background: #fcfcfd;
+  padding: 16px 18px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%);
+  box-shadow: 0 12px 24px rgba(17, 24, 39, 0.04);
 }
 
 .adminSavedViewCard strong,
@@ -483,6 +485,32 @@ a {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.adminPageHero {
+  margin-bottom: 18px;
+}
+
+.adminSavedViews,
+.adminSavedViewsComposer,
+.adminSavedViewsList {
+  gap: 14px;
+}
+
+.adminFilterFooter,
+.adminFilterActions {
+  gap: 10px;
+}
+
+.adminFilterChip {
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  background: rgba(248, 249, 251, 0.92);
+  padding: 8px 12px;
+  color: #334155;
+}
+
+.adminFilterCopy .formHint {
+  color: #5f6675;
 }
 
 .adminActionLabel {
@@ -1503,6 +1531,17 @@ button.landingButton.primaryButton:disabled {
 
 .authBanner {
   margin-top: 10px;
+}
+
+.authDemoForm {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.authDemoAction {
+  border-radius: 14px;
+  background: rgba(19, 34, 56, 0.06);
 }
 
 .authCardFooter {

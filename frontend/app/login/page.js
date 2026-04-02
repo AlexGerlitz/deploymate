@@ -7,6 +7,9 @@ export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
   const error = typeof params?.error === "string" ? params.error : "";
   const username = typeof params?.username === "string" ? params.username : "";
+  const demoAccessEnabled = Boolean(
+    process.env.DEPLOYMATE_DEMO_PASSWORD || process.env.DEPLOYMATE_ADMIN_PASSWORD,
+  );
 
   return (
     <main className="page authPage">
@@ -86,6 +89,22 @@ export default async function LoginPage({ searchParams }) {
               </button>
             </div>
           </form>
+
+          {demoAccessEnabled ? (
+            <form method="post" action="/login/demo" className="authDemoForm">
+              <button
+                type="submit"
+                className="linkButton authDemoAction"
+                data-testid="auth-demo-submit-button"
+              >
+                Explore live demo without registration
+              </button>
+              <p className="formHint">
+                Opens the current demo workspace immediately, so a reviewer can see the product
+                before creating an account.
+              </p>
+            </form>
+          ) : null}
 
           {error ? <div className="banner error" data-testid="auth-login-error-banner">{error}</div> : null}
 

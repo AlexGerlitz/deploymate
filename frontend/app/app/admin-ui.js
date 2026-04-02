@@ -12,31 +12,64 @@ export function AdminPageHeader({
   actions = [],
 }) {
   return (
-    <div className="header">
-      <div>
-        <h1 data-testid={titleTestId}>{title}</h1>
-        <p>{subtitle}</p>
-      </div>
-      <div className="buttonRow">
-        <Link href="/app" className="linkButton">
-          Back
-        </Link>
-        <button type="button" data-testid={refreshTestId} onClick={onRefresh} disabled={loading}>
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
-        {actions.map((action) => (
+    <section className="workspaceHero adminPageHero">
+      <div className="workspaceHeroBackdrop" />
+      <div className="header workspaceHeroHeader">
+        <div>
+          <div className="eyebrow">Admin workspace</div>
+          <h1 data-testid={titleTestId}>{title}</h1>
+          <p>{subtitle}</p>
+        </div>
+        <div className="buttonRow workspaceHeroActions">
+          <Link href="/app" className="linkButton workspaceSecondaryAction">
+            Back
+          </Link>
           <button
-            key={action.label}
             type="button"
-            data-testid={action.testId}
-            onClick={action.onClick}
-            disabled={action.disabled}
+            className="landingButton primaryButton workspacePrimaryAction"
+            data-testid={refreshTestId}
+            onClick={onRefresh}
+            disabled={loading}
           >
-            {action.label}
+            {loading ? "Refreshing..." : "Refresh"}
           </button>
-        ))}
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              className="workspaceGhostAction"
+              data-testid={action.testId}
+              onClick={action.onClick}
+              disabled={action.disabled}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+      <div className="workspaceHeroSummary">
+        <div className="workspaceHeroMetric">
+          <span>Control</span>
+          <strong>Admin</strong>
+          <p>Bulk actions, exports, saved views, and higher-trust workflows live here.</p>
+        </div>
+        <div className="workspaceHeroMetric">
+          <span>Review</span>
+          <strong>Audit</strong>
+          <p>Filterable audit trails and current-view exports support handoff and triage.</p>
+        </div>
+        <div className="workspaceHeroMetric">
+          <span>Speed</span>
+          <strong>Saved views</strong>
+          <p>Keep browser-local presets for repeated inbox and admin review routines.</p>
+        </div>
+        <div className="workspaceHeroBadge workspaceHeroSpotlight">
+          <span>What matters now</span>
+          <strong>{title}</strong>
+          <p>Use this surface to review data quickly, make controlled changes, and keep admin work shareable.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
