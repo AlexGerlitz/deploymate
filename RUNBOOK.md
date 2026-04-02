@@ -147,12 +147,27 @@ DEPLOYMATE_SMOKE_SERVER_ID='<server-id>' \
 bash scripts/post_deploy_smoke.sh
 ```
 
+Or create a temporary smoke target on the fly from an SSH key file:
+
+```bash
+DEPLOYMATE_BASE_URL=https://your-domain \
+DEPLOYMATE_ADMIN_USERNAME=admin \
+DEPLOYMATE_ADMIN_PASSWORD='<secret>' \
+DEPLOYMATE_SMOKE_RUNTIME_ENABLED=1 \
+DEPLOYMATE_SMOKE_SERVER_HOST='203.0.113.10' \
+DEPLOYMATE_SMOKE_SERVER_USERNAME='root' \
+DEPLOYMATE_SMOKE_SSH_KEY_FILE="$HOME/.ssh/id_ed25519" \
+bash scripts/post_deploy_smoke.sh
+```
+
 Runtime smoke notes:
 
 - if `DEPLOYMATE_SMOKE_SERVER_ID` is set, the script asks `/servers/{server_id}/suggested-ports` for a free external port
+- if `DEPLOYMATE_SMOKE_SERVER_ID` is empty but `DEPLOYMATE_SMOKE_SERVER_HOST`, `DEPLOYMATE_SMOKE_SERVER_USERNAME`, and `DEPLOYMATE_SMOKE_SSH_KEY_FILE` are set, the script creates and later deletes a temporary server target automatically
 - if `DEPLOYMATE_SMOKE_SERVER_ID` is not set, provide `DEPLOYMATE_SMOKE_EXTERNAL_PORT` explicitly
 - production can keep runtime smoke disabled when running in remote-only mode without a preconfigured smoke target
 - the script always attempts to delete the temporary smoke deployment before exit
+- if it created a temporary smoke server target, it also deletes that target before exit
 
 The scripted smoke currently validates:
 

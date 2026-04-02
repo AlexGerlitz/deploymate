@@ -7,6 +7,12 @@ USERNAME="${DEPLOYMATE_ADMIN_USERNAME:-}"
 PASSWORD="${DEPLOYMATE_ADMIN_PASSWORD:-}"
 RUNTIME_ENABLED="${DEPLOYMATE_SMOKE_RUNTIME_ENABLED:-0}"
 RUNTIME_SERVER_ID="${DEPLOYMATE_SMOKE_SERVER_ID:-}"
+RUNTIME_TEMP_SERVER_ID=""
+RUNTIME_SERVER_NAME="${DEPLOYMATE_SMOKE_SERVER_NAME:-prod-runtime-smoke}"
+RUNTIME_SERVER_HOST="${DEPLOYMATE_SMOKE_SERVER_HOST:-}"
+RUNTIME_SERVER_PORT="${DEPLOYMATE_SMOKE_SERVER_PORT:-22}"
+RUNTIME_SERVER_USERNAME="${DEPLOYMATE_SMOKE_SERVER_USERNAME:-}"
+RUNTIME_SSH_KEY_FILE="${DEPLOYMATE_SMOKE_SSH_KEY_FILE:-}"
 RUNTIME_IMAGE="${DEPLOYMATE_SMOKE_IMAGE:-nginx:alpine}"
 RUNTIME_INTERNAL_PORT="${DEPLOYMATE_SMOKE_INTERNAL_PORT:-80}"
 RUNTIME_EXTERNAL_PORT="${DEPLOYMATE_SMOKE_EXTERNAL_PORT:-}"
@@ -28,12 +34,19 @@ RUNTIME_ACTIVITY_BODY_FILE="$(mktemp)"
 RUNTIME_LOGS_BODY_FILE="$(mktemp)"
 RUNTIME_DELETE_BODY_FILE="$(mktemp)"
 RUNTIME_PORTS_BODY_FILE="$(mktemp)"
+RUNTIME_SERVER_CREATE_BODY_FILE="$(mktemp)"
+RUNTIME_SERVER_DELETE_BODY_FILE="$(mktemp)"
 
 cleanup() {
   if [ -n "$RUNTIME_DEPLOYMENT_ID" ] && [ -s "$COOKIE_JAR" ]; then
     curl -sS -o "$RUNTIME_DELETE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       -X DELETE "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID" >/dev/null || true
+  fi
+  if [ -n "$RUNTIME_TEMP_SERVER_ID" ] && [ -s "$COOKIE_JAR" ]; then
+    curl -sS -o "$RUNTIME_SERVER_DELETE_BODY_FILE" -w "%{http_code}" \
+      -b "$COOKIE_JAR" \
+      -X DELETE "$BASE_URL/api/servers/$RUNTIME_TEMP_SERVER_ID" >/dev/null || true
   fi
   rm -f \
     "$COOKIE_JAR" \
@@ -49,7 +62,9 @@ cleanup() {
     "$RUNTIME_ACTIVITY_BODY_FILE" \
     "$RUNTIME_LOGS_BODY_FILE" \
     "$RUNTIME_DELETE_BODY_FILE" \
-    "$RUNTIME_PORTS_BODY_FILE"
+    "$RUNTIME_PORTS_BODY_FILE" \
+    "$RUNTIME_SERVER_CREATE_BODY_FILE" \
+    "$RUNTIME_SERVER_DELETE_BODY_FILE"
 }
 
 trap cleanup EXIT
@@ -179,6 +194,66 @@ elif value is None:
 else:
     print(value)
 PY
+}
+
+ensure_runtime_server_id() {
+  if [ -n "$RUNTIME_SERVER_ID" ]; then
+    return 0
+  fi
+
+  if [ -z "$RUNTIME_SERVER_HOST" ] || [ -z "$RUNTIME_SERVER_USERNAME" ] || [ -z "$RUNTIME_SSH_KEY_FILE" ]; then
+    return 0
+  fi
+
+  if [ ! -f "$RUNTIME_SSH_KEY_FILE" ]; then
+    echo "[smoke] runtime ssh key file not found: $RUNTIME_SSH_KEY_FILE" >&2
+    exit 1
+  fi
+
+  local payload
+  payload="$(python3 - "$RUNTIME_SERVER_NAME" "$RUNTIME_SERVER_HOST" "$RUNTIME_SERVER_PORT" "$RUNTIME_SERVER_USERNAME" "$RUNTIME_SSH_KEY_FILE" <<'PY'
+import json
+import sys
+
+name = sys.argv[1]
+host = sys.argv[2]
+port = int(sys.argv[3])
+username = sys.argv[4]
+key_path = sys.argv[5]
+
+with open(key_path, "r", encoding="utf-8") as fh:
+    ssh_key = fh.read()
+
+print(json.dumps({
+    "name": name,
+    "host": host,
+    "port": port,
+    "username": username,
+    "auth_type": "ssh_key",
+    "ssh_key": ssh_key,
+}, ensure_ascii=True))
+PY
+)"
+
+  local create_status
+  create_status="$(
+    curl -sS -o "$RUNTIME_SERVER_CREATE_BODY_FILE" -w "%{http_code}" \
+      -b "$COOKIE_JAR" \
+      -H "Content-Type: application/json" \
+      -X POST "$BASE_URL/api/servers" \
+      --data "$payload"
+  )"
+  check_http_status "runtime smoke server create" "200" "$create_status" "$RUNTIME_SERVER_CREATE_BODY_FILE" >&2
+
+  RUNTIME_SERVER_ID="$(json_get "$RUNTIME_SERVER_CREATE_BODY_FILE" "id")"
+  if [ -z "$RUNTIME_SERVER_ID" ] || [ "$RUNTIME_SERVER_ID" = "null" ]; then
+    echo "[smoke] runtime smoke server create response is missing id" >&2
+    cat "$RUNTIME_SERVER_CREATE_BODY_FILE" >&2
+    exit 1
+  fi
+
+  RUNTIME_TEMP_SERVER_ID="$RUNTIME_SERVER_ID"
+  echo "[smoke] runtime smoke server created: $RUNTIME_SERVER_ID" >&2
 }
 
 resolve_runtime_external_port() {
@@ -452,6 +527,7 @@ fi
 echo "[smoke] restore dry-run ok"
 
 if [ "$RUNTIME_ENABLED" = "1" ] || [ "$RUNTIME_ENABLED" = "true" ]; then
+  ensure_runtime_server_id
   run_runtime_smoke
 else
   echo "[smoke] runtime smoke skipped"
