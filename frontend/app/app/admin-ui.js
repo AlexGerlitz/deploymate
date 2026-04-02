@@ -74,6 +74,7 @@ export function AdminFilterFooter({
   onReset,
   resetDisabled,
   resetTestId,
+  actions = [],
 }) {
   return (
     <div className="adminFilterFooter">
@@ -81,9 +82,125 @@ export function AdminFilterFooter({
         <p className="formHint">{summary}</p>
         <p className="formHint">{hint}</p>
       </div>
-      <button type="button" className="secondaryButton" data-testid={resetTestId} onClick={onReset} disabled={resetDisabled}>
-        Reset filters
-      </button>
+      <div className="adminFilterActions">
+        {actions.map((action) => (
+          <button
+            key={action.label}
+            type="button"
+            className="secondaryButton"
+            data-testid={action.testId}
+            onClick={action.onClick}
+            disabled={action.disabled}
+          >
+            {action.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="secondaryButton"
+          data-testid={resetTestId}
+          onClick={onReset}
+          disabled={resetDisabled}
+        >
+          Reset filters
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function AdminActiveFilters({ filters = [] }) {
+  const activeFilters = filters.filter(Boolean);
+
+  if (activeFilters.length === 0) {
+    return (
+      <div className="adminFilterChips">
+        <span className="adminFilterChip muted" data-testid="admin-active-filters-empty">
+          No active filters
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="adminFilterChips" data-testid="admin-active-filters">
+      {activeFilters.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          className="adminFilterChip"
+          data-testid={item.testId}
+          onClick={item.onRemove}
+        >
+          <span>{item.label}</span>
+          <span aria-hidden="true">x</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function AdminSavedViews({
+  title,
+  inputLabel,
+  inputValue,
+  onInputChange,
+  onSave,
+  saveDisabled,
+  saveTestId,
+  views = [],
+  onApply,
+  onDelete,
+  emptyText,
+  listTestId,
+}) {
+  return (
+    <div className="adminSavedViews">
+      <div className="sectionHeader">
+        <div>
+          <h3>{title}</h3>
+          <p className="formHint">Saved locally in this browser for faster admin workflows.</p>
+        </div>
+      </div>
+      <div className="adminSavedViewsComposer">
+        <label className="field">
+          <span>{inputLabel}</span>
+          <input value={inputValue} onChange={onInputChange} placeholder="Morning triage" />
+        </label>
+        <button
+          type="button"
+          className="secondaryButton"
+          data-testid={saveTestId}
+          onClick={onSave}
+          disabled={saveDisabled}
+        >
+          Save current view
+        </button>
+      </div>
+      {views.length === 0 ? (
+        <div className="empty" data-testid={listTestId}>
+          {emptyText}
+        </div>
+      ) : (
+        <div className="adminSavedViewsList" data-testid={listTestId}>
+          {views.map((view) => (
+            <div key={view.id} className="adminSavedViewCard">
+              <div>
+                <strong>{view.name}</strong>
+                <p className="formHint">Updated {view.updatedAtLabel}</p>
+              </div>
+              <div className="adminSavedViewActions">
+                <button type="button" className="secondaryButton" onClick={() => onApply(view.id)}>
+                  Apply
+                </button>
+                <button type="button" className="secondaryButton" onClick={() => onDelete(view.id)}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

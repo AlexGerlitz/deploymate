@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { AdminFeedbackBanners, AdminFilterFooter, AdminPageHeader } from "../admin-ui";
+import {
+  AdminActiveFilters,
+  AdminFeedbackBanners,
+  AdminFilterFooter,
+  AdminPageHeader,
+  AdminSavedViews,
+} from "../admin-ui";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -58,6 +64,7 @@ const smokeAuditEvents = [
 const smokeUsers = [
   { id: "smoke-admin", username: "smoke-admin", plan: "team" },
 ];
+const upgradeSavedViewsStorageKey = "deploymate.admin.upgradeRequests.savedViews";
 
 function formatDate(value) {
   if (!value) {
@@ -102,6 +109,39 @@ function triggerFileDownload(filename, blob) {
   URL.revokeObjectURL(url);
 }
 
+async function copyTextToClipboard(value) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "readonly");
+  textarea.style.position = "absolute";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function formatSavedViews(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && item.filters)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      filters: item.filters,
+      updatedAt: item.updatedAt || new Date().toISOString(),
+      updatedAtLabel: formatDate(item.updatedAt || new Date().toISOString()),
+    }));
+}
+
 function UpgradeRequestsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -112,6 +152,8 @@ function UpgradeRequestsPageContent() {
   const [adminOverview, setAdminOverview] = useState(smokeMode ? smokeOverview : null);
   const [auditEvents, setAuditEvents] = useState(smokeMode ? smokeAuditEvents : []);
   const [users, setUsers] = useState(smokeMode ? smokeUsers : []);
+  const [savedViews, setSavedViews] = useState([]);
+  const [savedViewName, setSavedViewName] = useState("");
   const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
@@ -130,7 +172,58 @@ function UpgradeRequestsPageContent() {
     query.trim() !== "" ||
     planFilter !== "all" ||
     statusFilter !== "all" ||
-    linkedOnly;
+    linkedOnly ||
+    auditQuery.trim() !== "";
+  const currentUpgradeView = {
+    q: query.trim(),
+    plan: planFilter,
+    status: statusFilter,
+    linked_only: linkedOnly,
+    audit_q: auditQuery.trim(),
+  };
+  const activeFilterChips = [
+    query.trim()
+      ? {
+          key: "upgrade-q",
+          label: `Search: ${query.trim()}`,
+          onRemove: () => setQuery(""),
+          testId: "upgrade-filter-chip-query",
+        }
+      : null,
+    planFilter !== "all"
+      ? {
+          key: "upgrade-plan",
+          label: `Plan: ${planFilter}`,
+          onRemove: () => setPlanFilter("all"),
+          testId: "upgrade-filter-chip-plan",
+        }
+      : null,
+    statusFilter !== "all"
+      ? {
+          key: "upgrade-status",
+          label: `Status: ${statusFilter}`,
+          onRemove: () => setStatusFilter("all"),
+          testId: "upgrade-filter-chip-status",
+        }
+      : null,
+    linkedOnly
+      ? {
+          key: "upgrade-linked",
+          label: "Linked users only",
+          onRemove: () => setLinkedOnly(false),
+          testId: "upgrade-filter-chip-linked",
+        }
+      : null,
+    auditQuery.trim()
+      ? {
+          key: "upgrade-audit",
+          label: `Audit: ${auditQuery.trim()}`,
+          onRemove: () => setAuditQuery(""),
+          testId: "upgrade-filter-chip-audit",
+        }
+      : null,
+  ];
+  const canSaveCurrentView = savedViewName.trim() !== "" && hasRequestFilters;
 
   function buildDraft(item) {
     return {
@@ -230,6 +323,26 @@ function UpgradeRequestsPageContent() {
     setAuditEvents(Array.isArray(data) ? data : []);
   }
 
+  function persistSavedViews(nextViews) {
+    const normalized = formatSavedViews(nextViews);
+    setSavedViews(normalized);
+    if (!smokeMode) {
+      window.localStorage.setItem(upgradeSavedViewsStorageKey, JSON.stringify(nextViews));
+    }
+  }
+
+  function applyViewFilters(filters) {
+    setQuery(filters.q || "");
+    setPlanFilter(filters.plan || "all");
+    setStatusFilter(filters.status || "all");
+    setLinkedOnly(Boolean(filters.linked_only));
+    setAuditQuery(filters.audit_q || "");
+  }
+
+  async function refreshPageData() {
+    await Promise.all([loadUsers(), loadRequests(), loadAdminOverview(), loadAuditEvents()]);
+  }
+
   function updateDraft(requestId, field, value) {
     setDrafts((current) => ({
       ...current,
@@ -297,7 +410,7 @@ function UpgradeRequestsPageContent() {
           return;
         }
 
-        await Promise.all([loadUsers(), loadRequests(), loadAdminOverview(), loadAuditEvents()]);
+        await refreshPageData();
       } catch {
         router.replace("/login");
       }
@@ -305,6 +418,39 @@ function UpgradeRequestsPageContent() {
 
     checkAuthAndLoad();
   }, [router]);
+
+  useEffect(() => {
+    if (smokeMode) {
+      setSavedViews(
+        formatSavedViews([
+          {
+            id: "upgrade-smoke-view",
+            name: "In review queue",
+            filters: {
+              q: "",
+              plan: "all",
+              status: "in_review",
+              linked_only: false,
+              audit_q: "",
+            },
+            updatedAt: "2026-04-02T00:12:00Z",
+          },
+        ]),
+      );
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(upgradeSavedViewsStorageKey);
+      if (!stored) {
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      setSavedViews(formatSavedViews(parsed));
+    } catch {
+      setSavedViews([]);
+    }
+  }, []);
 
   useEffect(() => {
     if (smokeMode) {
@@ -388,11 +534,74 @@ function UpgradeRequestsPageContent() {
     }
   }
 
+  async function handleCopyCurrentView() {
+    setError("");
+    try {
+      await copyTextToClipboard(window.location.href);
+      setSaveFeedback("Current view link copied.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to copy current view link.",
+      );
+    }
+  }
+
   function resetRequestFilters() {
     setQuery("");
     setPlanFilter("all");
     setStatusFilter("all");
     setLinkedOnly(false);
+    setAuditQuery("");
+  }
+
+  function handleSaveCurrentView() {
+    if (!canSaveCurrentView) {
+      return;
+    }
+
+    const nextViews = [
+      {
+        id: `${Date.now()}`,
+        name: savedViewName.trim(),
+        filters: currentUpgradeView,
+        updatedAt: new Date().toISOString(),
+      },
+      ...savedViews.map((item) => ({
+        id: item.id,
+        name: item.name,
+        filters: item.filters,
+        updatedAt: item.updatedAt,
+      })),
+    ].slice(0, 8);
+
+    persistSavedViews(nextViews);
+    setSavedViewName("");
+    setSaveFeedback("Saved current inbox view.");
+    setError("");
+  }
+
+  function handleApplySavedView(viewId) {
+    const nextView = savedViews.find((item) => item.id === viewId);
+    if (!nextView) {
+      return;
+    }
+    applyViewFilters(nextView.filters);
+    setSaveFeedback(`Applied saved view ${nextView.name}.`);
+    setError("");
+  }
+
+  function handleDeleteSavedView(viewId) {
+    const nextViews = savedViews
+      .filter((item) => item.id !== viewId)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        filters: item.filters,
+        updatedAt: item.updatedAt,
+      }));
+    persistSavedViews(nextViews);
+    setSaveFeedback("Saved inbox view removed.");
+    setError("");
   }
 
   if (!authChecked) {
@@ -433,9 +642,10 @@ function UpgradeRequestsPageContent() {
           titleTestId="upgrade-requests-page-title"
           subtitle={currentUser ? `Admin inbox · ${currentUser.username}` : "Admin inbox"}
           loading={loading}
-          onRefresh={() => Promise.all([loadUsers(), loadRequests(), loadAdminOverview(), loadAuditEvents()])}
+          onRefresh={refreshPageData}
           refreshTestId="upgrade-refresh-button"
           actions={[
+            { label: "Copy link", testId: "upgrade-copy-link-button", onClick: handleCopyCurrentView },
             { label: "Export CSV", testId: "upgrade-export-button", onClick: handleDownloadUpgradeExport },
           ]}
         />
@@ -518,6 +728,7 @@ function UpgradeRequestsPageContent() {
           </label>
           <p className="formHint">Recent audit events shown: {auditEvents.length}</p>
           <p className="formHint">Audit search updates after a short pause.</p>
+          <AdminActiveFilters filters={activeFilterChips} />
           {auditEvents.length === 0 ? (
             <div className="empty" data-testid="upgrade-audit-empty-state">
               {auditQuery.trim() ? "No upgrade audit events match this search." : "No upgrade audit events yet."}
@@ -651,10 +862,34 @@ function UpgradeRequestsPageContent() {
           </div>
           <AdminFilterFooter
             summary={`Showing ${filteredRequests.length} request${filteredRequests.length === 1 ? "" : "s"} for the current filters.`}
-            hint="Request search updates after a short pause."
+            hint="Inbox and audit filters stay in the URL, so this view can be shared or saved locally."
             onReset={resetRequestFilters}
             resetDisabled={!hasRequestFilters}
             resetTestId="upgrade-reset-filters-button"
+            actions={[
+              {
+                label: "Copy filter link",
+                testId: "upgrade-copy-filter-link-button",
+                onClick: handleCopyCurrentView,
+              },
+            ]}
+          />
+        </article>
+
+        <article className="card formCard">
+          <AdminSavedViews
+            title="Saved inbox views"
+            inputLabel="View name"
+            inputValue={savedViewName}
+            onInputChange={(event) => setSavedViewName(event.target.value)}
+            onSave={handleSaveCurrentView}
+            saveDisabled={!canSaveCurrentView}
+            saveTestId="upgrade-save-view-button"
+            views={savedViews}
+            onApply={handleApplySavedView}
+            onDelete={handleDeleteSavedView}
+            emptyText="No saved inbox views yet."
+            listTestId="upgrade-saved-views-list"
           />
         </article>
 

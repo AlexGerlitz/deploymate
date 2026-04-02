@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { AdminFeedbackBanners, AdminFilterFooter, AdminPageHeader } from "../admin-ui";
+import {
+  AdminActiveFilters,
+  AdminFeedbackBanners,
+  AdminFilterFooter,
+  AdminPageHeader,
+  AdminSavedViews,
+} from "../admin-ui";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -48,6 +54,7 @@ const smokeAuditEvents = [
     created_at: "2026-04-02T00:05:00Z",
   },
 ];
+const usersSavedViewsStorageKey = "deploymate.admin.users.savedViews";
 
 function formatDate(value) {
   if (!value) {
@@ -148,6 +155,39 @@ function buildRestoreDryRunCsv(report) {
   return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }
 
+async function copyTextToClipboard(value) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "readonly");
+  textarea.style.position = "absolute";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function formatSavedViews(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && item.filters)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      filters: item.filters,
+      updatedAt: item.updatedAt || new Date().toISOString(),
+      updatedAtLabel: formatDate(item.updatedAt || new Date().toISOString()),
+    }));
+}
+
 function UsersPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -160,6 +200,8 @@ function UsersPageContent() {
   const [backupBundleText, setBackupBundleText] = useState("");
   const [restoreDryRun, setRestoreDryRun] = useState(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
+  const [savedViews, setSavedViews] = useState([]);
+  const [savedViewName, setSavedViewName] = useState("");
   const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -191,7 +233,58 @@ function UsersPageContent() {
     query.trim() !== "" ||
     roleFilter !== "all" ||
     planFilter !== "all" ||
-    mustChangeFilter !== "all";
+    mustChangeFilter !== "all" ||
+    auditQuery.trim() !== "";
+  const currentUserView = {
+    q: query.trim(),
+    role: roleFilter,
+    plan: planFilter,
+    must_change_password: mustChangeFilter,
+    audit_q: auditQuery.trim(),
+  };
+  const activeFilterChips = [
+    query.trim()
+      ? {
+          key: "users-q",
+          label: `Search: ${query.trim()}`,
+          onRemove: () => setQuery(""),
+          testId: "users-filter-chip-query",
+        }
+      : null,
+    roleFilter !== "all"
+      ? {
+          key: "users-role",
+          label: `Role: ${roleFilter}`,
+          onRemove: () => setRoleFilter("all"),
+          testId: "users-filter-chip-role",
+        }
+      : null,
+    planFilter !== "all"
+      ? {
+          key: "users-plan",
+          label: `Plan: ${planFilter}`,
+          onRemove: () => setPlanFilter("all"),
+          testId: "users-filter-chip-plan",
+        }
+      : null,
+    mustChangeFilter !== "all"
+      ? {
+          key: "users-password",
+          label: mustChangeFilter === "required" ? "Password: change required" : "Password: ok",
+          onRemove: () => setMustChangeFilter("all"),
+          testId: "users-filter-chip-password",
+        }
+      : null,
+    auditQuery.trim()
+      ? {
+          key: "users-audit",
+          label: `Audit: ${auditQuery.trim()}`,
+          onRemove: () => setAuditQuery(""),
+          testId: "users-filter-chip-audit",
+        }
+      : null,
+  ];
+  const canSaveCurrentView = savedViewName.trim() !== "" && hasUserFilters;
 
   async function loadAdminOverview() {
     const response = await fetch(`${apiBaseUrl}/admin/overview`, {
@@ -260,6 +353,26 @@ function UsersPageContent() {
     }
   }
 
+  function persistSavedViews(nextViews) {
+    const normalized = formatSavedViews(nextViews);
+    setSavedViews(normalized);
+    if (!smokeMode) {
+      window.localStorage.setItem(usersSavedViewsStorageKey, JSON.stringify(nextViews));
+    }
+  }
+
+  function applyViewFilters(filters) {
+    setQuery(filters.q || "");
+    setRoleFilter(filters.role || "all");
+    setPlanFilter(filters.plan || "all");
+    setMustChangeFilter(filters.must_change_password || "all");
+    setAuditQuery(filters.audit_q || "");
+  }
+
+  async function refreshPageData() {
+    await Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()]);
+  }
+
   useEffect(() => {
     if (smokeMode) {
       return;
@@ -280,7 +393,7 @@ function UsersPageContent() {
           return;
         }
 
-        await Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()]);
+        await refreshPageData();
       } catch {
         router.replace("/login");
       }
@@ -288,6 +401,39 @@ function UsersPageContent() {
 
     checkAuthAndLoad();
   }, [router]);
+
+  useEffect(() => {
+    if (smokeMode) {
+      setSavedViews(
+        formatSavedViews([
+          {
+            id: "users-smoke-view",
+            name: "Admins only",
+            filters: {
+              q: "",
+              role: "admin",
+              plan: "all",
+              must_change_password: "all",
+              audit_q: "",
+            },
+            updatedAt: "2026-04-02T00:10:00Z",
+          },
+        ]),
+      );
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(usersSavedViewsStorageKey);
+      if (!stored) {
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      setSavedViews(formatSavedViews(parsed));
+    } catch {
+      setSavedViews([]);
+    }
+  }, []);
 
   function updateFormField(event) {
     const { name, value } = event.target;
@@ -321,7 +467,7 @@ function UsersPageContent() {
         role: "member",
       });
       setSuccess("User created successfully.");
-      await Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()]);
+      await refreshPageData();
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "Failed to create user.",
@@ -349,7 +495,7 @@ function UsersPageContent() {
         "Failed to update user role.",
       );
       setSuccess("User role updated successfully.");
-      await Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()]);
+      await refreshPageData();
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -379,7 +525,7 @@ function UsersPageContent() {
         "Failed to update user plan.",
       );
       setSuccess("User plan updated successfully.");
-      await Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()]);
+      await refreshPageData();
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -410,7 +556,7 @@ function UsersPageContent() {
         "Failed to delete user.",
       );
       setSuccess("User deleted successfully.");
-      await Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()]);
+      await refreshPageData();
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "Failed to delete user.",
@@ -454,6 +600,18 @@ function UsersPageContent() {
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "Failed to download admin audit export.",
+      );
+    }
+  }
+
+  async function handleCopyCurrentView() {
+    setError("");
+    try {
+      await copyTextToClipboard(window.location.href);
+      setSuccess("Current view link copied.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to copy current view link.",
       );
     }
   }
@@ -597,6 +755,57 @@ function UsersPageContent() {
     setRoleFilter("all");
     setPlanFilter("all");
     setMustChangeFilter("all");
+    setAuditQuery("");
+  }
+
+  function handleSaveCurrentView() {
+    if (!canSaveCurrentView) {
+      return;
+    }
+
+    const nextViews = [
+      {
+        id: `${Date.now()}`,
+        name: savedViewName.trim(),
+        filters: currentUserView,
+        updatedAt: new Date().toISOString(),
+      },
+      ...savedViews.map((item) => ({
+        id: item.id,
+        name: item.name,
+        filters: item.filters,
+        updatedAt: item.updatedAt,
+      })),
+    ].slice(0, 8);
+
+    persistSavedViews(nextViews);
+    setSavedViewName("");
+    setSuccess("Saved current user view.");
+    setError("");
+  }
+
+  function handleApplySavedView(viewId) {
+    const nextView = savedViews.find((item) => item.id === viewId);
+    if (!nextView) {
+      return;
+    }
+    applyViewFilters(nextView.filters);
+    setSuccess(`Applied saved view ${nextView.name}.`);
+    setError("");
+  }
+
+  function handleDeleteSavedView(viewId) {
+    const nextViews = savedViews
+      .filter((item) => item.id !== viewId)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        filters: item.filters,
+        updatedAt: item.updatedAt,
+      }));
+    persistSavedViews(nextViews);
+    setSuccess("Saved user view removed.");
+    setError("");
   }
 
   useEffect(() => {
@@ -698,9 +907,10 @@ function UsersPageContent() {
           titleTestId="users-page-title"
           subtitle={currentUser ? `Admin users management · ${currentUser.username}` : "Users"}
           loading={loading}
-          onRefresh={() => Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()])}
+          onRefresh={refreshPageData}
           refreshTestId="users-refresh-button"
           actions={[
+            { label: "Copy link", testId: "users-copy-link-button", onClick: handleCopyCurrentView },
             { label: "Export CSV", testId: "users-export-button", onClick: handleDownloadUsersExport },
             { label: "Audit CSV", testId: "users-audit-export-button", onClick: handleDownloadAuditExport },
           ]}
@@ -784,6 +994,7 @@ function UsersPageContent() {
           </label>
           <p className="formHint">Recent audit events shown: {auditEvents.length}</p>
           <p className="formHint">Audit search updates after a short pause.</p>
+          <AdminActiveFilters filters={activeFilterChips} />
           {auditEvents.length === 0 ? (
             <div className="empty" data-testid="users-audit-empty-state">
               {auditQuery.trim() ? "No admin audit events match this search." : "No admin audit events yet."}
@@ -1054,10 +1265,34 @@ function UsersPageContent() {
           </div>
           <AdminFilterFooter
             summary={`Showing ${filteredUsers.length} user${filteredUsers.length === 1 ? "" : "s"} for the current filters.`}
-            hint="User search updates after a short pause."
+            hint="User and audit filters stay in the URL, so this view can be shared or saved locally."
             onReset={resetUserFilters}
             resetDisabled={!hasUserFilters}
             resetTestId="users-reset-filters-button"
+            actions={[
+              {
+                label: "Copy filter link",
+                testId: "users-copy-filter-link-button",
+                onClick: handleCopyCurrentView,
+              },
+            ]}
+          />
+        </article>
+
+        <article className="card formCard">
+          <AdminSavedViews
+            title="Saved user views"
+            inputLabel="View name"
+            inputValue={savedViewName}
+            onInputChange={(event) => setSavedViewName(event.target.value)}
+            onSave={handleSaveCurrentView}
+            saveDisabled={!canSaveCurrentView}
+            saveTestId="users-save-view-button"
+            views={savedViews}
+            onApply={handleApplySavedView}
+            onDelete={handleDeleteSavedView}
+            emptyText="No saved user views yet."
+            listTestId="users-saved-views-list"
           />
         </article>
 

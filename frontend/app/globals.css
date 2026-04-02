@@ -367,6 +367,71 @@ a {
   gap: 4px;
 }
 
+.adminFilterActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.adminFilterChips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.adminFilterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d7dbe3;
+  border-radius: 999px;
+  background: #f8f9fb;
+  padding: 6px 10px;
+  font: inherit;
+}
+
+.adminFilterChip.muted {
+  color: #666;
+}
+
+.adminSavedViews {
+  display: grid;
+  gap: 14px;
+}
+
+.adminSavedViewsComposer {
+  display: grid;
+  gap: 12px;
+}
+
+.adminSavedViewsList {
+  display: grid;
+  gap: 10px;
+}
+
+.adminSavedViewCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fcfcfd;
+}
+
+.adminSavedViewCard strong,
+.adminSavedViewCard p {
+  margin: 0;
+}
+
+.adminSavedViewActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .fieldHint {
   color: #666;
   font-size: 13px;
