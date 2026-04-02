@@ -28,6 +28,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
+      # Required only when DeployMate should manage Docker on the same VPS host.
       - /var/run/docker.sock:/var/run/docker.sock
 
   frontend:

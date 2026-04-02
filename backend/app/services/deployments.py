@@ -32,6 +32,45 @@ def _run_local_command(command: List[str]) -> subprocess.CompletedProcess:
         ) from exc
 
 
+def _get_ssh_host_key_mode() -> str:
+    mode = os.getenv("DEPLOYMATE_SSH_HOST_KEY_CHECKING", "accept-new").strip().lower()
+    if mode in {"accept-new", "yes", "no"}:
+        return mode
+    return "accept-new"
+
+
+def _get_ssh_known_hosts_file(mode: str) -> str:
+    if mode == "no":
+        return "/dev/null"
+
+    configured = os.getenv("DEPLOYMATE_SSH_KNOWN_HOSTS_FILE", "").strip()
+    if configured:
+        return configured
+    return os.path.expanduser("~/.deploymate_known_hosts")
+
+
+def _build_ssh_base_command(server: dict) -> list[str]:
+    mode = _get_ssh_host_key_mode()
+    known_hosts_file = _get_ssh_known_hosts_file(mode)
+
+    if known_hosts_file not in {"", "/dev/null"}:
+        known_hosts_dir = os.path.dirname(known_hosts_file)
+        if known_hosts_dir:
+            os.makedirs(known_hosts_dir, exist_ok=True)
+
+    return [
+        "ssh",
+        "-p",
+        str(server["port"]),
+        "-o",
+        f"StrictHostKeyChecking={mode}",
+        "-o",
+        f"UserKnownHostsFile={known_hosts_file}",
+        "-o",
+        "LogLevel=ERROR",
+    ]
+
+
 def _run_remote_command(server: dict, command: List[str]) -> subprocess.CompletedProcess:
     ssh_command: List[str] = []
     temp_key_path = None
@@ -55,19 +94,7 @@ def _run_remote_command(server: dict, command: List[str]) -> subprocess.Complete
     else:
         raise HTTPException(status_code=400, detail="Unsupported server auth_type.")
 
-    ssh_command.extend(
-        [
-            "ssh",
-            "-p",
-            str(server["port"]),
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            "-o",
-            "LogLevel=ERROR",
-        ]
-    )
+    ssh_command.extend(_build_ssh_base_command(server))
 
     if temp_key_path:
         ssh_command.extend(["-i", temp_key_path])
