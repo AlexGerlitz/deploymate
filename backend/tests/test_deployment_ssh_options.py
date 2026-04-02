@@ -6,7 +6,11 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from app.services.auth import public_signup_enabled
-from app.services.deployments import _build_ssh_base_command, ensure_local_docker_runtime_enabled
+from app.services.deployments import (
+    _build_ssh_base_command,
+    ensure_local_docker_runtime_enabled,
+    local_docker_runtime_enabled,
+)
 
 
 class DeploymentSshOptionsTests(unittest.TestCase):
@@ -29,6 +33,10 @@ class DeploymentSshOptionsTests(unittest.TestCase):
     def test_local_runtime_guard_allows_when_enabled(self):
         with patch.dict(os.environ, {"DEPLOYMATE_LOCAL_DOCKER_ENABLED": "true"}, clear=False):
             ensure_local_docker_runtime_enabled()
+
+    def test_local_runtime_is_disabled_by_default(self):
+        with patch.dict(os.environ, {}, clear=False):
+            self.assertFalse(local_docker_runtime_enabled())
 
     def test_default_ssh_mode_is_accept_new(self):
         server = {"port": 22}

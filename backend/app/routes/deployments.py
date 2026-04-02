@@ -42,6 +42,7 @@ from app.services.deployments import (
     ensure_container_name_is_available,
     ensure_docker_is_available,
     ensure_external_port_is_available,
+    ensure_runtime_target_allowed,
     get_container_logs,
     get_container_logs_tail,
     inspect_container_state,
@@ -85,6 +86,7 @@ def _create_deployment(
 ) -> DeploymentResponse:
     enforce_plan_limit(user, "deployments")
     server = get_server_or_404(payload.server_id) if payload.server_id else None
+    ensure_runtime_target_allowed(server)
     ensure_docker_is_available(server)
     ensure_external_port_is_available(payload.external_port, server)
 
@@ -431,6 +433,9 @@ def _validate_template_payload(payload: DeploymentTemplateCreateRequest) -> None
 
     if payload.server_id:
         get_server_or_404(payload.server_id)
+        return
+
+    ensure_runtime_target_allowed(None)
 
 
 @router.get("/deployments", response_model=List[DeploymentResponse])
@@ -650,6 +655,7 @@ def redeploy_deployment(
 
     existing_deployment = get_deployment_record_or_404(deployment_id)
     server = get_server_or_404(existing_deployment["server_id"]) if existing_deployment.get("server_id") else None
+    ensure_runtime_target_allowed(server)
     ensure_docker_is_available(server)
     if (
         payload.external_port is not None

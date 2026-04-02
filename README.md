@@ -144,6 +144,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - dedicated servers frontend smoke in [scripts/frontend_servers_smoke.sh](scripts/frontend_servers_smoke.sh)
 - dedicated templates frontend smoke in [scripts/frontend_templates_smoke.sh](scripts/frontend_templates_smoke.sh)
 - deployment detail now includes quick reference, attention overview, and copyable runtime summary ergonomics
+- backend local Docker execution is now explicit opt-in; remote-only is the default runtime posture
 - the local release gate now runs auth, admin, admin-interactions, ops, restore, runtime, servers, and templates frontend smokes before build
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)
@@ -238,7 +239,7 @@ Current strengths:
 Current tradeoffs:
 
 - server credentials are still application-managed, but they are encrypted at rest and require a stable `DEPLOYMATE_SERVER_CREDENTIALS_KEY`
-- local Docker control is still available as an opt-in capability when explicitly enabled
+- local Docker control is explicit opt-in and disabled by default unless `DEPLOYMATE_LOCAL_DOCKER_ENABLED=true`
 - legacy password-based SSH records may still exist until they are rotated to SSH keys
 - local Docker control and remote SSH control still live in the same backend service boundary
 

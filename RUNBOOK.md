@@ -122,6 +122,12 @@ To audit the current database state for server credential encryption before a re
 bash scripts/server_credentials_audit.sh
 ```
 
+To verify that the repo still keeps local Docker execution behind an explicit opt-in boundary:
+
+```bash
+bash scripts/local_runtime_audit.sh
+```
+
 ## Frontend-only deploy
 
 Local:

@@ -1,4 +1,5 @@
 import unittest
+import os
 from datetime import datetime, timezone
 from subprocess import CompletedProcess
 from unittest.mock import patch
@@ -50,6 +51,13 @@ class DeploymentApiFlowTests(unittest.TestCase):
             self.addCleanup(patcher.stop)
 
         self.addCleanup(app.dependency_overrides.clear)
+        self.local_runtime_env = patch.dict(
+            os.environ,
+            {"DEPLOYMATE_LOCAL_DOCKER_ENABLED": "true"},
+            clear=False,
+        )
+        self.local_runtime_env.start()
+        self.addCleanup(self.local_runtime_env.stop)
         self.client = TestClient(app)
 
     def _serialize_record(self, record):

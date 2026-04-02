@@ -90,6 +90,11 @@ if [ -f "scripts/server_credentials_audit.sh" ]; then
   bash scripts/server_credentials_audit.sh
 fi
 
+if [ -f "scripts/local_runtime_audit.sh" ]; then
+  echo "[security-audit] local runtime audit"
+  bash scripts/local_runtime_audit.sh
+fi
+
 if [ "$WARNINGS" -eq 0 ]; then
   echo "[security-audit] no high-risk findings"
 else

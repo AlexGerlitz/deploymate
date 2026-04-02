@@ -34,7 +34,7 @@ def _run_local_command(command: List[str]) -> subprocess.CompletedProcess:
 
 
 def local_docker_runtime_enabled() -> bool:
-    raw_value = os.getenv("DEPLOYMATE_LOCAL_DOCKER_ENABLED", "true").strip().lower()
+    raw_value = os.getenv("DEPLOYMATE_LOCAL_DOCKER_ENABLED", "false").strip().lower()
     return raw_value not in {"0", "false", "no", "off"}
 
 
@@ -47,6 +47,12 @@ def ensure_local_docker_runtime_enabled() -> None:
                 "Attach a remote server target to continue."
             ),
         )
+
+
+def ensure_runtime_target_allowed(server: Optional[dict] = None) -> None:
+    if server is not None:
+        return
+    ensure_local_docker_runtime_enabled()
 
 
 def _get_ssh_host_key_mode() -> str:

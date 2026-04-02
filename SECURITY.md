@@ -21,6 +21,7 @@ Current strengths:
 - SSH host key checking defaults to `accept-new` instead of `no`
 - strict `DEPLOYMATE_SSH_HOST_KEY_CHECKING=yes` now fails fast unless a real non-empty `known_hosts` file is configured
 - production can run as remote-only without Docker socket access in the backend
+- local Docker execution is explicit opt-in and disabled by default in backend runtime policy
 - tracked-file security audit is part of the local preflight flow
 - new server targets now require SSH-key authentication
 - server credentials are encrypted at rest when stored, and startup now fails fast if credential records exist without `DEPLOYMATE_SERVER_CREDENTIALS_KEY`
@@ -28,7 +29,7 @@ Current strengths:
 Current tradeoffs:
 
 - server credentials are still application-managed
-- local Docker control is still available as an opt-in mode in some environments
+- local Docker control is still available as an explicit opt-in mode in some environments
 - local Docker execution and remote SSH orchestration still share one backend boundary
 
 ## Hardening direction
