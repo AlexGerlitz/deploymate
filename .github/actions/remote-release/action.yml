@@ -1,0 +1,178 @@
+name: Remote Release
+description: Prepare SSH materials and run the repository remote release helper.
+
+inputs:
+  surface:
+    description: Remote release surface
+    required: true
+  deploy_host:
+    description: SSH host alias or hostname
+    required: true
+  base_url:
+    description: Base URL for post-deploy smoke
+    required: true
+  admin_username:
+    description: Admin username for post-deploy smoke
+    required: true
+  admin_password:
+    description: Admin password for post-deploy smoke
+    required: true
+  deploy_ssh_private_key:
+    description: SSH private key used to reach the deploy host
+    required: true
+  deploy_ssh_known_hosts:
+    description: Pinned known_hosts content for the deploy host
+    required: true
+  runtime_smoke_enabled:
+    description: Enable runtime smoke
+    required: false
+    default: "0"
+  skip_smoke:
+    description: Skip post-deploy smoke
+    required: false
+    default: "0"
+  deploy_repo_dir:
+    description: Remote checkout path
+    required: false
+    default: ""
+  deploy_branch:
+    description: Remote Git branch
+    required: false
+    default: ""
+  deploy_env_file:
+    description: Remote compose env file
+    required: false
+    default: ""
+  runtime_smoke_ssh_private_key:
+    description: SSH private key used for temporary runtime smoke targets
+    required: false
+    default: ""
+  runtime_smoke_server_id:
+    description: Existing runtime smoke server id
+    required: false
+    default: ""
+  runtime_smoke_server_name:
+    description: Temporary runtime smoke server name
+    required: false
+    default: ""
+  runtime_smoke_server_host:
+    description: Temporary runtime smoke server host
+    required: false
+    default: ""
+  runtime_smoke_server_port:
+    description: Temporary runtime smoke server port
+    required: false
+    default: ""
+  runtime_smoke_server_username:
+    description: Temporary runtime smoke server username
+    required: false
+    default: ""
+  runtime_smoke_image:
+    description: Runtime smoke deployment image
+    required: false
+    default: ""
+  runtime_smoke_internal_port:
+    description: Runtime smoke deployment internal port
+    required: false
+    default: ""
+  runtime_smoke_external_port:
+    description: Runtime smoke deployment external port
+    required: false
+    default: ""
+  runtime_smoke_start_port:
+    description: Start port for suggested ports lookup
+    required: false
+    default: ""
+  runtime_smoke_health_timeout:
+    description: Runtime smoke health timeout
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare SSH
+      shell: bash
+      env:
+        DEPLOY_SSH_PRIVATE_KEY: ${{ inputs.deploy_ssh_private_key }}
+        DEPLOY_SSH_KNOWN_HOSTS: ${{ inputs.deploy_ssh_known_hosts }}
+        RUNTIME_SMOKE_SSH_PRIVATE_KEY: ${{ inputs.runtime_smoke_ssh_private_key }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$HOME/.ssh"
+        chmod 700 "$HOME/.ssh"
+
+        if [ -z "$DEPLOY_SSH_PRIVATE_KEY" ]; then
+          echo "[remote-release-action] missing deploy_ssh_private_key input" >&2
+          exit 1
+        fi
+
+        if [ -z "$DEPLOY_SSH_KNOWN_HOSTS" ]; then
+          echo "[remote-release-action] missing deploy_ssh_known_hosts input" >&2
+          exit 1
+        fi
+
+        printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+        chmod 600 "$HOME/.ssh/id_ed25519"
+
+        printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+        chmod 600 "$HOME/.ssh/known_hosts"
+
+        if [ -n "$RUNTIME_SMOKE_SSH_PRIVATE_KEY" ]; then
+          printf '%s\n' "$RUNTIME_SMOKE_SSH_PRIVATE_KEY" > "$HOME/.ssh/runtime_smoke_id_ed25519"
+          chmod 600 "$HOME/.ssh/runtime_smoke_id_ed25519"
+        fi
+
+    - name: Run remote release helper
+      shell: bash
+      env:
+        DEPLOYMATE_DEPLOY_HOST: ${{ inputs.deploy_host }}
+        DEPLOYMATE_BASE_URL: ${{ inputs.base_url }}
+        DEPLOYMATE_ADMIN_USERNAME: ${{ inputs.admin_username }}
+        DEPLOYMATE_ADMIN_PASSWORD: ${{ inputs.admin_password }}
+        DEPLOYMATE_DEPLOY_REPO_DIR: ${{ inputs.deploy_repo_dir }}
+        DEPLOYMATE_DEPLOY_BRANCH: ${{ inputs.deploy_branch }}
+        DEPLOYMATE_DEPLOY_ENV_FILE: ${{ inputs.deploy_env_file }}
+        DEPLOYMATE_SMOKE_RUNTIME_ENABLED: ${{ inputs.runtime_smoke_enabled }}
+        DEPLOYMATE_SMOKE_SERVER_ID: ${{ inputs.runtime_smoke_server_id }}
+        DEPLOYMATE_SMOKE_SERVER_NAME: ${{ inputs.runtime_smoke_server_name }}
+        DEPLOYMATE_SMOKE_SERVER_HOST: ${{ inputs.runtime_smoke_server_host }}
+        DEPLOYMATE_SMOKE_SERVER_PORT: ${{ inputs.runtime_smoke_server_port }}
+        DEPLOYMATE_SMOKE_SERVER_USERNAME: ${{ inputs.runtime_smoke_server_username }}
+        DEPLOYMATE_SMOKE_IMAGE: ${{ inputs.runtime_smoke_image }}
+        DEPLOYMATE_SMOKE_INTERNAL_PORT: ${{ inputs.runtime_smoke_internal_port }}
+        DEPLOYMATE_SMOKE_EXTERNAL_PORT: ${{ inputs.runtime_smoke_external_port }}
+        DEPLOYMATE_SMOKE_START_PORT: ${{ inputs.runtime_smoke_start_port }}
+        DEPLOYMATE_SMOKE_HEALTH_TIMEOUT: ${{ inputs.runtime_smoke_health_timeout }}
+      run: |
+        set -euo pipefail
+
+        if [ -f "$HOME/.ssh/runtime_smoke_id_ed25519" ]; then
+          export DEPLOYMATE_SMOKE_SSH_KEY_FILE="$HOME/.ssh/runtime_smoke_id_ed25519"
+        fi
+
+        args=(
+          --host "$DEPLOYMATE_DEPLOY_HOST"
+          --surface "${{ inputs.surface }}"
+          --base-url "$DEPLOYMATE_BASE_URL"
+          --admin-username "$DEPLOYMATE_ADMIN_USERNAME"
+          --admin-password "$DEPLOYMATE_ADMIN_PASSWORD"
+        )
+
+        if [ -n "${DEPLOYMATE_DEPLOY_REPO_DIR:-}" ]; then
+          args+=(--repo-dir "$DEPLOYMATE_DEPLOY_REPO_DIR")
+        fi
+
+        if [ -n "${DEPLOYMATE_DEPLOY_BRANCH:-}" ]; then
+          args+=(--branch "$DEPLOYMATE_DEPLOY_BRANCH")
+        fi
+
+        if [ -n "${DEPLOYMATE_DEPLOY_ENV_FILE:-}" ]; then
+          args+=(--env-file "$DEPLOYMATE_DEPLOY_ENV_FILE")
+        fi
+
+        if [ "${{ inputs.skip_smoke }}" = "1" ]; then
+          args+=(--skip-smoke)
+        fi
+
+        bash scripts/remote_release.sh "${args[@]}"

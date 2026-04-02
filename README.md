@@ -131,6 +131,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - GitHub Actions CI runs the same local release gate on `develop` pushes and pull requests
 - GitHub Actions staging workflow can auto-promote successful `develop` builds into a staging environment
 - GitHub Actions manual release workflow can run the remote release helper against a configured host
+- both repository-side deploy workflows share a reusable composite action instead of duplicating shell logic
 - tracked-file security audit in [scripts/security_audit.sh](scripts/security_audit.sh)
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
 - dedicated admin frontend smoke in [scripts/frontend_admin_smoke.sh](scripts/frontend_admin_smoke.sh)

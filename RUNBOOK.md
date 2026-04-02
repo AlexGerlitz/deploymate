@@ -53,6 +53,8 @@ Recommended promotion order:
 2. staging deploy runs through `.github/workflows/staging.yml`
 3. production deploy stays behind `.github/workflows/release.yml` or a manual `scripts/remote_release.sh` run
 
+The staging and production GitHub workflows both call the same reusable composite action in `.github/actions/remote-release/action.yml`, so deploy behavior stays aligned with `scripts/remote_release.sh`.
+
 Before the first deploy of encrypted server credentials, or before enabling remote server management on a fresh environment:
 
 ```bash
