@@ -34,6 +34,17 @@ Or run the broader local release gate:
 bash scripts/release_workflow.sh --surface full
 ```
 
+For a single remote deploy command that also runs post-deploy smoke:
+
+```bash
+bash scripts/remote_release.sh \
+  --host <deploy-host> \
+  --surface full \
+  --base-url https://your-domain \
+  --admin-username admin \
+  --admin-password '<secret>'
+```
+
 Before the first deploy of encrypted server credentials, or before enabling remote server management on a fresh environment:
 
 ```bash
@@ -78,6 +89,17 @@ docker compose -f docker-compose.prod.yml --env-file .env.production ps frontend
 curl -I https://your-domain/app
 ```
 
+Single-command alternative from the workstation:
+
+```bash
+bash scripts/remote_release.sh \
+  --host <deploy-host> \
+  --surface frontend \
+  --base-url https://your-domain \
+  --admin-username admin \
+  --admin-password '<secret>'
+```
+
 ## Backend-only deploy
 
 Local:
@@ -105,6 +127,17 @@ git pull --ff-only origin develop
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps backend
 docker compose -f docker-compose.prod.yml --env-file .env.production ps backend
 curl -I https://your-domain/api/health
+```
+
+Single-command alternative from the workstation:
+
+```bash
+bash scripts/remote_release.sh \
+  --host <deploy-host> \
+  --surface backend \
+  --base-url https://your-domain \
+  --admin-username admin \
+  --admin-password '<secret>'
 ```
 
 If this release introduces encrypted server credentials and production already has existing server records, the backend startup path will migrate any plaintext records to encrypted form after boot as long as `DEPLOYMATE_SERVER_CREDENTIALS_KEY` is present.
@@ -141,6 +174,17 @@ curl -I https://your-domain/app
 curl -I https://your-domain/api/health
 ```
 
+Single-command alternative from the workstation:
+
+```bash
+bash scripts/remote_release.sh \
+  --host <deploy-host> \
+  --surface full \
+  --base-url https://your-domain \
+  --admin-username admin \
+  --admin-password '<secret>'
+```
+
 ## Post-deploy smoke
 
 ```bash
@@ -172,6 +216,21 @@ DEPLOYMATE_SMOKE_SERVER_HOST='203.0.113.10' \
 DEPLOYMATE_SMOKE_SERVER_USERNAME='root' \
 DEPLOYMATE_SMOKE_SSH_KEY_FILE="$HOME/.ssh/id_ed25519" \
 bash scripts/post_deploy_smoke.sh
+```
+
+The same runtime env vars can be passed through `scripts/remote_release.sh` so a remote deploy can immediately run the deeper runtime smoke in one command:
+
+```bash
+DEPLOYMATE_SMOKE_RUNTIME_ENABLED=1 \
+DEPLOYMATE_SMOKE_SERVER_HOST='203.0.113.10' \
+DEPLOYMATE_SMOKE_SERVER_USERNAME='root' \
+DEPLOYMATE_SMOKE_SSH_KEY_FILE="$HOME/.ssh/id_ed25519" \
+bash scripts/remote_release.sh \
+  --host <deploy-host> \
+  --surface full \
+  --base-url https://your-domain \
+  --admin-username admin \
+  --admin-password '<secret>'
 ```
 
 Runtime smoke notes:

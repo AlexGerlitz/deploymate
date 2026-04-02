@@ -127,6 +127,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 - scripted preflight in [scripts/preflight.sh](scripts/preflight.sh)
 - scripted local release gate in [scripts/release_workflow.sh](scripts/release_workflow.sh)
+- scripted remote release helper in [scripts/remote_release.sh](scripts/remote_release.sh)
 - GitHub Actions CI runs the same local release gate on `develop` pushes and pull requests
 - tracked-file security audit in [scripts/security_audit.sh](scripts/security_audit.sh)
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
@@ -190,6 +191,17 @@ cd /opt/deploymate
 git pull --ff-only origin develop
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps frontend
 DEPLOYMATE_BASE_URL=https://your-domain DEPLOYMATE_ADMIN_USERNAME=admin DEPLOYMATE_ADMIN_PASSWORD='<secret>' bash scripts/post_deploy_smoke.sh
+```
+
+Or use the single remote helper for prod-like or staging-like deploys:
+
+```bash
+bash scripts/remote_release.sh \
+  --host <deploy-host> \
+  --surface full \
+  --base-url https://your-domain \
+  --admin-username admin \
+  --admin-password '<secret>'
 ```
 
 ## Security Posture

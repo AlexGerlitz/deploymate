@@ -62,6 +62,17 @@ DEPLOYMATE_ADMIN_PASSWORD='<secret>' \
 bash scripts/post_deploy_smoke.sh
 ```
 
+Or use the scripted remote release path to do remote sync, rebuild, and smoke as one ordered operation:
+
+```bash
+bash scripts/remote_release.sh \
+  --host <deploy-host> \
+  --surface full \
+  --base-url https://your-domain \
+  --admin-username admin \
+  --admin-password '<secret>'
+```
+
 This validates:
 
 - `/login`
