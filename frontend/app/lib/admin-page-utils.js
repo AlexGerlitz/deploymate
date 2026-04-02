@@ -76,21 +76,95 @@ export function buildFilterChips(items = []) {
   return items.filter(Boolean);
 }
 
+export function isActiveFilterValue(candidate) {
+  return (
+    candidate !== undefined &&
+    candidate !== null &&
+    candidate !== false &&
+    candidate !== "" &&
+    candidate !== "all"
+  );
+}
+
+export function createTextFilterDefinition(options) {
+  const {
+    key,
+    value,
+    setValue,
+    chipKey,
+    chipLabel,
+    testId,
+  } = options;
+
+  return {
+    key,
+    value,
+    normalizedValue: value.trim(),
+    chipKey,
+    chipLabel,
+    onRemove: () => setValue(""),
+    testId,
+  };
+}
+
+export function createChoiceFilterDefinition(options) {
+  const {
+    key,
+    value,
+    setValue,
+    chipKey,
+    chipLabel,
+    testId,
+    resetValue = "all",
+    normalizedValue = value,
+  } = options;
+
+  return {
+    key,
+    value,
+    normalizedValue,
+    chipKey,
+    chipLabel,
+    onRemove: () => setValue(resetValue),
+    testId,
+  };
+}
+
+export function createBooleanFilterDefinition(options) {
+  const {
+    key,
+    value,
+    setValue,
+    chipKey,
+    chipLabel,
+    testId,
+    offValue = false,
+    serializeValue = true,
+  } = options;
+
+  return {
+    key,
+    value,
+    normalizedValue: Boolean(value),
+    serializeValue,
+    chipKey,
+    chipLabel,
+    onRemove: () => setValue(offValue),
+    testId,
+  };
+}
+
 export function buildFilterState(definitions = []) {
   const currentFilters = {};
   let hasActiveFilters = false;
+  const serializedEntries = [];
 
   for (const definition of definitions) {
     const {
       key,
       value,
       normalizedValue = value,
-      activeWhen = (candidate) =>
-        candidate !== undefined &&
-        candidate !== null &&
-        candidate !== false &&
-        candidate !== "" &&
-        candidate !== "all",
+      activeWhen = isActiveFilterValue,
       serializeWhen = activeWhen,
       serializeValue = normalizedValue,
       includeInCurrent = true,
@@ -104,18 +178,16 @@ export function buildFilterState(definitions = []) {
       hasActiveFilters = true;
     }
 
-    definition._serialized =
-      serializeWhen(normalizedValue) ? serializeValue : undefined;
+    serializedEntries.push([
+      key,
+      serializeWhen(normalizedValue) ? serializeValue : undefined,
+    ]);
   }
 
   return {
     currentFilters,
     hasActiveFilters,
-    syncedSearchParams: buildSearchParams(
-      Object.fromEntries(
-        definitions.map((definition) => [definition.key, definition._serialized]),
-      ),
-    ).toString(),
+    syncedSearchParams: buildSearchParams(Object.fromEntries(serializedEntries)).toString(),
   };
 }
 
@@ -127,12 +199,7 @@ export function buildFilterChipsFromDefinitions(definitions = []) {
         chipLabel,
         onRemove,
         testId,
-        activeWhen = (candidate) =>
-          candidate !== undefined &&
-          candidate !== null &&
-          candidate !== false &&
-          candidate !== "" &&
-          candidate !== "all",
+        activeWhen = isActiveFilterValue,
         normalizedValue = definition.value,
       } = definition;
 

@@ -37,6 +37,8 @@ import {
   buildFilterState,
   buildAuditEventsCsv,
   copyTextToClipboard,
+  createChoiceFilterDefinition,
+  createTextFilterDefinition,
   readJsonOrError,
   sortItemsByDateMode,
   triggerFileDownload,
@@ -149,48 +151,46 @@ function UsersPageContent() {
       )
     : [];
   const primaryFilterDefinitions = [
-    {
+    createTextFilterDefinition({
       key: "q",
       value: query,
-      normalizedValue: query.trim(),
+      setValue: setQuery,
       chipKey: "users-q",
       chipLabel: `Search: ${query.trim()}`,
-      onRemove: () => setQuery(""),
       testId: "users-filter-chip-query",
-    },
-    {
+    }),
+    createChoiceFilterDefinition({
       key: "role",
       value: roleFilter,
+      setValue: setRoleFilter,
       chipKey: "users-role",
       chipLabel: `Role: ${roleFilter}`,
-      onRemove: () => setRoleFilter("all"),
       testId: "users-filter-chip-role",
-    },
-    {
+    }),
+    createChoiceFilterDefinition({
       key: "plan",
       value: planFilter,
+      setValue: setPlanFilter,
       chipKey: "users-plan",
       chipLabel: `Plan: ${planFilter}`,
-      onRemove: () => setPlanFilter("all"),
       testId: "users-filter-chip-plan",
-    },
-    {
+    }),
+    createChoiceFilterDefinition({
       key: "must_change_password",
       value: mustChangeFilter,
+      setValue: setMustChangeFilter,
       chipKey: "users-password",
       chipLabel: mustChangeFilter === "required" ? "Password: change required" : "Password: ok",
-      onRemove: () => setMustChangeFilter("all"),
       testId: "users-filter-chip-password",
-    },
-    {
+    }),
+    createTextFilterDefinition({
       key: "audit_q",
       value: auditQuery,
-      normalizedValue: auditQuery.trim(),
+      setValue: setAuditQuery,
       chipKey: "users-audit",
       chipLabel: `Audit: ${auditQuery.trim()}`,
-      onRemove: () => setAuditQuery(""),
       testId: "users-filter-chip-audit",
-    },
+    }),
   ];
   const { currentFilters: currentUserView, hasActiveFilters: hasUserFilters } =
     buildFilterState(primaryFilterDefinitions);

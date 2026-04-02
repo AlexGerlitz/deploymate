@@ -35,6 +35,9 @@ import {
   buildFilterState,
   buildAuditEventsCsv,
   copyTextToClipboard,
+  createBooleanFilterDefinition,
+  createChoiceFilterDefinition,
+  createTextFilterDefinition,
   readJsonOrError,
   sortItemsByDateMode,
   triggerFileDownload,
@@ -110,49 +113,46 @@ function UpgradeRequestsPageContent() {
   const [drafts, setDrafts] = useState({});
   const filteredRequests = requests;
   const primaryFilterDefinitions = [
-    {
+    createTextFilterDefinition({
       key: "q",
       value: query,
-      normalizedValue: query.trim(),
+      setValue: setQuery,
       chipKey: "upgrade-q",
       chipLabel: `Search: ${query.trim()}`,
-      onRemove: () => setQuery(""),
       testId: "upgrade-filter-chip-query",
-    },
-    {
+    }),
+    createChoiceFilterDefinition({
       key: "plan",
       value: planFilter,
+      setValue: setPlanFilter,
       chipKey: "upgrade-plan",
       chipLabel: `Plan: ${planFilter}`,
-      onRemove: () => setPlanFilter("all"),
       testId: "upgrade-filter-chip-plan",
-    },
-    {
+    }),
+    createChoiceFilterDefinition({
       key: "status",
       value: statusFilter,
+      setValue: setStatusFilter,
       chipKey: "upgrade-status",
       chipLabel: `Status: ${statusFilter}`,
-      onRemove: () => setStatusFilter("all"),
       testId: "upgrade-filter-chip-status",
-    },
-    {
+    }),
+    createBooleanFilterDefinition({
       key: "linked_only",
       value: linkedOnly,
-      normalizedValue: linkedOnly,
+      setValue: setLinkedOnly,
       chipKey: "upgrade-linked",
       chipLabel: "Linked users only",
-      onRemove: () => setLinkedOnly(false),
       testId: "upgrade-filter-chip-linked",
-    },
-    {
+    }),
+    createTextFilterDefinition({
       key: "audit_q",
       value: auditQuery,
-      normalizedValue: auditQuery.trim(),
+      setValue: setAuditQuery,
       chipKey: "upgrade-audit",
       chipLabel: `Audit: ${auditQuery.trim()}`,
-      onRemove: () => setAuditQuery(""),
       testId: "upgrade-filter-chip-audit",
-    },
+    }),
   ];
   const { currentFilters: currentUpgradeView, hasActiveFilters: hasRequestFilters } =
     buildFilterState(primaryFilterDefinitions);
