@@ -21,6 +21,7 @@ ul {
 
 button {
   cursor: pointer;
+  font: inherit;
 }
 
 button:disabled {
