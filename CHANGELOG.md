@@ -26,6 +26,7 @@ Highlights:
 - moved server diagnostics and connection probing into a dedicated service layer instead of keeping ops-oriented SSH health logic inside deployment runtime orchestration
 - moved deployment health/logs/diagnostics assembly into a dedicated observability service so runtime inspection is separated from deployment mutation flows
 - moved deployment create/redeploy/delete mutation workflows into a dedicated service so deployment routes are now thin HTTP adapters over orchestration logic
+- moved deployment template list/create/update/duplicate/deploy/delete workflow into a dedicated service so routes no longer own template orchestration either
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface
