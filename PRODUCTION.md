@@ -20,6 +20,7 @@ Notes:
 
 - Production now defaults to a `remote-only` profile. The backend does not need `/var/run/docker.sock` for the standard production setup.
 - Keep `NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0` in production so the UI matches the remote-only backend policy and does not offer local host deployment paths.
+- Public demo signup can be enabled with `DEPLOYMATE_PUBLIC_SIGNUP_ENABLED=true` and `NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED=1`. New users are created as `member` on the `trial` plan.
 - HTTPS is Caddy-ready. With a real public domain on ports `80` and `443`, Caddy can issue certificates automatically.
 - Remote server deployments over SSH still require reachable target hosts and valid SSH credentials stored in DeployMate.
 - SSH host key handling is configurable through `DEPLOYMATE_SSH_HOST_KEY_CHECKING`. The safer default is now `accept-new`. Use `yes` for pinned host keys or `no` only for throwaway lab environments.

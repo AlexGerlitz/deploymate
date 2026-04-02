@@ -7,16 +7,21 @@ from app.db import (
     delete_session,
     get_user_by_id,
     get_user_by_username,
+    insert_user,
     update_user_password,
 )
-from app.schemas import ChangePasswordRequest, LoginRequest, UserResponse
+from app.schemas import ChangePasswordRequest, LoginRequest, PublicSignupRequest, UserResponse
 from app.services.auth import (
     SESSION_COOKIE_NAME,
     build_user_response_payload,
     create_session_token,
     get_current_user,
+    hash_password,
+    public_signup_enabled,
     verify_password,
 )
+from datetime import datetime, timezone
+import uuid
 
 
 router = APIRouter(prefix="/auth")
@@ -43,6 +48,48 @@ def login(payload: LoginRequest, response: Response) -> UserResponse:
         path="/",
     )
     return UserResponse(**build_user_response_payload(user))
+
+
+@router.post("/register", response_model=UserResponse)
+def register(payload: PublicSignupRequest, response: Response) -> UserResponse:
+    if not public_signup_enabled():
+        raise HTTPException(status_code=403, detail="Public signup is disabled.")
+
+    username = payload.username.strip()
+    if username != payload.username:
+        raise HTTPException(
+            status_code=400,
+            detail="Username cannot start or end with spaces.",
+        )
+
+    if get_user_by_username(username):
+        raise HTTPException(status_code=400, detail="Username already exists.")
+
+    user_record = {
+        "id": str(uuid.uuid4()),
+        "username": username,
+        "password_hash": hash_password(payload.password),
+        "plan": "trial",
+        "role": "member",
+        "must_change_password": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    insert_user(user_record)
+
+    session_token = create_session_token()
+    create_session(session_token, user_record["id"])
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_token,
+        httponly=True,
+        samesite="lax",
+        secure=_cookie_secure_flag(),
+        path="/",
+    )
+    created_user = get_user_by_id(user_record["id"])
+    if not created_user:
+        raise HTTPException(status_code=500, detail="Failed to create user.")
+    return UserResponse(**build_user_response_payload(created_user))
 
 
 @router.get("/me", response_model=UserResponse)

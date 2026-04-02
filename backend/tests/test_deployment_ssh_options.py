@@ -5,10 +5,19 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
+from app.services.auth import public_signup_enabled
 from app.services.deployments import _build_ssh_base_command, ensure_local_docker_runtime_enabled
 
 
 class DeploymentSshOptionsTests(unittest.TestCase):
+    def test_public_signup_disabled_by_default(self):
+        with patch.dict(os.environ, {}, clear=False):
+            self.assertFalse(public_signup_enabled())
+
+    def test_public_signup_enabled_helper_accepts_true_values(self):
+        with patch.dict(os.environ, {"DEPLOYMATE_PUBLIC_SIGNUP_ENABLED": "true"}, clear=False):
+            self.assertTrue(public_signup_enabled())
+
     def test_local_runtime_guard_blocks_when_disabled(self):
         with patch.dict(os.environ, {"DEPLOYMATE_LOCAL_DOCKER_ENABLED": "false"}, clear=False):
             with self.assertRaises(HTTPException) as context:

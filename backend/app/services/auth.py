@@ -85,6 +85,11 @@ def get_default_admin_credentials() -> tuple[str, str]:
     return username, password
 
 
+def public_signup_enabled() -> bool:
+    raw_value = os.getenv("DEPLOYMATE_PUBLIC_SIGNUP_ENABLED", "false").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
 def get_plan_limits(plan: str) -> dict[str, int]:
     return PLAN_LIMITS.get(plan, PLAN_LIMITS["trial"]).copy()
 

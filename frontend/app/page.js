@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+const publicSignupEnabled =
+  process.env.NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED === "1";
+
 export default function LandingPage() {
   return (
     <main className="landingPage">
@@ -19,9 +22,15 @@ export default function LandingPage() {
               <Link href="/login" className="landingButton primaryButton">
                 Login
               </Link>
-              <Link href="/upgrade" className="landingButton secondaryButton">
-                Start trial / Request access
-              </Link>
+              {publicSignupEnabled ? (
+                <Link href="/register" className="landingButton secondaryButton">
+                  Create trial account
+                </Link>
+              ) : (
+                <Link href="/upgrade" className="landingButton secondaryButton">
+                  Start trial / Request access
+                </Link>
+              )}
             </div>
           </div>
 
@@ -93,9 +102,15 @@ export default function LandingPage() {
                 <li>Up to 3 deployments</li>
                 <li>Email onboarding</li>
               </ul>
-              <Link href="/upgrade" className="landingButton secondaryButton">
-                Request access
-              </Link>
+              {publicSignupEnabled ? (
+                <Link href="/register" className="landingButton secondaryButton">
+                  Create account
+                </Link>
+              ) : (
+                <Link href="/upgrade" className="landingButton secondaryButton">
+                  Request access
+                </Link>
+              )}
             </article>
             <article className="pricingCard pricingCardFeatured">
               <div className="pricingBadge">Recommended</div>
@@ -107,9 +122,15 @@ export default function LandingPage() {
                 <li>Up to 15 deployments</li>
                 <li>Priority setup help</li>
               </ul>
-              <Link href="/upgrade" className="landingButton primaryButton">
-                Start trial
-              </Link>
+              {publicSignupEnabled ? (
+                <Link href="/register" className="landingButton primaryButton">
+                  Start free trial
+                </Link>
+              ) : (
+                <Link href="/upgrade" className="landingButton primaryButton">
+                  Start trial
+                </Link>
+              )}
             </article>
             <article className="pricingCard">
               <h3>Team</h3>

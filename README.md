@@ -39,6 +39,7 @@ It is built for pragmatic operator experience rather than platform complexity.
 - support reusable deployment templates with usage tracking and preview
 - inspect logs, health, activity, and external port mappings
 - target either local Docker or remote SSH hosts, with production capable of running in remote-only mode
+- optional public signup for safe `trial` accounts
 
 ### Server management
 

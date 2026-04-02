@@ -7,6 +7,7 @@ BASE_URL="http://127.0.0.1:${PORT}"
 SERVER_LOG="${FRONTEND_SMOKE_LOG:-/tmp/deploymate-frontend-admin-smoke.log}"
 USERS_HTML="$(mktemp)"
 UPGRADE_HTML="$(mktemp)"
+REGISTER_HTML="$(mktemp)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
@@ -15,7 +16,7 @@ cleanup() {
     kill "$SERVER_PID" >/dev/null 2>&1 || true
     wait "$SERVER_PID" 2>/dev/null || true
   fi
-  rm -f "$USERS_HTML" "$UPGRADE_HTML"
+  rm -f "$USERS_HTML" "$UPGRADE_HTML" "$REGISTER_HTML"
 }
 
 trap cleanup EXIT
@@ -41,8 +42,12 @@ if ! curl -sS -o /dev/null "$BASE_URL/login"; then
   exit 1
 fi
 
+curl -sS "$BASE_URL/register" >"$REGISTER_HTML"
+
 curl -sS "$BASE_URL/app/users" >"$USERS_HTML"
 curl -sS "$BASE_URL/app/upgrade-requests" >"$UPGRADE_HTML"
+
+grep -q 'Create Trial Account\|Public signup is not enabled' "$REGISTER_HTML"
 
 grep -q 'data-testid="users-page-title"' "$USERS_HTML"
 grep -q 'data-testid="backup-panel-title"' "$USERS_HTML"
@@ -157,6 +162,7 @@ grep -q 'Update current view' "$UPGRADE_HTML"
 grep -q 'Loaded from local browser storage\|Using local browser storage' "$UPGRADE_HTML"
 
 echo "[frontend-smoke] users page rendered"
+echo "[frontend-smoke] register page rendered"
 echo "[frontend-smoke] backup panel rendered"
 echo "[frontend-smoke] backup preflight controls rendered"
 echo "[frontend-smoke] disabled states rendered"

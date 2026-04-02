@@ -28,13 +28,14 @@ async function readJsonOrError(response, fallbackMessage) {
   return payload;
 }
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     username: "",
     password: "",
+    confirm_password: "",
   });
 
   function updateFormField(event) {
@@ -50,33 +51,69 @@ export default function LoginPage() {
     setSubmitting(true);
     setError("");
 
+    if (form.password !== form.confirm_password) {
+      setError("Password and confirmation must match.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(form),
-      });
-      const user = await readJsonOrError(response, "Failed to log in.");
-      router.replace(user.must_change_password ? "/change-password" : "/app");
+      await readJsonOrError(
+        await fetch(`${apiBaseUrl}/auth/register`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            username: form.username,
+            password: form.password,
+          }),
+        }),
+        "Failed to create account.",
+      );
+      router.replace("/app");
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Failed to log in.",
+          : "Failed to create account.",
       );
     } finally {
       setSubmitting(false);
     }
   }
 
+  if (!publicSignupEnabled) {
+    return (
+      <main className="page">
+        <div className="container narrowContainer">
+          <article className="card formCard">
+            <h1>Create Trial Account</h1>
+            <div className="banner subtle">
+              Public signup is not enabled in this environment.
+            </div>
+            <div className="formActions">
+              <Link href="/login" className="linkButton">
+                Back to login
+              </Link>
+            </div>
+          </article>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="page">
       <div className="container narrowContainer">
         <article className="card formCard">
-          <h1>Login</h1>
+          <h1>Create Trial Account</h1>
+          <div className="banner subtle">
+            Public signup creates a `member` account on the `trial` plan so you can
+            explore the product safely.
+          </div>
+
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
               <span>Username</span>
@@ -87,7 +124,13 @@ export default function LoginPage() {
                 onChange={updateFormField}
                 disabled={submitting}
                 required
+                minLength={3}
+                maxLength={32}
+                pattern="[a-zA-Z0-9_.-]+"
               />
+              <span className="fieldHint">
+                Use 3-32 characters: letters, numbers, dots, dashes, or underscores.
+              </span>
             </label>
 
             <label className="field">
@@ -95,35 +138,41 @@ export default function LoginPage() {
               <input
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 value={form.password}
                 onChange={updateFormField}
                 disabled={submitting}
                 required
+                minLength={8}
+              />
+              <span className="fieldHint">Use at least 8 characters.</span>
+            </label>
+
+            <label className="field">
+              <span>Confirm password</span>
+              <input
+                name="confirm_password"
+                type="password"
+                autoComplete="new-password"
+                value={form.confirm_password}
+                onChange={updateFormField}
+                disabled={submitting}
+                required
+                minLength={8}
               />
             </label>
 
             <div className="formActions">
               <button type="submit" disabled={submitting}>
-                {submitting ? "Logging in..." : "Login"}
+                {submitting ? "Creating..." : "Create account"}
               </button>
+              <Link href="/login" className="linkButton">
+                Back to login
+              </Link>
             </div>
           </form>
 
           {error ? <div className="banner error">{error}</div> : null}
-          <div className="banner subtle">
-            If this is the first run with the default admin account, you will be asked to
-            change the password after login.
-          </div>
-          {publicSignupEnabled ? (
-            <div className="banner subtle">
-              New here?{" "}
-              <Link href="/register" className="inlineLink">
-                Create a trial account
-              </Link>
-              .
-            </div>
-          ) : null}
         </article>
       </div>
     </main>
