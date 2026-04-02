@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { AdminFeedbackBanners, AdminFilterFooter, AdminPageHeader } from "../admin-ui";
 
 const apiBaseUrl =
@@ -102,8 +102,10 @@ function triggerFileDownload(filename, blob) {
   URL.revokeObjectURL(url);
 }
 
-export default function UpgradeRequestsPage() {
+function UpgradeRequestsPageContent() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
   const [requests, setRequests] = useState(smokeMode ? smokeRequests : []);
@@ -113,11 +115,11 @@ export default function UpgradeRequestsPage() {
   const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
-  const [query, setQuery] = useState("");
-  const [planFilter, setPlanFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [linkedOnly, setLinkedOnly] = useState(false);
-  const [auditQuery, setAuditQuery] = useState("");
+  const [query, setQuery] = useState(() => searchParams.get("q") || "");
+  const [planFilter, setPlanFilter] = useState(() => searchParams.get("plan") || "all");
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") || "all");
+  const [linkedOnly, setLinkedOnly] = useState(() => searchParams.get("linked_only") === "true");
+  const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
   const [savingId, setSavingId] = useState("");
@@ -303,6 +305,33 @@ export default function UpgradeRequestsPage() {
 
     checkAuthAndLoad();
   }, [router]);
+
+  useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
+    const params = new URLSearchParams();
+    if (query.trim()) {
+      params.set("q", query.trim());
+    }
+    if (planFilter !== "all") {
+      params.set("plan", planFilter);
+    }
+    if (statusFilter !== "all") {
+      params.set("status", statusFilter);
+    }
+    if (linkedOnly) {
+      params.set("linked_only", "true");
+    }
+    if (auditQuery.trim()) {
+      params.set("audit_q", auditQuery.trim());
+    }
+    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    const currentUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
+    if (nextUrl !== currentUrl) {
+      router.replace(nextUrl, { scroll: false });
+    }
+  }, [smokeMode, pathname, router, searchParams, query, planFilter, statusFilter, linkedOnly, auditQuery]);
 
   useEffect(() => {
     if (smokeMode) {
@@ -835,5 +864,13 @@ export default function UpgradeRequestsPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function UpgradeRequestsPage() {
+  return (
+    <Suspense fallback={<main className="page"><div className="container"><div className="empty">Loading upgrade inbox...</div></div></main>}>
+      <UpgradeRequestsPageContent />
+    </Suspense>
   );
 }

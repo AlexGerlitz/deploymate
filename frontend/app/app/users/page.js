@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { AdminFeedbackBanners, AdminFilterFooter, AdminPageHeader } from "../admin-ui";
 
 const apiBaseUrl =
@@ -148,8 +148,10 @@ function buildRestoreDryRunCsv(report) {
   return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }
 
-export default function UsersPage() {
+function UsersPageContent() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
   const [users, setUsers] = useState(smokeMode ? smokeUsers : []);
@@ -165,11 +167,17 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState("");
   const [deletingUserId, setDeletingUserId] = useState("");
-  const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [planFilter, setPlanFilter] = useState("all");
-  const [mustChangeFilter, setMustChangeFilter] = useState("all");
-  const [auditQuery, setAuditQuery] = useState("");
+  const [query, setQuery] = useState(() => searchParams.get("q") || "");
+  const [roleFilter, setRoleFilter] = useState(() => searchParams.get("role") || "all");
+  const [planFilter, setPlanFilter] = useState(() => searchParams.get("plan") || "all");
+  const [mustChangeFilter, setMustChangeFilter] = useState(() => {
+    const value = searchParams.get("must_change_password");
+    if (value === "required" || value === "ok") {
+      return value;
+    }
+    return "all";
+  });
+  const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
   const [form, setForm] = useState({
@@ -590,6 +598,33 @@ export default function UsersPage() {
     setPlanFilter("all");
     setMustChangeFilter("all");
   }
+
+  useEffect(() => {
+    if (smokeMode) {
+      return;
+    }
+    const params = new URLSearchParams();
+    if (query.trim()) {
+      params.set("q", query.trim());
+    }
+    if (roleFilter !== "all") {
+      params.set("role", roleFilter);
+    }
+    if (planFilter !== "all") {
+      params.set("plan", planFilter);
+    }
+    if (mustChangeFilter !== "all") {
+      params.set("must_change_password", mustChangeFilter);
+    }
+    if (auditQuery.trim()) {
+      params.set("audit_q", auditQuery.trim());
+    }
+    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    const currentUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
+    if (nextUrl !== currentUrl) {
+      router.replace(nextUrl, { scroll: false });
+    }
+  }, [smokeMode, pathname, router, searchParams, query, roleFilter, planFilter, mustChangeFilter, auditQuery]);
 
   useEffect(() => {
     if (smokeMode) {
@@ -1143,5 +1178,13 @@ export default function UsersPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense fallback={<main className="page"><div className="container"><div className="empty">Loading admin users...</div></div></main>}>
+      <UsersPageContent />
+    </Suspense>
   );
 }
