@@ -33,6 +33,7 @@ Highlights:
 - moved auth change-password smoke fixtures into the shared frontend smoke fixture layer
 - made frontend preflight and local release builds clear stale `.next` artifacts before `next build`
 - moved admin saved-views normalization, merge, parse, and sort helpers into a shared frontend lib
+- moved shared admin page clipboard, download, fetch-error, and audit CSV helpers into a dedicated frontend lib
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface
