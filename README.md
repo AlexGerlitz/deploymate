@@ -133,6 +133,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - GitHub Actions manual release workflow can run the remote release helper against a configured host
 - both repository-side deploy workflows share a reusable composite action instead of duplicating shell logic
 - tracked-file security audit in [scripts/security_audit.sh](scripts/security_audit.sh)
+- release workflow secret-contract audit in [scripts/release_workflow_audit.sh](scripts/release_workflow_audit.sh)
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
 - dedicated admin frontend smoke in [scripts/frontend_admin_smoke.sh](scripts/frontend_admin_smoke.sh)
 - dedicated runtime frontend smoke in [scripts/frontend_runtime_smoke.sh](scripts/frontend_runtime_smoke.sh)

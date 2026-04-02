@@ -55,6 +55,12 @@ Recommended promotion order:
 
 The staging and production GitHub workflows both call the same reusable composite action in `.github/actions/remote-release/action.yml`, so deploy behavior stays aligned with `scripts/remote_release.sh`.
 
+To verify that the release workflows and the documented GitHub secret contract still match:
+
+```bash
+bash scripts/release_workflow_audit.sh
+```
+
 Before the first deploy of encrypted server credentials, or before enabling remote server management on a fresh environment:
 
 ```bash

@@ -15,6 +15,7 @@ Highlights:
 - added a staging GitHub Actions workflow to auto-deploy successful `develop` builds into a staging environment
 - added a manual GitHub Actions release workflow for guarded remote deploys and smoke checks
 - deduplicated repository-side deploy logic behind a reusable GitHub composite action
+- added a release workflow audit to keep GitHub secret usage aligned with RUNBOOK.md
 - updated smoke checks to accept the authenticated `/app` redirect behavior now enforced by middleware
 
 ## v0.1.0

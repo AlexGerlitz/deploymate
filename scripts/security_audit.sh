@@ -80,6 +80,11 @@ if rg -n -S '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
   WARNINGS=1
 fi
 
+if [ -f "scripts/release_workflow_audit.sh" ]; then
+  echo "[security-audit] release workflow audit"
+  bash scripts/release_workflow_audit.sh
+fi
+
 if [ "$WARNINGS" -eq 0 ]; then
   echo "[security-audit] no high-risk findings"
 else
