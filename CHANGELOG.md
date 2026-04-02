@@ -9,6 +9,7 @@ Highlights:
 - added an HTTP-level server API flow test for create -> test -> diagnostics -> suggested ports -> delete
 - added an HTTP-level admin API flow test for users, upgrade requests, exports, backup bundle, restore dry-run, and audit history
 - added an HTTP-level deployment template API flow test for create, filter, update, duplicate, deploy, and delete
+- added an HTTP-level ops API flow test for overview and deployments/servers/templates/activity exports
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend templates smoke coverage for the templates panel and create-form template controls
 - extended the local release gate to run the frontend templates smoke alongside admin and runtime smokes
