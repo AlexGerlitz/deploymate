@@ -5,6 +5,7 @@
 Highlights:
 
 - added backend route tests for deployment redeploy, delete, and diagnostics behavior
+- added an HTTP-level deployment API flow test for create -> health/logs/diagnostics/activity -> delete
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - extended post-deploy smoke with optional create -> health -> diagnostics -> logs -> activity -> delete runtime flow
 - updated smoke checks to accept the authenticated `/app` redirect behavior now enforced by middleware
