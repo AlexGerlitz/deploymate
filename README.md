@@ -1,4 +1,12 @@
-# DeployMate
+<p align="center">
+  <img src="frontend/app/icon.svg" alt="DeployMate logo" width="96" height="96" />
+</p>
+
+<h1 align="center">DeployMate</h1>
+
+<p align="center">
+  Self-hosted Docker deployment control panel with admin tooling, operational visibility, backup dry-runs, and release safety checks.
+</p>
 
 DeployMate is a self-hosted deployment control panel for small teams that need a fast way to ship Docker containers, manage reusable templates, track operational state, and handle lightweight admin workflows from one UI.
 
@@ -10,6 +18,18 @@ It is built for pragmatic operator experience rather than platform complexity.
 - production release flow is already scripted with preflight and post-deploy smoke checks
 - the admin surface has saved views, bulk actions, exports, audit history, and backup tooling
 - production security posture was improved with a remote-only deployment profile and safer SSH defaults
+
+## At A Glance
+
+| Area | What is already implemented |
+| --- | --- |
+| Deployments | create, redeploy, inspect, delete, logs, health, activity |
+| Servers | saved SSH targets, connection tests, diagnostics, suggested ports |
+| Templates | reusable presets, usage tracking, preview, duplicate, filters |
+| Admin users | filters, saved views, bulk actions, exports, audit trail |
+| Upgrade inbox | filters, saved views, bulk actions, exports, audit trail |
+| Recovery | backup bundle export and restore dry-run conflict analysis |
+| Release safety | preflight, admin smoke, post-deploy smoke |
 
 ## Feature Highlights
 
@@ -59,6 +79,14 @@ Browser
 
 More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## Repository Tour
+
+- `backend/` FastAPI application and deployment orchestration
+- `frontend/` Next.js application and admin/operator UI
+- `scripts/` release, smoke, and preflight automation
+- `deploy/` production reverse-proxy config
+- `docker-compose.prod.yml` production stack definition
+
 ## Key Screens In The App
 
 - `/app` operations dashboard
@@ -74,6 +102,15 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - dedicated admin frontend smoke in [scripts/frontend_admin_smoke.sh](scripts/frontend_admin_smoke.sh)
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)
+
+## Demo Walkthrough
+
+If I were demoing the project to a reviewer, I would open it in this order:
+
+1. `/app` for the operations overview
+2. `/deployments/[deploymentId]` for runtime state, logs, and health
+3. `/app/users` for saved views, bulk actions, audit, and backup tooling
+4. `/app/upgrade-requests` for admin workflow depth and export/reporting features
 
 ## Local Development
 
@@ -153,6 +190,8 @@ Start here:
 - [PRODUCTION.md](PRODUCTION.md)
 - [RUNBOOK.md](RUNBOOK.md)
 - [SAFE-RELEASE.md](SAFE-RELEASE.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [SECURITY.md](SECURITY.md)
 
 ## Roadmap
 
