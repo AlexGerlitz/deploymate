@@ -1,91 +1,24 @@
-"use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const publicSignupEnabled =
   process.env.NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED === "1";
 
-async function readJsonOrError(response, fallbackMessage) {
-  const contentType = response.headers.get("content-type") || "";
-  const payload = contentType.includes("application/json")
-    ? await response.json()
-    : null;
-
-  if (!response.ok) {
-    const error = new Error(
-      payload && typeof payload.detail === "string"
-        ? payload.detail
-        : fallbackMessage,
-    );
-    error.status = response.status;
-    throw error;
-  }
-
-  return payload;
-}
-
-export default function LoginPage() {
-  const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({
-    username: "",
-    password: "",
-  });
-
-  function updateFormField(event) {
-    const { name, value } = event.target;
-    setForm((currentForm) => ({
-      ...currentForm,
-      [name]: value,
-    }));
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(form),
-      });
-      const user = await readJsonOrError(response, "Failed to log in.");
-      router.replace(user.must_change_password ? "/change-password" : "/app");
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Failed to log in.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
+export default async function LoginPage({ searchParams }) {
+  const params = await searchParams;
+  const error = typeof params?.error === "string" ? params.error : "";
+  const username = typeof params?.username === "string" ? params.username : "";
 
   return (
     <main className="page">
       <div className="container narrowContainer">
         <article className="card formCard">
           <h1>Login</h1>
-          <form className="form" onSubmit={handleSubmit}>
+          <form className="form" method="post" action="/login/submit">
             <label className="field">
               <span>Username</span>
               <input
                 name="username"
                 autoComplete="username"
-                value={form.username}
-                onChange={updateFormField}
-                disabled={submitting}
+                defaultValue={username}
                 required
               />
             </label>
@@ -96,17 +29,12 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                value={form.password}
-                onChange={updateFormField}
-                disabled={submitting}
                 required
               />
             </label>
 
             <div className="formActions">
-              <button type="submit" disabled={submitting}>
-                {submitting ? "Logging in..." : "Login"}
-              </button>
+              <button type="submit">Login</button>
             </div>
           </form>
 

@@ -370,6 +370,7 @@ function triggerFileDownload(filename, blob) {
 export default function HomePage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
+  const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
   const [deployments, setDeployments] = useState([]);
@@ -816,6 +817,7 @@ export default function HomePage() {
       try {
         await loadCurrentUser();
         setAuthChecked(true);
+        setAuthFallbackVisible(false);
         await refreshPage();
       } catch {
         router.replace("/login");
@@ -824,6 +826,20 @@ export default function HomePage() {
 
     checkAuthAndLoad();
   }, [router]);
+
+  useEffect(() => {
+    if (authChecked) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setAuthFallbackVisible(true);
+    }, 3500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [authChecked]);
 
   useEffect(() => {
     if (!authChecked) {
@@ -1792,7 +1808,29 @@ export default function HomePage() {
     return (
       <main className="page">
         <div className="container">
-          <div className="empty">Checking authentication...</div>
+          {authFallbackVisible ? (
+            <div className="card formCard">
+              <h1>Checking authentication</h1>
+              <div className="banner subtle">
+                This app usually redirects into the authenticated workspace automatically.
+                If your browser or webview blocks that bootstrap flow, use the direct
+                public entry points below.
+              </div>
+              <div className="formActions">
+                <Link href="/login" className="linkButton">
+                  Open login
+                </Link>
+                <Link href="/register" className="linkButton">
+                  Create trial account
+                </Link>
+                <Link href="/" className="linkButton">
+                  Back to homepage
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="empty">Checking authentication...</div>
+          )}
         </div>
       </main>
     );
