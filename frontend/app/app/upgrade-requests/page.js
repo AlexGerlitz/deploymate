@@ -397,19 +397,25 @@ export default function UpgradeRequestsPage() {
             </Link>
             <button
               type="button"
+              data-testid="upgrade-refresh-button"
               onClick={() => Promise.all([loadUsers(), loadRequests(), loadAdminOverview(), loadAuditEvents()])}
               disabled={loading}
             >
               {loading ? "Refreshing..." : "Refresh"}
             </button>
-            <button type="button" onClick={handleDownloadUpgradeExport}>
+            <button type="button" data-testid="upgrade-export-button" onClick={handleDownloadUpgradeExport}>
               Export CSV
             </button>
           </div>
         </div>
 
-        {error ? <div className="banner error">{error}</div> : null}
-        {saveFeedback ? <div className="banner success">{saveFeedback}</div> : null}
+        {smokeMode ? (
+          <div className="banner subtle" data-testid="admin-smoke-banner">
+            Smoke mode active
+          </div>
+        ) : null}
+        {error ? <div className="banner error" data-testid="upgrade-error-banner">{error}</div> : null}
+        {saveFeedback ? <div className="banner success" data-testid="upgrade-success-banner">{saveFeedback}</div> : null}
 
         {adminOverview ? (
           <article className="card formCard">
@@ -482,7 +488,7 @@ export default function UpgradeRequestsPage() {
           <p className="formHint">Recent audit events shown: {auditEvents.length}</p>
           <p className="formHint">Audit search updates after a short pause.</p>
           {auditEvents.length === 0 ? (
-            <div className="empty">
+            <div className="empty" data-testid="upgrade-audit-empty-state">
               {auditQuery.trim() ? "No upgrade audit events match this search." : "No upgrade audit events yet."}
             </div>
           ) : (
@@ -621,12 +627,12 @@ export default function UpgradeRequestsPage() {
         ) : null}
 
         {!loading && requests.length === 0 ? (
-          <div className="empty">No upgrade requests found for the current filters.</div>
+          <div className="empty" data-testid="upgrade-empty-state">No upgrade requests found for the current filters.</div>
         ) : null}
 
         <div className="list">
           {!loading && requests.length > 0 && filteredRequests.length === 0 ? (
-            <div className="empty">No upgrade requests match this filter or search.</div>
+            <div className="empty" data-testid="upgrade-filter-empty-state">No upgrade requests match this filter or search.</div>
           ) : null}
 
           {filteredRequests.map((item) => (

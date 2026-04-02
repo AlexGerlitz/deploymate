@@ -656,22 +656,28 @@ export default function UsersPage() {
             </Link>
             <button
               type="button"
+              data-testid="users-refresh-button"
               onClick={() => Promise.all([loadUsers(), loadAdminOverview(), loadAuditEvents()])}
               disabled={loading}
             >
               {loading ? "Refreshing..." : "Refresh"}
             </button>
-            <button type="button" onClick={handleDownloadUsersExport}>
+            <button type="button" data-testid="users-export-button" onClick={handleDownloadUsersExport}>
               Export CSV
             </button>
-            <button type="button" onClick={handleDownloadAuditExport}>
+            <button type="button" data-testid="users-audit-export-button" onClick={handleDownloadAuditExport}>
               Audit CSV
             </button>
           </div>
         </div>
 
-        {error ? <div className="banner error">{error}</div> : null}
-        {success ? <div className="banner success">{success}</div> : null}
+        {smokeMode ? (
+          <div className="banner subtle" data-testid="admin-smoke-banner">
+            Smoke mode active
+          </div>
+        ) : null}
+        {error ? <div className="banner error" data-testid="users-error-banner">{error}</div> : null}
+        {success ? <div className="banner success" data-testid="users-success-banner">{success}</div> : null}
 
         {adminOverview ? (
           <article className="card formCard">
@@ -744,7 +750,7 @@ export default function UsersPage() {
           <p className="formHint">Recent audit events shown: {auditEvents.length}</p>
           <p className="formHint">Audit search updates after a short pause.</p>
           {auditEvents.length === 0 ? (
-            <div className="empty">
+            <div className="empty" data-testid="users-audit-empty-state">
               {auditQuery.trim() ? "No admin audit events match this search." : "No admin audit events yet."}
             </div>
           ) : (
@@ -816,7 +822,7 @@ export default function UsersPage() {
             >
               Report JSON
             </button>
-            <button type="button" onClick={handleDownloadRestoreReportCsv} disabled={!restoreDryRun}>
+            <button type="button" data-testid="restore-report-csv-button" onClick={handleDownloadRestoreReportCsv} disabled={!restoreDryRun}>
               Report CSV
             </button>
           </div>
@@ -1070,12 +1076,12 @@ export default function UsersPage() {
         ) : null}
 
         {!loading && users.length === 0 ? (
-          <div className="empty">No users found for the current filters.</div>
+          <div className="empty" data-testid="users-empty-state">No users found for the current filters.</div>
         ) : null}
 
         <div className="list">
           {!loading && users.length > 0 && filteredUsers.length === 0 ? (
-            <div className="empty">No users match this filter or search.</div>
+            <div className="empty" data-testid="users-filter-empty-state">No users match this filter or search.</div>
           ) : null}
 
           {filteredUsers.map((user) => (
