@@ -4,6 +4,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+clean_frontend_build_artifacts() {
+  if [ -d "frontend/.next" ]; then
+    echo "[preflight] removing stale frontend/.next"
+    rm -rf "frontend/.next"
+  fi
+}
+
 cd "$ROOT_DIR"
 
 echo "[preflight] repo: $ROOT_DIR"
@@ -11,6 +18,7 @@ echo "[preflight] git status"
 git status --short
 
 if [ -f "frontend/package.json" ]; then
+  clean_frontend_build_artifacts
   echo "[preflight] frontend build"
   npm --prefix frontend run build
 fi

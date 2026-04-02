@@ -6,7 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo "[local-runtime-audit] checking backend default"
-if ! rg -n 'DEPLOYMATE_LOCAL_DOCKER_ENABLED", "false"' backend/app/services/deployments.py >/dev/null; then
+if ! rg -n 'DEPLOYMATE_LOCAL_DOCKER_ENABLED", "false"' backend/app/services/runtime_executors.py >/dev/null; then
   echo "[local-runtime-audit] fail: backend local runtime is not default-off" >&2
   exit 1
 fi

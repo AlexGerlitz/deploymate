@@ -6,6 +6,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SURFACE="full"
 BACKEND_PYTHON="${BACKEND_PYTHON:-}"
 
+clean_frontend_build_artifacts() {
+  if [ -d "frontend/.next" ]; then
+    echo "[release] removing stale frontend/.next"
+    rm -rf "frontend/.next"
+  fi
+}
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -90,6 +97,7 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   echo "[release] frontend templates smoke"
   npm --prefix frontend run smoke:templates
 
+  clean_frontend_build_artifacts
   echo "[release] frontend build"
   npm --prefix frontend run build
 fi
