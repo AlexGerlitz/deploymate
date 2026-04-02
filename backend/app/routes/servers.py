@@ -24,14 +24,14 @@ from app.services.deployments import (
     get_suggested_external_ports,
     test_server_connection,
 )
-from app.services.auth import enforce_plan_limit, require_auth
+from app.services.auth import enforce_plan_limit, require_admin
 
 
-router = APIRouter(dependencies=[Depends(require_auth)])
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 @router.post("/servers", response_model=ServerResponse)
-def create_server(payload: ServerCreateRequest, user=Depends(require_auth)) -> ServerResponse:
+def create_server(payload: ServerCreateRequest, user=Depends(require_admin)) -> ServerResponse:
     enforce_plan_limit(user, "servers")
 
     if payload.auth_type == "password" and not payload.password:

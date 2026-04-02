@@ -1,10 +1,19 @@
 import unittest
 from unittest.mock import patch
 
+from fastapi import HTTPException
+
 from app.routes.root import _build_admin_audit_summary, _build_backup_bundle
+from app.services.auth import require_admin
 
 
 class AdminHelperTests(unittest.TestCase):
+    def test_require_admin_rejects_member_user(self):
+        with self.assertRaises(HTTPException) as context:
+            require_admin({"id": "user-1", "role": "member"})
+
+        self.assertEqual(context.exception.status_code, 403)
+
     def test_build_admin_audit_summary_counts_target_types(self):
         items = [
             {

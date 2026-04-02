@@ -650,6 +650,13 @@ export default function HomePage() {
   }
 
   async function loadServers(silent = false) {
+    if (!currentUser?.is_admin) {
+      setServers([]);
+      setServersError("");
+      setServersLoading(false);
+      return;
+    }
+
     if (!silent) {
       setServersLoading(true);
       setServersError("");
@@ -2016,12 +2023,20 @@ export default function HomePage() {
           <h2>Getting Started</h2>
           <div className="onboardingList">
             <div className="onboardingItem">
-              <strong>Add server</strong>
-              <p>Save your VPS target with SSH access so DeployMate can reach it.</p>
+              <strong>{currentUser?.is_admin ? "Add server" : "Explore the app"}</strong>
+              <p>
+                {currentUser?.is_admin
+                  ? "Save your VPS target with SSH access so DeployMate can reach it."
+                  : "Trial accounts can review the product surface safely without infrastructure control."}
+              </p>
             </div>
             <div className="onboardingItem">
-              <strong>Test connection</strong>
-              <p>Run the built-in SSH and Docker check before the first deploy.</p>
+              <strong>{currentUser?.is_admin ? "Test connection" : "Open admin workspaces"}</strong>
+              <p>
+                {currentUser?.is_admin
+                  ? "Run the built-in SSH and Docker check before the first deploy."
+                  : "Inspect saved views, audit trails, exports, and backup dry-run workflows."}
+              </p>
             </div>
             <div className="onboardingItem">
               <strong>Create deployment</strong>
@@ -2050,6 +2065,7 @@ export default function HomePage() {
           </div>
         ) : null}
 
+        {currentUser?.is_admin ? (
         <article className="card formCard">
           <div className="sectionHeader">
             <div>
@@ -2361,6 +2377,16 @@ export default function HomePage() {
             ))}
           </div>
         </article>
+        ) : (
+          <article className="card formCard">
+            <h2>Servers</h2>
+            <div className="banner subtle">
+              Server management is restricted to admin users. Trial accounts can explore
+              the dashboard, admin workspaces, saved views, exports, and restore dry-run
+              flows without touching shared infrastructure.
+            </div>
+          </article>
+        )}
 
         <article className="card formCard">
           <div className="sectionHeader">
