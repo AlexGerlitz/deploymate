@@ -146,10 +146,31 @@ export function AdminSavedViews({
   inputValue,
   onInputChange,
   onSave,
+  onUpdateCurrent,
   saveDisabled,
+  updateDisabled,
   saveTestId,
+  updateTestId,
   saveLabel = "Save current view",
+  updateLabel = "Update current view",
   statusText = "",
+  metaText = "",
+  inputHint = "",
+  inputCountText = "",
+  viewSummaryText = "",
+  useCurrentNameLabel = "",
+  onUseCurrentName,
+  useCurrentNameDisabled,
+  searchValue = "",
+  onSearchChange,
+  searchTestId,
+  searchPlaceholder = "Search saved views",
+  sourceFilter = "all",
+  onSourceFilterChange,
+  sourceFilterTestId,
+  sortValue = "newest",
+  onSortChange,
+  sortTestId,
   views = [],
   onApply,
   onDelete,
@@ -159,6 +180,9 @@ export function AdminSavedViews({
   listTestId,
   activeViewId = "",
 }) {
+  const importedCount = views.filter((view) => view.source === "imported").length;
+  const localCount = views.length - importedCount;
+
   return (
     <div className="adminSavedViews">
       <div className="sectionHeader">
@@ -166,16 +190,41 @@ export function AdminSavedViews({
           <h3>{title}</h3>
           <p className="formHint">Saved locally in this browser for faster admin workflows.</p>
           <p className="formHint">
-            {views.length === 0 ? "No saved views yet." : `${views.length} saved view${views.length === 1 ? "" : "s"}.`}
+          {views.length === 0 ? "No saved views yet." : `${views.length} saved view${views.length === 1 ? "" : "s"} · max 8.`}
           </p>
+          {views.length > 0 ? (
+            <p className="formHint">
+              {localCount} local · {importedCount} imported · newest first
+            </p>
+          ) : null}
+          {views.length >= 8 ? (
+            <p className="formHint">View limit reached. Saving a matching name will replace the existing preset.</p>
+          ) : null}
+          {importedCount > 0 ? (
+            <p className="formHint">Imported presets can be removed with `Clear imported` without touching local ones.</p>
+          ) : null}
         </div>
       </div>
       <div className="adminSavedViewsComposer">
         <label className="field">
           <span>{inputLabel}</span>
-          <input value={inputValue} onChange={onInputChange} placeholder="Morning triage" />
+          <input value={inputValue} onChange={onInputChange} placeholder="Morning triage" maxLength={40} />
         </label>
+        {onUseCurrentName ? (
+          <button
+            type="button"
+            className="secondaryButton"
+            onClick={onUseCurrentName}
+            disabled={useCurrentNameDisabled}
+          >
+            {useCurrentNameLabel || "Use current name"}
+          </button>
+        ) : null}
+        {inputHint ? <p className="formHint">{inputHint}</p> : null}
+        {inputCountText ? <p className="formHint">{inputCountText}</p> : null}
         {statusText ? <p className="formHint">{statusText}</p> : null}
+        {viewSummaryText ? <p className="formHint">{viewSummaryText}</p> : null}
+        {metaText ? <p className="formHint">{metaText}</p> : null}
         <button
           type="button"
           className="secondaryButton"
@@ -185,6 +234,44 @@ export function AdminSavedViews({
         >
           {saveLabel}
         </button>
+        {onUpdateCurrent ? (
+          <button
+            type="button"
+            className="secondaryButton"
+            data-testid={updateTestId}
+            onClick={onUpdateCurrent}
+            disabled={updateDisabled}
+          >
+            {updateLabel}
+          </button>
+        ) : null}
+      </div>
+      <div className="adminSavedViewsComposer">
+        <label className="field">
+          <span>Find saved views</span>
+          <input
+            data-testid={searchTestId}
+            value={searchValue}
+            onChange={onSearchChange}
+            placeholder={searchPlaceholder}
+          />
+        </label>
+        <label className="field">
+          <span>Source</span>
+          <select data-testid={sourceFilterTestId} value={sourceFilter} onChange={onSourceFilterChange}>
+            <option value="all">All</option>
+            <option value="local">Local</option>
+            <option value="imported">Imported</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Sort</span>
+          <select data-testid={sortTestId} value={sortValue} onChange={onSortChange}>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="name">Name</option>
+          </select>
+        </label>
       </div>
       {actions.length > 0 ? (
         <div className="adminSavedViewActions">
@@ -222,6 +309,9 @@ export function AdminSavedViews({
                   <strong>{view.name}</strong>
                   {activeViewId === view.id ? (
                     <span className="status healthy">Current</span>
+                  ) : null}
+                  {view.sourceLabel ? (
+                    <span className="status unknown">{view.sourceLabel}</span>
                   ) : null}
                 </div>
                 {view.summary ? <p className="formHint">{view.summary}</p> : null}

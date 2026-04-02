@@ -172,6 +172,10 @@ async function copyTextToClipboard(value) {
   document.body.removeChild(textarea);
 }
 
+function normalizeSavedViewName(value) {
+  return value.trim().replaceAll(/\s+/g, " ");
+}
+
 function formatSavedViews(items) {
   if (!Array.isArray(items)) {
     return [];
@@ -189,7 +193,9 @@ function formatSavedViews(items) {
       name: item.name,
       filters: item.filters,
       updatedAt: item.updatedAt || new Date().toISOString(),
+      source: item.source || "local",
       updatedAtLabel: formatDate(item.updatedAt || new Date().toISOString()),
+      sourceLabel: item.source === "imported" ? "Imported" : "Local",
       summary: [
         item.filters.role && item.filters.role !== "all" ? `role ${item.filters.role}` : null,
         item.filters.plan && item.filters.plan !== "all" ? `plan ${item.filters.plan}` : null,
@@ -212,17 +218,57 @@ function normalizeSavedViewsForStorage(items) {
     name: item.name,
     filters: item.filters,
     updatedAt: item.updatedAt,
+    source: item.source || "local",
   }));
 }
 
 function parseImportedSavedViews(payload) {
   if (Array.isArray(payload)) {
-    return payload;
+    return { views: payload, meta: { source: "legacy-array" } };
   }
   if (payload && Array.isArray(payload.views)) {
-    return payload.views;
+    return {
+      views: payload.views,
+      meta: {
+        source: "bundle",
+        version: payload.version,
+        scope: payload.scope,
+        exportedAt: payload.exported_at,
+      },
+    };
   }
-  return [];
+  return { views: [], meta: null };
+}
+
+function dedupeSavedViewsByName(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = normalizeSavedViewName(item.name).toLowerCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function mergeSavedViews(existingItems, importedItems) {
+  return dedupeSavedViewsByName([...importedItems, ...existingItems]).slice(0, 8);
+}
+
+function sortSavedViews(items, mode) {
+  const nextItems = [...items];
+  if (mode === "oldest") {
+    return nextItems.sort(
+      (left, right) => new Date(left.updatedAt || 0).getTime() - new Date(right.updatedAt || 0).getTime(),
+    );
+  }
+  if (mode === "name") {
+    return nextItems.sort((left, right) => left.name.localeCompare(right.name));
+  }
+  return nextItems.sort(
+    (left, right) => new Date(right.updatedAt || 0).getTime() - new Date(left.updatedAt || 0).getTime(),
+  );
 }
 
 function UsersPageContent() {
@@ -239,6 +285,10 @@ function UsersPageContent() {
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [savedViews, setSavedViews] = useState([]);
   const [savedViewName, setSavedViewName] = useState("");
+  const [savedViewsMetaText, setSavedViewsMetaText] = useState("Using local browser storage.");
+  const [savedViewsSearch, setSavedViewsSearch] = useState("");
+  const [savedViewsSourceFilter, setSavedViewsSourceFilter] = useState("all");
+  const [savedViewsSort, setSavedViewsSort] = useState("newest");
   const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -280,15 +330,20 @@ function UsersPageContent() {
     audit_q: auditQuery.trim(),
   };
   const currentUserViewSignature = JSON.stringify(currentUserView);
+  const normalizedSavedViewName = normalizeSavedViewName(savedViewName);
   const matchedSavedViewByName = savedViews.find(
-    (item) => item.name.trim().toLowerCase() === savedViewName.trim().toLowerCase(),
+    (item) => normalizeSavedViewName(item.name).toLowerCase() === normalizedSavedViewName.toLowerCase(),
   );
   const activeSavedViewId =
     savedViews.find((item) => JSON.stringify(item.filters) === currentUserViewSignature)?.id || "";
+  const activeSavedView = savedViews.find((item) => item.id === activeSavedViewId) || null;
   const hasSavedViewNameMatch = Boolean(matchedSavedViewByName);
   const hasSavedViewChanges =
     matchedSavedViewByName &&
     JSON.stringify(matchedSavedViewByName.filters) !== currentUserViewSignature;
+  const activeSavedViewHasChanges =
+    activeSavedView &&
+    JSON.stringify(activeSavedView.filters) !== currentUserViewSignature;
   const activeFilterChips = [
     query.trim()
       ? {
@@ -331,7 +386,31 @@ function UsersPageContent() {
         }
       : null,
   ];
-  const canSaveCurrentView = savedViewName.trim() !== "" && hasUserFilters;
+  const canSaveCurrentView = normalizedSavedViewName !== "" && hasUserFilters;
+  const reachedViewLimitWithoutReplace =
+    savedViews.length >= 8 && !hasSavedViewNameMatch;
+  const visibleSavedViews = sortSavedViews(
+    savedViews.filter((item) => {
+      if (
+        savedViewsSourceFilter !== "all" &&
+        (item.source || "local") !== savedViewsSourceFilter
+      ) {
+        return false;
+      }
+      const haystack = `${item.name} ${item.summary || ""}`.toLowerCase();
+      return haystack.includes(savedViewsSearch.trim().toLowerCase());
+    }),
+    savedViewsSort,
+  );
+  const savedViewsToolsDirty =
+    normalizedSavedViewName !== "" ||
+    savedViewsSearch.trim() !== "" ||
+    savedViewsSourceFilter !== "all" ||
+    savedViewsSort !== "newest";
+  const savedViewsSummaryText =
+    savedViews.length === 0
+      ? ""
+      : `Showing ${visibleSavedViews.length} of ${savedViews.length} saved user view${savedViews.length === 1 ? "" : "s"}.`;
 
   async function loadAdminOverview() {
     const response = await fetch(`${apiBaseUrl}/admin/overview`, {
@@ -421,6 +500,17 @@ function UsersPageContent() {
   }
 
   useEffect(() => {
+    if (!success && !error) {
+      return undefined;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setSuccess("");
+      setError("");
+    }, 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [success, error]);
+
+  useEffect(() => {
     if (smokeMode) {
       return;
     }
@@ -477,8 +567,10 @@ function UsersPageContent() {
       }
       const parsed = JSON.parse(stored);
       setSavedViews(formatSavedViews(parsed));
+      setSavedViewsMetaText("Loaded from local browser storage.");
     } catch {
       setSavedViews([]);
+      setSavedViewsMetaText("Using local browser storage.");
     }
   }, []);
 
@@ -847,12 +939,13 @@ function UsersPageContent() {
     const nextViews = [
       {
         id: matchedView ? matchedView.id : `${Date.now()}`,
-        name: savedViewName.trim(),
+        name: normalizedSavedViewName,
         filters: currentUserView,
         updatedAt: new Date().toISOString(),
+        source: "local",
       },
       ...savedViews
-        .filter((item) => item.name.trim().toLowerCase() !== savedViewName.trim().toLowerCase())
+        .filter((item) => normalizeSavedViewName(item.name).toLowerCase() !== normalizedSavedViewName.toLowerCase())
         .map((item) => ({
           id: item.id,
           name: item.name,
@@ -862,6 +955,7 @@ function UsersPageContent() {
     ].slice(0, 8);
 
     persistSavedViews(nextViews);
+    setSavedViewsMetaText("Using local browser storage.");
     setSavedViewName("");
     setSuccess("Saved current user view.");
     setError("");
@@ -874,7 +968,40 @@ function UsersPageContent() {
     }
     applyViewFilters(nextView.filters);
     setSavedViewName(nextView.name);
+    setSavedViewsMetaText(
+      nextView.source === "imported" ? "Applied an imported saved view." : "Applied a local saved view.",
+    );
     setSuccess(`Applied saved view ${nextView.name}.`);
+    setError("");
+  }
+
+  function handleUpdateCurrentView() {
+    if (!activeSavedViewId) {
+      return;
+    }
+
+    const nextViews = [
+      {
+        id: activeSavedViewId,
+        name: activeSavedView?.name || normalizedSavedViewName || "Saved view",
+        filters: currentUserView,
+        updatedAt: new Date().toISOString(),
+        source: "local",
+      },
+      ...savedViews
+        .filter((item) => item.id !== activeSavedViewId)
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          filters: item.filters,
+          updatedAt: item.updatedAt,
+        })),
+    ].slice(0, 8);
+
+    persistSavedViews(nextViews);
+    setSavedViewsMetaText("Using local browser storage.");
+    setSavedViewName(activeSavedView?.name || "");
+    setSuccess("Current saved user view updated.");
     setError("");
   }
 
@@ -930,14 +1057,47 @@ function UsersPageContent() {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(typeof reader.result === "string" ? reader.result : "[]");
+        const imported = parseImportedSavedViews(parsed);
+        if (imported.meta?.version && imported.meta.version !== 1) {
+          throw new Error("Unsupported saved views export version.");
+        }
+        if (imported.meta?.scope && imported.meta.scope !== "admin-users") {
+          throw new Error("This file is not a users saved views export.");
+        }
+        const importedViews = formatSavedViews(imported.views).map((item) => ({
+          ...item,
+          source: "imported",
+        }));
         const normalized = normalizeSavedViewsForStorage(
-          formatSavedViews(parseImportedSavedViews(parsed)),
-        ).slice(0, 8);
+          mergeSavedViews(formatSavedViews(savedViews), importedViews),
+        );
+        if (normalized.length === 0) {
+          throw new Error("No valid saved user views found in this file.");
+        }
+        const importedNameSet = new Set(
+          importedViews.map((item) => normalizeSavedViewName(item.name).toLowerCase()),
+        );
+        const replacedCount = formatSavedViews(savedViews).filter((item) =>
+          importedNameSet.has(normalizeSavedViewName(item.name).toLowerCase()),
+        ).length;
+        const mergedTotal = dedupeSavedViewsByName([...importedViews, ...formatSavedViews(savedViews)]).length;
+        const skippedCount = Math.max(0, mergedTotal - normalized.length);
         persistSavedViews(normalized);
-        setSuccess(`Imported ${normalized.length} saved user view${normalized.length === 1 ? "" : "s"}.`);
+        setSavedViewsMetaText(
+          imported.meta?.source === "bundle"
+            ? `Imported bundle${imported.meta.version ? ` v${imported.meta.version}` : ""}${imported.meta.exportedAt ? ` · exported ${formatDate(imported.meta.exportedAt)}` : ""}.`
+            : "Imported legacy saved views file.",
+        );
+        setSuccess(
+          `Saved user views merged. Total: ${normalized.length}. Replaced: ${replacedCount}. Skipped by limit: ${skippedCount}.`,
+        );
         setError("");
-      } catch {
-        setError("Failed to import saved user views.");
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Failed to import saved user views.",
+        );
       }
     };
     reader.onerror = () => {
@@ -950,8 +1110,34 @@ function UsersPageContent() {
   function handleClearSavedViews() {
     persistSavedViews([]);
     setSavedViewName("");
+    setSavedViewsMetaText("Using local browser storage.");
     setSuccess("Saved user views cleared.");
     setError("");
+  }
+
+  function handleClearImportedSavedViews() {
+    const nextViews = savedViews.filter((item) => item.source !== "imported");
+    persistSavedViews(nextViews);
+    setSavedViewsMetaText("Using local browser storage.");
+    setSuccess("Imported user views removed.");
+    setError("");
+  }
+
+  function handleResetSavedViewsTools() {
+    setSavedViewName("");
+    setSavedViewsSearch("");
+    setSavedViewsSourceFilter("all");
+    setSavedViewsSort("newest");
+    setSavedViewsMetaText("Using local browser storage.");
+    setSuccess("Saved views tools reset.");
+    setError("");
+  }
+
+  function handleUseCurrentSavedViewName() {
+    if (!activeSavedView?.name) {
+      return;
+    }
+    setSavedViewName(activeSavedView.name);
   }
 
   useEffect(() => {
@@ -1432,19 +1618,43 @@ function UsersPageContent() {
             inputValue={savedViewName}
             onInputChange={(event) => setSavedViewName(event.target.value)}
             onSave={handleSaveCurrentView}
-            saveDisabled={!canSaveCurrentView}
+            onUpdateCurrent={handleUpdateCurrentView}
+            saveDisabled={!canSaveCurrentView || reachedViewLimitWithoutReplace}
+            updateDisabled={!activeSavedViewHasChanges}
             saveTestId="users-save-view-button"
+            updateTestId="users-update-current-view-button"
             saveLabel={hasSavedViewNameMatch ? "Update saved view" : "Save current view"}
+            inputHint="Names are case-insensitive and extra spaces are normalized. Matching names update the existing saved view."
+            inputCountText={`${normalizedSavedViewName.length}/40 characters`}
+            viewSummaryText={savedViewsSummaryText}
+            useCurrentNameLabel="Use current name"
+            onUseCurrentName={handleUseCurrentSavedViewName}
+            useCurrentNameDisabled={!activeSavedView?.name}
+            searchValue={savedViewsSearch}
+            onSearchChange={(event) => setSavedViewsSearch(event.target.value)}
+            searchTestId="users-saved-views-search"
+            searchPlaceholder="admins, team, imported"
+            sourceFilter={savedViewsSourceFilter}
+            onSourceFilterChange={(event) => setSavedViewsSourceFilter(event.target.value)}
+            sourceFilterTestId="users-saved-views-source-filter"
+            sortValue={savedViewsSort}
+            onSortChange={(event) => setSavedViewsSort(event.target.value)}
+            sortTestId="users-saved-views-sort"
             statusText={
               !hasUserFilters
                 ? "Set at least one user or audit filter before saving a view."
+                : reachedViewLimitWithoutReplace
+                ? "Saved views are full. Use an existing name or clear some presets first."
+                : activeSavedViewHasChanges
+                ? `Current saved view "${activeSavedView?.name || ""}" has unsaved filter changes.`
                 : hasSavedViewNameMatch
                 ? hasSavedViewChanges
                   ? "This will update the existing saved view with the current filters."
                   : "Saved view name matches the current filter state."
                 : ""
             }
-            views={savedViews}
+            metaText={savedViewsMetaText}
+            views={visibleSavedViews}
             onApply={handleApplySavedView}
             onDelete={handleDeleteSavedView}
             onCopy={handleCopySavedViewLink}
@@ -1468,8 +1678,24 @@ function UsersPageContent() {
                 onClick: handleClearSavedViews,
                 disabled: savedViews.length === 0,
               },
+              {
+                label: "Clear imported",
+                testId: "users-clear-imported-saved-views-button",
+                onClick: handleClearImportedSavedViews,
+                disabled: !savedViews.some((item) => item.source === "imported"),
+              },
+              {
+                label: "Reset tools",
+                testId: "users-reset-saved-views-tools-button",
+                onClick: handleResetSavedViewsTools,
+                disabled: !savedViewsToolsDirty,
+              },
             ]}
-            emptyText="No saved user views yet."
+            emptyText={
+              savedViews.length === 0
+                ? "No saved user views yet."
+                : "No saved user views match this search or source filter."
+            }
             listTestId="users-saved-views-list"
             activeViewId={activeSavedViewId}
           />
