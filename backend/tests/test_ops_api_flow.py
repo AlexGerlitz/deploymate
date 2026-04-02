@@ -1,4 +1,6 @@
 import unittest
+import os
+import tempfile
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -140,16 +142,36 @@ class OpsApiFlowTests(unittest.TestCase):
         return list(self.notifications[:limit])
 
     def test_full_ops_http_flow(self):
-        overview_response = self.client.get("/ops/overview?notifications_limit=100")
-        self.assertEqual(overview_response.status_code, 200)
-        overview = overview_response.json()
-        self.assertEqual(overview["user"]["username"], "smoke-admin")
-        self.assertEqual(overview["deployments"]["total"], 2)
-        self.assertEqual(overview["deployments"]["failed"], 1)
-        self.assertEqual(overview["servers"]["unused"], 1)
-        self.assertEqual(overview["notifications"]["error"], 1)
-        self.assertEqual(overview["templates"]["top_template_name"], "Smoke template")
-        self.assertGreaterEqual(len(overview["attention_items"]), 3)
+        with tempfile.NamedTemporaryFile("w", delete=False) as handle:
+            handle.write("203.0.113.10 ssh-ed25519 AAAAC3NzaSmokeKey\n")
+            known_hosts_path = handle.name
+
+        self.addCleanup(lambda: os.path.exists(known_hosts_path) and os.unlink(known_hosts_path))
+
+        with patch.dict(
+            os.environ,
+            {
+                "DEPLOYMATE_LOCAL_DOCKER_ENABLED": "false",
+                "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "yes",
+                "DEPLOYMATE_SSH_KNOWN_HOSTS_FILE": known_hosts_path,
+                "DEPLOYMATE_SERVER_CREDENTIALS_KEY": "configured-key",
+            },
+            clear=False,
+        ):
+            overview_response = self.client.get("/ops/overview?notifications_limit=100")
+            self.assertEqual(overview_response.status_code, 200)
+            overview = overview_response.json()
+            self.assertEqual(overview["user"]["username"], "smoke-admin")
+            self.assertEqual(overview["deployments"]["total"], 2)
+            self.assertEqual(overview["deployments"]["failed"], 1)
+            self.assertEqual(overview["servers"]["unused"], 1)
+            self.assertEqual(overview["notifications"]["error"], 1)
+            self.assertEqual(overview["templates"]["top_template_name"], "Smoke template")
+            self.assertFalse(overview["capabilities"]["local_docker_enabled"])
+            self.assertEqual(overview["capabilities"]["ssh_host_key_checking"], "yes")
+            self.assertTrue(overview["capabilities"]["strict_known_hosts_configured"])
+            self.assertTrue(overview["capabilities"]["server_credentials_key_configured"])
+            self.assertGreaterEqual(len(overview["attention_items"]), 3)
 
         deployments_export_response = self.client.get("/ops/exports/deployments?format=json")
         self.assertEqual(deployments_export_response.status_code, 200)

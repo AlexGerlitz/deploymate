@@ -147,6 +147,14 @@ class OpsUserSummary(BaseModel):
     role: UserRole = "member"
 
 
+class OpsRuntimeCapabilitiesSummary(BaseModel):
+    local_docker_enabled: bool = False
+    ssh_host_key_checking: str = "accept-new"
+    strict_known_hosts_configured: bool = False
+    server_credentials_key_configured: bool = False
+    remote_only_recommended: bool = True
+
+
 class OpsOverviewResponse(BaseModel):
     generated_at: str
     user: Optional[OpsUserSummary] = None
@@ -154,6 +162,7 @@ class OpsOverviewResponse(BaseModel):
     servers: OpsServersSummary = Field(default_factory=OpsServersSummary)
     notifications: OpsNotificationsSummary = Field(default_factory=OpsNotificationsSummary)
     templates: OpsTemplatesSummary = Field(default_factory=OpsTemplatesSummary)
+    capabilities: OpsRuntimeCapabilitiesSummary = Field(default_factory=OpsRuntimeCapabilitiesSummary)
     attention_items: list[OpsAttentionItem] = Field(default_factory=list)
 
 

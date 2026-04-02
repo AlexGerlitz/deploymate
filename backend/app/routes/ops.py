@@ -1,5 +1,6 @@
 import csv
 import io
+import os
 from datetime import datetime, timezone
 from typing import Iterable
 
@@ -12,11 +13,14 @@ from app.schemas import (
     OpsDeploymentsSummary,
     OpsNotificationsSummary,
     OpsOverviewResponse,
+    OpsRuntimeCapabilitiesSummary,
     OpsServersSummary,
     OpsTemplatesSummary,
     OpsUserSummary,
 )
 from app.services.auth import require_auth
+from app.services.deployments import local_docker_runtime_enabled
+from app.services.server_credentials import SERVER_CREDENTIALS_KEY_ENV
 
 
 router = APIRouter(prefix="/ops", dependencies=[Depends(require_auth)])
@@ -46,6 +50,22 @@ def _is_recent_date(value: str | None, days: int = 7) -> bool:
         return False
     delta = datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)
     return delta.total_seconds() <= days * 24 * 60 * 60
+
+
+def _build_runtime_capabilities_summary() -> OpsRuntimeCapabilitiesSummary:
+    ssh_mode = os.getenv("DEPLOYMATE_SSH_HOST_KEY_CHECKING", "accept-new").strip().lower() or "accept-new"
+    known_hosts_path = os.getenv("DEPLOYMATE_SSH_KNOWN_HOSTS_FILE", "").strip()
+    strict_known_hosts_configured = False
+    if ssh_mode == "yes" and known_hosts_path and os.path.isfile(known_hosts_path):
+        strict_known_hosts_configured = os.path.getsize(known_hosts_path) > 0
+
+    return OpsRuntimeCapabilitiesSummary(
+        local_docker_enabled=local_docker_runtime_enabled(),
+        ssh_host_key_checking=ssh_mode,
+        strict_known_hosts_configured=strict_known_hosts_configured,
+        server_credentials_key_configured=bool(os.getenv(SERVER_CREDENTIALS_KEY_ENV, "").strip()),
+        remote_only_recommended=True,
+    )
 
 
 def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOverviewResponse:
@@ -80,6 +100,7 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
         reverse=True,
     )
     top_template = popular_templates[0] if popular_templates else None
+    capabilities = _build_runtime_capabilities_summary()
 
     attention_items: list[OpsAttentionItem] = []
 
@@ -137,6 +158,33 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
             )
         )
 
+    if capabilities.local_docker_enabled:
+        attention_items.append(
+            OpsAttentionItem(
+                level="warn",
+                title="Local Docker execution is enabled",
+                detail="Remote-only remains the recommended runtime posture for production.",
+            )
+        )
+
+    if capabilities.ssh_host_key_checking != "yes":
+        attention_items.append(
+            OpsAttentionItem(
+                level="warn",
+                title="SSH host trust is not pinned",
+                detail="Switch to strict known-host verification for stronger remote target trust.",
+            )
+        )
+
+    if not capabilities.server_credentials_key_configured and servers:
+        attention_items.append(
+            OpsAttentionItem(
+                level="error",
+                title="Server credential key is missing",
+                detail="Configure DEPLOYMATE_SERVER_CREDENTIALS_KEY before handling stored server credentials.",
+            )
+        )
+
     return OpsOverviewResponse(
         generated_at=datetime.now(timezone.utc).isoformat(),
         user=OpsUserSummary(
@@ -174,6 +222,7 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
             top_template_name=(top_template or {}).get("template_name"),
             top_template_use_count=int((top_template or {}).get("use_count") or 0),
         ),
+        capabilities=capabilities,
         attention_items=attention_items,
     )
 

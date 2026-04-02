@@ -67,11 +67,13 @@ check_contains "ops deployments card" 'data-testid="ops-overview-deployments-car
 check_contains "ops servers card" 'data-testid="ops-overview-servers-card"'
 check_contains "ops activity card" 'data-testid="ops-overview-activity-card"'
 check_contains "ops templates card" 'data-testid="ops-overview-templates-card"'
+check_contains "ops capabilities card" 'data-testid="ops-overview-capabilities-card"'
 check_contains "ops attention list or empty banner" 'data-testid="ops-attention-list"|data-testid="ops-attention-empty-banner"'
 check_contains "ops smoke deployment count copy" 'Deployments'
 check_contains "ops smoke servers copy" 'Servers'
 check_contains "ops smoke activity copy" 'Activity'
 check_contains "ops smoke templates copy" 'Templates'
+check_contains "ops runtime posture copy" 'remote-only|mixed'
 
 echo "[frontend-ops-smoke] ops overview rendered"
 echo "[frontend-ops-smoke] ops export actions rendered"

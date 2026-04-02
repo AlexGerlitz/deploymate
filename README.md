@@ -145,6 +145,7 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - dedicated templates frontend smoke in [scripts/frontend_templates_smoke.sh](scripts/frontend_templates_smoke.sh)
 - deployment detail now includes quick reference, attention overview, and copyable runtime summary ergonomics
 - backend local Docker execution is now explicit opt-in; remote-only is the default runtime posture
+- operations overview now exposes backend runtime capability posture, including local Docker, SSH trust mode, and credential-key readiness
 - the local release gate now runs auth, admin, admin-interactions, ops, restore, runtime, servers, and templates frontend smokes before build
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)

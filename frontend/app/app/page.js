@@ -170,6 +170,13 @@ const smokeOpsOverview = {
     top_template_name: "Smoke template",
     top_template_use_count: 1,
   },
+  capabilities: {
+    local_docker_enabled: false,
+    ssh_host_key_checking: "yes",
+    strict_known_hosts_configured: true,
+    server_credentials_key_configured: true,
+    remote_only_recommended: true,
+  },
   attention_items: [],
 };
 
@@ -2211,6 +2218,23 @@ export default function HomePage() {
                 <span>Used in 7d {opsSnapshot.templates.recently_used}</span>
                 <span>
                   Top {opsSnapshot.templates.top_template_name || "No popular template yet"}
+                </span>
+              </div>
+            </div>
+            <div className="overviewCard" data-testid="ops-overview-capabilities-card">
+              <span className="overviewLabel">Runtime posture</span>
+              <strong className="overviewValue">
+                {opsSnapshot.capabilities?.local_docker_enabled ? "mixed" : "remote-only"}
+              </strong>
+              <div className="overviewMeta">
+                <span>
+                  Local Docker {opsSnapshot.capabilities?.local_docker_enabled ? "enabled" : "disabled"}
+                </span>
+                <span>
+                  SSH trust {opsSnapshot.capabilities?.ssh_host_key_checking || "accept-new"}
+                </span>
+                <span>
+                  Cred key {opsSnapshot.capabilities?.server_credentials_key_configured ? "configured" : "missing"}
                 </span>
               </div>
             </div>

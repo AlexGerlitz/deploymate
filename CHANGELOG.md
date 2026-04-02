@@ -19,6 +19,7 @@ Highlights:
 - enforced fail-fast startup when server credential records exist without `DEPLOYMATE_SERVER_CREDENTIALS_KEY`
 - added `scripts/server_credentials_audit.sh` and wired server credential checks into `scripts/security_audit.sh`
 - made backend local Docker execution explicit opt-in by default and added local runtime boundary audit coverage
+- added runtime capability posture to ops overview so the UI reflects backend local-Docker, SSH trust, and credential-key state
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface
