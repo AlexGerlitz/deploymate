@@ -11,82 +11,19 @@ import {
   AdminPageHeader,
   AdminSavedViews,
 } from "../admin-ui";
+import {
+  smokeAdminUser as smokeUser,
+  smokeMode,
+  smokeUpgradeAuditEvents as smokeAuditEvents,
+  smokeUpgradeAuditViews,
+  smokeUpgradeOverview as smokeOverview,
+  smokeUpgradeRequests as smokeRequests,
+  smokeUpgradeSavedViews,
+  smokeUpgradeUsers as smokeUsers,
+} from "../../lib/admin-smoke-fixtures";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
-const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
-const smokeUser = {
-  id: "smoke-admin",
-  username: "smoke-admin",
-  is_admin: true,
-  role: "admin",
-  plan: "team",
-};
-const smokeRequests = [
-  {
-    id: "smoke-request-1",
-    status: "in_review",
-    name: "Smoke Team",
-    email: "ops@example.com",
-    company_or_team: "Smoke Team",
-    use_case: "Smoke validation",
-    current_plan: "trial",
-    handled_by_username: "smoke-admin",
-    target_username: "smoke-admin",
-    target_user_id: "smoke-admin",
-    reviewed_at: "2026-04-02T00:05:00Z",
-    updated_at: "2026-04-02T00:05:00Z",
-    created_at: "2026-04-02T00:00:00Z",
-    internal_note: "Smoke test note",
-  },
-];
-const smokeOverview = {
-  upgrade_requests: {
-    total: 1,
-    new: 0,
-    in_review: 1,
-    approved: 0,
-    rejected: 0,
-    closed: 0,
-    linked_users: 1,
-  },
-  attention_items: [],
-};
-const smokeAuditEvents = [
-  {
-    id: "smoke-upgrade-audit-1",
-    action_type: "upgrade_request.updated",
-    actor_username: "smoke-admin",
-    target_label: "Smoke Team",
-    details: "Smoke Team approved during smoke verification.",
-    created_at: "2026-04-02T00:06:00Z",
-  },
-];
-const smokeUsers = [
-  { id: "smoke-admin", username: "smoke-admin", plan: "team" },
-];
-const smokeUpgradeSavedViews = [
-  {
-    id: "upgrade-smoke-view",
-    name: "In review queue",
-    filters: {
-      q: "",
-      plan: "all",
-      status: "in_review",
-      linked_only: false,
-      audit_q: "",
-    },
-    updatedAt: "2026-04-02T00:12:00Z",
-  },
-];
-const smokeUpgradeAuditViews = [
-  {
-    id: "upgrade-audit-smoke-view",
-    name: "Newest approvals",
-    filters: { audit_q: "approved", audit_sort: "newest" },
-    updatedAt: "2026-04-02T00:22:00Z",
-  },
-];
 const upgradeSavedViewsStorageKey = "deploymate.admin.upgradeRequests.savedViews";
 const upgradeAuditViewsStorageKey = "deploymate.admin.upgradeRequests.auditViews";
 
