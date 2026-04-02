@@ -22,18 +22,21 @@ import {
   smokeUpgradeUsers as smokeUsers,
 } from "../../lib/admin-smoke-fixtures";
 import {
-  dedupeSavedViewsByName,
   formatSavedViews,
-  mergeSavedViews,
-  normalizeSavedViewName,
-  normalizeSavedViewsForStorage,
-  parseImportedSavedViews,
-  sortSavedViews,
 } from "../../lib/admin-saved-views";
 import {
+  useAdminAuditViewsManager,
+  useAdminSavedViewsManager,
+  useDebouncedValue,
+} from "../../lib/admin-page-hooks";
+import {
+  buildFilterChips,
+  buildFilterChipsFromDefinitions,
+  buildFilterState,
   buildAuditEventsCsv,
   copyTextToClipboard,
   readJsonOrError,
+  sortItemsByDateMode,
   triggerFileDownload,
 } from "../../lib/admin-page-utils";
 import { buildSelectedRequestsCsv } from "../../lib/admin-export-utils";
@@ -82,16 +85,6 @@ function UpgradeRequestsPageContent() {
   const [adminOverview, setAdminOverview] = useState(smokeMode ? smokeOverview : null);
   const [auditEvents, setAuditEvents] = useState(smokeMode ? smokeAuditEvents : []);
   const [users, setUsers] = useState(smokeMode ? smokeUsers : []);
-  const [savedViews, setSavedViews] = useState(
-    smokeMode ? formatUpgradeSavedViews(smokeUpgradeSavedViews) : [],
-  );
-  const [savedViewName, setSavedViewName] = useState("");
-  const [savedViewsMetaText, setSavedViewsMetaText] = useState(
-    smokeMode ? "Loaded from local browser storage." : "Using local browser storage.",
-  );
-  const [savedViewsSearch, setSavedViewsSearch] = useState("");
-  const [savedViewsSourceFilter, setSavedViewsSourceFilter] = useState("all");
-  const [savedViewsSort, setSavedViewsSort] = useState("newest");
   const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
@@ -105,12 +98,8 @@ function UpgradeRequestsPageContent() {
     () => searchParams.get("audit_q") || (smokeMode ? "approved" : ""),
   );
   const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
-  const [auditViews, setAuditViews] = useState(
-    smokeMode ? formatUpgradeSavedViews(smokeUpgradeAuditViews) : [],
-  );
-  const [auditViewName, setAuditViewName] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [debouncedAuditQuery, setDebouncedAuditQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, { disabled: smokeMode, initialValue: "" });
+  const debouncedAuditQuery = useDebouncedValue(auditQuery, { disabled: smokeMode, initialValue: "" });
   const [savingId, setSavingId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [selectedRequestIds, setSelectedRequestIds] = useState(
@@ -120,105 +109,170 @@ function UpgradeRequestsPageContent() {
   const [saveFeedback, setSaveFeedback] = useState("");
   const [drafts, setDrafts] = useState({});
   const filteredRequests = requests;
-  const hasRequestFilters =
-    query.trim() !== "" ||
-    planFilter !== "all" ||
-    statusFilter !== "all" ||
-    linkedOnly ||
-    auditQuery.trim() !== "";
-  const currentUpgradeView = {
-    q: query.trim(),
-    plan: planFilter,
-    status: statusFilter,
-    linked_only: linkedOnly,
-    audit_q: auditQuery.trim(),
-  };
-  const currentUpgradeViewSignature = JSON.stringify(currentUpgradeView);
-  const normalizedSavedViewName = normalizeSavedViewName(savedViewName);
-  const matchedSavedViewByName = savedViews.find(
-    (item) => normalizeSavedViewName(item.name).toLowerCase() === normalizedSavedViewName.toLowerCase(),
-  );
-  const activeSavedViewId =
-    savedViews.find((item) => JSON.stringify(item.filters) === currentUpgradeViewSignature)?.id || "";
-  const activeSavedView = savedViews.find((item) => item.id === activeSavedViewId) || null;
-  const hasSavedViewNameMatch = Boolean(matchedSavedViewByName);
-  const hasSavedViewChanges =
-    matchedSavedViewByName &&
-    JSON.stringify(matchedSavedViewByName.filters) !== currentUpgradeViewSignature;
-  const activeSavedViewHasChanges =
-    activeSavedView &&
-    JSON.stringify(activeSavedView.filters) !== currentUpgradeViewSignature;
-  const activeFilterChips = [
-    query.trim()
-      ? {
-          key: "upgrade-q",
-          label: `Search: ${query.trim()}`,
-          onRemove: () => setQuery(""),
-          testId: "upgrade-filter-chip-query",
-        }
-      : null,
-    planFilter !== "all"
-      ? {
-          key: "upgrade-plan",
-          label: `Plan: ${planFilter}`,
-          onRemove: () => setPlanFilter("all"),
-          testId: "upgrade-filter-chip-plan",
-        }
-      : null,
-    statusFilter !== "all"
-      ? {
-          key: "upgrade-status",
-          label: `Status: ${statusFilter}`,
-          onRemove: () => setStatusFilter("all"),
-          testId: "upgrade-filter-chip-status",
-        }
-      : null,
-    linkedOnly
-      ? {
-          key: "upgrade-linked",
-          label: "Linked users only",
-          onRemove: () => setLinkedOnly(false),
-          testId: "upgrade-filter-chip-linked",
-        }
-      : null,
+  const primaryFilterDefinitions = [
+    {
+      key: "q",
+      value: query,
+      normalizedValue: query.trim(),
+      chipKey: "upgrade-q",
+      chipLabel: `Search: ${query.trim()}`,
+      onRemove: () => setQuery(""),
+      testId: "upgrade-filter-chip-query",
+    },
+    {
+      key: "plan",
+      value: planFilter,
+      chipKey: "upgrade-plan",
+      chipLabel: `Plan: ${planFilter}`,
+      onRemove: () => setPlanFilter("all"),
+      testId: "upgrade-filter-chip-plan",
+    },
+    {
+      key: "status",
+      value: statusFilter,
+      chipKey: "upgrade-status",
+      chipLabel: `Status: ${statusFilter}`,
+      onRemove: () => setStatusFilter("all"),
+      testId: "upgrade-filter-chip-status",
+    },
+    {
+      key: "linked_only",
+      value: linkedOnly,
+      normalizedValue: linkedOnly,
+      chipKey: "upgrade-linked",
+      chipLabel: "Linked users only",
+      onRemove: () => setLinkedOnly(false),
+      testId: "upgrade-filter-chip-linked",
+    },
+    {
+      key: "audit_q",
+      value: auditQuery,
+      normalizedValue: auditQuery.trim(),
+      chipKey: "upgrade-audit",
+      chipLabel: `Audit: ${auditQuery.trim()}`,
+      onRemove: () => setAuditQuery(""),
+      testId: "upgrade-filter-chip-audit",
+    },
+  ];
+  const { currentFilters: currentUpgradeView, hasActiveFilters: hasRequestFilters } =
+    buildFilterState(primaryFilterDefinitions);
+  const {
+    savedViews,
+    savedViewName,
+    setSavedViewName,
+    savedViewsMetaText,
+    savedViewsSearch,
+    setSavedViewsSearch,
+    savedViewsSourceFilter,
+    setSavedViewsSourceFilter,
+    savedViewsSort,
+    setSavedViewsSort,
+    normalizedSavedViewName,
+    hasSavedViewNameMatch,
+    hasSavedViewChanges,
+    activeSavedViewId,
+    activeSavedView,
+    activeSavedViewHasChanges,
+    canSaveCurrentView,
+    reachedViewLimitWithoutReplace,
+    visibleSavedViews,
+    savedViewsToolsDirty,
+    savedViewsSummaryText,
+    handleSaveCurrentView,
+    handleApplySavedView,
+    handleUpdateCurrentView,
+    handleDeleteSavedView,
+    handleDownloadSavedViews,
+    handleImportSavedViews,
+    handleClearSavedViews,
+    handleClearImportedSavedViews,
+    handleResetSavedViewsTools,
+    handleUseCurrentSavedViewName,
+    handleCopySavedViewLink,
+  } = useAdminSavedViewsManager({
+    smokeMode,
+    initialViews: smokeMode ? formatUpgradeSavedViews(smokeUpgradeSavedViews) : [],
+    formatViews: formatUpgradeSavedViews,
+    storageKey: upgradeSavedViewsStorageKey,
+    currentFilters: currentUpgradeView,
+    hasFilters: hasRequestFilters,
+    applyViewFilters,
+    pathname,
+    copyText: copyTextToClipboard,
+    setFeedback: setSaveFeedback,
+    setError,
+    initialMetaText: smokeMode ? "Loaded from local browser storage." : "Using local browser storage.",
+    exportFilename: "deploymate-upgrade-saved-views.json",
+    exportScope: "admin-upgrade-requests",
+    summaryNoun: "inbox",
+    emptyImportMessage: "No valid saved inbox views found in this file.",
+    wrongScopeMessage: "This file is not an upgrade requests saved views export.",
+    saveSuccessMessage: "Saved current inbox view.",
+    updateSuccessMessage: "Current saved inbox view updated.",
+    deleteSuccessMessage: "Saved inbox view removed.",
+    exportSuccessMessage: "Saved inbox views exported.",
+    clearSuccessMessage: "Saved inbox views cleared.",
+    clearImportedSuccessMessage: "Imported inbox views removed.",
+    resetToolsSuccessMessage: "Saved views tools reset.",
+    importMergeMessage: ({ total, replacedCount, skippedCount }) =>
+      `Saved inbox views merged. Total: ${total}. Replaced: ${replacedCount}. Skipped by limit: ${skippedCount}.`,
+  });
+  const activeFilterChips = buildFilterChipsFromDefinitions(primaryFilterDefinitions);
+  const activeAuditFilterChips = buildFilterChips([
     auditQuery.trim()
       ? {
-          key: "upgrade-audit",
-          label: `Audit: ${auditQuery.trim()}`,
-          onRemove: () => setAuditQuery(""),
-          testId: "upgrade-filter-chip-audit",
-        }
-      : null,
-  ];
-  const activeAuditFilterChips = auditQuery.trim()
-    ? [
-        {
           key: "upgrade-audit-search",
           label: `Audit: ${auditQuery.trim()}`,
           onRemove: () => setAuditQuery(""),
           testId: "upgrade-audit-filter-chip-query",
-        },
-      ]
-    : [];
-  const visibleAuditEvents = [...auditEvents].sort((left, right) => {
-    const leftTime = new Date(left.created_at || 0).getTime();
-    const rightTime = new Date(right.created_at || 0).getTime();
-    return auditSort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+        }
+      : null,
+  ]);
+  const visibleAuditEvents = sortItemsByDateMode(auditEvents, {
+    valueKey: "created_at",
+    mode: auditSort,
   });
   const currentAuditView = {
     audit_q: auditQuery.trim(),
     audit_sort: auditSort,
   };
-  const currentAuditViewSignature = JSON.stringify(currentAuditView);
-  const normalizedAuditViewName = normalizeSavedViewName(auditViewName);
-  const matchedAuditViewByName = auditViews.find(
-    (item) => normalizeSavedViewName(item.name).toLowerCase() === normalizedAuditViewName.toLowerCase(),
-  );
-  const activeAuditViewId =
-    auditViews.find((item) => JSON.stringify(item.filters) === currentAuditViewSignature)?.id || "";
-  const hasAuditViewNameMatch = Boolean(matchedAuditViewByName);
-  const canSaveAuditView =
-    normalizedAuditViewName !== "" && (auditQuery.trim() || auditSort !== "newest");
+  const {
+    auditViews,
+    auditViewName,
+    setAuditViewName,
+    normalizedAuditViewName,
+    hasAuditViewNameMatch,
+    activeAuditViewId,
+    canSaveAuditView,
+    handleSaveAuditView,
+    handleApplyAuditView,
+    handleDeleteAuditView,
+    handleCopyAuditViewLink,
+    handleResetAuditTools,
+  } = useAdminAuditViewsManager({
+    smokeMode,
+    initialViews: smokeMode ? formatUpgradeSavedViews(smokeUpgradeAuditViews) : [],
+    formatViews: formatUpgradeSavedViews,
+    storageKey: upgradeAuditViewsStorageKey,
+    currentFilters: currentAuditView,
+    canSaveWhen: auditQuery.trim() || auditSort !== "newest",
+    applyViewFilters: (filters) => {
+      setAuditQuery(filters.audit_q || "");
+      setAuditSort(filters.audit_sort || "newest");
+    },
+    pathname,
+    copyText: copyTextToClipboard,
+    setFeedback: setSaveFeedback,
+    setError,
+    resetViewFilters: () => {
+      setAuditQuery("");
+      setAuditSort("newest");
+    },
+    copyParams: {
+      audit_q: auditQuery.trim(),
+      audit_sort: auditSort !== "newest" ? auditSort : undefined,
+    },
+  });
   const selectedVisibleRequestIds = filteredRequests
     .map((item) => item.id)
     .filter((requestId) => selectedRequestIds.includes(requestId));
@@ -231,31 +285,14 @@ function UpgradeRequestsPageContent() {
     filteredRequests.length > 0 && selectedVisibleRequestIds.length === filteredRequests.length;
   const hasSelectedRequests = selectedRequestIds.length > 0;
   const bulkRequestsDirty = hasSelectedRequests || bulkStatusValue !== "";
-  const canSaveCurrentView = normalizedSavedViewName !== "" && hasRequestFilters;
-  const reachedViewLimitWithoutReplace =
-    savedViews.length >= 8 && !hasSavedViewNameMatch;
-  const visibleSavedViews = sortSavedViews(
-    savedViews.filter((item) => {
-      if (
-        savedViewsSourceFilter !== "all" &&
-        (item.source || "local") !== savedViewsSourceFilter
-      ) {
-        return false;
-      }
-      const haystack = `${item.name} ${item.summary || ""}`.toLowerCase();
-      return haystack.includes(savedViewsSearch.trim().toLowerCase());
-    }),
-    savedViewsSort,
-  );
-  const savedViewsToolsDirty =
-    normalizedSavedViewName !== "" ||
-    savedViewsSearch.trim() !== "" ||
-    savedViewsSourceFilter !== "all" ||
-    savedViewsSort !== "newest";
-  const savedViewsSummaryText =
-    savedViews.length === 0
-      ? ""
-      : `Showing ${visibleSavedViews.length} of ${savedViews.length} saved inbox view${savedViews.length === 1 ? "" : "s"}.`;
+  const { syncedSearchParams } = buildFilterState([
+    ...primaryFilterDefinitions,
+    {
+      key: "audit_sort",
+      value: auditSort,
+      serializeWhen: (value) => value !== "newest",
+    },
+  ]);
 
   function buildDraft(item) {
     return {
@@ -353,14 +390,6 @@ function UpgradeRequestsPageContent() {
     });
     const data = await readJsonOrError(response, "Failed to load admin audit events.");
     setAuditEvents(Array.isArray(data) ? data : []);
-  }
-
-  function persistSavedViews(nextViews) {
-    const normalized = formatSavedViews(nextViews);
-    setSavedViews(normalized);
-    if (!smokeMode) {
-      window.localStorage.setItem(upgradeSavedViewsStorageKey, JSON.stringify(nextViews));
-    }
   }
 
   function applyViewFilters(filters) {
@@ -628,86 +657,18 @@ function UpgradeRequestsPageContent() {
     if (smokeMode) {
       return;
     }
-
-    try {
-      const stored = window.localStorage.getItem(upgradeSavedViewsStorageKey);
-      if (!stored) {
-        return;
-      }
-      const parsed = JSON.parse(stored);
-      setSavedViews(formatSavedViews(parsed));
-      setSavedViewsMetaText("Loaded from local browser storage.");
-    } catch {
-      setSavedViews([]);
-      setSavedViewsMetaText("Using local browser storage.");
-    }
-
-    try {
-      const storedAudit = window.localStorage.getItem(upgradeAuditViewsStorageKey);
-      if (!storedAudit) {
-        return;
-      }
-      setAuditViews(formatSavedViews(JSON.parse(storedAudit)));
-    } catch {
-      setAuditViews([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (smokeMode) {
-      return;
-    }
-    const params = new URLSearchParams();
-    if (query.trim()) {
-      params.set("q", query.trim());
-    }
-    if (planFilter !== "all") {
-      params.set("plan", planFilter);
-    }
-    if (statusFilter !== "all") {
-      params.set("status", statusFilter);
-    }
-    if (linkedOnly) {
-      params.set("linked_only", "true");
-    }
-    if (auditQuery.trim()) {
-      params.set("audit_q", auditQuery.trim());
-    }
-    if (auditSort !== "newest") {
-      params.set("audit_sort", auditSort);
-    }
-    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    const nextUrl = syncedSearchParams ? `${pathname}?${syncedSearchParams}` : pathname;
     const currentUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
     if (nextUrl !== currentUrl) {
       router.replace(nextUrl, { scroll: false });
     }
-  }, [smokeMode, pathname, router, searchParams, query, planFilter, statusFilter, linkedOnly, auditQuery, auditSort]);
+  }, [pathname, router, searchParams, smokeMode, syncedSearchParams]);
 
   useEffect(() => {
     setSelectedRequestIds((currentIds) =>
       currentIds.filter((requestId) => requests.some((item) => item.id === requestId)),
     );
   }, [requests]);
-
-  useEffect(() => {
-    if (smokeMode) {
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 250);
-    return () => window.clearTimeout(timeoutId);
-  }, [query]);
-
-  useEffect(() => {
-    if (smokeMode) {
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedAuditQuery(auditQuery);
-    }, 250);
-    return () => window.clearTimeout(timeoutId);
-  }, [auditQuery]);
 
   useEffect(() => {
     if (smokeMode || !authChecked || accessDenied) {
@@ -756,35 +717,6 @@ function UpgradeRequestsPageContent() {
     }
   }
 
-  async function handleCopySavedViewLink(viewId) {
-    const nextView = savedViews.find((item) => item.id === viewId);
-    if (!nextView) {
-      return;
-    }
-
-    const params = new URLSearchParams();
-    if (nextView.filters.q) {
-      params.set("q", nextView.filters.q);
-    }
-    if (nextView.filters.plan && nextView.filters.plan !== "all") {
-      params.set("plan", nextView.filters.plan);
-    }
-    if (nextView.filters.status && nextView.filters.status !== "all") {
-      params.set("status", nextView.filters.status);
-    }
-    if (nextView.filters.linked_only) {
-      params.set("linked_only", "true");
-    }
-    if (nextView.filters.audit_q) {
-      params.set("audit_q", nextView.filters.audit_q);
-    }
-
-    const url = `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-    await copyTextToClipboard(url);
-    setSaveFeedback(`Saved view link copied for ${nextView.name}.`);
-    setError("");
-  }
-
   function handleDownloadVisibleAuditExport() {
     const blob = new Blob([buildAuditEventsCsv(visibleAuditEvents)], {
       type: "text/csv;charset=utf-8",
@@ -794,307 +726,12 @@ function UpgradeRequestsPageContent() {
     setError("");
   }
 
-  async function handleCopyAuditViewLink() {
-    const params = new URLSearchParams();
-    if (auditQuery.trim()) {
-      params.set("audit_q", auditQuery.trim());
-    }
-    if (auditSort !== "newest") {
-      params.set("audit_sort", auditSort);
-    }
-    const url = `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-    await copyTextToClipboard(url);
-    setSaveFeedback("Audit view link copied.");
-    setError("");
-  }
-
-  function handleResetAuditTools() {
-    setAuditQuery("");
-    setAuditSort("newest");
-    setSaveFeedback("Audit tools reset.");
-    setError("");
-  }
-
-  function persistAuditViews(nextViews) {
-    const normalized = formatSavedViews(nextViews);
-    setAuditViews(normalized);
-    if (!smokeMode) {
-      window.localStorage.setItem(upgradeAuditViewsStorageKey, JSON.stringify(nextViews));
-    }
-  }
-
-  function handleSaveAuditView() {
-    if (!canSaveAuditView) {
-      return;
-    }
-    const matchedView = matchedAuditViewByName;
-    const nextViews = [
-      {
-        id: matchedView ? matchedView.id : `${Date.now()}`,
-        name: normalizedAuditViewName,
-        filters: currentAuditView,
-        updatedAt: new Date().toISOString(),
-        source: "local",
-      },
-      ...auditViews
-        .filter((item) => normalizeSavedViewName(item.name).toLowerCase() !== normalizedAuditViewName.toLowerCase())
-        .map((item) => ({
-          id: item.id,
-          name: item.name,
-          filters: item.filters,
-          updatedAt: item.updatedAt,
-          source: item.source,
-        })),
-    ].slice(0, 8);
-    persistAuditViews(nextViews);
-    setAuditViewName("");
-    setSaveFeedback("Audit view saved.");
-    setError("");
-  }
-
-  function handleApplyAuditView(viewId) {
-    const nextView = auditViews.find((item) => item.id === viewId);
-    if (!nextView) {
-      return;
-    }
-    setAuditQuery(nextView.filters.audit_q || "");
-    setAuditSort(nextView.filters.audit_sort || "newest");
-    setAuditViewName(nextView.name);
-    setSaveFeedback(`Applied audit view ${nextView.name}.`);
-    setError("");
-  }
-
-  function handleDeleteAuditView(viewId) {
-    persistAuditViews(
-      auditViews.filter((item) => item.id !== viewId).map((item) => ({
-        id: item.id,
-        name: item.name,
-        filters: item.filters,
-        updatedAt: item.updatedAt,
-        source: item.source,
-      })),
-    );
-    setSaveFeedback("Audit view removed.");
-    setError("");
-  }
-
   function resetRequestFilters() {
     setQuery("");
     setPlanFilter("all");
     setStatusFilter("all");
     setLinkedOnly(false);
     setAuditQuery("");
-  }
-
-  function handleSaveCurrentView() {
-    if (!canSaveCurrentView) {
-      return;
-    }
-
-    const matchedView = matchedSavedViewByName;
-
-    const nextViews = [
-      {
-        id: matchedView ? matchedView.id : `${Date.now()}`,
-        name: normalizedSavedViewName,
-        filters: currentUpgradeView,
-        updatedAt: new Date().toISOString(),
-        source: "local",
-      },
-      ...savedViews
-        .filter((item) => normalizeSavedViewName(item.name).toLowerCase() !== normalizedSavedViewName.toLowerCase())
-        .map((item) => ({
-          id: item.id,
-          name: item.name,
-          filters: item.filters,
-          updatedAt: item.updatedAt,
-        })),
-    ].slice(0, 8);
-
-    persistSavedViews(nextViews);
-    setSavedViewsMetaText("Using local browser storage.");
-    setSavedViewName("");
-    setSaveFeedback("Saved current inbox view.");
-    setError("");
-  }
-
-  function handleApplySavedView(viewId) {
-    const nextView = savedViews.find((item) => item.id === viewId);
-    if (!nextView) {
-      return;
-    }
-    applyViewFilters(nextView.filters);
-    setSavedViewName(nextView.name);
-    setSavedViewsMetaText(
-      nextView.source === "imported" ? "Applied an imported saved view." : "Applied a local saved view.",
-    );
-    setSaveFeedback(`Applied saved view ${nextView.name}.`);
-    setError("");
-  }
-
-  function handleUpdateCurrentView() {
-    if (!activeSavedViewId) {
-      return;
-    }
-
-    const nextViews = [
-      {
-        id: activeSavedViewId,
-        name: activeSavedView?.name || normalizedSavedViewName || "Saved view",
-        filters: currentUpgradeView,
-        updatedAt: new Date().toISOString(),
-        source: "local",
-      },
-      ...savedViews
-        .filter((item) => item.id !== activeSavedViewId)
-        .map((item) => ({
-          id: item.id,
-          name: item.name,
-          filters: item.filters,
-          updatedAt: item.updatedAt,
-        })),
-    ].slice(0, 8);
-
-    persistSavedViews(nextViews);
-    setSavedViewsMetaText("Using local browser storage.");
-    setSavedViewName(activeSavedView?.name || "");
-    setSaveFeedback("Current saved inbox view updated.");
-    setError("");
-  }
-
-  function handleDeleteSavedView(viewId) {
-    const deletedView = savedViews.find((item) => item.id === viewId);
-    const nextViews = savedViews
-      .filter((item) => item.id !== viewId)
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        filters: item.filters,
-        updatedAt: item.updatedAt,
-      }));
-    persistSavedViews(nextViews);
-    if (deletedView && deletedView.name === savedViewName) {
-      setSavedViewName("");
-    }
-    setSaveFeedback("Saved inbox view removed.");
-    setError("");
-  }
-
-  function handleDownloadSavedViews() {
-    if (savedViews.length === 0) {
-      return;
-    }
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          {
-            version: 1,
-            exported_at: new Date().toISOString(),
-            scope: "admin-upgrade-requests",
-            views: normalizeSavedViewsForStorage(savedViews),
-          },
-          null,
-          2,
-        ),
-      ],
-      { type: "application/json;charset=utf-8" },
-    );
-    triggerFileDownload("deploymate-upgrade-saved-views.json", blob);
-    setSaveFeedback("Saved inbox views exported.");
-    setError("");
-  }
-
-  function handleImportSavedViews(event) {
-    const [file] = Array.from(event.target.files || []);
-    if (!file) {
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(typeof reader.result === "string" ? reader.result : "[]");
-        const imported = parseImportedSavedViews(parsed);
-        if (imported.meta?.version && imported.meta.version !== 1) {
-          throw new Error("Unsupported saved views export version.");
-        }
-        if (imported.meta?.scope && imported.meta.scope !== "admin-upgrade-requests") {
-          throw new Error("This file is not an upgrade requests saved views export.");
-        }
-        const importedViews = formatSavedViews(imported.views).map((item) => ({
-          ...item,
-          source: "imported",
-        }));
-        const normalized = normalizeSavedViewsForStorage(
-          mergeSavedViews(formatUpgradeSavedViews(savedViews), importedViews),
-        );
-        if (normalized.length === 0) {
-          throw new Error("No valid saved inbox views found in this file.");
-        }
-        const importedNameSet = new Set(
-          importedViews.map((item) => normalizeSavedViewName(item.name).toLowerCase()),
-        );
-        const replacedCount = formatUpgradeSavedViews(savedViews).filter((item) =>
-          importedNameSet.has(normalizeSavedViewName(item.name).toLowerCase()),
-        ).length;
-        const mergedTotal = dedupeSavedViewsByName([...importedViews, ...formatUpgradeSavedViews(savedViews)]).length;
-        const skippedCount = Math.max(0, mergedTotal - normalized.length);
-        persistSavedViews(normalized);
-        setSavedViewsMetaText(
-          imported.meta?.source === "bundle"
-            ? `Imported bundle${imported.meta.version ? ` v${imported.meta.version}` : ""}${imported.meta.exportedAt ? ` · exported ${formatDate(imported.meta.exportedAt)}` : ""}.`
-            : "Imported legacy saved views file.",
-        );
-        setSaveFeedback(
-          `Saved inbox views merged. Total: ${normalized.length}. Replaced: ${replacedCount}. Skipped by limit: ${skippedCount}.`,
-        );
-        setError("");
-      } catch (requestError) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Failed to import saved inbox views.",
-        );
-      }
-    };
-    reader.onerror = () => {
-      setError("Failed to read saved views file.");
-    };
-    reader.readAsText(file);
-    event.target.value = "";
-  }
-
-  function handleClearSavedViews() {
-    persistSavedViews([]);
-    setSavedViewName("");
-    setSavedViewsMetaText("Using local browser storage.");
-    setSaveFeedback("Saved inbox views cleared.");
-    setError("");
-  }
-
-  function handleClearImportedSavedViews() {
-    const nextViews = savedViews.filter((item) => item.source !== "imported");
-    persistSavedViews(nextViews);
-    setSavedViewsMetaText("Using local browser storage.");
-    setSaveFeedback("Imported inbox views removed.");
-    setError("");
-  }
-
-  function handleResetSavedViewsTools() {
-    setSavedViewName("");
-    setSavedViewsSearch("");
-    setSavedViewsSourceFilter("all");
-    setSavedViewsSort("newest");
-    setSavedViewsMetaText("Using local browser storage.");
-    setSaveFeedback("Saved views tools reset.");
-    setError("");
-  }
-
-  function handleUseCurrentSavedViewName() {
-    if (!activeSavedView?.name) {
-      return;
-    }
-    setSavedViewName(activeSavedView.name);
   }
 
   if (!authChecked) {

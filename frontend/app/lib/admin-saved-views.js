@@ -89,3 +89,119 @@ export function sortSavedViews(items, mode) {
     (left, right) => new Date(right.updatedAt || 0).getTime() - new Date(left.updatedAt || 0).getTime(),
   );
 }
+
+export function upsertSavedView(items, options) {
+  const { matchedView, name, filters, source = "local" } = options;
+  const normalizedName = normalizeSavedViewName(name).toLowerCase();
+
+  return [
+    {
+      id: matchedView ? matchedView.id : `${Date.now()}`,
+      name,
+      filters,
+      updatedAt: new Date().toISOString(),
+      source,
+    },
+    ...items
+      .filter((item) => normalizeSavedViewName(item.name).toLowerCase() !== normalizedName)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        filters: item.filters,
+        updatedAt: item.updatedAt,
+        source: item.source,
+      })),
+  ].slice(0, 8);
+}
+
+export function replaceSavedView(items, options) {
+  const { viewId, name, filters, source = "local" } = options;
+
+  return [
+    {
+      id: viewId,
+      name,
+      filters,
+      updatedAt: new Date().toISOString(),
+      source,
+    },
+    ...items
+      .filter((item) => item.id !== viewId)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        filters: item.filters,
+        updatedAt: item.updatedAt,
+        source: item.source,
+      })),
+  ].slice(0, 8);
+}
+
+export function removeSavedView(items, viewId) {
+  return items
+    .filter((item) => item.id !== viewId)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      filters: item.filters,
+      updatedAt: item.updatedAt,
+      source: item.source,
+    }));
+}
+
+export function removeImportedSavedViews(items) {
+  return items.filter((item) => item.source !== "imported");
+}
+
+export function importSavedViewsBundle(options) {
+  const {
+    payload,
+    scope,
+    currentViews,
+    formatViews,
+    formatDate = (value) => value,
+    emptyStateMessage,
+    wrongScopeMessage,
+  } = options;
+
+  const imported = parseImportedSavedViews(payload);
+  if (imported.meta?.version && imported.meta.version !== 1) {
+    throw new Error("Unsupported saved views export version.");
+  }
+  if (imported.meta?.scope && imported.meta.scope !== scope) {
+    throw new Error(wrongScopeMessage);
+  }
+
+  const importedViews = formatSavedViews(imported.views).map((item) => ({
+    ...item,
+    source: "imported",
+  }));
+  const normalized = normalizeSavedViewsForStorage(
+    mergeSavedViews(formatViews(currentViews), importedViews),
+  );
+
+  if (normalized.length === 0) {
+    throw new Error(emptyStateMessage);
+  }
+
+  const currentFormattedViews = formatViews(currentViews);
+  const importedNameSet = new Set(
+    importedViews.map((item) => normalizeSavedViewName(item.name).toLowerCase()),
+  );
+  const replacedCount = currentFormattedViews.filter((item) =>
+    importedNameSet.has(normalizeSavedViewName(item.name).toLowerCase()),
+  ).length;
+  const mergedTotal = dedupeSavedViewsByName([...importedViews, ...currentFormattedViews]).length;
+  const skippedCount = Math.max(0, mergedTotal - normalized.length);
+  const metaText =
+    imported.meta?.source === "bundle"
+      ? `Imported bundle${imported.meta.version ? ` v${imported.meta.version}` : ""}${imported.meta.exportedAt ? ` · exported ${formatDate(imported.meta.exportedAt)}` : ""}.`
+      : "Imported legacy saved views file.";
+
+  return {
+    normalized,
+    metaText,
+    replacedCount,
+    skippedCount,
+  };
+}

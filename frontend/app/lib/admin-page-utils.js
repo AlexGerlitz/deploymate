@@ -37,6 +37,133 @@ export function escapeCsvCell(value) {
   return normalized;
 }
 
+export function buildSearchParams(paramsObject = {}) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(paramsObject)) {
+    if (
+      value === undefined ||
+      value === null ||
+      value === false ||
+      value === "" ||
+      value === "all" ||
+      value === "newest"
+    ) {
+      continue;
+    }
+
+    params.set(key, value === true ? "true" : String(value));
+  }
+
+  return params;
+}
+
+export function buildPageUrl(origin, pathname, paramsObject = {}) {
+  const params = buildSearchParams(paramsObject);
+  return `${origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+}
+
+export function persistFormattedViews(nextViews, options) {
+  const { formatViews, setViews, storageKey, disableStorage = false } = options;
+  setViews(formatViews(nextViews));
+
+  if (!disableStorage) {
+    window.localStorage.setItem(storageKey, JSON.stringify(nextViews));
+  }
+}
+
+export function buildFilterChips(items = []) {
+  return items.filter(Boolean);
+}
+
+export function buildFilterState(definitions = []) {
+  const currentFilters = {};
+  let hasActiveFilters = false;
+
+  for (const definition of definitions) {
+    const {
+      key,
+      value,
+      normalizedValue = value,
+      activeWhen = (candidate) =>
+        candidate !== undefined &&
+        candidate !== null &&
+        candidate !== false &&
+        candidate !== "" &&
+        candidate !== "all",
+      serializeWhen = activeWhen,
+      serializeValue = normalizedValue,
+      includeInCurrent = true,
+    } = definition;
+
+    if (includeInCurrent) {
+      currentFilters[key] = normalizedValue;
+    }
+
+    if (activeWhen(normalizedValue)) {
+      hasActiveFilters = true;
+    }
+
+    definition._serialized =
+      serializeWhen(normalizedValue) ? serializeValue : undefined;
+  }
+
+  return {
+    currentFilters,
+    hasActiveFilters,
+    syncedSearchParams: buildSearchParams(
+      Object.fromEntries(
+        definitions.map((definition) => [definition.key, definition._serialized]),
+      ),
+    ).toString(),
+  };
+}
+
+export function buildFilterChipsFromDefinitions(definitions = []) {
+  return buildFilterChips(
+    definitions.map((definition) => {
+      const {
+        chipKey,
+        chipLabel,
+        onRemove,
+        testId,
+        activeWhen = (candidate) =>
+          candidate !== undefined &&
+          candidate !== null &&
+          candidate !== false &&
+          candidate !== "" &&
+          candidate !== "all",
+        normalizedValue = definition.value,
+      } = definition;
+
+      if (!chipKey || !chipLabel || !onRemove || !activeWhen(normalizedValue)) {
+        return null;
+      }
+
+      return {
+        key: chipKey,
+        label: chipLabel,
+        onRemove,
+        testId,
+      };
+    }),
+  );
+}
+
+export function sortItemsByDateMode(items, options = {}) {
+  const {
+    valueKey,
+    mode = "newest",
+    emptyValue = 0,
+  } = options;
+
+  return [...items].sort((left, right) => {
+    const leftTime = new Date(left?.[valueKey] || emptyValue).getTime();
+    const rightTime = new Date(right?.[valueKey] || emptyValue).getTime();
+    return mode === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+  });
+}
+
 export function buildAuditEventsCsv(items, options = {}) {
   const includeTargetType = options.includeTargetType === true;
   const rows = [

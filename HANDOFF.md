@@ -5,8 +5,8 @@ Updated: 2026-04-02
 ## Current State
 
 - Branch: `develop`
-- Working tree: clean
-- Latest commit: `7009c09` `Extract admin export utilities`
+- Working tree: dirty
+- Latest commit: `0d049e3` `Add session handoff`
 - `origin/develop` is up to date
 - Remote checkout on `deploymate` is synced to the same commit in `/opt/deploymate`
 
@@ -72,11 +72,12 @@ Shared frontend libs added recently:
 
 - [smoke-fixtures.js](/Users/alexgerlitz/deploymate/frontend/app/lib/smoke-fixtures.js)
 - [admin-smoke-fixtures.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-smoke-fixtures.js)
+- [admin-page-hooks.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-hooks.js)
 - [admin-saved-views.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-saved-views.js)
 - [admin-page-utils.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-utils.js)
 - [admin-export-utils.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-export-utils.js)
 
-The latest sequence of frontend cleanup commits:
+The previous cleanup commit sequence in git was:
 
 - `467143d` `Extract shared admin smoke fixtures`
 - `444831d` `Consolidate auth smoke fixtures`
@@ -84,6 +85,22 @@ The latest sequence of frontend cleanup commits:
 - `8a891cc` `Extract admin saved view helpers`
 - `4c5a0ea` `Extract admin page utilities`
 - `7009c09` `Extract admin export utilities`
+
+The current uncommitted frontend refactor built on top of that and already moved the remaining repeated admin-page state into shared helpers:
+
+- shared debounced value hook
+- shared localStorage load helpers
+- shared saved-views manager hook
+- shared audit-views manager hook
+- shared saved-view CRUD/import/export helpers
+- shared query/filter-state helpers
+- shared filter-chip builders
+- shared audit-event sort helper
+
+Current file sizes after the refactor:
+
+- [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js) -> `1983` lines
+- [upgrade requests page](/Users/alexgerlitz/deploymate/frontend/app/app/upgrade-requests/page.js) -> `1525` lines
 
 ## What Was Verified Recently
 
@@ -114,27 +131,33 @@ Practical rule:
 
 ## Best Next Step
 
-The next high-value frontend cleanup is:
+The biggest repeated saved-views/query-sync block is already extracted.
 
-- extract shared saved-views persistence and query-sync logic from:
+The next high-value step is one of these:
+
+- commit the current frontend refactor
+- do a final cleanup pass on helper naming / API shape in:
+  - [admin-page-hooks.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-hooks.js)
+  - [admin-page-utils.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-utils.js)
+  - [admin-saved-views.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-saved-views.js)
+- or continue shrinking the pages by extracting config-driven admin filter definitions / fetch parameter builders
+
+If continuing code cleanup before commit, the best concrete target is:
+
+- remove remaining page-local filter config duplication between:
   - [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js)
   - [upgrade requests page](/Users/alexgerlitz/deploymate/frontend/app/app/upgrade-requests/page.js)
+- consider a tiny shared helper for admin filter definitions / fetch params
+- then re-run build + admin smoke and commit
 
-That is the biggest remaining repeated block in the frontend admin surface.
-
-Concrete target areas:
-
-- `localStorage` load/persist helpers
-- URL query param sync
-- debounced search/audit sync wiring
-- possibly a shared hook for admin saved views state
+If you want to stop cleanup work and ship, this is already at a good commit point.
 
 ## If You Need To Resume Fast
 
 1. Open [HANDOFF.md](/Users/alexgerlitz/deploymate/HANDOFF.md)
 2. Confirm current commit with `git rev-parse --short HEAD`
-3. Start from the next step above
-4. Re-run:
+3. Check current frontend edits with `git status --short`
+4. Either commit the refactor or continue from the next step above
+5. Re-run:
    - `FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:admin`
    - `npm --prefix frontend run build`
-
