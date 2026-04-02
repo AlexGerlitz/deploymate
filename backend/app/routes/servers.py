@@ -19,11 +19,8 @@ from app.schemas import (
     ServerResponse,
     ServerSuggestedPortsResponse,
 )
-from app.services.deployments import (
-    collect_server_diagnostics,
-    get_suggested_external_ports,
-    test_server_connection,
-)
+from app.services.deployments import get_suggested_external_ports
+from app.services.server_diagnostics import collect_server_diagnostics, test_server_connection
 from app.services.auth import enforce_plan_limit, require_admin
 
 
