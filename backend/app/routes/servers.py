@@ -34,8 +34,11 @@ router = APIRouter(dependencies=[Depends(require_admin)])
 def create_server(payload: ServerCreateRequest, user=Depends(require_admin)) -> ServerResponse:
     enforce_plan_limit(user, "servers")
 
-    if payload.auth_type == "password" and not payload.password:
-        raise HTTPException(status_code=400, detail="password is required for auth_type=password.")
+    if payload.auth_type != "ssh_key":
+        raise HTTPException(
+            status_code=400,
+            detail="New server targets must use ssh_key authentication.",
+        )
 
     if payload.auth_type == "ssh_key" and not payload.ssh_key:
         raise HTTPException(status_code=400, detail="ssh_key is required for auth_type=ssh_key.")
@@ -47,7 +50,7 @@ def create_server(payload: ServerCreateRequest, user=Depends(require_admin)) -> 
         "port": payload.port,
         "username": payload.username,
         "auth_type": payload.auth_type,
-        "password": payload.password,
+        "password": None,
         "ssh_key": payload.ssh_key,
         "created_at": datetime.now(timezone.utc),
     }

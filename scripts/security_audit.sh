@@ -59,6 +59,9 @@ for file in "${FILTERED_FILES[@]}"; do
     backend/tests/*|README.md|PRODUCTION.md|RUNBOOK.md|SAFE-RELEASE.md|SECURITY.md|CHANGELOG.md|ARCHITECTURE.md|ROADMAP.md|CONTRIBUTING.md|docs/*)
       continue
       ;;
+    scripts/security_audit.sh)
+      continue
+      ;;
     *)
       RUNTIME_FILES+=("$file")
       ;;

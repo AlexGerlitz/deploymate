@@ -445,8 +445,7 @@ export default function HomePage() {
     host: "",
     port: "22",
     username: "",
-    auth_type: "password",
-    password: "",
+    auth_type: "ssh_key",
     ssh_key: "",
   });
 
@@ -1395,10 +1394,6 @@ export default function HomePage() {
       auth_type: serverForm.auth_type,
     };
 
-    if (serverForm.auth_type === "password" && serverForm.password) {
-      payload.password = serverForm.password;
-    }
-
     if (serverForm.auth_type === "ssh_key" && serverForm.ssh_key) {
       payload.ssh_key = serverForm.ssh_key;
     }
@@ -1419,8 +1414,7 @@ export default function HomePage() {
         host: "",
         port: "22",
         username: "",
-        auth_type: "password",
-        password: "",
+        auth_type: "ssh_key",
         ssh_key: "",
       });
       setServerSubmitSuccess("Server added successfully.");
@@ -2026,7 +2020,7 @@ export default function HomePage() {
               <strong>{currentUser?.is_admin ? "Add server" : "Explore the app"}</strong>
               <p>
                 {currentUser?.is_admin
-                  ? "Save your VPS target with SSH access so DeployMate can reach it."
+                  ? "Save your VPS target with SSH-key access so DeployMate can reach it."
                   : "Trial accounts can review the product surface safely without infrastructure control."}
               </p>
             </div>
@@ -2137,43 +2131,23 @@ export default function HomePage() {
 
             <label className="field">
               <span>Auth type</span>
-              <select
-                name="auth_type"
-                value={serverForm.auth_type}
-                onChange={updateServerFormField}
-                disabled={serverSubmitting}
-              >
-                <option value="password">password</option>
-                <option value="ssh_key">ssh_key</option>
-              </select>
+              <input value="ssh_key" disabled />
+              <span className="fieldHint">
+                New server targets use SSH keys only. Password-based SSH is kept only for
+                legacy records.
+              </span>
             </label>
 
-            {serverForm.auth_type === "password" ? (
-              <label className="field">
-                <span>Password</span>
-                <input
-                  name="password"
-                  type="password"
-                  value={serverForm.password}
-                  onChange={updateServerFormField}
-                  disabled={serverSubmitting}
-                  required
-                />
-              </label>
-            ) : null}
-
-            {serverForm.auth_type === "ssh_key" ? (
-              <label className="field">
-                <span>SSH key</span>
-                <textarea
-                  name="ssh_key"
-                  value={serverForm.ssh_key}
-                  onChange={updateServerFormField}
-                  disabled={serverSubmitting}
-                  required
-                />
-              </label>
-            ) : null}
+            <label className="field">
+              <span>SSH key</span>
+              <textarea
+                name="ssh_key"
+                value={serverForm.ssh_key}
+                onChange={updateServerFormField}
+                disabled={serverSubmitting}
+                required
+              />
+            </label>
 
             <div className="formActions">
               <button type="submit" disabled={serverSubmitting || serverLimitReached}>

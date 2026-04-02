@@ -68,7 +68,7 @@ Reviewer path:
 
 ### Server management
 
-- register remote servers with password or SSH-key auth
+- register remote servers with SSH-key auth for new targets
 - test connectivity before using a target
 - run diagnostics and fetch suggested free ports
 
@@ -206,6 +206,7 @@ Current tradeoffs:
 
 - server credentials are still stored by the application to support remote deployment workflows
 - local Docker control is still available as an opt-in capability when explicitly enabled
+- legacy password-based SSH records may still exist until they are rotated to SSH keys
 - local Docker control and remote SSH control still live in the same backend service boundary
 
 These are conscious MVP tradeoffs, not hidden assumptions.

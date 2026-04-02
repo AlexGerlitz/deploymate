@@ -21,6 +21,7 @@ Current strengths:
 - SSH host key checking defaults to `accept-new` instead of `no`
 - production can run as remote-only without Docker socket access in the backend
 - tracked-file security audit is part of the local preflight flow
+- new server targets now require SSH-key authentication
 
 Current tradeoffs:
 
