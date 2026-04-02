@@ -3178,12 +3178,36 @@ export default function HomePage() {
           ) : null}
 
           {filteredDeployments.map((deployment) => (
-            <article className="card" key={deployment.id} data-testid={`runtime-deployment-card-${deployment.id}`}>
-              <div className="row">
-                <span className="label">Status</span>
+            <article
+              className="card compactCard deploymentCard"
+              key={deployment.id}
+              data-testid={`runtime-deployment-card-${deployment.id}`}
+            >
+              <div className="deploymentCardHeader">
+                <div>
+                  <span className="deploymentCardEyebrow">Deployment</span>
+                  <h3>{deployment.container_name || deployment.image || "Unnamed deployment"}</h3>
+                  <p>{deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local target"}</p>
+                </div>
                 <span className={`status ${deployment.status || "unknown"}`}>
                   {deployment.status || "unknown"}
                 </span>
+              </div>
+              <div className="deploymentCardMetrics">
+                <div className="deploymentMetric">
+                  <span>Image</span>
+                  <strong>{deployment.image || "N/A"}</strong>
+                </div>
+                <div className="deploymentMetric">
+                  <span>Endpoint</span>
+                  <strong>{buildDeploymentUrl(deployment) || "Internal only"}</strong>
+                </div>
+                <div className="deploymentMetric">
+                  <span>Ports</span>
+                  <strong>
+                    {deployment.internal_port || "-"} {"->"} {deployment.external_port || "-"}
+                  </strong>
+                </div>
               </div>
               <div className="row">
                 <span className="label">Image</span>

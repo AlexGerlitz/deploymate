@@ -201,6 +201,13 @@ export default function DeploymentDetailsPage({ params }) {
     diagnostics,
     activity,
   );
+  const detailPriority =
+    attentionItems[0]?.message ||
+    (deployment?.status === "failed"
+      ? "Deployment is failed and needs a deliberate redeploy."
+      : health?.status && health.status !== "healthy"
+        ? `Health is currently ${health.status}.`
+        : "Runtime surface is stable enough for review.");
 
   async function loadDeploymentDiagnostics() {
     setDiagnosticsLoading(true);
@@ -664,89 +671,133 @@ export default function DeploymentDetailsPage({ params }) {
   return (
     <main className="page">
       <div className="container">
-        <div className="header">
-          <div>
-            <h1 data-testid="runtime-detail-page-title">Deployment Details</h1>
-            <p>
-              {currentUser
-                ? `${deploymentId} · ${currentUser.username}`
-                : deploymentId}
-            </p>
-          </div>
-          <div className="buttonRow" data-testid="runtime-detail-header-actions">
-            <Link href="/app" className="linkButton">
-              Back
-            </Link>
-            {deploymentUrl ? (
-              <a
-                href={deploymentUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="linkButton"
-                data-testid="runtime-detail-open-app-button"
+        <section className="workspaceHero">
+          <div className="workspaceHeroBackdrop" />
+          <div className="header workspaceHeroHeader">
+            <div>
+              <div className="eyebrow">Runtime detail</div>
+              <h1 data-testid="runtime-detail-page-title">Deployment details</h1>
+              <p>
+                {currentUser
+                  ? `${deploymentId} · ${currentUser.username}. ${detailPriority}`
+                  : deploymentId}
+              </p>
+            </div>
+            <div className="buttonRow workspaceHeroActions" data-testid="runtime-detail-header-actions">
+              <Link href="/app" className="linkButton workspaceSecondaryAction">
+                Back
+              </Link>
+              {deploymentUrl ? (
+                <a
+                  href={deploymentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="linkButton workspaceSecondaryAction"
+                  data-testid="runtime-detail-open-app-button"
+                >
+                  Open app
+                </a>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => copyText(runtimeSummaryText, "Runtime summary")}
+                disabled={!runtimeSummaryText}
+                className="landingButton primaryButton workspacePrimaryAction"
+                data-testid="runtime-detail-copy-summary-button"
               >
-                Open app
-              </a>
-            ) : null}
-            <button type="button" onClick={() => copyText(runtimeSummaryText, "Runtime summary")} disabled={!runtimeSummaryText} data-testid="runtime-detail-copy-summary-button">
-              Copy summary
-            </button>
-            <button type="button" onClick={() => loadDeploymentDetails()} disabled={loading} data-testid="runtime-detail-refresh-button">
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
-            <button type="button" onClick={handleLogout}>
-              Logout
-            </button>
-            <button
-              type="button"
-              className="dangerButton"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? "Deleting..." : "Delete"}
-            </button>
+                Copy summary
+              </button>
+              <button type="button" onClick={() => loadDeploymentDetails()} disabled={loading} className="workspaceGhostAction" data-testid="runtime-detail-refresh-button">
+                {loading ? "Refreshing..." : "Refresh"}
+              </button>
+              <button type="button" onClick={handleLogout} className="workspaceGhostAction">
+                Logout
+              </button>
+              <button
+                type="button"
+                className="dangerButton"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
           </div>
+
+          <div className="workspaceHeroSummary">
+            <div className="workspaceHeroMetric">
+              <span>Status</span>
+              <strong>{deployment?.status || "unknown"}</strong>
+              <p>{deployment?.container_name || "Container name pending"}</p>
+            </div>
+            <div className="workspaceHeroMetric">
+              <span>Endpoint</span>
+              <strong>{deploymentUrl ? "Live" : "Private"}</strong>
+              <p>{deploymentUrl || "No public URL assigned yet"}</p>
+            </div>
+            <div className="workspaceHeroMetric">
+              <span>Health</span>
+              <strong>{health?.status || "unknown"}</strong>
+              <p>
+                {health?.response_time_ms || health?.response_time_ms === 0
+                  ? `${health.response_time_ms} ms`
+                  : "No recent latency sample"}
+              </p>
+            </div>
+            <div className="workspaceHeroBadge workspaceHeroSpotlight">
+              <span>What matters now</span>
+              <strong>{detailPriority}</strong>
+              <p>Use this page for redeploy, diagnostics, health review, logs, and incident handoff.</p>
+            </div>
+          </div>
+        </section>
+
+        <div className="workspaceBannerStack">
+          {error ? <div className="banner error">{error}</div> : null}
+          {copyMessage ? <div className="banner subtle">{copyMessage}</div> : null}
+          {templateError ? <div className="banner error">{templateError}</div> : null}
+          {templateSuccess ? <div className="banner success">{templateSuccess}</div> : null}
+          {currentUser?.must_change_password ? (
+            <div className="banner error">
+              You are still using the default admin password.{" "}
+              <Link href="/change-password" className="inlineLink">
+                Change it now
+              </Link>
+              .
+            </div>
+          ) : null}
+          {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
+
+          <div className="workspaceStatusStrip">
+            <div className="workspaceStatusCard">
+              <span>Backend</span>
+              <strong>{apiBaseUrl}</strong>
+              <p>Authenticated deployment controls and runtime data flow through this API surface.</p>
+            </div>
+            <div className="workspaceStatusCard">
+              <span>Cadence</span>
+              <strong>8-second refresh</strong>
+              <p>Deployment, health, and activity keep refreshing automatically.</p>
+            </div>
+            <div className="workspaceStatusCard">
+              <span>Attention</span>
+              <strong>{attentionItems.length}</strong>
+              <p data-testid="runtime-detail-attention-banner">
+                {attentionItems.length > 0
+                  ? `${attentionItems.length} runtime attention item${attentionItems.length === 1 ? "" : "s"} need review.`
+                  : "No active runtime warnings right now."}
+              </p>
+            </div>
+          </div>
+
+          {smokeMode ? (
+            <div className="workspaceMetaLine">
+              <span data-testid="runtime-detail-smoke-banner">
+                Runtime detail smoke mode uses fixture deployment data.
+              </span>
+            </div>
+          ) : null}
         </div>
-
-        {error ? <div className="banner error">{error}</div> : null}
-        {copyMessage ? <div className="banner subtle">{copyMessage}</div> : null}
-        {templateError ? <div className="banner error">{templateError}</div> : null}
-        {templateSuccess ? <div className="banner success">{templateSuccess}</div> : null}
-        {currentUser?.must_change_password ? (
-          <div className="banner error">
-            You are still using the default admin password.{" "}
-            <Link href="/change-password" className="inlineLink">
-              Change it now
-            </Link>
-            .
-          </div>
-        ) : null}
-
-        <div className="banner">
-          Backend: <code>{apiBaseUrl}</code>
-        </div>
-
-        {smokeMode ? (
-          <div className="banner subtle" data-testid="runtime-detail-smoke-banner">
-            Runtime detail smoke mode uses fixture deployment data.
-          </div>
-        ) : null}
-
-        <div className="banner subtle">
-          Deployment, health, and activity refresh automatically every 8 seconds.
-        </div>
-
-        {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
-
-        {attentionItems.length > 0 ? (
-          <div className="banner error" data-testid="runtime-detail-attention-banner">
-            {attentionItems.length} runtime attention item{attentionItems.length === 1 ? "" : "s"} need review.
-          </div>
-        ) : (
-          <div className="banner subtle" data-testid="runtime-detail-attention-banner">
-            No active runtime warnings right now.
-          </div>
-        )}
 
         <article className="card formCard">
           <h2>Save as template</h2>
@@ -942,7 +993,7 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </div>
 
-            <article className="card" data-testid="runtime-detail-summary-card">
+            <article className="card compactCard" data-testid="runtime-detail-summary-card">
               <div className="row">
                 <span className="label">Status</span>
                 <span className={`status ${deployment.status || "unknown"}`}>
@@ -1061,7 +1112,7 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
-            <article className="card" data-testid="runtime-detail-quick-reference-card">
+            <article className="card compactCard" data-testid="runtime-detail-quick-reference-card">
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-quick-reference-title">Quick reference</h2>
               </div>
@@ -1107,7 +1158,7 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
-            <article className="card" data-testid="runtime-detail-attention-list-card">
+            <article className="card compactCard" data-testid="runtime-detail-attention-list-card">
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-attention-list-title">Attention items</h2>
               </div>
@@ -1137,7 +1188,7 @@ export default function DeploymentDetailsPage({ params }) {
               )}
             </article>
 
-            <article className="card" data-testid="runtime-detail-diagnostics-card">
+            <article className="card compactCard" data-testid="runtime-detail-diagnostics-card">
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-diagnostics-title">Diagnostics</h2>
                 <div className="actions">
@@ -1243,7 +1294,7 @@ export default function DeploymentDetailsPage({ params }) {
               )}
             </article>
 
-            <article className="card" data-testid="runtime-detail-health-card">
+            <article className="card compactCard" data-testid="runtime-detail-health-card">
               <div className="row">
                 <span className="label">Health status</span>
                 <span className={`status ${health?.status || "unknown"}`}>
@@ -1289,7 +1340,7 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
-            <article className="card" data-testid="runtime-detail-logs-card">
+            <article className="card compactCard" data-testid="runtime-detail-logs-card">
               <div className="row">
                 <span className="label">Logs</span>
                 <div className="stackedValue">
@@ -1316,7 +1367,7 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
-            <article className="card" data-testid="runtime-detail-activity-card">
+            <article className="card compactCard" data-testid="runtime-detail-activity-card">
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-activity-title">Activity</h2>
               </div>

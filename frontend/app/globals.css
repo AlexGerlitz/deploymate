@@ -795,6 +795,69 @@ code {
   box-shadow: 0 14px 30px rgba(17, 24, 39, 0.05);
 }
 
+.deploymentCard {
+  display: grid;
+  gap: 14px;
+}
+
+.deploymentCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.deploymentCardEyebrow {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #8f5e0d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.deploymentCardHeader h3 {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.deploymentCardHeader p {
+  margin: 6px 0 0;
+  color: #5f6675;
+}
+
+.deploymentCardMetrics {
+  display: grid;
+  gap: 10px;
+}
+
+.deploymentMetric {
+  padding: 14px 16px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 16px;
+  background: rgba(247, 250, 252, 0.92);
+}
+
+.deploymentMetric span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.deploymentMetric strong {
+  display: block;
+  margin-top: 8px;
+  color: #132238;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
 .landingPage {
   min-height: 100vh;
   background:
@@ -1686,6 +1749,10 @@ button.landingButton.primaryButton:disabled {
   .compactList {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+  }
+
+  .deploymentCardMetrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .landingGrid,
