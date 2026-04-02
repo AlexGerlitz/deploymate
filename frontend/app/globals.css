@@ -426,6 +426,13 @@ a {
   margin: 0;
 }
 
+.adminSavedViewTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .adminSavedViewActions {
   display: flex;
   gap: 8px;

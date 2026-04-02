@@ -185,6 +185,19 @@ function formatSavedViews(items) {
       filters: item.filters,
       updatedAt: item.updatedAt || new Date().toISOString(),
       updatedAtLabel: formatDate(item.updatedAt || new Date().toISOString()),
+      summary: [
+        item.filters.role && item.filters.role !== "all" ? `role ${item.filters.role}` : null,
+        item.filters.plan && item.filters.plan !== "all" ? `plan ${item.filters.plan}` : null,
+        item.filters.must_change_password && item.filters.must_change_password !== "all"
+          ? item.filters.must_change_password === "required"
+            ? "password change required"
+            : "password ok"
+          : null,
+        item.filters.q ? `search ${item.filters.q}` : null,
+        item.filters.audit_q ? `audit ${item.filters.audit_q}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
     }));
 }
 
@@ -242,6 +255,16 @@ function UsersPageContent() {
     must_change_password: mustChangeFilter,
     audit_q: auditQuery.trim(),
   };
+  const currentUserViewSignature = JSON.stringify(currentUserView);
+  const matchedSavedViewByName = savedViews.find(
+    (item) => item.name.trim().toLowerCase() === savedViewName.trim().toLowerCase(),
+  );
+  const activeSavedViewId =
+    savedViews.find((item) => JSON.stringify(item.filters) === currentUserViewSignature)?.id || "";
+  const hasSavedViewNameMatch = Boolean(matchedSavedViewByName);
+  const hasSavedViewChanges =
+    matchedSavedViewByName &&
+    JSON.stringify(matchedSavedViewByName.filters) !== currentUserViewSignature;
   const activeFilterChips = [
     query.trim()
       ? {
@@ -763,19 +786,23 @@ function UsersPageContent() {
       return;
     }
 
+    const matchedView = matchedSavedViewByName;
+
     const nextViews = [
       {
-        id: `${Date.now()}`,
+        id: matchedView ? matchedView.id : `${Date.now()}`,
         name: savedViewName.trim(),
         filters: currentUserView,
         updatedAt: new Date().toISOString(),
       },
-      ...savedViews.map((item) => ({
-        id: item.id,
-        name: item.name,
-        filters: item.filters,
-        updatedAt: item.updatedAt,
-      })),
+      ...savedViews
+        .filter((item) => item.name.trim().toLowerCase() !== savedViewName.trim().toLowerCase())
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          filters: item.filters,
+          updatedAt: item.updatedAt,
+        })),
     ].slice(0, 8);
 
     persistSavedViews(nextViews);
@@ -790,6 +817,7 @@ function UsersPageContent() {
       return;
     }
     applyViewFilters(nextView.filters);
+    setSavedViewName(nextView.name);
     setSuccess(`Applied saved view ${nextView.name}.`);
     setError("");
   }
@@ -1288,11 +1316,20 @@ function UsersPageContent() {
             onSave={handleSaveCurrentView}
             saveDisabled={!canSaveCurrentView}
             saveTestId="users-save-view-button"
+            saveLabel={hasSavedViewNameMatch ? "Update saved view" : "Save current view"}
+            statusText={
+              hasSavedViewNameMatch
+                ? hasSavedViewChanges
+                  ? "This will update the existing saved view with the current filters."
+                  : "Saved view name matches the current filter state."
+                : ""
+            }
             views={savedViews}
             onApply={handleApplySavedView}
             onDelete={handleDeleteSavedView}
             emptyText="No saved user views yet."
             listTestId="users-saved-views-list"
+            activeViewId={activeSavedViewId}
           />
         </article>
 

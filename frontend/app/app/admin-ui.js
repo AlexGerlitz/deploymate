@@ -148,11 +148,14 @@ export function AdminSavedViews({
   onSave,
   saveDisabled,
   saveTestId,
+  saveLabel = "Save current view",
+  statusText = "",
   views = [],
   onApply,
   onDelete,
   emptyText,
   listTestId,
+  activeViewId = "",
 }) {
   return (
     <div className="adminSavedViews">
@@ -160,6 +163,9 @@ export function AdminSavedViews({
         <div>
           <h3>{title}</h3>
           <p className="formHint">Saved locally in this browser for faster admin workflows.</p>
+          <p className="formHint">
+            {views.length === 0 ? "No saved views yet." : `${views.length} saved view${views.length === 1 ? "" : "s"}.`}
+          </p>
         </div>
       </div>
       <div className="adminSavedViewsComposer">
@@ -167,6 +173,7 @@ export function AdminSavedViews({
           <span>{inputLabel}</span>
           <input value={inputValue} onChange={onInputChange} placeholder="Morning triage" />
         </label>
+        {statusText ? <p className="formHint">{statusText}</p> : null}
         <button
           type="button"
           className="secondaryButton"
@@ -174,7 +181,7 @@ export function AdminSavedViews({
           onClick={onSave}
           disabled={saveDisabled}
         >
-          Save current view
+          {saveLabel}
         </button>
       </div>
       {views.length === 0 ? (
@@ -186,12 +193,23 @@ export function AdminSavedViews({
           {views.map((view) => (
             <div key={view.id} className="adminSavedViewCard">
               <div>
-                <strong>{view.name}</strong>
+                <div className="adminSavedViewTitle">
+                  <strong>{view.name}</strong>
+                  {activeViewId === view.id ? (
+                    <span className="status healthy">Current</span>
+                  ) : null}
+                </div>
+                {view.summary ? <p className="formHint">{view.summary}</p> : null}
                 <p className="formHint">Updated {view.updatedAtLabel}</p>
               </div>
               <div className="adminSavedViewActions">
-                <button type="button" className="secondaryButton" onClick={() => onApply(view.id)}>
-                  Apply
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => onApply(view.id)}
+                  disabled={activeViewId === view.id}
+                >
+                  {activeViewId === view.id ? "Applied" : "Apply"}
                 </button>
                 <button type="button" className="secondaryButton" onClick={() => onDelete(view.id)}>
                   Remove

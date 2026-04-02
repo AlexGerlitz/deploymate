@@ -139,6 +139,15 @@ function formatSavedViews(items) {
       filters: item.filters,
       updatedAt: item.updatedAt || new Date().toISOString(),
       updatedAtLabel: formatDate(item.updatedAt || new Date().toISOString()),
+      summary: [
+        item.filters.status && item.filters.status !== "all" ? `status ${item.filters.status}` : null,
+        item.filters.plan && item.filters.plan !== "all" ? `plan ${item.filters.plan}` : null,
+        item.filters.linked_only ? "linked only" : null,
+        item.filters.q ? `search ${item.filters.q}` : null,
+        item.filters.audit_q ? `audit ${item.filters.audit_q}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
     }));
 }
 
@@ -181,6 +190,16 @@ function UpgradeRequestsPageContent() {
     linked_only: linkedOnly,
     audit_q: auditQuery.trim(),
   };
+  const currentUpgradeViewSignature = JSON.stringify(currentUpgradeView);
+  const matchedSavedViewByName = savedViews.find(
+    (item) => item.name.trim().toLowerCase() === savedViewName.trim().toLowerCase(),
+  );
+  const activeSavedViewId =
+    savedViews.find((item) => JSON.stringify(item.filters) === currentUpgradeViewSignature)?.id || "";
+  const hasSavedViewNameMatch = Boolean(matchedSavedViewByName);
+  const hasSavedViewChanges =
+    matchedSavedViewByName &&
+    JSON.stringify(matchedSavedViewByName.filters) !== currentUpgradeViewSignature;
   const activeFilterChips = [
     query.trim()
       ? {
@@ -559,19 +578,23 @@ function UpgradeRequestsPageContent() {
       return;
     }
 
+    const matchedView = matchedSavedViewByName;
+
     const nextViews = [
       {
-        id: `${Date.now()}`,
+        id: matchedView ? matchedView.id : `${Date.now()}`,
         name: savedViewName.trim(),
         filters: currentUpgradeView,
         updatedAt: new Date().toISOString(),
       },
-      ...savedViews.map((item) => ({
-        id: item.id,
-        name: item.name,
-        filters: item.filters,
-        updatedAt: item.updatedAt,
-      })),
+      ...savedViews
+        .filter((item) => item.name.trim().toLowerCase() !== savedViewName.trim().toLowerCase())
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          filters: item.filters,
+          updatedAt: item.updatedAt,
+        })),
     ].slice(0, 8);
 
     persistSavedViews(nextViews);
@@ -586,6 +609,7 @@ function UpgradeRequestsPageContent() {
       return;
     }
     applyViewFilters(nextView.filters);
+    setSavedViewName(nextView.name);
     setSaveFeedback(`Applied saved view ${nextView.name}.`);
     setError("");
   }
@@ -885,11 +909,20 @@ function UpgradeRequestsPageContent() {
             onSave={handleSaveCurrentView}
             saveDisabled={!canSaveCurrentView}
             saveTestId="upgrade-save-view-button"
+            saveLabel={hasSavedViewNameMatch ? "Update saved view" : "Save current view"}
+            statusText={
+              hasSavedViewNameMatch
+                ? hasSavedViewChanges
+                  ? "This will update the existing saved view with the current filters."
+                  : "Saved view name matches the current filter state."
+                : ""
+            }
             views={savedViews}
             onApply={handleApplySavedView}
             onDelete={handleDeleteSavedView}
             emptyText="No saved inbox views yet."
             listTestId="upgrade-saved-views-list"
+            activeViewId={activeSavedViewId}
           />
         </article>
 
