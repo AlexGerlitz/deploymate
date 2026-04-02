@@ -380,6 +380,33 @@ export function AdminSavedViews({
   );
 }
 
+export function AdminDisclosureSection({
+  title,
+  subtitle = "",
+  badge = "",
+  defaultOpen = false,
+  testId,
+  children,
+}) {
+  return (
+    <details className="adminDisclosure" open={defaultOpen} data-testid={testId}>
+      <summary className="adminDisclosureSummary">
+        <div className="adminDisclosureCopy">
+          <strong>{title}</strong>
+          {subtitle ? <p>{subtitle}</p> : null}
+        </div>
+        <div className="adminDisclosureMeta">
+          {badge ? <span className="status unknown">{badge}</span> : null}
+          <span className="adminDisclosureChevron" aria-hidden="true">
+            ▾
+          </span>
+        </div>
+      </summary>
+      <div className="adminDisclosureBody">{children}</div>
+    </details>
+  );
+}
+
 export function AdminAuditToolbar({
   title,
   description,

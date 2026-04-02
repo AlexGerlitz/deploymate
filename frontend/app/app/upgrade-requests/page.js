@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import {
   AdminActiveFilters,
   AdminAuditToolbar,
+  AdminDisclosureSection,
   AdminFeedbackBanners,
   AdminFilterFooter,
   AdminPageHeader,
@@ -834,75 +835,82 @@ function UpgradeRequestsPageContent() {
           </article>
         ) : null}
 
-        <AdminAuditToolbar
-          title="Upgrade audit trail"
-          description="Recent admin actions taken on upgrade requests."
-          query={auditQuery}
-          onQueryChange={(event) => setAuditQuery(event.target.value)}
-          queryPlaceholder="approved, in_review, target user"
-          queryTestId="upgrade-audit-search"
-          sortValue={auditSort}
-          onSortChange={(event) => setAuditSort(event.target.value)}
-          sortTestId="upgrade-audit-sort"
-          totalCount={visibleAuditEvents.length}
-          summary="Audit search updates after a short pause."
-          filters={activeAuditFilterChips}
-          actions={[
-            { label: "Copy audit link", testId: "upgrade-audit-copy-link-button", onClick: handleCopyAuditViewLink },
-            { label: "Export current CSV", testId: "upgrade-audit-current-export-button", onClick: handleDownloadVisibleAuditExport, disabled: visibleAuditEvents.length === 0 },
-            { label: "Reset audit", testId: "upgrade-audit-reset-button", onClick: handleResetAuditTools, disabled: !(auditQuery.trim() || auditSort !== "newest") },
-          ]}
-          emptyTestId="upgrade-audit-empty-state"
-          emptyText={auditQuery.trim() ? "No upgrade audit events match this search." : "No upgrade audit events yet."}
+        <AdminDisclosureSection
+          title="Audit and review tools"
+          subtitle="Recent activity and saved audit presets stay available here without crowding the main queue."
+          badge={`${visibleAuditEvents.length} activity`}
+          testId="upgrade-advanced-tools"
         >
-          <div className="timeline">
-            {visibleAuditEvents.map((item) => (
-              <div className="timelineItem" key={item.id}>
-                <div className="row">
-                  <span className="label">Action</span>
-                  <span>{item.action_type}</span>
+          <AdminAuditToolbar
+            title="Upgrade audit trail"
+            description="Recent admin actions taken on upgrade requests."
+            query={auditQuery}
+            onQueryChange={(event) => setAuditQuery(event.target.value)}
+            queryPlaceholder="approved, in_review, target user"
+            queryTestId="upgrade-audit-search"
+            sortValue={auditSort}
+            onSortChange={(event) => setAuditSort(event.target.value)}
+            sortTestId="upgrade-audit-sort"
+            totalCount={visibleAuditEvents.length}
+            summary="Audit search updates after a short pause."
+            filters={activeAuditFilterChips}
+            actions={[
+              { label: "Copy audit link", testId: "upgrade-audit-copy-link-button", onClick: handleCopyAuditViewLink },
+              { label: "Export current CSV", testId: "upgrade-audit-current-export-button", onClick: handleDownloadVisibleAuditExport, disabled: visibleAuditEvents.length === 0 },
+              { label: "Reset audit", testId: "upgrade-audit-reset-button", onClick: handleResetAuditTools, disabled: !(auditQuery.trim() || auditSort !== "newest") },
+            ]}
+            emptyTestId="upgrade-audit-empty-state"
+            emptyText={auditQuery.trim() ? "No upgrade audit events match this search." : "No upgrade audit events yet."}
+          >
+            <div className="timeline">
+              {visibleAuditEvents.map((item) => (
+                <div className="timelineItem" key={item.id}>
+                  <div className="row">
+                    <span className="label">Action</span>
+                    <span>{item.action_type}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Actor</span>
+                    <span>{item.actor_username || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Target</span>
+                    <span>{item.target_label || item.target_id || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Details</span>
+                    <span>{item.details || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Created</span>
+                    <span>{formatDate(item.created_at)}</span>
+                  </div>
                 </div>
-                <div className="row">
-                  <span className="label">Actor</span>
-                  <span>{item.actor_username || "-"}</span>
-                </div>
-                <div className="row">
-                  <span className="label">Target</span>
-                  <span>{item.target_label || item.target_id || "-"}</span>
-                </div>
-                <div className="row">
-                  <span className="label">Details</span>
-                  <span>{item.details || "-"}</span>
-                </div>
-                <div className="row">
-                  <span className="label">Created</span>
-                  <span>{formatDate(item.created_at)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </AdminAuditToolbar>
+              ))}
+            </div>
+          </AdminAuditToolbar>
 
-        <article className="card formCard">
-          <AdminSavedViews
-            title="Saved audit views"
-            inputLabel="Audit view name"
-            inputValue={auditViewName}
-            onInputChange={(event) => setAuditViewName(event.target.value)}
-            onSave={handleSaveAuditView}
-            saveDisabled={!canSaveAuditView}
-            saveTestId="upgrade-save-audit-view-button"
-            saveLabel={hasAuditViewNameMatch ? "Update audit view" : "Save audit view"}
-            inputHint="Save the current audit query and sort. Audit presets are stored separately from the main inbox saved views."
-            inputCountText={`${normalizedAuditViewName.length}/40 characters`}
-            views={auditViews}
-            onApply={handleApplyAuditView}
-            onDelete={handleDeleteAuditView}
-            emptyText="No saved audit views yet."
-            listTestId="upgrade-audit-views-list"
-            activeViewId={activeAuditViewId}
-          />
-        </article>
+          <article className="card formCard">
+            <AdminSavedViews
+              title="Saved audit views"
+              inputLabel="Audit view name"
+              inputValue={auditViewName}
+              onInputChange={(event) => setAuditViewName(event.target.value)}
+              onSave={handleSaveAuditView}
+              saveDisabled={!canSaveAuditView}
+              saveTestId="upgrade-save-audit-view-button"
+              saveLabel={hasAuditViewNameMatch ? "Update audit view" : "Save audit view"}
+              inputHint="Save the current audit query and sort. Audit presets are stored separately from the main inbox saved views."
+              inputCountText={`${normalizedAuditViewName.length}/40 characters`}
+              views={auditViews}
+              onApply={handleApplyAuditView}
+              onDelete={handleDeleteAuditView}
+              emptyText="No saved audit views yet."
+              listTestId="upgrade-audit-views-list"
+              activeViewId={activeAuditViewId}
+            />
+          </article>
+        </AdminDisclosureSection>
 
         <article className="card formCard">
           <div className="sectionHeader">
@@ -1017,6 +1025,20 @@ function UpgradeRequestsPageContent() {
           />
         </article>
 
+        {loading && requests.length === 0 ? (
+          <div className="empty">Loading review queue...</div>
+        ) : null}
+
+        {!loading && requests.length === 0 ? (
+          <div className="empty" data-testid="upgrade-empty-state">No requests match this view yet. Clear a filter or wait for new demand.</div>
+        ) : null}
+
+        <AdminDisclosureSection
+          title="Saved views and bulk tools"
+          subtitle="Reusable queue presets and larger review actions stay one click away."
+          badge={`${savedViews.length} saved`}
+          testId="upgrade-power-tools"
+        >
         <article className="card formCard">
           <AdminSavedViews
             title="Saved inbox views"
@@ -1106,14 +1128,6 @@ function UpgradeRequestsPageContent() {
             activeViewId={activeSavedViewId}
           />
         </article>
-
-        {loading && requests.length === 0 ? (
-          <div className="empty">Loading review queue...</div>
-        ) : null}
-
-        {!loading && requests.length === 0 ? (
-          <div className="empty" data-testid="upgrade-empty-state">No requests match this view yet. Clear a filter or wait for new demand.</div>
-        ) : null}
 
         <article className="card formCard adminToolCard" data-testid="upgrade-bulk-card">
           <div className="sectionHeader">
@@ -1300,6 +1314,7 @@ function UpgradeRequestsPageContent() {
             </p>
           </div>
         </article>
+        </AdminDisclosureSection>
 
         <div className="list">
           {!loading && requests.length > 0 && filteredRequests.length === 0 ? (

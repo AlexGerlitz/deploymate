@@ -584,6 +584,66 @@ a {
   font-size: 13px;
 }
 
+.adminDisclosure {
+  margin-bottom: 18px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 251, 253, 0.98) 100%);
+  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.05);
+  overflow: hidden;
+}
+
+.adminDisclosureSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.adminDisclosureSummary::-webkit-details-marker {
+  display: none;
+}
+
+.adminDisclosureCopy {
+  display: grid;
+  gap: 6px;
+}
+
+.adminDisclosureCopy strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.adminDisclosureCopy p {
+  margin: 0;
+  color: #5f6675;
+}
+
+.adminDisclosureMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adminDisclosureChevron {
+  color: #5f6675;
+  font-size: 18px;
+  transition: transform 180ms ease;
+}
+
+.adminDisclosure[open] .adminDisclosureChevron {
+  transform: rotate(180deg);
+}
+
+.adminDisclosureBody {
+  padding: 0 18px 18px;
+}
+
 .portSuggestions {
   display: flex;
   gap: 8px;

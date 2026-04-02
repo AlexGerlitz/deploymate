@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import {
   AdminActiveFilters,
   AdminAuditToolbar,
+  AdminDisclosureSection,
   AdminFeedbackBanners,
   AdminFilterFooter,
   AdminPageHeader,
@@ -1121,94 +1122,100 @@ function UsersPageContent() {
           </article>
         ) : null}
 
-        <AdminAuditToolbar
-          title="Admin audit trail"
-          description="Recent admin actions across users and upgrade handling."
-          query={auditQuery}
-          onQueryChange={(event) => setAuditQuery(event.target.value)}
-          queryPlaceholder="user.updated, alice, approved"
-          queryTestId="users-audit-search"
-          filterLabel="Scope"
-          filterValue={auditScopeFilter}
-          onFilterChange={(event) => setAuditScopeFilter(event.target.value)}
-          filterOptions={[
-            { label: "All targets", value: "all" },
-            { label: "Users", value: "user" },
-            { label: "Upgrade requests", value: "upgrade_request" },
-          ]}
-          filterTestId="users-audit-scope-filter"
-          sortValue={auditSort}
-          onSortChange={(event) => setAuditSort(event.target.value)}
-          sortTestId="users-audit-sort"
-          totalCount={visibleAuditEvents.length}
-          summary="Audit search updates after a short pause."
-          filters={activeAuditFilterChips}
-          actions={[
-            { label: "Copy audit link", testId: "users-audit-copy-link-button", onClick: handleCopyAuditViewLink },
-            { label: "Export current CSV", testId: "users-audit-current-export-button", onClick: handleDownloadVisibleAuditExport, disabled: visibleAuditEvents.length === 0 },
-            { label: "Reset audit", testId: "users-audit-reset-button", onClick: handleResetAuditTools, disabled: !(auditQuery.trim() || auditScopeFilter !== "all" || auditSort !== "newest") },
-          ]}
-          emptyTestId="users-audit-empty-state"
-          emptyText={auditQuery.trim() ? "No admin audit events match this search." : "No admin audit events yet."}
+        <AdminDisclosureSection
+          title="Recovery and audit tools"
+          subtitle="Advanced review utilities, restore validation, and saved audit presets live here."
+          badge={`${visibleAuditEvents.length} activity`}
+          testId="users-advanced-tools"
         >
-          <div className="timeline">
-            {visibleAuditEvents.map((item) => (
-              <div className="timelineItem" key={item.id}>
-                <div className="row">
-                  <span className="label">Action</span>
-                  <span>{item.action_type}</span>
+          <AdminAuditToolbar
+            title="Admin audit trail"
+            description="Recent admin actions across users and upgrade handling."
+            query={auditQuery}
+            onQueryChange={(event) => setAuditQuery(event.target.value)}
+            queryPlaceholder="user.updated, alice, approved"
+            queryTestId="users-audit-search"
+            filterLabel="Scope"
+            filterValue={auditScopeFilter}
+            onFilterChange={(event) => setAuditScopeFilter(event.target.value)}
+            filterOptions={[
+              { label: "All targets", value: "all" },
+              { label: "Users", value: "user" },
+              { label: "Upgrade requests", value: "upgrade_request" },
+            ]}
+            filterTestId="users-audit-scope-filter"
+            sortValue={auditSort}
+            onSortChange={(event) => setAuditSort(event.target.value)}
+            sortTestId="users-audit-sort"
+            totalCount={visibleAuditEvents.length}
+            summary="Audit search updates after a short pause."
+            filters={activeAuditFilterChips}
+            actions={[
+              { label: "Copy audit link", testId: "users-audit-copy-link-button", onClick: handleCopyAuditViewLink },
+              { label: "Export current CSV", testId: "users-audit-current-export-button", onClick: handleDownloadVisibleAuditExport, disabled: visibleAuditEvents.length === 0 },
+              { label: "Reset audit", testId: "users-audit-reset-button", onClick: handleResetAuditTools, disabled: !(auditQuery.trim() || auditScopeFilter !== "all" || auditSort !== "newest") },
+            ]}
+            emptyTestId="users-audit-empty-state"
+            emptyText={auditQuery.trim() ? "No admin audit events match this search." : "No admin audit events yet."}
+          >
+            <div className="timeline">
+              {visibleAuditEvents.map((item) => (
+                <div className="timelineItem" key={item.id}>
+                  <div className="row">
+                    <span className="label">Action</span>
+                    <span>{item.action_type}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Actor</span>
+                    <span>{item.actor_username || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Target</span>
+                    <span>{item.target_type} · {item.target_label || item.target_id || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Details</span>
+                    <span>{item.details || "-"}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Created</span>
+                    <span>{formatDate(item.created_at)}</span>
+                  </div>
                 </div>
-                <div className="row">
-                  <span className="label">Actor</span>
-                  <span>{item.actor_username || "-"}</span>
-                </div>
-                <div className="row">
-                  <span className="label">Target</span>
-                  <span>{item.target_type} · {item.target_label || item.target_id || "-"}</span>
-                </div>
-                <div className="row">
-                  <span className="label">Details</span>
-                  <span>{item.details || "-"}</span>
-                </div>
-                <div className="row">
-                  <span className="label">Created</span>
-                  <span>{formatDate(item.created_at)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </AdminAuditToolbar>
-
-        <article className="card formCard">
-          <AdminSavedViews
-            title="Saved audit views"
-            inputLabel="Audit view name"
-            inputValue={auditViewName}
-            onInputChange={(event) => setAuditViewName(event.target.value)}
-            onSave={handleSaveAuditView}
-            saveDisabled={!canSaveAuditView}
-            saveTestId="users-save-audit-view-button"
-            saveLabel={hasAuditViewNameMatch ? "Update audit view" : "Save audit view"}
-            inputHint="Save the current audit query, scope, and sort. Audit presets are stored separately from the main users saved views."
-            inputCountText={`${normalizedAuditViewName.length}/40 characters`}
-            views={auditViews}
-            onApply={handleApplyAuditView}
-            onDelete={handleDeleteAuditView}
-            emptyText="No saved audit views yet."
-            listTestId="users-audit-views-list"
-            activeViewId={activeAuditViewId}
-          />
-        </article>
-
-        <article className="card formCard backupPanel">
-          <div className="sectionHeader">
-            <div>
-              <h2 data-testid="backup-panel-title">Backup and restore dry run</h2>
-              <p className="formHint">
-                Export the current admin state, then validate a restore bundle without applying live changes.
-              </p>
+              ))}
             </div>
-          </div>
+          </AdminAuditToolbar>
+
+          <article className="card formCard">
+            <AdminSavedViews
+              title="Saved audit views"
+              inputLabel="Audit view name"
+              inputValue={auditViewName}
+              onInputChange={(event) => setAuditViewName(event.target.value)}
+              onSave={handleSaveAuditView}
+              saveDisabled={!canSaveAuditView}
+              saveTestId="users-save-audit-view-button"
+              saveLabel={hasAuditViewNameMatch ? "Update audit view" : "Save audit view"}
+              inputHint="Save the current audit query, scope, and sort. Audit presets are stored separately from the main users saved views."
+              inputCountText={`${normalizedAuditViewName.length}/40 characters`}
+              views={auditViews}
+              onApply={handleApplyAuditView}
+              onDelete={handleDeleteAuditView}
+              emptyText="No saved audit views yet."
+              listTestId="users-audit-views-list"
+              activeViewId={activeAuditViewId}
+            />
+          </article>
+
+          <article className="card formCard backupPanel">
+            <div className="sectionHeader">
+              <div>
+                <h2 data-testid="backup-panel-title">Backup and restore dry run</h2>
+                <p className="formHint">
+                  Export the current admin state, then validate a restore bundle without applying live changes.
+                </p>
+              </div>
+            </div>
           <div className="backupActionGroup">
             <button
               type="button"
@@ -1294,8 +1301,8 @@ function UsersPageContent() {
               </div>
             </div>
           ) : null}
-          {restoreDryRun ? (
-            <div className="backupReport" data-testid="restore-report">
+            {restoreDryRun ? (
+              <div className="backupReport" data-testid="restore-report">
               <div className="overviewGrid">
                 <div className="overviewCard">
                   <span className="overviewLabel">Bundle</span>
@@ -1429,9 +1436,10 @@ function UsersPageContent() {
                   </div>
                 ))}
               </div>
-            </div>
-          ) : null}
-        </article>
+              </div>
+            ) : null}
+          </article>
+        </AdminDisclosureSection>
 
         <article className="card formCard">
           <div className="sectionHeader">
@@ -1542,6 +1550,68 @@ function UsersPageContent() {
           />
         </article>
 
+        <article className="card formCard adminToolCard">
+          <div className="adminToolHeader">
+            <span className="adminToolEyebrow">Access setup</span>
+            <h2>Create user</h2>
+            <p className="adminToolMeta">
+              Add a teammate with a temporary password, then tighten access and plan after the account is created.
+            </p>
+          </div>
+          <form className="form" onSubmit={handleCreateUser}>
+            <label className="field">
+              <span>Username</span>
+              <input
+                name="username"
+                value={form.username}
+                onChange={updateFormField}
+                disabled={submitting}
+                placeholder="new-admin"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Password</span>
+              <input
+                name="password"
+                type="password"
+                value={form.password}
+                onChange={updateFormField}
+                disabled={submitting}
+                placeholder="Temporary password"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Role</span>
+              <select
+                name="role"
+                value={form.role}
+                onChange={updateFormField}
+                disabled={submitting}
+              >
+                <option value="member">member</option>
+                <option value="admin">admin</option>
+              </select>
+            </label>
+
+            <div className="formActions">
+              <button type="submit" disabled={submitting}>
+                {submitting ? "Creating..." : "Create user"}
+              </button>
+            </div>
+            <p className="formHint">New accounts start on the `trial` plan and can be upgraded or restricted immediately after creation.</p>
+          </form>
+        </article>
+
+        <AdminDisclosureSection
+          title="Saved views and bulk tools"
+          subtitle="Power-user shortcuts for repeated access reviews and larger edits."
+          badge={`${savedViews.length} saved`}
+          testId="users-power-tools"
+        >
         <article className="card formCard">
           <AdminSavedViews
             title="Saved user views"
@@ -1630,62 +1700,6 @@ function UsersPageContent() {
             listTestId="users-saved-views-list"
             activeViewId={activeSavedViewId}
           />
-        </article>
-
-        <article className="card formCard adminToolCard">
-          <div className="adminToolHeader">
-            <span className="adminToolEyebrow">Access setup</span>
-            <h2>Create user</h2>
-            <p className="adminToolMeta">
-              Add a teammate with a temporary password, then tighten access and plan after the account is created.
-            </p>
-          </div>
-          <form className="form" onSubmit={handleCreateUser}>
-            <label className="field">
-              <span>Username</span>
-              <input
-                name="username"
-                value={form.username}
-                onChange={updateFormField}
-                disabled={submitting}
-                placeholder="new-admin"
-                required
-              />
-            </label>
-
-            <label className="field">
-              <span>Password</span>
-              <input
-                name="password"
-                type="password"
-                value={form.password}
-                onChange={updateFormField}
-                disabled={submitting}
-                placeholder="Temporary password"
-                required
-              />
-            </label>
-
-            <label className="field">
-              <span>Role</span>
-              <select
-                name="role"
-                value={form.role}
-                onChange={updateFormField}
-                disabled={submitting}
-              >
-                <option value="member">member</option>
-                <option value="admin">admin</option>
-              </select>
-            </label>
-
-            <div className="formActions">
-              <button type="submit" disabled={submitting}>
-                {submitting ? "Creating..." : "Create user"}
-              </button>
-            </div>
-            <p className="formHint">New accounts start on the `trial` plan and can be upgraded or restricted immediately after creation.</p>
-          </form>
         </article>
 
         <article className="card formCard adminToolCard" data-testid="users-bulk-card">
@@ -1898,6 +1912,7 @@ function UsersPageContent() {
             </p>
           </div>
         </article>
+        </AdminDisclosureSection>
 
         {loading && users.length === 0 ? (
           <div className="empty">Loading team access view...</div>
