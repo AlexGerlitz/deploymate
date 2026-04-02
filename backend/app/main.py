@@ -1,8 +1,10 @@
 import os
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from app.db import init_db
 from app.routes.auth import router as auth_router
@@ -34,16 +36,43 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class CookieOriginGuardMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method in {"POST", "PATCH", "DELETE", "PUT"}:
+            origin = request.headers.get("origin", "").strip()
+            cookie_header = request.headers.get("cookie", "")
+            if origin and "deploymate_session=" in cookie_header and not _origin_is_allowed(origin):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Origin is not allowed for authenticated write requests."},
+                )
+
+        return await call_next(request)
+
+
+def _normalize_origin(origin: str) -> str:
+    parsed = urlsplit(origin.strip())
+    if not parsed.scheme or not parsed.netloc:
+        return origin.strip().rstrip("/")
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def _get_allowed_origins() -> list[str]:
     raw_value = os.getenv("CORS_ALLOW_ORIGINS", "")
     if raw_value.strip():
-        return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+        return [_normalize_origin(origin) for origin in raw_value.split(",") if origin.strip()]
     return [
         "http://127.0.0.1:3000",
         "http://localhost:3000",
     ]
 
+
+def _origin_is_allowed(origin: str) -> bool:
+    return _normalize_origin(origin) in _get_allowed_origins()
+
+
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CookieOriginGuardMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
