@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { readJsonOrThrow, resolveServerApiUrl } from "../../lib/auth-form-helpers";
+import {
+  readJsonOrThrow,
+  resolvePublicOrigin,
+  resolveServerApiUrl,
+} from "../../lib/auth-form-helpers";
 
 function redirectWithError(request, message, username = "") {
-  const url = new URL("/register", request.url);
+  const url = new URL("/register", resolvePublicOrigin(request));
   if (message) {
     url.searchParams.set("error", message);
   }
@@ -37,7 +41,7 @@ export async function POST(request) {
       cache: "no-store",
     });
     await readJsonOrThrow(response, "Failed to create account.");
-    const nextResponse = NextResponse.redirect(new URL("/app", request.url), {
+    const nextResponse = NextResponse.redirect(new URL("/app", resolvePublicOrigin(request)), {
       status: 303,
     });
     const sessionCookie = response.headers.get("set-cookie");

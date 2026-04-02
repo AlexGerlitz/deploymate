@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { readJsonOrThrow, resolveServerApiUrl } from "../../lib/auth-form-helpers";
+import {
+  readJsonOrThrow,
+  resolvePublicOrigin,
+  resolveServerApiUrl,
+} from "../../lib/auth-form-helpers";
 
 function redirectWithError(request, message, username = "") {
-  const url = new URL("/login", request.url);
+  const url = new URL("/login", resolvePublicOrigin(request));
   if (message) {
     url.searchParams.set("error", message);
   }
@@ -33,7 +37,7 @@ export async function POST(request) {
     });
     const user = await readJsonOrThrow(response, "Failed to log in.");
     const redirectTarget = user.must_change_password ? "/change-password" : "/app";
-    const nextResponse = NextResponse.redirect(new URL(redirectTarget, request.url), {
+    const nextResponse = NextResponse.redirect(new URL(redirectTarget, resolvePublicOrigin(request)), {
       status: 303,
     });
     const sessionCookie = response.headers.get("set-cookie");
