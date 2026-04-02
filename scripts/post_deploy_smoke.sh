@@ -76,6 +76,43 @@ check_http_ok() {
   echo "[smoke] $label ok"
 }
 
+check_http_redirect_to_login() {
+  local label="$1"
+  local url="$2"
+
+  local headers_file
+  headers_file="$(mktemp)"
+  local status_code
+  status_code="$(curl -sS -D "$headers_file" -o /dev/null -w "%{http_code}" "$url")"
+  local location
+  location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/, "", $2); print $2}' "$headers_file" | tail -n 1)"
+  rm -f "$headers_file"
+
+  case "$status_code" in
+    301|302|303|307|308)
+      ;;
+    *)
+      echo "[smoke] $label expected redirect to login, got HTTP $status_code: $url" >&2
+      exit 1
+      ;;
+  esac
+
+  if [ -z "$location" ]; then
+    echo "[smoke] $label redirect missing Location header: $url" >&2
+    exit 1
+  fi
+
+  case "$location" in
+    */login|*/login?*)
+      echo "[smoke] $label ok"
+      ;;
+    *)
+      echo "[smoke] $label redirected to unexpected location: $location" >&2
+      exit 1
+      ;;
+  esac
+}
+
 check_http_status() {
   local label="$1"
   local expected_status="$2"
@@ -314,7 +351,7 @@ require_env "DEPLOYMATE_ADMIN_PASSWORD" "$PASSWORD"
 echo "[smoke] base url: $BASE_URL"
 
 check_http_ok "login page" "$BASE_URL/login"
-check_http_ok "app shell" "$BASE_URL/app"
+check_http_redirect_to_login "app shell redirect" "$BASE_URL/app"
 
 health_body="$(curl -sS --fail-with-body "$BASE_URL/api/health")"
 health_status="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$health_body")"
