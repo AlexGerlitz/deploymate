@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
+import { AdminDisclosureSection } from "../../app/admin-ui";
 import {
   smokeActivity,
   smokeDeployment,
@@ -1112,6 +1113,12 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </article>
 
+            <AdminDisclosureSection
+              title="Runtime tools and history"
+              subtitle="Quick reference, diagnostics, logs, and activity remain available here without crowding the first runtime screen."
+              badge={`${attentionItems.length} attention`}
+              testId="runtime-detail-tools-disclosure"
+            >
             <article className="card compactCard" data-testid="runtime-detail-quick-reference-card">
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-quick-reference-title">Quick reference</h2>
@@ -1405,6 +1412,7 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               )}
             </article>
+            </AdminDisclosureSection>
           </>
         ) : null}
       </div>

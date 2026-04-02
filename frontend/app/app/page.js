@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AdminDisclosureSection } from "./admin-ui";
 import {
   smokeDeployments,
   smokeMode,
@@ -2223,6 +2224,12 @@ export default function HomePage() {
         ) : null}
 
         {currentUser?.is_admin ? (
+        <AdminDisclosureSection
+          title="Servers"
+          subtitle="Saved targets, diagnostics, and connection checks stay here when you need infrastructure detail."
+          badge={`${servers.length} targets`}
+          testId="servers-disclosure"
+        >
         <article className="card formCard" data-testid="servers-card">
           <div className="sectionHeader" data-testid="servers-header">
             <div>
@@ -2523,6 +2530,7 @@ export default function HomePage() {
             ))}
           </div>
         </article>
+        </AdminDisclosureSection>
         ) : (
           <article className="card formCard" data-testid="servers-card">
             <h2 data-testid="servers-title">Servers</h2>
@@ -2534,6 +2542,12 @@ export default function HomePage() {
           </article>
         )}
 
+        <AdminDisclosureSection
+          title="Activity history"
+          subtitle="Past deploy events and operational messages stay available here without dominating the main workspace."
+          badge={`${filteredNotifications.length} items`}
+          testId="activity-history-disclosure"
+        >
         <article className="card formCard">
           <div className="sectionHeader">
             <h2>Activity history</h2>
@@ -2635,7 +2649,14 @@ export default function HomePage() {
             </div>
           ) : null}
         </article>
+        </AdminDisclosureSection>
 
+        <AdminDisclosureSection
+          title="Deployment templates"
+          subtitle="Reusable presets and previews stay close at hand without competing with the create flow."
+          badge={`${templates.length} templates`}
+          testId="templates-disclosure"
+        >
         <article className="card formCard" data-testid="templates-card">
           <div className="sectionHeader" data-testid="templates-section-header">
             <div>
@@ -2870,6 +2891,7 @@ export default function HomePage() {
           {templateDuplicateError ? <div className="banner error" data-testid="template-duplicate-error-banner">{templateDuplicateError}</div> : null}
           {templateDuplicateSuccess ? <div className="banner success" data-testid="template-duplicate-success-banner">{templateDuplicateSuccess}</div> : null}
         </article>
+        </AdminDisclosureSection>
 
         <article className="card formCard" data-testid="create-deployment-card">
           <h2 data-testid="create-deployment-title">Create deployment</h2>
