@@ -20,6 +20,22 @@ DeployMate is a self-hosted deployment control panel for small teams that need a
 
 It is built for pragmatic operator experience rather than platform complexity.
 
+## Reviewer Package
+
+If you are opening this repository as a hiring reviewer, these are the fastest entry points:
+
+- live app: `https://deploymatecloud.ru`
+- public signup: `https://deploymatecloud.ru/register`
+- release notes: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)
+- architecture overview: [ARCHITECTURE.md](ARCHITECTURE.md)
+- production/release discipline: [RUNBOOK.md](RUNBOOK.md), [SAFE-RELEASE.md](SAFE-RELEASE.md), [SECURITY.md](SECURITY.md)
+
+What to evaluate quickly:
+
+- product depth: deployments, templates, servers, admin users, upgrade requests, backup dry-run
+- engineering maturity: scripted preflight, smoke coverage, remote release flow, production docs
+- operational thinking: security posture, runtime capability boundaries, release safety checks
+
 ## Try It Live
 
 Public trial signup is enabled on the live instance:
@@ -36,6 +52,13 @@ Reviewer path:
 4. review saved views, bulk actions, audit trail, backup bundle, and restore dry-run tooling
 
 ![Reviewer demo flow](docs/demo-flow.svg)
+
+Recommended reviewer order:
+
+1. `/app` for the operator overview
+2. `/deployments/[deploymentId]` for runtime state and observability
+3. `/app/users` for admin saved views, bulk actions, audit, and recovery tooling
+4. `/app/upgrade-requests` for workflow depth, exports, and admin triage surface
 
 ## Why This Project Is Interesting
 
@@ -106,6 +129,8 @@ Browser
 More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ![Architecture flow](docs/architecture-flow.svg)
+
+For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md).
 
 ## Repository Tour
 
