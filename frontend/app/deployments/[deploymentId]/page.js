@@ -209,6 +209,66 @@ export default function DeploymentDetailsPage({ params }) {
       : health?.status && health.status !== "healthy"
         ? `Health is currently ${health.status}.`
         : "Runtime surface is stable enough for review.");
+  const detailGuideCards = [
+    {
+      step: "01",
+      title: "Review live state",
+      detail:
+        attentionItems.length > 0
+          ? `${attentionItems.length} runtime item${attentionItems.length === 1 ? "" : "s"} need review before the next change.`
+          : "Status, endpoint, and health are stable enough for a quick review.",
+      href: "#runtime-detail-overview",
+      actionLabel: "Check runtime state",
+    },
+    {
+      step: "02",
+      title: "Apply the next rollout change",
+      detail:
+        deployment?.status === "failed"
+          ? "Adjust image, ports, or env vars, then run a deliberate redeploy."
+          : "Use redeploy only when you are ready to change the current runtime.",
+      href: "#runtime-detail-redeploy",
+      actionLabel: "Open redeploy",
+    },
+    {
+      step: "03",
+      title: "Keep a reusable handoff",
+      detail:
+        "Save this setup as a template or open deeper runtime tools only when you need diagnostics, logs, or activity.",
+      href: "#runtime-detail-secondary-tools",
+      actionLabel: "Open tools",
+    },
+  ];
+  const detailGlanceItems = [
+    {
+      label: "Endpoint",
+      value: deploymentUrl ? "Live" : "Private",
+      detail: deploymentUrl || "No public URL assigned yet.",
+    },
+    {
+      label: "Cadence",
+      value: "8-second refresh",
+      detail: "Deployment, health, and activity refresh automatically while you stay on this page.",
+    },
+    {
+      label: "Attention",
+      value: `${attentionItems.length}`,
+      detail:
+        attentionItems.length > 0
+          ? `${attentionItems.length} runtime attention item${attentionItems.length === 1 ? "" : "s"} need review.`
+          : "No active runtime warnings right now.",
+    },
+    {
+      label: "Next step",
+      value:
+        attentionItems.length > 0
+          ? "Review runtime issues"
+          : deployment?.status === "failed"
+            ? "Redeploy deliberately"
+            : "Keep current rollout stable",
+      detail: detailPriority,
+    },
+  ];
 
   async function loadDeploymentDiagnostics() {
     setDiagnosticsLoading(true);
@@ -769,65 +829,118 @@ export default function DeploymentDetailsPage({ params }) {
           ) : null}
           {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
 
-          <div className="workspaceStatusStrip">
-            <div className="workspaceStatusCard">
-              <span>Backend</span>
-              <strong>{apiBaseUrl}</strong>
-              <p>Authenticated deployment controls and runtime data flow through this API surface.</p>
+          <article className="card formCard workspaceGuidePanel" data-testid="runtime-detail-guide-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2 data-testid="runtime-detail-guide-title">Use this runtime page in three moves</h2>
+                <p className="formHint">
+                  Review the live state first, change the rollout deliberately, then open deeper tools only when incident or handoff work needs them.
+                </p>
+              </div>
             </div>
-            <div className="workspaceStatusCard">
-              <span>Cadence</span>
-              <strong>8-second refresh</strong>
-              <p>Deployment, health, and activity keep refreshing automatically.</p>
-            </div>
-            <div className="workspaceStatusCard">
-              <span>Attention</span>
-              <strong>{attentionItems.length}</strong>
-              <p data-testid="runtime-detail-attention-banner">
-                {attentionItems.length > 0
-                  ? `${attentionItems.length} runtime attention item${attentionItems.length === 1 ? "" : "s"} need review.`
-                  : "No active runtime warnings right now."}
-              </p>
-            </div>
-          </div>
 
-          {smokeMode ? (
-            <div className="workspaceMetaLine">
-              <span data-testid="runtime-detail-smoke-banner">
-                Runtime detail smoke mode uses fixture deployment data.
-              </span>
+            <div className="workspaceGuideGrid">
+              <div className="stepsGrid workspaceGuideSteps">
+                {detailGuideCards.map((card) => (
+                  <article key={card.step} className="stepCard workspaceStepCard">
+                    <span className="stepNumber">{card.step}</span>
+                    <h3>{card.title}</h3>
+                    <p>{card.detail}</p>
+                    <Link
+                      href={card.href}
+                      className={
+                        card.actionLabel === "Open redeploy"
+                          ? "landingButton primaryButton"
+                          : "landingButton secondaryButton"
+                      }
+                    >
+                      {card.actionLabel}
+                    </Link>
+                  </article>
+                ))}
+              </div>
+
+              <aside className="workspaceGlancePanel">
+                <div className="workspaceGlanceHeader">
+                  <span className="eyebrow">At a glance</span>
+                  <strong>Current runtime</strong>
+                </div>
+                <div className="workspaceGlanceList">
+                  {detailGlanceItems.map((item) => (
+                    <div key={item.label} className="workspaceStatusCard workspaceGlanceItem">
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                      <p data-testid={item.label === "Attention" ? "runtime-detail-attention-banner" : undefined}>
+                        {item.detail}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="workspaceMetaLine">
+                  <span>
+                    Backend: <code>{apiBaseUrl}</code>
+                  </span>
+                  {smokeMode ? (
+                    <span data-testid="runtime-detail-smoke-banner">
+                      Runtime detail smoke mode uses fixture deployment data.
+                    </span>
+                  ) : (
+                    <span>Authenticated deployment controls and runtime data flow through this API surface.</span>
+                  )}
+                </div>
+              </aside>
             </div>
-          ) : null}
+          </article>
         </div>
 
-        <article className="card formCard">
-          <h2>Save as template</h2>
-          <div className="form">
-            <label className="field">
-              <span>Template name</span>
-              <input
-                value={templateName}
-                onChange={(event) => setTemplateName(event.target.value)}
-                placeholder="nginx baseline"
-                disabled={templateSaving}
-              />
-              <span className="fieldHint">
-                Save the current deployment settings as a reusable preset for future deploys.
-              </span>
-            </label>
-            <div className="formActions">
-              <button
-                type="button"
-                onClick={handleSaveTemplate}
-                disabled={templateSaving || !templateName.trim() || !form.image.trim()}
-              >
-                {templateSaving ? "Saving template..." : "Save as template"}
-              </button>
-            </div>
-          </div>
-        </article>
+        {loading && !deployment ? <div className="empty">Loading deployment...</div> : null}
 
-        <article className="card formCard">
+        {deployment ? (
+          <>
+            <div
+              className="overviewGrid"
+              data-testid="runtime-detail-overview-grid"
+              id="runtime-detail-overview"
+            >
+              <div className="overviewCard" data-testid="runtime-detail-endpoint-card">
+                <span className="overviewLabel">Endpoint</span>
+                <strong className="overviewValue">{deploymentUrl || "No public URL"}</strong>
+                <div className="overviewMeta">
+                  <span>Internal {deployment.internal_port || "-"}</span>
+                  <span>External {deployment.external_port || "-"}</span>
+                </div>
+              </div>
+              <div className="overviewCard" data-testid="runtime-detail-runtime-card">
+                <span className="overviewLabel">Runtime</span>
+                <strong className="overviewValue">{deployment.container_name || "Container pending"}</strong>
+                <div className="overviewMeta">
+                  <span>Status {deployment.status || "unknown"}</span>
+                  <span>Server {deployment.server_name || "Local"}</span>
+                </div>
+              </div>
+              <div className="overviewCard" data-testid="runtime-detail-health-overview-card">
+                <span className="overviewLabel">Health</span>
+                <strong className="overviewValue">{health?.status || "unknown"}</strong>
+                <div className="overviewMeta">
+                  <span>Checked {formatDate(health?.checked_at)}</span>
+                  <span>
+                    {health?.response_time_ms || health?.response_time_ms === 0
+                      ? `${health.response_time_ms} ms`
+                      : "No latency yet"}
+                  </span>
+                </div>
+              </div>
+              <div className="overviewCard" data-testid="runtime-detail-attention-card">
+                <span className="overviewLabel">Attention</span>
+                <strong className="overviewValue">{attentionItems.length}</strong>
+                <div className="overviewMeta">
+                  <span>Errors {attentionItems.filter((item) => item.status === "error").length}</span>
+                  <span>Warnings {attentionItems.filter((item) => item.status === "warn").length}</span>
+                </div>
+              </div>
+            </div>
+
+        <article className="card formCard" id="runtime-detail-redeploy">
           <h2>Redeploy</h2>
           <form className="form" onSubmit={handleRedeploy}>
             <label className="field">
@@ -951,49 +1064,6 @@ export default function DeploymentDetailsPage({ params }) {
           {redeploySuccess ? <div className="banner success">{redeploySuccess}</div> : null}
         </article>
 
-        {loading && !deployment ? <div className="empty">Loading deployment...</div> : null}
-
-        {deployment ? (
-          <>
-            <div className="overviewGrid" data-testid="runtime-detail-overview-grid">
-              <div className="overviewCard" data-testid="runtime-detail-endpoint-card">
-                <span className="overviewLabel">Endpoint</span>
-                <strong className="overviewValue">{deploymentUrl || "No public URL"}</strong>
-                <div className="overviewMeta">
-                  <span>Internal {deployment.internal_port || "-"}</span>
-                  <span>External {deployment.external_port || "-"}</span>
-                </div>
-              </div>
-              <div className="overviewCard" data-testid="runtime-detail-runtime-card">
-                <span className="overviewLabel">Runtime</span>
-                <strong className="overviewValue">{deployment.container_name || "Container pending"}</strong>
-                <div className="overviewMeta">
-                  <span>Status {deployment.status || "unknown"}</span>
-                  <span>Server {deployment.server_name || "Local"}</span>
-                </div>
-              </div>
-              <div className="overviewCard" data-testid="runtime-detail-health-overview-card">
-                <span className="overviewLabel">Health</span>
-                <strong className="overviewValue">{health?.status || "unknown"}</strong>
-                <div className="overviewMeta">
-                  <span>Checked {formatDate(health?.checked_at)}</span>
-                  <span>
-                    {health?.response_time_ms || health?.response_time_ms === 0
-                      ? `${health.response_time_ms} ms`
-                      : "No latency yet"}
-                  </span>
-                </div>
-              </div>
-              <div className="overviewCard" data-testid="runtime-detail-attention-card">
-                <span className="overviewLabel">Attention</span>
-                <strong className="overviewValue">{attentionItems.length}</strong>
-                <div className="overviewMeta">
-                  <span>Errors {attentionItems.filter((item) => item.status === "error").length}</span>
-                  <span>Warnings {attentionItems.filter((item) => item.status === "warn").length}</span>
-                </div>
-              </div>
-            </div>
-
             <article className="card compactCard" data-testid="runtime-detail-summary-card">
               <div className="row">
                 <span className="label">Status</span>
@@ -1110,6 +1180,46 @@ export default function DeploymentDetailsPage({ params }) {
                     "-"
                   )}
                 </span>
+              </div>
+            </article>
+
+            <AdminDisclosureSection
+              title="Templates and runtime tools"
+              subtitle="Save this configuration for later, then open diagnostics, logs, and activity only when you need deeper runtime context."
+              badge={`${attentionItems.length} attention`}
+              testId="runtime-detail-secondary-tools"
+            >
+            <article className="card compactCard" data-testid="runtime-detail-template-card">
+              <div className="sectionHeader">
+                <div>
+                  <h2>Save as template</h2>
+                  <p className="formHint">
+                    Turn the current deployment settings into a reusable preset for the next rollout.
+                  </p>
+                </div>
+              </div>
+              <div className="form">
+                <label className="field">
+                  <span>Template name</span>
+                  <input
+                    value={templateName}
+                    onChange={(event) => setTemplateName(event.target.value)}
+                    placeholder="nginx baseline"
+                    disabled={templateSaving}
+                  />
+                  <span className="fieldHint">
+                    Save image, ports, env vars, and server selection as a reusable handoff.
+                  </span>
+                </label>
+                <div className="formActions">
+                  <button
+                    type="button"
+                    onClick={handleSaveTemplate}
+                    disabled={templateSaving || !templateName.trim() || !form.image.trim()}
+                  >
+                    {templateSaving ? "Saving template..." : "Save as template"}
+                  </button>
+                </div>
               </div>
             </article>
 
@@ -1412,6 +1522,7 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               )}
             </article>
+            </AdminDisclosureSection>
             </AdminDisclosureSection>
           </>
         ) : null}

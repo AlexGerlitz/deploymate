@@ -34,22 +34,35 @@ export default function LandingPage() {
           <div className="landingHeroGrid">
             <div className="landingHeroCopy">
               <div className="eyebrow">Live B2B product surface</div>
-              <h1>Give small teams a deployment experience that actually feels like software.</h1>
+              <h1>Deployment operations, reduced to one calm and legible product surface.</h1>
               <p className="landingLead">
-                DeployMate turns scattered VPS operations into a productized control
-                surface: deployments, templates, server diagnostics, admin workflows,
-                exports, backup dry-runs, and rollout visibility in one place.
+                DeployMate gives small teams one place to launch, review, and govern
+                application rollouts without falling back to scattered shell habits,
+                sticky-note handoffs, or ad-hoc admin routines.
               </p>
 
               <div className="landingHeroSummary">
                 <div className="heroSummaryCard">
-                  <span className="heroSummaryLabel">Best fit</span>
-                  <strong>Agencies, SaaS teams, internal product ops</strong>
+                  <span className="heroSummaryLabel">What it gives you</span>
+                  <strong>A clearer operating surface for rollouts, targets, templates, and admin review</strong>
                 </div>
                 <div className="heroSummaryCard">
-                  <span className="heroSummaryLabel">What it replaces</span>
-                  <strong>Manual SSH routines, ad-hoc deploy notes, brittle handoffs</strong>
+                  <span className="heroSummaryLabel">What it removes</span>
+                  <strong>Manual SSH rituals, uncertain release steps, and fragile team handoffs</strong>
                 </div>
+              </div>
+
+              <div className="landingPathGrid">
+                <article className="landingPathCard">
+                  <span className="heroSummaryLabel">Path 01</span>
+                  <strong>Open the product and understand the current state immediately.</strong>
+                  <p>See what is running, what needs attention, and what the next action should be.</p>
+                </article>
+                <article className="landingPathCard">
+                  <span className="heroSummaryLabel">Path 02</span>
+                  <strong>Standardize the next rollout instead of improvising it again.</strong>
+                  <p>Use guided create flows, reusable templates, diagnostics, and admin control in the same system.</p>
+                </article>
               </div>
 
               <div className="buttonRow">
@@ -69,63 +82,63 @@ export default function LandingPage() {
 
               <div className="landingMetaRow">
                 <span className="landingMetaBadge">Live app</span>
-                <span className="landingMetaBadge">Admin workflows</span>
-                <span className="landingMetaBadge">Export + audit tooling</span>
-                <span className="landingMetaBadge">Release-safe delivery</span>
+                <span className="landingMetaBadge">Guided workspace</span>
+                <span className="landingMetaBadge">Admin review flows</span>
+                <span className="landingMetaBadge">Runtime visibility</span>
               </div>
             </div>
 
             <div className="landingShowcase">
               <article className="showcaseFrame">
                 <div className="showcaseTopline">
-                  <span className="showcaseChip">Operations overview</span>
+                  <span className="showcaseChip">Product preview</span>
                   <span className="showcaseLive">Live</span>
                 </div>
 
                 <div className="showcaseScoreboard">
                   <div className="showcaseMetric">
-                    <span>Deployments</span>
-                    <strong>03</strong>
-                    <small>tracked from one dashboard</small>
+                    <span>Workspace</span>
+                    <strong>One primary flow</strong>
+                    <small>review state, act deliberately, open deeper tools only when needed</small>
                   </div>
                   <div className="showcaseMetric">
-                    <span>Servers</span>
-                    <strong>01</strong>
-                    <small>diagnostics and suggested ports</small>
+                    <span>Runtime</span>
+                    <strong>Deployments + health</strong>
+                    <small>status, endpoints, logs, diagnostics, and activity in one place</small>
                   </div>
                   <div className="showcaseMetric">
-                    <span>Admin surface</span>
-                    <strong>Users + inbox</strong>
-                    <small>saved views, exports, audit history</small>
+                    <span>Admin</span>
+                    <strong>Users + upgrade inbox</strong>
+                    <small>saved views, exports, audit trails, and controlled changes</small>
                   </div>
                 </div>
 
                 <div className="showcasePanels">
                   <div className="showcasePanel">
                     <div className="showcasePanelHeader">
-                      <strong>Runtime posture</strong>
-                      <span className="status warn">remote-only</span>
+                      <strong>What the interface optimizes for</strong>
+                      <span className="status ok">clarity</span>
                     </div>
                     <ul className="showcaseList">
-                      <li>Backend and frontend capability boundaries aligned</li>
-                      <li>Release checks and post-deploy smoke in place</li>
-                      <li>Operator-first visibility into logs, health, and activity</li>
+                      <li>One obvious next action on each primary screen</li>
+                      <li>Advanced tools available without competing for attention</li>
+                      <li>Runtime and admin work stay visible instead of tribal</li>
                     </ul>
                   </div>
 
                   <div className="showcasePanel">
                     <div className="showcasePanelHeader">
-                      <strong>Admin workflows</strong>
+                      <strong>What makes it feel substantial</strong>
                       <span className="status ok">ready</span>
                     </div>
                     <div className="showcaseTimeline">
                       <div>
-                        <span className="timelineLabel">Users</span>
-                        <p>Filter by role, plan, and password state. Save and share filtered views.</p>
+                        <span className="timelineLabel">Real product flow</span>
+                        <p>Login, workspace, deployment detail, admin review, and release-aware surfaces already exist.</p>
                       </div>
                       <div>
-                        <span className="timelineLabel">Upgrade inbox</span>
-                        <p>Review requests, export snapshots, and keep an audit trail of admin actions.</p>
+                        <span className="timelineLabel">Operational depth</span>
+                        <p>Templates, diagnostics, exports, recovery prep, and audit views give the product weight.</p>
                       </div>
                     </div>
                   </div>
@@ -144,26 +157,26 @@ export default function LandingPage() {
           <div className="landingGrid">
             <article className="landingCard landingCardAccent">
               <span className="cardKicker">Positioning</span>
-              <h2>Built like a real software product, not a throwaway internal panel.</h2>
+              <h2>Made to feel like a product from the first screen, not a technical console in disguise.</h2>
               <p>
-                The value is not just deployment. It is the productization of operational
-                work into a cleaner customer-facing and operator-facing experience.
+                The value is not only that something can deploy. The value is that
+                operational work becomes clearer, easier to review, and easier to repeat.
               </p>
             </article>
             <article className="landingCard">
               <span className="cardKicker">For B2B teams</span>
-              <h2>One place for deployments, templates, targets, and admin control.</h2>
+              <h2>One system for rollout state, reusable templates, targets, and admin control.</h2>
               <p>
-                Teams can onboard a server, launch services, inspect runtime state, and
-                keep operational workflows visible instead of tribal.
+                Teams can onboard a target, launch services, inspect runtime state, and
+                keep operational workflows explicit instead of tribal.
               </p>
             </article>
             <article className="landingCard">
-              <span className="cardKicker">For sales demos</span>
-              <h2>Strong enough to show to stakeholders without explaining infrastructure first.</h2>
+              <span className="cardKicker">For demos</span>
+              <h2>Strong enough to show to stakeholders before any deep infrastructure explanation.</h2>
               <p>
-                The interface leads with clarity, state, and workflow depth, so the product
-                feels tangible before technical details even come up.
+                The interface leads with visible state and clear actions, so the product
+                feels tangible before technical details even enter the conversation.
               </p>
             </article>
           </div>
@@ -174,11 +187,11 @@ export default function LandingPage() {
         <div className="container">
           <div className="sectionIntro sectionIntroWide">
             <div className="eyebrow">What buyers notice</div>
-            <h2>A surface that communicates control, clarity, and repeatability.</h2>
+            <h2>A calmer interface that makes operational work feel deliberate.</h2>
             <p className="sectionLead">
-              The strongest B2B tools make operational work feel structured. DeployMate is
-              built around that idea: visible state, understandable actions, and fewer
-              hidden steps between “we should ship” and “it is live”.
+              The strongest B2B tools reduce cognitive noise. DeployMate is built around
+              that idea: visible state, understandable actions, and fewer hidden steps
+              between “we should ship” and “it is live”.
             </p>
           </div>
 

@@ -635,6 +635,56 @@ export default function HomePage() {
         : "Deployments and activity cards keep refreshing automatically",
     },
   ];
+  const workspaceGuideCards = [
+    {
+      step: "01",
+      title: "Review current health",
+      detail:
+        opsSnapshot.deployments.failed > 0
+          ? `${opsSnapshot.deployments.failed} deployment${opsSnapshot.deployments.failed === 1 ? "" : "s"} need attention before the next rollout.`
+          : `${opsSnapshot.deployments.running} deployment${opsSnapshot.deployments.running === 1 ? "" : "s"} are running cleanly right now.`,
+      href: "#runtime-deployments",
+      actionLabel:
+        opsSnapshot.deployments.failed > 0 ? "Review deployments" : "Open live deployments",
+    },
+    {
+      step: "02",
+      title: "Start the next rollout",
+      detail:
+        templates.length > 0
+          ? `${templates.length} saved template${templates.length === 1 ? "" : "s"} can accelerate the next deployment.`
+          : "Use the guided form to pick an image, ports, and env vars for the next deployment.",
+      href: "#create-deployment",
+      actionLabel: "Create deployment",
+    },
+    {
+      step: "03",
+      title: currentUser?.is_admin ? "Keep the workspace aligned" : "Explore the workspace safely",
+      detail: currentUser?.is_admin
+        ? "Open user access or upgrade review when you need to change shared workspace settings."
+        : "Trial access keeps admin controls separate while you review the core runtime flow.",
+      href: currentUser?.is_admin ? "/app/users" : "/upgrade",
+      actionLabel: currentUser?.is_admin ? "Open admin surface" : "View upgrade options",
+    },
+  ];
+  const workspaceGlanceItems = [
+    ...workspaceStatusItems,
+    {
+      label: "Next step",
+      value:
+        opsSnapshot.deployments.failed > 0
+          ? "Resolve failed rollout"
+          : deployments.length === 0
+            ? "Launch first deployment"
+            : "Prepare next rollout",
+      detail:
+        opsSnapshot.attention_items[0]?.detail ||
+        "Use the deployment list first, then open advanced workspace tools only when needed.",
+    },
+  ];
+  const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
+    opsSnapshot.attention_items.length === 1 ? "" : "s"
+  }`;
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -1993,39 +2043,83 @@ export default function HomePage() {
             </div>
           ) : null}
 
-          <div className="workspaceStatusStrip">
-            {workspaceStatusItems.map((item) => (
-              <div key={item.label} className="workspaceStatusCard">
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-                <p>{item.detail}</p>
+          <article className="card formCard workspaceGuidePanel" data-testid="workspace-guide-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2 data-testid="workspace-guide-title">Use the workspace in three moves</h2>
+                <p className="formHint">
+                  Start with the current state, take the next rollout action, then open deeper controls only when they are needed.
+                </p>
               </div>
-            ))}
-          </div>
+            </div>
 
-          <div className="workspaceMetaLine">
-            <span>
-              Backend: <code>{apiBaseUrl}</code>
-            </span>
-            {currentUser ? (
-              <span>
-                Usage {currentUser.usage?.servers ?? 0}/{currentUser.limits?.max_servers ?? 0} servers ·{" "}
-                {currentUser.usage?.deployments ?? 0}/{currentUser.limits?.max_deployments ?? 0} deployments ·{" "}
-                <Link href="/upgrade" className="inlineLink">
-                  Upgrade
-                </Link>
-              </span>
-            ) : null}
-            {smokeMode ? (
-              <span data-testid="runtime-smoke-banner">
-                Smoke mode uses fixture data for runtime surfaces.
-              </span>
-            ) : (
-              <span>Deployments and notifications refresh automatically every 8 seconds.</span>
-            )}
-          </div>
+            <div className="workspaceGuideGrid">
+              <div className="stepsGrid workspaceGuideSteps">
+                {workspaceGuideCards.map((card) => {
+                  const linkClass =
+                    card.actionLabel === "Create deployment"
+                      ? "landingButton primaryButton"
+                      : "landingButton secondaryButton";
+
+                  return (
+                    <article key={card.step} className="stepCard workspaceStepCard">
+                      <span className="stepNumber">{card.step}</span>
+                      <h3>{card.title}</h3>
+                      <p>{card.detail}</p>
+                      <Link href={card.href} className={linkClass}>
+                        {card.actionLabel}
+                      </Link>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <aside className="workspaceGlancePanel">
+                <div className="workspaceGlanceHeader">
+                  <span className="eyebrow">At a glance</span>
+                  <strong>Current workspace</strong>
+                </div>
+                <div className="workspaceGlanceList">
+                  {workspaceGlanceItems.map((item) => (
+                    <div key={item.label} className="workspaceStatusCard workspaceGlanceItem">
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                      <p>{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="workspaceMetaLine">
+                  <span>
+                    Backend: <code>{apiBaseUrl}</code>
+                  </span>
+                  {currentUser ? (
+                    <span>
+                      Usage {currentUser.usage?.servers ?? 0}/{currentUser.limits?.max_servers ?? 0} servers ·{" "}
+                      {currentUser.usage?.deployments ?? 0}/{currentUser.limits?.max_deployments ?? 0} deployments ·{" "}
+                      <Link href="/upgrade" className="inlineLink">
+                        Upgrade
+                      </Link>
+                    </span>
+                  ) : null}
+                  {smokeMode ? (
+                    <span data-testid="runtime-smoke-banner">
+                      Smoke mode uses fixture data for runtime surfaces.
+                    </span>
+                  ) : (
+                    <span>Deployments and notifications refresh automatically every 8 seconds.</span>
+                  )}
+                </div>
+              </aside>
+            </div>
+          </article>
         </div>
 
+        <AdminDisclosureSection
+          title="Workspace signals and reports"
+          subtitle="Operational totals, attention items, and exportable summaries stay here when you want the full picture."
+          badge={workspaceSignalsBadge}
+          testId="ops-overview-disclosure"
+        >
         <article className="card formCard" data-testid="ops-overview-card">
           <div className="sectionHeader" data-testid="ops-overview-header">
             <div>
@@ -2186,32 +2280,7 @@ export default function HomePage() {
             <div className="banner subtle" data-testid="ops-attention-empty-banner">No immediate attention items from the current data.</div>
           )}
         </article>
-
-        <article className="card formCard onboardingCard">
-          <h2>Getting Started</h2>
-          <div className="onboardingList">
-            <div className="onboardingItem">
-              <strong>{currentUser?.is_admin ? "Add server" : "Explore the app"}</strong>
-              <p>
-                {currentUser?.is_admin
-                  ? "Save your VPS target with SSH-key access so DeployMate can reach it."
-                  : "Trial accounts can review the product surface safely without infrastructure control."}
-              </p>
-            </div>
-            <div className="onboardingItem">
-              <strong>{currentUser?.is_admin ? "Test connection" : "Open admin workspaces"}</strong>
-              <p>
-                {currentUser?.is_admin
-                  ? "Run the built-in SSH and Docker check before the first deploy."
-                  : "Inspect saved views, audit trails, exports, and backup dry-run workflows."}
-              </p>
-            </div>
-            <div className="onboardingItem">
-              <strong>Create deployment</strong>
-              <p>Pick an image, set ports and env vars, then launch your app.</p>
-            </div>
-          </div>
-        </article>
+        </AdminDisclosureSection>
 
         {serverLimitReached ? (
           <div className="banner error">
@@ -2903,6 +2972,161 @@ export default function HomePage() {
         </article>
         </AdminDisclosureSection>
 
+        <div
+            className="sectionHeader deploymentsHeader"
+            data-testid="runtime-deployments-section"
+            id="runtime-deployments"
+        >
+          <div>
+            <h2 data-testid="runtime-deployments-title">Deployments</h2>
+            <p className="formHint">
+              Filter current deployments by status or search by image, container, or server.
+            </p>
+          </div>
+          <div className="deploymentControls">
+            <div className="filterTabs" role="tablist" aria-label="Deployment filters">
+              <button
+                type="button"
+                className={deploymentFilter === "all" ? "active" : ""}
+                onClick={() => setDeploymentFilter("all")}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={deploymentFilter === "running" ? "active" : ""}
+                onClick={() => setDeploymentFilter("running")}
+              >
+                Running
+              </button>
+              <button
+                type="button"
+                className={deploymentFilter === "failed" ? "active" : ""}
+                onClick={() => setDeploymentFilter("failed")}
+              >
+                Failed
+              </button>
+            </div>
+            <label className="field deploymentSearch">
+              <span>Search</span>
+              <input
+                value={deploymentQuery}
+                onChange={(event) => setDeploymentQuery(event.target.value)}
+                placeholder="nginx, test-nginx, main-vps"
+              />
+            </label>
+            <div className="banner subtle inlineBanner">
+              Showing {filteredDeployments.length} of {deployments.length} deployments.
+            </div>
+          </div>
+        </div>
+
+        <div className="list" data-testid="runtime-deployments-list">
+          {loading && deployments.length === 0 ? (
+            <div className="empty">Loading deployments...</div>
+          ) : null}
+
+          {!loading && deployments.length === 0 ? (
+            <div className="empty">No deployments found.</div>
+          ) : null}
+
+          {!loading && deployments.length > 0 && filteredDeployments.length === 0 ? (
+            <div className="empty">
+              No deployments match this filter. Try another status or clear the search.
+            </div>
+          ) : null}
+
+          {filteredDeployments.map((deployment) => (
+            <article
+              className="card compactCard deploymentCard"
+              key={deployment.id}
+              data-testid={`runtime-deployment-card-${deployment.id}`}
+            >
+              <div className="deploymentCardHeader">
+                <div>
+                  <span className="deploymentCardEyebrow">Deployment</span>
+                  <h3>{deployment.container_name || deployment.image || "Unnamed deployment"}</h3>
+                  <p>{deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local target"}</p>
+                </div>
+                <span className={`status ${deployment.status || "unknown"}`}>
+                  {deployment.status || "unknown"}
+                </span>
+              </div>
+              <div className="deploymentCardMetrics">
+                <div className="deploymentMetric">
+                  <span>Image</span>
+                  <strong>{deployment.image || "N/A"}</strong>
+                </div>
+                <div className="deploymentMetric">
+                  <span>Endpoint</span>
+                  <strong>{buildDeploymentUrl(deployment) || "Internal only"}</strong>
+                </div>
+                <div className="deploymentMetric">
+                  <span>Ports</span>
+                  <strong>
+                    {deployment.internal_port || "-"} {"->"} {deployment.external_port || "-"}
+                  </strong>
+                </div>
+              </div>
+              <div className="row">
+                <span className="label">Image</span>
+                <span>{deployment.image || "N/A"}</span>
+              </div>
+              <div className="row">
+                <span className="label">Container</span>
+                <span>{deployment.container_name || "N/A"}</span>
+              </div>
+              <div className="row">
+                <span className="label">Server</span>
+                <span>
+                  {deployment.server_name
+                    ? `${deployment.server_name} (${deployment.server_host})`
+                    : "Local"}
+                </span>
+              </div>
+              <div className="row">
+                <span className="label">Created</span>
+                <span>{formatDate(deployment.created_at)}</span>
+              </div>
+              <div className="row">
+                <span className="label">Error</span>
+                <span>{deployment.error || "-"}</span>
+              </div>
+              <div className="row">
+                <span className="label">URL</span>
+                <span>{buildDeploymentUrl(deployment) || "-"}</span>
+              </div>
+              <div className="actions">
+                <Link
+                  href={`/deployments/${deployment.id}`}
+                  className="linkButton"
+                  data-testid={`runtime-deployment-details-link-${deployment.id}`}
+                >
+                  View details
+                </Link>
+                {buildDeploymentUrl(deployment) ? (
+                  <a
+                    href={buildDeploymentUrl(deployment)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="linkButton"
+                  >
+                    Open app
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  className="dangerButton"
+                  onClick={() => handleDelete(deployment.id)}
+                  disabled={deletingDeploymentId === deployment.id}
+                >
+                  {deletingDeploymentId === deployment.id ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+
         <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
           <h2 data-testid="create-deployment-title">Create deployment</h2>
           {!localDeploymentsEnabled ? (
@@ -3148,157 +3372,6 @@ export default function HomePage() {
             </div>
           ) : null}
         </article>
-
-          <div className="sectionHeader deploymentsHeader" data-testid="runtime-deployments-section">
-          <div>
-            <h2 data-testid="runtime-deployments-title">Deployments</h2>
-            <p className="formHint">
-              Filter current deployments by status or search by image, container, or server.
-            </p>
-          </div>
-          <div className="deploymentControls">
-            <div className="filterTabs" role="tablist" aria-label="Deployment filters">
-              <button
-                type="button"
-                className={deploymentFilter === "all" ? "active" : ""}
-                onClick={() => setDeploymentFilter("all")}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                className={deploymentFilter === "running" ? "active" : ""}
-                onClick={() => setDeploymentFilter("running")}
-              >
-                Running
-              </button>
-              <button
-                type="button"
-                className={deploymentFilter === "failed" ? "active" : ""}
-                onClick={() => setDeploymentFilter("failed")}
-              >
-                Failed
-              </button>
-            </div>
-            <label className="field deploymentSearch">
-              <span>Search</span>
-              <input
-                value={deploymentQuery}
-                onChange={(event) => setDeploymentQuery(event.target.value)}
-                placeholder="nginx, test-nginx, main-vps"
-              />
-            </label>
-            <div className="banner subtle inlineBanner">
-              Showing {filteredDeployments.length} of {deployments.length} deployments.
-            </div>
-          </div>
-        </div>
-
-        <div className="list" data-testid="runtime-deployments-list">
-          {loading && deployments.length === 0 ? (
-            <div className="empty">Loading deployments...</div>
-          ) : null}
-
-          {!loading && deployments.length === 0 ? (
-            <div className="empty">No deployments found.</div>
-          ) : null}
-
-          {!loading && deployments.length > 0 && filteredDeployments.length === 0 ? (
-            <div className="empty">
-              No deployments match this filter. Try another status or clear the search.
-            </div>
-          ) : null}
-
-          {filteredDeployments.map((deployment) => (
-            <article
-              className="card compactCard deploymentCard"
-              key={deployment.id}
-              data-testid={`runtime-deployment-card-${deployment.id}`}
-            >
-              <div className="deploymentCardHeader">
-                <div>
-                  <span className="deploymentCardEyebrow">Deployment</span>
-                  <h3>{deployment.container_name || deployment.image || "Unnamed deployment"}</h3>
-                  <p>{deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local target"}</p>
-                </div>
-                <span className={`status ${deployment.status || "unknown"}`}>
-                  {deployment.status || "unknown"}
-                </span>
-              </div>
-              <div className="deploymentCardMetrics">
-                <div className="deploymentMetric">
-                  <span>Image</span>
-                  <strong>{deployment.image || "N/A"}</strong>
-                </div>
-                <div className="deploymentMetric">
-                  <span>Endpoint</span>
-                  <strong>{buildDeploymentUrl(deployment) || "Internal only"}</strong>
-                </div>
-                <div className="deploymentMetric">
-                  <span>Ports</span>
-                  <strong>
-                    {deployment.internal_port || "-"} {"->"} {deployment.external_port || "-"}
-                  </strong>
-                </div>
-              </div>
-              <div className="row">
-                <span className="label">Image</span>
-                <span>{deployment.image || "N/A"}</span>
-              </div>
-              <div className="row">
-                <span className="label">Container</span>
-                <span>{deployment.container_name || "N/A"}</span>
-              </div>
-              <div className="row">
-                <span className="label">Server</span>
-                <span>
-                  {deployment.server_name
-                    ? `${deployment.server_name} (${deployment.server_host})`
-                    : "Local"}
-                </span>
-              </div>
-              <div className="row">
-                <span className="label">Created</span>
-                <span>{formatDate(deployment.created_at)}</span>
-              </div>
-              <div className="row">
-                <span className="label">Error</span>
-                <span>{deployment.error || "-"}</span>
-              </div>
-              <div className="row">
-                <span className="label">URL</span>
-                <span>{buildDeploymentUrl(deployment) || "-"}</span>
-              </div>
-              <div className="actions">
-                <Link
-                  href={`/deployments/${deployment.id}`}
-                  className="linkButton"
-                  data-testid={`runtime-deployment-details-link-${deployment.id}`}
-                >
-                  View details
-                </Link>
-                {buildDeploymentUrl(deployment) ? (
-                  <a
-                    href={buildDeploymentUrl(deployment)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="linkButton"
-                  >
-                    Open app
-                  </a>
-                ) : null}
-                <button
-                  type="button"
-                  className="dangerButton"
-                  onClick={() => handleDelete(deployment.id)}
-                  disabled={deletingDeploymentId === deployment.id}
-                >
-                  {deletingDeploymentId === deployment.id ? "Deleting..." : "Delete"}
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
       </div>
     </main>
   );
