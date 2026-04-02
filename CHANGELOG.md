@@ -11,8 +11,9 @@ Highlights:
 - added an HTTP-level deployment template API flow test for create, filter, update, duplicate, deploy, and delete
 - added an HTTP-level ops API flow test for overview and deployments/servers/templates/activity exports
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
+- added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend templates smoke coverage for the templates panel and create-form template controls
-- extended the local release gate to run the frontend templates smoke alongside admin and runtime smokes
+- extended the local release gate to run admin, ops, runtime, and templates frontend smokes before build
 - extended post-deploy smoke with optional create -> health -> diagnostics -> logs -> activity -> delete runtime flow
 - added a single local release workflow script for preflight, frontend smokes, build, and backend tests
 - added a single remote release helper to sync, rebuild, and run post-deploy smoke in one command

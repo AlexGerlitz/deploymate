@@ -42,6 +42,12 @@ npm --prefix frontend run smoke:templates
 
 The full local release gate already includes this templates smoke alongside the admin and runtime frontend smokes.
 
+For ops-overview focused frontend changes, also run:
+
+```bash
+npm --prefix frontend run smoke:ops
+```
+
 For a single remote deploy command that also runs post-deploy smoke:
 
 ```bash

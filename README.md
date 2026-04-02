@@ -136,9 +136,10 @@ More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 - release workflow secret-contract audit in [scripts/release_workflow_audit.sh](scripts/release_workflow_audit.sh)
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
 - dedicated admin frontend smoke in [scripts/frontend_admin_smoke.sh](scripts/frontend_admin_smoke.sh)
+- dedicated ops frontend smoke in [scripts/frontend_ops_smoke.sh](scripts/frontend_ops_smoke.sh)
 - dedicated runtime frontend smoke in [scripts/frontend_runtime_smoke.sh](scripts/frontend_runtime_smoke.sh)
 - dedicated templates frontend smoke in [scripts/frontend_templates_smoke.sh](scripts/frontend_templates_smoke.sh)
-- the local release gate now runs admin, runtime, and templates frontend smokes before build
+- the local release gate now runs admin, ops, runtime, and templates frontend smokes before build
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)
 

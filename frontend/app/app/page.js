@@ -2046,19 +2046,19 @@ export default function HomePage() {
           Deployments and notifications refresh automatically every 8 seconds.
         </div>
 
-        <article className="card formCard">
-          <div className="sectionHeader">
+        <article className="card formCard" data-testid="ops-overview-card">
+          <div className="sectionHeader" data-testid="ops-overview-header">
             <div>
-              <h2>Operations overview</h2>
+              <h2 data-testid="ops-overview-title">Operations overview</h2>
               <p className="formHint">
                 High-signal summary, attention items, and export actions built from the current dashboard state.
               </p>
             </div>
-            <div className="actions">
-              <button type="button" onClick={handleCopyOpsSummary}>
+            <div className="actions" data-testid="ops-overview-actions">
+              <button type="button" onClick={handleCopyOpsSummary} data-testid="ops-copy-summary-button">
                 Copy summary
               </button>
-              <button type="button" onClick={handleDownloadSnapshot}>
+              <button type="button" onClick={handleDownloadSnapshot} data-testid="ops-download-overview-button">
                 Download overview JSON
               </button>
               <button
@@ -2069,6 +2069,7 @@ export default function HomePage() {
                     `${apiBaseUrl}/ops/exports/deployments?format=csv`,
                   )
                 }
+                data-testid="ops-export-deployments-button"
               >
                 Export deployments CSV
               </button>
@@ -2080,6 +2081,7 @@ export default function HomePage() {
                     `${apiBaseUrl}/ops/exports/servers?format=csv`,
                   )
                 }
+                data-testid="ops-export-servers-button"
               >
                 Export servers CSV
               </button>
@@ -2091,6 +2093,7 @@ export default function HomePage() {
                     `${apiBaseUrl}/ops/exports/templates?format=csv`,
                   )
                 }
+                data-testid="ops-export-templates-button"
               >
                 Export templates CSV
               </button>
@@ -2102,6 +2105,7 @@ export default function HomePage() {
                     `${apiBaseUrl}/ops/exports/activity?format=csv&limit=200`,
                   )
                 }
+                data-testid="ops-export-activity-button"
               >
                 Export activity CSV
               </button>
@@ -2109,11 +2113,11 @@ export default function HomePage() {
           </div>
 
           {opsOverviewLoading ? (
-            <div className="banner subtle">Refreshing server-side operations overview...</div>
+            <div className="banner subtle" data-testid="ops-overview-loading-banner">Refreshing server-side operations overview...</div>
           ) : null}
 
-          <div className="overviewGrid">
-            <div className="overviewCard">
+          <div className="overviewGrid" data-testid="ops-overview-grid">
+            <div className="overviewCard" data-testid="ops-overview-deployments-card">
               <span className="overviewLabel">Deployments</span>
               <strong className="overviewValue">{opsSnapshot.deployments.total}</strong>
               <div className="overviewMeta">
@@ -2123,7 +2127,7 @@ export default function HomePage() {
                 <span>Public URLs {opsSnapshot.deployments.public_urls}</span>
               </div>
             </div>
-            <div className="overviewCard">
+            <div className="overviewCard" data-testid="ops-overview-servers-card">
               <span className="overviewLabel">Servers</span>
               <strong className="overviewValue">{opsSnapshot.servers.total}</strong>
               <div className="overviewMeta">
@@ -2132,7 +2136,7 @@ export default function HomePage() {
                 <span>Unused {opsSnapshot.servers.unused}</span>
               </div>
             </div>
-            <div className="overviewCard">
+            <div className="overviewCard" data-testid="ops-overview-activity-card">
               <span className="overviewLabel">Activity</span>
               <strong className="overviewValue">{opsSnapshot.notifications.total}</strong>
               <div className="overviewMeta">
@@ -2146,7 +2150,7 @@ export default function HomePage() {
                 </span>
               </div>
             </div>
-            <div className="overviewCard">
+            <div className="overviewCard" data-testid="ops-overview-templates-card">
               <span className="overviewLabel">Templates</span>
               <strong className="overviewValue">{opsSnapshot.templates.total}</strong>
               <div className="overviewMeta">
@@ -2160,9 +2164,9 @@ export default function HomePage() {
           </div>
 
           {opsSnapshot.attention_items.length > 0 ? (
-            <div className="overviewAttentionList">
+            <div className="overviewAttentionList" data-testid="ops-attention-list">
               {opsSnapshot.attention_items.map((item, index) => (
-                <div key={`${item.title}-${index}`} className="overviewAttentionItem">
+                <div key={`${item.title}-${index}`} className="overviewAttentionItem" data-testid={`ops-attention-item-${index}`}>
                   <div className="row">
                     <span className="label">Level</span>
                     <span className={`status ${item.level === "info" ? "unknown" : item.level}`}>
@@ -2181,7 +2185,7 @@ export default function HomePage() {
               ))}
             </div>
           ) : (
-            <div className="banner subtle">No immediate attention items from the current data.</div>
+            <div className="banner subtle" data-testid="ops-attention-empty-banner">No immediate attention items from the current data.</div>
           )}
         </article>
 
