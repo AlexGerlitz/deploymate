@@ -70,6 +70,29 @@ def _build_ssh_base_command(server: dict) -> list[str]:
     mode = _get_ssh_host_key_mode()
     known_hosts_file = _get_ssh_known_hosts_file(mode)
 
+    if mode == "yes":
+        if not known_hosts_file or known_hosts_file == "/dev/null":
+            raise HTTPException(
+                status_code=500,
+                detail="Strict SSH host key checking requires a real known_hosts file.",
+            )
+        if not os.path.isfile(known_hosts_file):
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Strict SSH host key checking is enabled, but the known_hosts file "
+                    f'"{known_hosts_file}" does not exist.'
+                ),
+            )
+        if os.path.getsize(known_hosts_file) == 0:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Strict SSH host key checking is enabled, but the known_hosts file "
+                    f'"{known_hosts_file}" is empty.'
+                ),
+            )
+
     if known_hosts_file not in {"", "/dev/null"}:
         known_hosts_dir = os.path.dirname(known_hosts_file)
         if known_hosts_dir:

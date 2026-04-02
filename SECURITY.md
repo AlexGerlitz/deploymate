@@ -19,6 +19,7 @@ Current strengths:
 - restore flow is dry-run only
 - admin audit trail exists for important admin actions
 - SSH host key checking defaults to `accept-new` instead of `no`
+- strict `DEPLOYMATE_SSH_HOST_KEY_CHECKING=yes` now fails fast unless a real non-empty `known_hosts` file is configured
 - production can run as remote-only without Docker socket access in the backend
 - tracked-file security audit is part of the local preflight flow
 - new server targets now require SSH-key authentication

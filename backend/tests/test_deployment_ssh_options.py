@@ -53,6 +53,9 @@ class DeploymentSshOptionsTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             known_hosts = os.path.join(temp_dir, "nested", "known_hosts")
+            os.makedirs(os.path.dirname(known_hosts), exist_ok=True)
+            with open(known_hosts, "w", encoding="utf-8") as handle:
+                handle.write("example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey\n")
             with patch.dict(
                 os.environ,
                 {
@@ -66,6 +69,47 @@ class DeploymentSshOptionsTests(unittest.TestCase):
             self.assertIn("StrictHostKeyChecking=yes", command)
             self.assertIn(f"UserKnownHostsFile={known_hosts}", command)
             self.assertTrue(os.path.isdir(os.path.dirname(known_hosts)))
+
+    def test_strict_mode_requires_existing_known_hosts_file(self):
+        server = {"port": 22}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            known_hosts = os.path.join(temp_dir, "missing", "known_hosts")
+            with patch.dict(
+                os.environ,
+                {
+                    "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "yes",
+                    "DEPLOYMATE_SSH_KNOWN_HOSTS_FILE": known_hosts,
+                },
+                clear=False,
+            ):
+                with self.assertRaises(HTTPException) as context:
+                    _build_ssh_base_command(server)
+
+        self.assertEqual(context.exception.status_code, 500)
+        self.assertIn("does not exist", context.exception.detail)
+
+    def test_strict_mode_rejects_empty_known_hosts_file(self):
+        server = {"port": 22}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            known_hosts = os.path.join(temp_dir, "known_hosts")
+            with open(known_hosts, "w", encoding="utf-8"):
+                pass
+
+            with patch.dict(
+                os.environ,
+                {
+                    "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "yes",
+                    "DEPLOYMATE_SSH_KNOWN_HOSTS_FILE": known_hosts,
+                },
+                clear=False,
+            ):
+                with self.assertRaises(HTTPException) as context:
+                    _build_ssh_base_command(server)
+
+        self.assertEqual(context.exception.status_code, 500)
+        self.assertIn("is empty", context.exception.detail)
 
 
 if __name__ == "__main__":
