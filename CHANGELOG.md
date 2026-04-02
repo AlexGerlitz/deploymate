@@ -7,6 +7,7 @@ Highlights:
 - added backend route tests for deployment redeploy, delete, and diagnostics behavior
 - added an HTTP-level deployment API flow test for create -> health/logs/diagnostics/activity -> delete
 - added an HTTP-level server API flow test for create -> test -> diagnostics -> suggested ports -> delete
+- added an HTTP-level admin API flow test for users, upgrade requests, exports, backup bundle, restore dry-run, and audit history
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - extended post-deploy smoke with optional create -> health -> diagnostics -> logs -> activity -> delete runtime flow
 - added a single local release workflow script for preflight, frontend smokes, build, and backend tests
