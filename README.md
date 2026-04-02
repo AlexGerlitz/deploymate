@@ -36,6 +36,24 @@ What to evaluate quickly:
 - engineering maturity: scripted preflight, smoke coverage, remote release flow, production docs
 - operational thinking: security posture, runtime capability boundaries, release safety checks
 
+## Product Preview
+
+Public trial signup is enabled, and the deployed app already exposes the richer operator and admin surfaces:
+
+### Trial onboarding
+
+![Public trial registration screen](docs/screenshots/register-page.png)
+
+### Operator dashboard
+
+![Operations overview dashboard](docs/screenshots/app-dashboard.png)
+
+### Admin workflows
+
+![Admin users workspace](docs/screenshots/admin-users.png)
+
+![Upgrade inbox workspace](docs/screenshots/upgrade-inbox.png)
+
 ## Try It Live
 
 Public trial signup is enabled on the live instance:
