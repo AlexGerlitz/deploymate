@@ -237,7 +237,7 @@ Current strengths:
 
 Current tradeoffs:
 
-- server credentials are still application-managed and require a stable `DEPLOYMATE_SERVER_CREDENTIALS_KEY`
+- server credentials are still application-managed, but they are encrypted at rest and require a stable `DEPLOYMATE_SERVER_CREDENTIALS_KEY`
 - local Docker control is still available as an opt-in capability when explicitly enabled
 - legacy password-based SSH records may still exist until they are rotated to SSH keys
 - local Docker control and remote SSH control still live in the same backend service boundary
@@ -261,7 +261,7 @@ Start here:
 
 Next likely improvements:
 
-1. encrypt server credentials at rest or move them to external secret management
+1. move server credentials to external secret management
 2. split local Docker execution into a narrower executor boundary
 3. move from `accept-new` to a stricter pinned known-host workflow
 4. deepen automated smoke coverage around deployment runtime flows

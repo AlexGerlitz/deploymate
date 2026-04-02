@@ -15,6 +15,10 @@ def server_credentials_encryption_enabled() -> bool:
     return bool(os.getenv(SERVER_CREDENTIALS_KEY_ENV, "").strip())
 
 
+def server_credential_is_encrypted(value: str | None) -> bool:
+    return bool(value) and value.startswith(SERVER_CREDENTIALS_PREFIX)
+
+
 def _get_fernet() -> Fernet:
     key = os.getenv(SERVER_CREDENTIALS_KEY_ENV, "").strip()
     if not key:

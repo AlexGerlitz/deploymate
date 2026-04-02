@@ -85,6 +85,11 @@ if [ -f "scripts/release_workflow_audit.sh" ]; then
   bash scripts/release_workflow_audit.sh
 fi
 
+if [ -f "scripts/server_credentials_audit.sh" ]; then
+  echo "[security-audit] server credentials audit"
+  bash scripts/server_credentials_audit.sh
+fi
+
 if [ "$WARNINGS" -eq 0 ]; then
   echo "[security-audit] no high-risk findings"
 else

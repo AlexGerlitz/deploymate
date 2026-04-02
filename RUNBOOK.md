@@ -116,6 +116,12 @@ bash scripts/prepare_known_hosts.sh --host <target-host> --port 22
 
 Do not rotate `DEPLOYMATE_SERVER_CREDENTIALS_KEY` casually. Existing stored server credentials depend on it for decryption.
 
+To audit the current database state for server credential encryption before a release:
+
+```bash
+bash scripts/server_credentials_audit.sh
+```
+
 ## Frontend-only deploy
 
 Local:

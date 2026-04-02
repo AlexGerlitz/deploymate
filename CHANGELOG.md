@@ -16,6 +16,8 @@ Highlights:
 - improved restore dry-run reporting with digest copy, issues CSV export, and attention overview cards
 - added dedicated frontend restore-report smoke coverage for backup / restore validation workflows
 - improved deployment detail ergonomics with quick overview cards, attention surface, and copyable runtime summary
+- enforced fail-fast startup when server credential records exist without `DEPLOYMATE_SERVER_CREDENTIALS_KEY`
+- added `scripts/server_credentials_audit.sh` and wired server credential checks into `scripts/security_audit.sh`
 - added dedicated frontend runtime smoke coverage for `/app` and `/deployments/[deploymentId]`
 - added dedicated frontend ops smoke coverage for the operations overview and export action surface
 - added dedicated frontend servers smoke coverage for the server-management and diagnostics surface

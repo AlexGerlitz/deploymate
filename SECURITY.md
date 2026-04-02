@@ -23,6 +23,7 @@ Current strengths:
 - production can run as remote-only without Docker socket access in the backend
 - tracked-file security audit is part of the local preflight flow
 - new server targets now require SSH-key authentication
+- server credentials are encrypted at rest when stored, and startup now fails fast if credential records exist without `DEPLOYMATE_SERVER_CREDENTIALS_KEY`
 
 Current tradeoffs:
 
@@ -34,7 +35,7 @@ Current tradeoffs:
 
 Planned improvements include:
 
-1. encrypting server credentials at rest or moving them to external secret management
+1. moving server credentials to external secret management
 2. tightening SSH trust from `accept-new` toward pinned known-host workflows
 3. splitting Docker execution into a narrower capability boundary
 4. increasing automated coverage around runtime deployment paths

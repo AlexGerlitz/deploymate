@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from app.services.server_credentials import (
     ServerCredentialCryptoError,
     encrypt_server_credential,
+    server_credential_is_encrypted,
     server_credentials_encryption_enabled,
 )
 
@@ -269,6 +270,7 @@ def init_db() -> None:
             cur.execute(alter_templates_add_updated_at_sql)
             cur.execute(alter_templates_add_last_used_at_sql)
             cur.execute(alter_templates_add_use_count_sql)
+            _assert_server_credentials_policy(cur)
             _migrate_server_credentials_in_place(cur)
         conn.commit()
 
@@ -624,6 +626,59 @@ def _encrypt_server_credential_value(value: str | None) -> str | None:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+def _build_server_credentials_audit(rows: list[tuple[str | None, str | None]]) -> dict[str, int]:
+    summary = {
+        "server_records": len(rows),
+        "credential_records": 0,
+        "encrypted_values": 0,
+        "plaintext_values": 0,
+        "empty_values": 0,
+        "encrypted_records": 0,
+        "plaintext_records": 0,
+    }
+
+    for password, ssh_key in rows:
+        values = [value for value in (password, ssh_key) if value]
+        if values:
+            summary["credential_records"] += 1
+        else:
+            summary["empty_values"] += 1
+
+        record_has_encrypted = False
+        record_has_plaintext = False
+        for value in values:
+            if server_credential_is_encrypted(value):
+                summary["encrypted_values"] += 1
+                record_has_encrypted = True
+            else:
+                summary["plaintext_values"] += 1
+                record_has_plaintext = True
+
+        if record_has_encrypted:
+            summary["encrypted_records"] += 1
+        if record_has_plaintext:
+            summary["plaintext_records"] += 1
+
+    return summary
+
+
+def _assert_server_credentials_policy(cur: psycopg.Cursor) -> None:
+    cur.execute("SELECT password, ssh_key FROM servers;")
+    summary = _build_server_credentials_audit(cur.fetchall())
+
+    if summary["credential_records"] == 0:
+        return
+
+    if not server_credentials_encryption_enabled():
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "DEPLOYMATE_SERVER_CREDENTIALS_KEY must be set before startup when "
+                "server credential records already exist."
+            ),
+        )
+
+
 def _migrate_server_credentials_in_place(cur: psycopg.Cursor) -> None:
     if not server_credentials_encryption_enabled():
         return
@@ -679,6 +734,16 @@ def get_server_or_404(server_id: str) -> dict[str, Any]:
                 raise HTTPException(status_code=404, detail="Server not found.")
 
             return _row_to_dict(cur, row)
+
+
+def get_server_credentials_audit() -> dict[str, Any]:
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT password, ssh_key FROM servers;")
+            return {
+                **_build_server_credentials_audit(cur.fetchall()),
+                "encryption_key_configured": server_credentials_encryption_enabled(),
+            }
 
 
 def delete_server_record(server_id: str) -> None:
