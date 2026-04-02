@@ -33,7 +33,7 @@ cleanup() {
   if [ -n "$RUNTIME_DEPLOYMENT_ID" ] && [ -s "$COOKIE_JAR" ]; then
     curl -sS -o "$RUNTIME_DELETE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
-      -X DELETE "$BASE_URL/deployments/$RUNTIME_DEPLOYMENT_ID" >/dev/null || true
+      -X DELETE "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID" >/dev/null || true
   fi
   rm -f \
     "$COOKIE_JAR" \
@@ -171,7 +171,7 @@ expression = sys.argv[2]
 with open(path, "r", encoding="utf-8") as fh:
     data = json.load(fh)
 
-value = eval(expression, {"__builtins__": {}}, {"data": data})
+value = eval(expression, {"__builtins__": {}}, {"data": data, "len": len})
 if isinstance(value, bool):
     print("true" if value else "false")
 elif value is None:
@@ -196,9 +196,9 @@ resolve_runtime_external_port() {
   ports_status="$(
     curl -sS -o "$RUNTIME_PORTS_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
-      "$BASE_URL/servers/$RUNTIME_SERVER_ID/suggested-ports?limit=1&start_port=$RUNTIME_START_PORT"
+      "$BASE_URL/api/servers/$RUNTIME_SERVER_ID/suggested-ports?limit=1&start_port=$RUNTIME_START_PORT"
   )"
-  check_http_status "suggested ports" "200" "$ports_status" "$RUNTIME_PORTS_BODY_FILE"
+  check_http_status "suggested ports" "200" "$ports_status" "$RUNTIME_PORTS_BODY_FILE" >&2
 
   local port
   port="$(json_query "$RUNTIME_PORTS_BODY_FILE" 'data.get("ports", [None])[0]')"
@@ -247,7 +247,7 @@ PY
     curl -sS -o "$RUNTIME_CREATE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       -H "Content-Type: application/json" \
-      -X POST "$BASE_URL/deployments" \
+      -X POST "$BASE_URL/api/deployments" \
       --data "$payload"
   )"
   check_http_status "runtime deployment create" "200" "$create_status" "$RUNTIME_CREATE_BODY_FILE"
@@ -267,7 +267,7 @@ PY
     health_status="$(
       curl -sS -o "$RUNTIME_HEALTH_BODY_FILE" -w "%{http_code}" \
         -b "$COOKIE_JAR" \
-        "$BASE_URL/deployments/$RUNTIME_DEPLOYMENT_ID/health"
+        "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID/health"
     )"
     check_http_status "runtime deployment health endpoint" "200" "$health_status" "$RUNTIME_HEALTH_BODY_FILE"
 
@@ -290,7 +290,7 @@ PY
   diagnostics_status="$(
     curl -sS -o "$RUNTIME_DIAGNOSTICS_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
-      "$BASE_URL/deployments/$RUNTIME_DEPLOYMENT_ID/diagnostics"
+      "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID/diagnostics"
   )"
   check_http_status "runtime deployment diagnostics" "200" "$diagnostics_status" "$RUNTIME_DIAGNOSTICS_BODY_FILE"
   if [ "$(json_get "$RUNTIME_DIAGNOSTICS_BODY_FILE" "deployment_id")" != "$RUNTIME_DEPLOYMENT_ID" ]; then
@@ -304,7 +304,7 @@ PY
   logs_status="$(
     curl -sS -o "$RUNTIME_LOGS_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
-      "$BASE_URL/deployments/$RUNTIME_DEPLOYMENT_ID/logs"
+      "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID/logs"
   )"
   check_http_status "runtime deployment logs" "200" "$logs_status" "$RUNTIME_LOGS_BODY_FILE"
   if [ "$(json_get "$RUNTIME_LOGS_BODY_FILE" "container_name")" = "null" ]; then
@@ -318,7 +318,7 @@ PY
   activity_status="$(
     curl -sS -o "$RUNTIME_ACTIVITY_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
-      "$BASE_URL/deployments/$RUNTIME_DEPLOYMENT_ID/activity"
+      "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID/activity"
   )"
   check_http_status "runtime deployment activity" "200" "$activity_status" "$RUNTIME_ACTIVITY_BODY_FILE"
   if [ "$(json_query "$RUNTIME_ACTIVITY_BODY_FILE" 'len(data)')" = "0" ]; then
@@ -332,7 +332,7 @@ PY
   delete_status="$(
     curl -sS -o "$RUNTIME_DELETE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
-      -X DELETE "$BASE_URL/deployments/$RUNTIME_DEPLOYMENT_ID"
+      -X DELETE "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID"
   )"
   check_http_status "runtime deployment delete" "200" "$delete_status" "$RUNTIME_DELETE_BODY_FILE"
   if [ "$(json_get "$RUNTIME_DELETE_BODY_FILE" "status")" != "deleted" ]; then
