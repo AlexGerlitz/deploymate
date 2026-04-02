@@ -1302,8 +1302,16 @@ function UpgradeRequestsPageContent() {
           ) : null}
 
           {filteredRequests.map((item) => (
-            <article className="card compactCard" key={item.id}>
-              <div className="row">
+            <article className="card compactCard adminEntityCard" key={item.id}>
+              <div className="adminEntityCardHeader">
+                <div>
+                  <span className="adminEntityCardEyebrow">Upgrade request</span>
+                  <h3>{item.name || item.email || "Unnamed request"}</h3>
+                  <p>
+                    {(item.status || "unknown").replace("_", " ")} · {item.company_or_team || "Independent"} ·{" "}
+                    {item.current_plan || "trial"}
+                  </p>
+                </div>
                 <label className="bulkSelectLabel">
                   <input
                     type="checkbox"
@@ -1314,6 +1322,20 @@ function UpgradeRequestsPageContent() {
                   />
                   <span>Select request</span>
                 </label>
+              </div>
+              <div className="adminEntityCardMetrics">
+                <div className="adminEntityMetric">
+                  <span>Status</span>
+                  <strong>{(item.status || "unknown").replace("_", " ")}</strong>
+                </div>
+                <div className="adminEntityMetric">
+                  <span>Plan</span>
+                  <strong>{item.current_plan || "-"}</strong>
+                </div>
+                <div className="adminEntityMetric">
+                  <span>Target user</span>
+                  <strong>{item.target_username || "Not linked"}</strong>
+                </div>
               </div>
               <div className="row">
                 <span className="label">Status</span>

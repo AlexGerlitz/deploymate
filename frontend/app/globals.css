@@ -862,6 +862,69 @@ code {
   gap: 10px;
 }
 
+.adminEntityCard {
+  display: grid;
+  gap: 14px;
+}
+
+.adminEntityCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adminEntityCardEyebrow {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #8f5e0d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.adminEntityCardHeader h3 {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.adminEntityCardHeader p {
+  margin: 6px 0 0;
+  color: #5f6675;
+}
+
+.adminEntityCardMetrics {
+  display: grid;
+  gap: 10px;
+}
+
+.adminEntityMetric {
+  padding: 14px 16px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 16px;
+  background: rgba(247, 250, 252, 0.92);
+}
+
+.adminEntityMetric span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.adminEntityMetric strong {
+  display: block;
+  margin-top: 8px;
+  color: #132238;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
 .deploymentMetric {
   padding: 14px 16px;
   border: 1px solid rgba(19, 34, 56, 0.08);
@@ -1791,6 +1854,10 @@ button.landingButton.primaryButton:disabled {
   }
 
   .deploymentCardMetrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .adminEntityCardMetrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 

@@ -1891,8 +1891,16 @@ function UsersPageContent() {
           ) : null}
 
           {filteredUsers.map((user) => (
-            <article className="card compactCard" key={user.id}>
-              <div className="row">
+            <article className="card compactCard adminEntityCard" key={user.id}>
+              <div className="adminEntityCardHeader">
+                <div>
+                  <span className="adminEntityCardEyebrow">User</span>
+                  <h3>{user.username}</h3>
+                  <p>
+                    {user.role} · {user.plan} ·{" "}
+                    {user.must_change_password ? "password change required" : "password OK"}
+                  </p>
+                </div>
                 <label className="bulkSelectLabel">
                   <input
                     type="checkbox"
@@ -1903,6 +1911,20 @@ function UsersPageContent() {
                   />
                   <span>Select user</span>
                 </label>
+              </div>
+              <div className="adminEntityCardMetrics">
+                <div className="adminEntityMetric">
+                  <span>Role</span>
+                  <strong>{user.role}</strong>
+                </div>
+                <div className="adminEntityMetric">
+                  <span>Plan</span>
+                  <strong>{user.plan}</strong>
+                </div>
+                <div className="adminEntityMetric">
+                  <span>Security</span>
+                  <strong>{user.must_change_password ? "Change required" : "Password OK"}</strong>
+                </div>
               </div>
               <div className="row">
                 <span className="label">Username</span>
