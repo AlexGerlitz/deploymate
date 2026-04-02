@@ -50,6 +50,7 @@ export default async function LoginPage({ searchParams }) {
                 Enter your account to access the live workspace and admin surfaces.
               </p>
             </div>
+            <div className="authCardBadge">Live product access</div>
           </div>
 
           <form className="form" method="post" action="/login/submit" data-testid="auth-login-form">
@@ -76,7 +77,11 @@ export default async function LoginPage({ searchParams }) {
             </label>
 
             <div className="formActions authActions">
-              <button type="submit" className="landingButton primaryButton" data-testid="auth-login-submit-button">
+              <button
+                type="submit"
+                className="landingButton primaryButton authPrimaryAction"
+                data-testid="auth-login-submit-button"
+              >
                 Open workspace
               </button>
             </div>
@@ -98,6 +103,13 @@ export default async function LoginPage({ searchParams }) {
               .
             </div>
           ) : null}
+
+          <div className="authCardFooter">
+            <Link href="/" className="linkButton">
+              Back to homepage
+            </Link>
+            <span className="authFooterNote">Built for B2B demos, operator workflows, and admin visibility.</span>
+          </div>
         </article>
       </div>
     </main>

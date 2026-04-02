@@ -236,7 +236,7 @@ export default function ChangePasswordPage() {
             <div className="formActions authActions">
               <button
                 type="submit"
-                className="landingButton primaryButton"
+                className="landingButton primaryButton authPrimaryAction"
                 disabled={submitting}
                 data-testid="auth-change-password-submit-button"
               >

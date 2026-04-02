@@ -69,6 +69,7 @@ export default async function RegisterPage({ searchParams }) {
                 Use a simple account name and get into the live workspace immediately.
               </p>
             </div>
+            <div className="authCardBadge">Public trial</div>
           </div>
 
           <div className="banner subtle authBanner" data-testid="auth-register-help-banner">
@@ -122,7 +123,7 @@ export default async function RegisterPage({ searchParams }) {
             <div className="formActions authActions">
               <button
                 type="submit"
-                className="landingButton primaryButton"
+                className="landingButton primaryButton authPrimaryAction"
                 data-testid="auth-register-submit-button"
               >
                 Create account
@@ -134,6 +135,13 @@ export default async function RegisterPage({ searchParams }) {
           </form>
 
           {error ? <div className="banner error" data-testid="auth-register-error-banner">{error}</div> : null}
+
+          <div className="authCardFooter">
+            <Link href="/" className="linkButton">
+              Back to homepage
+            </Link>
+            <span className="authFooterNote">Trial accounts are scoped for safe product exploration.</span>
+          </div>
         </article>
       </div>
     </main>
