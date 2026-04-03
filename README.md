@@ -275,6 +275,7 @@ The fast gate intentionally uses fewer resources:
 - security secret scans and runtime-policy scans now prefer per-file fingerprint reuse even in wider scopes when the file set is still manageable, so repeat full-scope checks stop rescanning the entire repo unnecessarily
 - `make recommend-local-mode` now suggests the cheapest useful loop for the current diff, so you spend less time deciding between `backend`, `frontend-hot`, `changed`, or `profile-changed`
 - `make changed` now narrows mixed diffs down to an effective `frontend` or `backend` fast surface automatically when one side already resolves to `skip`, so shared-but-one-sided changes stop paying for an unnecessary second half
+- `make auto-local` now executes the recommended loop directly, including auto-switching between fast and profile modes when the diff looks expensive enough to justify timing and cache context
 - project-specific layout and route assumptions now live behind [scripts/project_automation_config.sh](scripts/project_automation_config.sh), so the reusable automation core is no longer welded directly to DeployMate paths
 - project-specific path-to-target rules now live behind [scripts/project_automation_targets.sh](scripts/project_automation_targets.sh), so moving this system to another repo no longer means rewriting every `detect_*` script
 - frontend smoke assertions now live behind [scripts/project_automation_smoke_checks.sh](scripts/project_automation_smoke_checks.sh), so both the fast and heavier smoke runners are no longer welded to DeployMate-specific selectors

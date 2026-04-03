@@ -148,13 +148,20 @@ fi
 recommended_command="make changed"
 recommended_mode="changed"
 recommendation_reason="$reason"
+recommended_run_command="make changed"
+recommended_profile_command="make profile-changed"
+recommended_execution_class="fast"
 backend_fast_mode=""
 frontend_fast_mode=""
 frontend_fast_smokes=""
+backend_syntax_mode=""
 
 if [ "$surface" = "skip" ]; then
   recommended_command="make timing-history"
   recommended_mode="skip"
+  recommended_run_command="make timing-history"
+  recommended_profile_command="make timing-history"
+  recommended_execution_class="skip"
 elif [ "$surface" = "frontend" ]; then
   while IFS='=' read -r key value; do
     case "$key" in
@@ -167,24 +174,38 @@ elif [ "$surface" = "frontend" ]; then
     esac
   done < <(bash scripts/detect_frontend_fast_scope.sh "${changed_files[@]}")
 
+  recommended_profile_command="make profile-frontend"
   if [ "$frontend_fast_mode" = "targeted" ]; then
     case "$frontend_fast_smokes" in
       auth|ops|runtime)
         recommended_command="make frontend-hot"
         recommended_mode="frontend-hot"
+        recommended_run_command="make frontend-hot"
         recommendation_reason="single frontend fast target (${frontend_fast_smokes})"
         ;;
       *)
         recommended_command="make frontend"
         recommended_mode="frontend"
+        recommended_run_command="make frontend"
         recommendation_reason="frontend-only diff with targeted smokes"
         ;;
     esac
   else
-    recommended_command="make frontend"
-    recommended_mode="frontend"
+    recommended_command="make profile-frontend"
+    recommended_mode="profile-frontend"
+    recommended_run_command="make frontend"
+    recommended_execution_class="profile"
+    recommendation_reason="frontend-only diff needs the default smoke pack"
   fi
 elif [ "$surface" = "backend" ]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      backend_syntax_mode)
+        backend_syntax_mode="$value"
+        ;;
+    esac
+  done < <(bash scripts/detect_backend_syntax_scope.sh "${changed_files[@]}")
+
   while IFS='=' read -r key value; do
     case "$key" in
       backend_fast_mode)
@@ -195,12 +216,21 @@ elif [ "$surface" = "backend" ]; then
 
   recommended_command="make backend"
   recommended_mode="backend"
+  recommended_run_command="make backend"
+  recommended_profile_command="make profile-backend"
   case "$backend_fast_mode" in
     targeted)
       recommendation_reason="backend-only diff with targeted test modules"
       ;;
     safety)
-      recommendation_reason="backend-only diff needs safety suite"
+      if [ "$backend_syntax_mode" = "full" ] || [ "${#changed_files[@]}" -gt 3 ]; then
+        recommended_command="make profile-backend"
+        recommended_mode="profile-backend"
+        recommended_execution_class="profile"
+        recommendation_reason="backend-only diff needs the safety suite and profiling context"
+      else
+        recommendation_reason="backend-only diff needs safety suite"
+      fi
       ;;
     skip)
       recommendation_reason="backend diff resolved to skip backend fast suite"
@@ -227,22 +257,39 @@ else
   done < <(bash scripts/detect_frontend_fast_scope.sh "${changed_files[@]}")
 
   if [ "$frontend_fast_mode" = "skip" ] && [ "${backend_fast_mode:-safety}" != "skip" ]; then
-    recommended_command="make backend"
-    recommended_mode="backend"
-    recommendation_reason="mixed diff resolves to backend-only fast loop"
+    recommended_run_command="make backend"
+    recommended_profile_command="make profile-backend"
+    if [ "$backend_fast_mode" = "safety" ]; then
+      recommended_command="make profile-backend"
+      recommended_mode="profile-backend"
+      recommended_execution_class="profile"
+      recommendation_reason="mixed diff collapses to backend-only safety loop"
+    else
+      recommended_command="make backend"
+      recommended_mode="backend"
+      recommendation_reason="mixed diff resolves to backend-only fast loop"
+    fi
   elif [ "$backend_fast_mode" = "skip" ] && [ "${frontend_fast_mode:-default}" != "skip" ]; then
+    recommended_profile_command="make profile-frontend"
     if [ "$frontend_fast_mode" = "targeted" ] && { [ "$frontend_fast_smokes" = "auth" ] || [ "$frontend_fast_smokes" = "ops" ] || [ "$frontend_fast_smokes" = "runtime" ]; }; then
       recommended_command="make frontend-hot"
       recommended_mode="frontend-hot"
+      recommended_run_command="make frontend-hot"
       recommendation_reason="mixed diff resolves to single frontend fast target (${frontend_fast_smokes})"
     else
-      recommended_command="make frontend"
-      recommended_mode="frontend"
-      recommendation_reason="mixed diff resolves to frontend-only fast loop"
+      recommended_command="make profile-frontend"
+      recommended_mode="profile-frontend"
+      recommended_run_command="make frontend"
+      recommended_execution_class="profile"
+      recommendation_reason="mixed diff resolves to frontend-only default smoke pack"
     fi
   else
     recommended_command="make profile-changed"
     recommended_mode="profile-changed"
+    recommended_run_command="make changed"
+    recommended_profile_command="make profile-changed"
+    recommended_execution_class="profile"
+    recommendation_reason="shared or mixed changes benefit from timing and cache context"
   fi
 fi
 
@@ -252,4 +299,7 @@ printf 'surface=%s\n' "$surface"
 printf 'reason=%s\n' "$reason"
 printf 'recommended_mode=%s\n' "$recommended_mode"
 printf 'recommended_command=%s\n' "$recommended_command"
+printf 'recommended_run_command=%s\n' "$recommended_run_command"
+printf 'recommended_profile_command=%s\n' "$recommended_profile_command"
+printf 'recommended_execution_class=%s\n' "$recommended_execution_class"
 printf 'recommendation_reason=%s\n' "$recommendation_reason"
