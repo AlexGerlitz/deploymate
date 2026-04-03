@@ -183,6 +183,18 @@ case "$PRESET" in
     AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Queue changes" }, { value: "bulk", label: "Bulk changes" }]'
     CSV_HEADERS='["id", "label", "status", "note"]'
     CSV_ROW='[item.id, item.label, item.status, item.note]'
+    ACTION_SECTION_TITLE="First real action"
+    ACTION_SECTION_DESCRIPTION="Use the scaffold to prove one operator decision flow end to end before adding more controls."
+    ACTION_FOCUS_HINT="Pick one queue item and make the first meaningful review decision local-first."
+    ACTION_NOTE_PLACEHOLDER="Add the operator note that explains why this queue item moved."
+    PRIMARY_ACTION_LABEL="Mark ready"
+    PRIMARY_ACTION_STATUS="ready"
+    PRIMARY_ACTION_NOTE="Queue item promoted into the next actionable slice."
+    PRIMARY_ACTION_SUCCESS="Starter action applied: item marked ready."
+    SECONDARY_ACTION_LABEL="Escalate review"
+    SECONDARY_ACTION_STATUS="needs-follow-up"
+    SECONDARY_ACTION_NOTE="Queue item escalated for a narrower follow-up review."
+    SECONDARY_ACTION_SUCCESS="Starter action applied: item escalated for follow-up."
     ;;
   users)
     SEARCH_PLACEHOLDER="Search username, role, plan, or password state"
@@ -243,6 +255,18 @@ case "$PRESET" in
     AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "User changes" }, { value: "bulk", label: "Bulk role/plan" }]'
     CSV_HEADERS='["id", "username", "role_or_plan", "note"]'
     CSV_ROW='[item.id, item.label, item.status, item.note]'
+    ACTION_SECTION_TITLE="Access decision starter"
+    ACTION_SECTION_DESCRIPTION="Start with one user action that actually changes access posture: password follow-up or role triage."
+    ACTION_FOCUS_HINT="Keep the first user workflow narrow: password, role, or plan. Do not mix all three on day one."
+    ACTION_NOTE_PLACEHOLDER="Capture the operator reason for the access decision."
+    PRIMARY_ACTION_LABEL="Require password reset"
+    PRIMARY_ACTION_STATUS="password_reset_required"
+    PRIMARY_ACTION_NOTE="Password reset follow-up queued from the starter user surface."
+    PRIMARY_ACTION_SUCCESS="Starter action applied: password reset required."
+    SECONDARY_ACTION_LABEL="Promote access review"
+    SECONDARY_ACTION_STATUS="access_review"
+    SECONDARY_ACTION_NOTE="User moved into a focused access review queue."
+    SECONDARY_ACTION_SUCCESS="Starter action applied: user moved into access review."
     ;;
   upgrade-requests)
     SEARCH_PLACEHOLDER="Search request name, email, plan, or review note"
@@ -303,6 +327,18 @@ case "$PRESET" in
     AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Inbox changes" }, { value: "bulk", label: "Bulk triage" }]'
     CSV_HEADERS='["id", "request", "status", "note"]'
     CSV_ROW='[item.id, item.label, item.status, item.note]'
+    ACTION_SECTION_TITLE="Inbox disposition starter"
+    ACTION_SECTION_DESCRIPTION="Start with one disposition flow that moves requests forward: approve, close, or hold for follow-up."
+    ACTION_FOCUS_HINT="The first inbox workflow should change request state and leave a clear note for the next operator."
+    ACTION_NOTE_PLACEHOLDER="Capture why this request changed state."
+    PRIMARY_ACTION_LABEL="Approve request"
+    PRIMARY_ACTION_STATUS="approved"
+    PRIMARY_ACTION_NOTE="Upgrade request approved from the first starter inbox flow."
+    PRIMARY_ACTION_SUCCESS="Starter action applied: request approved."
+    SECONDARY_ACTION_LABEL="Close request"
+    SECONDARY_ACTION_STATUS="closed"
+    SECONDARY_ACTION_NOTE="Upgrade request closed after initial triage."
+    SECONDARY_ACTION_SUCCESS="Starter action applied: request closed."
     ;;
   servers)
     SEARCH_PLACEHOLDER="Search server name, auth type, or diagnostics state"
@@ -363,6 +399,18 @@ case "$PRESET" in
     AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Server changes" }, { value: "bulk", label: "Ops follow-up" }]'
     CSV_HEADERS='["id", "server", "auth_or_state", "note"]'
     CSV_ROW='[item.id, item.label, item.status, item.note]'
+    ACTION_SECTION_TITLE="Operations action starter"
+    ACTION_SECTION_DESCRIPTION="Use the first server flow to resolve one concrete ops decision: diagnostics, auth readiness, or connection follow-up."
+    ACTION_FOCUS_HINT="The first server action should reduce uncertainty about connectivity or auth state."
+    ACTION_NOTE_PLACEHOLDER="Capture the ops note that explains the diagnostics or connectivity decision."
+    PRIMARY_ACTION_LABEL="Run diagnostics"
+    PRIMARY_ACTION_STATUS="diagnostics_running"
+    PRIMARY_ACTION_NOTE="Diagnostics follow-up started from the starter server queue."
+    PRIMARY_ACTION_SUCCESS="Starter action applied: diagnostics started."
+    SECONDARY_ACTION_LABEL="Mark SSH ready"
+    SECONDARY_ACTION_STATUS="ssh_ready"
+    SECONDARY_ACTION_NOTE="Server promoted into the SSH-ready follow-up slice."
+    SECONDARY_ACTION_SUCCESS="Starter action applied: server marked SSH ready."
     ;;
   *)
     echo "[scaffold-deploymate-surface] unsupported preset: $PRESET" >&2
@@ -650,7 +698,7 @@ EOF
         filterLabel="Scope"
         filterValue={auditScope}
         onFilterChange={(event) => setAuditScope(event.target.value)}
-        filterOptions=${AUDIT_OPTIONS}
+        filterOptions={${AUDIT_OPTIONS}}
         filterTestId="${SURFACE_SLUG}-audit-scope"
         sortValue={auditSort}
         onSortChange={(event) => setAuditSort(event.target.value)}
@@ -776,6 +824,10 @@ function ${PASCAL_NAME}PageContent() {
   const [success, setSuccess] = useState(
     "Scaffold ready. Replace the sample queue, filters, and actions with the first real workflow.",
   );
+  const [items, setItems] = useState(sampleItems);
+  const [selectedItemId, setSelectedItemId] = useState(() => sampleItems[0]?.id || "");
+  const [actionNote, setActionNote] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState("");
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
   const primaryFilterDefinitions = [
     createTextFilterDefinition({
@@ -795,15 +847,68 @@ ${audit_state_block}
   const filteredItems = useMemo(() => {
     const normalized = currentFilters.q.trim().toLowerCase();
     if (!normalized) {
-      return sampleItems;
+      return items;
     }
-    return sampleItems.filter((item) => {
+    return items.filter((item) => {
       return [item.label, item.status, item.note].some((value) =>
         value.toLowerCase().includes(normalized),
       );
     });
-  }, [currentFilters.q]);
+  }, [currentFilters.q, items]);
+  const selectedItem = filteredItems.find((item) => item.id === selectedItemId)
+    || items.find((item) => item.id === selectedItemId)
+    || filteredItems[0]
+    || items[0]
+    || null;
 ${export_helpers_block}
+
+  function handleSelectItem(itemId) {
+    setSelectedItemId(itemId);
+    setSuccess("Focused the starter action panel on the selected queue item.");
+    setError("");
+  }
+
+  function handleRunStarterAction(actionKind, itemId = selectedItem?.id || "") {
+    if (!itemId) {
+      setError("Choose a queue item before running the starter action.");
+      setSuccess("");
+      return;
+    }
+
+    const actionConfig = actionKind === "primary"
+      ? {
+          label: "${PRIMARY_ACTION_LABEL}",
+          status: "${PRIMARY_ACTION_STATUS}",
+          note: "${PRIMARY_ACTION_NOTE}",
+          success: "${PRIMARY_ACTION_SUCCESS}",
+        }
+      : {
+          label: "${SECONDARY_ACTION_LABEL}",
+          status: "${SECONDARY_ACTION_STATUS}",
+          note: "${SECONDARY_ACTION_NOTE}",
+          success: "${SECONDARY_ACTION_SUCCESS}",
+        };
+
+    setActionLoadingId(itemId);
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              status: actionConfig.status,
+              note: actionNote.trim()
+                ? \`\${actionConfig.note} Note: \${actionNote.trim()}\`
+                : actionConfig.note,
+            }
+          : item,
+      ),
+    );
+    setSelectedItemId(itemId);
+    setActionNote("");
+    setSuccess(\`\${actionConfig.success} Replace this local state change with the first real mutation next.\`);
+    setError("");
+    setActionLoadingId("");
+  }
 
   useEffect(() => {
     const nextQuery = searchParams.get("q") || "";
@@ -873,10 +978,96 @@ ${export_helpers_block}
             key={item.id}
             title={item.label}
             body={item.note}
-            status={item.status}
-          />
+            status={item.id === selectedItemId ? \`\${item.status} · focused\` : item.status}
+          >
+            <div className="adminFilterActions">
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid={\`\${item.id}-focus\`}
+                onClick={() => handleSelectItem(item.id)}
+              >
+                {item.id === selectedItemId ? "Focused" : "Focus item"}
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid={\`\${item.id}-primary-action\`}
+                onClick={() => handleRunStarterAction("primary", item.id)}
+                disabled={actionLoadingId === item.id}
+              >
+                ${PRIMARY_ACTION_LABEL}
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid={\`\${item.id}-secondary-action\`}
+                onClick={() => handleRunStarterAction("secondary", item.id)}
+                disabled={actionLoadingId === item.id}
+              >
+                ${SECONDARY_ACTION_LABEL}
+              </button>
+            </div>
+          </AdminSurfaceQueueCard>
         ))}
       </AdminSurfaceQueue>
+
+      <AdminDisclosureSection
+        title="${ACTION_SECTION_TITLE}"
+        subtitle="${ACTION_SECTION_DESCRIPTION}"
+        badge="Action starter"
+        defaultOpen
+        testId="${SURFACE_SLUG}-action-starter"
+      >
+        <div className="sectionHeader">
+          <div>
+            <h3>Focused queue item</h3>
+            <p className="formHint">${ACTION_FOCUS_HINT}</p>
+          </div>
+          {selectedItem ? <span className="status unknown">{selectedItem.status}</span> : null}
+        </div>
+        {selectedItem ? (
+          <>
+            <p className="formHint">
+              <strong>{selectedItem.label}</strong> · {selectedItem.note}
+            </p>
+            <label className="field">
+              <span>Operator note</span>
+              <textarea
+                data-testid="${SURFACE_SLUG}-action-note"
+                rows={3}
+                value={actionNote}
+                onChange={(event) => setActionNote(event.target.value)}
+                placeholder="${ACTION_NOTE_PLACEHOLDER}"
+              />
+            </label>
+            <div className="adminFilterActions">
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="${SURFACE_SLUG}-action-primary"
+                onClick={() => handleRunStarterAction("primary")}
+                disabled={actionLoadingId === selectedItem.id}
+              >
+                ${PRIMARY_ACTION_LABEL}
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="${SURFACE_SLUG}-action-secondary"
+                onClick={() => handleRunStarterAction("secondary")}
+                disabled={actionLoadingId === selectedItem.id}
+              >
+                ${SECONDARY_ACTION_LABEL}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="empty" data-testid="${SURFACE_SLUG}-action-empty">
+            No queue item selected yet.
+          </div>
+        )}
+      </AdminDisclosureSection>
 
       <article className="card formCard">
         <AdminFilterFooter
@@ -901,7 +1092,7 @@ ${export_section}
         <ol className="formHint">
           <li>Replace the static queue with the first real backend payload.</li>
           <li>Keep only the filters and secondary sections that support one concrete admin workflow.</li>
-          <li>Wire one real action end to end before adding more controls.</li>
+          <li>Replace ${PRIMARY_ACTION_LABEL} and ${SECONDARY_ACTION_LABEL} with the first real mutation path.</li>
         </ol>
       </AdminDisclosureSection>
     </main>
@@ -937,6 +1128,8 @@ def list_${PY_SLUG}_items(query: str = "") -> dict:
             "surface": "${SURFACE_SLUG}",
             "total": len(items),
             "query": query,
+            "primary_action_label": "${PRIMARY_ACTION_LABEL}",
+            "secondary_action_label": "${SECONDARY_ACTION_LABEL}",
             "next_step": "Replace stub data with the first real repository-backed workflow.",
         },
     }
@@ -1023,6 +1216,8 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
                 "surface": "${SURFACE_SLUG}",
                 "total": 1,
                 "query": query,
+                "primary_action_label": "${PRIMARY_ACTION_LABEL}",
+                "secondary_action_label": "${SECONDARY_ACTION_LABEL}",
                 "next_step": "Replace stub data with the first real repository-backed workflow.",
             },
         }
@@ -1034,6 +1229,7 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["surface"], "${SURFACE_SLUG}")
         self.assertEqual(len(payload["items"]), 1)
         self.assertEqual(payload["summary"]["query"], "")
+        self.assertEqual(payload["summary"]["primary_action_label"], "${PRIMARY_ACTION_LABEL}")
 
     def test_${PY_SLUG}_query_filter_flow(self):
         with patch(
@@ -1068,6 +1264,8 @@ class ${PASCAL_NAME}Summary(BaseModel):
     surface: str
     total: int = 0
     query: str = ""
+    primary_action_label: str
+    secondary_action_label: str
     next_step: str
 
 

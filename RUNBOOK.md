@@ -276,6 +276,7 @@ The backend side now also gets typed response models in `backend/app/schemas.py`
 Add `--with-saved-views`, `--with-audit`, and `--with-export` when the first useful version of the surface should already include those secondary sections.
 Those richer flags now also generate real starter wiring for URL state, filter chips, saved-views manager hooks, audit filtering, and local JSON/CSV exports, so the surface starts closer to a live DeployMate workflow than a blank mock.
 Add `--preset users`, `--preset upgrade-requests`, or `--preset servers` when the feature already clearly matches one of those common DeployMate surface families.
+Presets now also change the starter action flow itself, so the generated surface already includes the first local decision pattern for that family instead of a queue-only mock.
 
 The CI, staging, and production workflows now write a short GitHub job summary with the chosen surface, smoke mode, requested commit SHA, deployed SHA, and target URL so the result is readable without opening raw logs.
 

@@ -314,6 +314,7 @@ The generated page is now more than a static mock:
 - saved-views manager wiring when `--with-saved-views` is enabled
 - audit filter/sort starter wiring when `--with-audit` is enabled
 - working local JSON/CSV starter exports when `--with-export` is enabled
+- a preset-aware starter action panel with two real local action paths you can replace with the first real mutation
 
 The scaffold is also entity-aware now:
 
@@ -323,6 +324,15 @@ The scaffold is also entity-aware now:
 - `--preset servers`
 
 So the generated sample queue, summary copy, search placeholder, and starter export shape can already look closer to the kind of DeployMate surface you are actually adding.
+
+Those presets now also shape the first real action pattern:
+
+- `generic`: queue triage / escalate
+- `users`: password reset / access review
+- `upgrade-requests`: approve / close
+- `servers`: run diagnostics / mark SSH ready
+
+So the next screen starts closer to a true DeployMate workflow, not just a list with placeholder cards.
 
 ## Product Starter
 
