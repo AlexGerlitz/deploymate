@@ -108,6 +108,7 @@ After the push:
 4. mixed or shared changes fall back to a full staging deploy
 5. docs-only or workflow-only changes skip both the release gate and staging deploy entirely
 6. older in-progress CI runs on the same branch are cancelled automatically so only the newest iteration keeps running
+7. the release gate now skips unnecessary dependency installs too, so frontend-only changes do not install backend requirements and backend-only changes do not install frontend packages
 
 Use `.github/workflows/staging.yml` only as a manual fallback when you need to redeploy staging on demand.
 That manual fallback now also supports `skip_smoke` when you need a faster redeploy for operator-only checks.

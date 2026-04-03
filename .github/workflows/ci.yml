@@ -77,6 +77,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node
+        if: needs.detect-changes.outputs.surface == 'frontend' || needs.detect-changes.outputs.surface == 'full'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -84,14 +85,17 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
+        if: needs.detect-changes.outputs.surface == 'frontend' || needs.detect-changes.outputs.surface == 'full'
         run: npm --prefix frontend ci
 
       - name: Setup Python
+        if: needs.detect-changes.outputs.surface == 'backend' || needs.detect-changes.outputs.surface == 'full'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install backend dependencies
+        if: needs.detect-changes.outputs.surface == 'backend' || needs.detect-changes.outputs.surface == 'full'
         run: python -m pip install -r backend/requirements.txt
 
       - name: Run release workflow
@@ -112,6 +116,8 @@ jobs:
             echo "- Base ref: \`${{ needs.detect-changes.outputs.base_ref }}\`"
             echo "- Surface: \`${{ needs.detect-changes.outputs.surface }}\`"
             echo "- Reason: ${{ needs.detect-changes.outputs.reason }}"
+            echo "- Frontend deps: \`${{ (needs.detect-changes.outputs.surface == 'frontend' || needs.detect-changes.outputs.surface == 'full') && 'installed' || 'skipped' }}\`"
+            echo "- Backend deps: \`${{ (needs.detect-changes.outputs.surface == 'backend' || needs.detect-changes.outputs.surface == 'full') && 'installed' || 'skipped' }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   release-gate-skipped:

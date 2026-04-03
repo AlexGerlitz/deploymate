@@ -70,7 +70,7 @@ echo "[release] surface: $SURFACE"
 echo "[release] backend python: $BACKEND_PYTHON"
 
 echo "[release] preflight"
-bash scripts/preflight.sh
+bash scripts/preflight.sh --surface "$SURFACE"
 
 if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   echo "[release] frontend auth smoke"
@@ -105,6 +105,14 @@ fi
 if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
   echo "[release] backend test suite"
   PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest discover -s backend/tests -p 'test_*.py'
+fi
+
+echo "[release] executed phases:"
+if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
+  echo "[release]   - frontend preflight, smokes, and build"
+fi
+if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
+  echo "[release]   - backend preflight and test suite"
 fi
 
 echo "[release] checks passed"

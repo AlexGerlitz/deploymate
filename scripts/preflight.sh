@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SURFACE="full"
 
 clean_frontend_build_artifacts() {
   if [ -d "frontend/.next" ]; then
@@ -11,19 +12,55 @@ clean_frontend_build_artifacts() {
   fi
 }
 
+usage() {
+  cat <<'EOF'
+Usage:
+  bash scripts/preflight.sh [--surface frontend|backend|full]
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --surface)
+      SURFACE="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "[preflight] unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+case "$SURFACE" in
+  frontend|backend|full)
+    ;;
+  *)
+    echo "[preflight] invalid surface: $SURFACE" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
+
 cd "$ROOT_DIR"
 
 echo "[preflight] repo: $ROOT_DIR"
+echo "[preflight] surface: $SURFACE"
 echo "[preflight] git status"
 git status --short
 
-if [ -f "frontend/package.json" ]; then
+if [ -f "frontend/package.json" ] && { [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; }; then
   clean_frontend_build_artifacts
   echo "[preflight] frontend build"
   npm --prefix frontend run build
 fi
 
-if [ -d "backend/app" ]; then
+if [ -d "backend/app" ] && { [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; }; then
   echo "[preflight] backend syntax check"
   python_files=()
   while IFS= read -r file; do
