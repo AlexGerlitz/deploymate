@@ -70,42 +70,37 @@ frontend_smoke_clear_state() {
 }
 
 start_frontend_smoke_server() {
-  local start_cmd=""
+  local state_file=""
 
-  if [ -x "$REPO_ROOT/frontend/node_modules/.bin/next" ]; then
-    start_cmd="cd \"$REPO_ROOT/frontend\" && exec ./node_modules/.bin/next dev --hostname 127.0.0.1 --port \"$PORT\""
-  else
-    start_cmd="cd \"$REPO_ROOT/frontend\" && exec npm run dev -- --hostname 127.0.0.1 --port \"$PORT\""
-  fi
+  state_file="$(frontend_smoke_server_state_file)"
 
   if [ "$PERSIST_SERVER" = "1" ]; then
-    frontend_smoke_load_state
-    if frontend_smoke_pid_alive "${FRONTEND_SMOKE_SERVER_PID:-}" || frontend_smoke_url_alive; then
+    if python3 "$SCRIPT_DIR/frontend_smoke_daemon.py" status \
+      --state-file "$state_file" \
+      --port "$PORT"; then
+      frontend_smoke_load_state
       SERVER_LOG="${FRONTEND_SMOKE_SERVER_LOG:-$SERVER_LOG}"
       DIST_DIR="${FRONTEND_SMOKE_SERVER_DIST_DIR:-$DIST_DIR}"
+      FRONTEND_SMOKE_SERVER_PID="${FRONTEND_SMOKE_SERVER_PID:-}"
       export FRONTEND_SMOKE_SERVER_PID SERVER_LOG DIST_DIR
       return 0
     fi
     frontend_smoke_clear_state
-  fi
-
-  if [ "$PERSIST_SERVER" = "1" ]; then
-    if command -v setsid >/dev/null 2>&1; then
-      setsid env NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_DIST_DIR="$DIST_DIR" \
-        bash -lc "$start_cmd" </dev/null >"$SERVER_LOG" 2>&1 &
-    else
-      nohup env NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_DIST_DIR="$DIST_DIR" \
-        bash -lc "$start_cmd" </dev/null >"$SERVER_LOG" 2>&1 &
-    fi
+    python3 "$SCRIPT_DIR/frontend_smoke_daemon.py" start \
+      --state-file "$state_file" \
+      --frontend-dir "$REPO_ROOT/frontend" \
+      --port "$PORT" \
+      --dist-dir "$DIST_DIR" \
+      --log-file "$SERVER_LOG" \
+      ${NEXT_PUBLIC_SMOKE_RESTORE_REPORT:+--restore-report}
+    frontend_smoke_load_state
+    FRONTEND_SMOKE_SERVER_PID="${FRONTEND_SMOKE_SERVER_PID:-}"
   else
     NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_DIST_DIR="$DIST_DIR" \
-      bash -lc "$start_cmd" >"$SERVER_LOG" 2>&1 &
+      bash -lc "cd \"$REPO_ROOT/frontend\" && exec npm run dev -- --hostname 127.0.0.1 --port \"$PORT\"" >"$SERVER_LOG" 2>&1 &
+    FRONTEND_SMOKE_SERVER_PID=$!
   fi
-  FRONTEND_SMOKE_SERVER_PID=$!
   export FRONTEND_SMOKE_SERVER_PID
-  if [ "$PERSIST_SERVER" = "1" ]; then
-    frontend_smoke_write_state
-  fi
 }
 
 wait_for_frontend_smoke_url() {
@@ -129,8 +124,16 @@ wait_for_frontend_smoke_url() {
 }
 
 stop_frontend_smoke_server() {
+  local state_file=""
+
   if [ "$PERSIST_SERVER" = "1" ] && [ "$KEEP_ALIVE_ON_EXIT" = "1" ]; then
     return 0
+  fi
+
+  state_file="$(frontend_smoke_server_state_file)"
+
+  if [ "$PERSIST_SERVER" = "1" ]; then
+    python3 "$SCRIPT_DIR/frontend_smoke_daemon.py" stop --state-file "$state_file" >/dev/null 2>&1 || true
   fi
 
   if [ -n "${FRONTEND_SMOKE_SERVER_PID:-}" ] && kill -0 "$FRONTEND_SMOKE_SERVER_PID" 2>/dev/null; then
