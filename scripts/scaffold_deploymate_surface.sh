@@ -212,6 +212,20 @@ case "$PRESET" in
     SECONDARY_ACTION_STATUS="needs-follow-up"
     SECONDARY_ACTION_NOTE="Queue item escalated for a narrower follow-up review."
     SECONDARY_ACTION_SUCCESS="Starter action applied: item escalated for follow-up."
+    BULK_SECTION_TITLE="Bulk triage starter"
+    BULK_SECTION_DESCRIPTION="Use bulk actions only after the queue shape is already useful for single-item review."
+    BULK_PRESET_ONE_LABEL="Select triage slice"
+    BULK_PRESET_ONE_SEGMENT="triage"
+    BULK_PRESET_TWO_LABEL="Select follow-up slice"
+    BULK_PRESET_TWO_SEGMENT="follow-up"
+    BULK_APPLY_LABEL="Apply bulk status"
+    BULK_STATUS_OPTIONS='[{ value: "ready", label: "Ready" }, { value: "needs-follow-up", label: "Needs follow-up" }, { value: "closed", label: "Closed" }]'
+    MUTATION_ROUTE_LABEL="PATCH /api/admin/review-items/{id}"
+    MUTATION_PAYLOAD_JS='({
+      status: "ready",
+      operator_note: actionNote || "Starter review note",
+      queue_segment: selectedItem.segment,
+    })'
     ;;
   users)
     SEARCH_PLACEHOLDER="Search username, role, plan, or password state"
@@ -301,6 +315,20 @@ case "$PRESET" in
     SECONDARY_ACTION_STATUS="access_review"
     SECONDARY_ACTION_NOTE="User moved into a focused access review queue."
     SECONDARY_ACTION_SUCCESS="Starter action applied: user moved into access review."
+    BULK_SECTION_TITLE="Bulk access starter"
+    BULK_SECTION_DESCRIPTION="Keep the first bulk flow tied to the current filtered user slice: role or plan follow-up."
+    BULK_PRESET_ONE_LABEL="Select password workflow"
+    BULK_PRESET_ONE_SEGMENT="password"
+    BULK_PRESET_TWO_LABEL="Select access workflow"
+    BULK_PRESET_TWO_SEGMENT="access"
+    BULK_APPLY_LABEL="Apply bulk workflow"
+    BULK_STATUS_OPTIONS='[{ value: "password_reset_required", label: "Password reset required" }, { value: "access_review", label: "Access review" }, { value: "team", label: "Team follow-up" }]'
+    MUTATION_ROUTE_LABEL="PATCH /api/users/{id}"
+    MUTATION_PAYLOAD_JS='({
+      role_or_status: "password_reset_required",
+      operator_note: actionNote || "Starter access note",
+      workflow: selectedItem.segment,
+    })'
     ;;
   upgrade-requests)
     SEARCH_PLACEHOLDER="Search request name, email, plan, or review note"
@@ -390,6 +418,20 @@ case "$PRESET" in
     SECONDARY_ACTION_STATUS="closed"
     SECONDARY_ACTION_NOTE="Upgrade request closed after initial triage."
     SECONDARY_ACTION_SUCCESS="Starter action applied: request closed."
+    BULK_SECTION_TITLE="Bulk inbox starter"
+    BULK_SECTION_DESCRIPTION="Bulk request actions should stay close to the visible inbox slice so operators can reason about what changed."
+    BULK_PRESET_ONE_LABEL="Select linked requests"
+    BULK_PRESET_ONE_SEGMENT="linked"
+    BULK_PRESET_TWO_LABEL="Select unlinked requests"
+    BULK_PRESET_TWO_SEGMENT="unlinked"
+    BULK_APPLY_LABEL="Apply bulk status"
+    BULK_STATUS_OPTIONS='[{ value: "in_review", label: "In review" }, { value: "approved", label: "Approved" }, { value: "closed", label: "Closed" }]'
+    MUTATION_ROUTE_LABEL="PATCH /api/upgrade-requests/{id}"
+    MUTATION_PAYLOAD_JS='({
+      status: "approved",
+      review_note: actionNote || "Starter inbox note",
+      request_type: selectedItem.segment,
+    })'
     ;;
   servers)
     SEARCH_PLACEHOLDER="Search server name, auth type, or diagnostics state"
@@ -479,6 +521,20 @@ case "$PRESET" in
     SECONDARY_ACTION_STATUS="ssh_ready"
     SECONDARY_ACTION_NOTE="Server promoted into the SSH-ready follow-up slice."
     SECONDARY_ACTION_SUCCESS="Starter action applied: server marked SSH ready."
+    BULK_SECTION_TITLE="Bulk ops starter"
+    BULK_SECTION_DESCRIPTION="Use bulk server actions only when the same diagnostics or auth follow-up applies to a visible slice of the queue."
+    BULK_PRESET_ONE_LABEL="Select diagnostics slice"
+    BULK_PRESET_ONE_SEGMENT="diagnostics"
+    BULK_PRESET_TWO_LABEL="Select auth slice"
+    BULK_PRESET_TWO_SEGMENT="auth"
+    BULK_APPLY_LABEL="Apply bulk ops state"
+    BULK_STATUS_OPTIONS='[{ value: "diagnostics_running", label: "Diagnostics running" }, { value: "ssh_ready", label: "SSH ready" }, { value: "needs_auth_review", label: "Needs auth review" }]'
+    MUTATION_ROUTE_LABEL="PATCH /api/servers/{id}"
+    MUTATION_PAYLOAD_JS='({
+      ops_state: "diagnostics_running",
+      operator_note: actionNote || "Starter ops note",
+      focus: selectedItem.segment,
+    })'
     ;;
   *)
     echo "[scaffold-deploymate-surface] unsupported preset: $PRESET" >&2
@@ -883,6 +939,7 @@ ${utils_imports}
 const sampleItems = ${SAMPLE_ITEMS_FRONTEND};
 const starterMetrics = ${METRICS_JS};
 const segmentFilterOptions = ${SEGMENT_FILTER_OPTIONS};
+const bulkStatusOptions = ${BULK_STATUS_OPTIONS};
 
 ${constants_block}
 ${helpers_block}
@@ -896,8 +953,10 @@ function ${PASCAL_NAME}PageContent() {
   );
   const [items, setItems] = useState(sampleItems);
   const [selectedItemId, setSelectedItemId] = useState(() => sampleItems[0]?.id || "");
+  const [selectedItemIds, setSelectedItemIds] = useState(() => sampleItems[0] ? [sampleItems[0].id] : []);
   const [actionNote, setActionNote] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
+  const [bulkStatusValue, setBulkStatusValue] = useState(() => bulkStatusOptions[0]?.value || "");
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
   const [segmentFilter, setSegmentFilter] = useState(
     () => searchParams.get("segment") || "${SEGMENT_FILTER_DEFAULT}",
@@ -963,11 +1022,42 @@ ${audit_state_block}
     || filteredItems[0]
     || items[0]
     || null;
+  const selectedItems = items.filter((item) => selectedItemIds.includes(item.id));
+  const starterMutationPreview = selectedItem
+    ? ${MUTATION_PAYLOAD_JS}
+    : null;
 ${export_helpers_block}
 
   function handleSelectItem(itemId) {
     setSelectedItemId(itemId);
+    setSelectedItemIds((currentIds) =>
+      currentIds.includes(itemId) ? currentIds : [...currentIds, itemId],
+    );
     setSuccess("Focused the starter action panel on the selected queue item.");
+    setError("");
+  }
+
+  function handleToggleSelection(itemId) {
+    setSelectedItemIds((currentIds) => {
+      if (currentIds.includes(itemId)) {
+        return currentIds.filter((currentId) => currentId !== itemId);
+      }
+      return [...currentIds, itemId];
+    });
+    setSelectedItemId(itemId);
+    setSuccess("Updated starter bulk selection.");
+    setError("");
+  }
+
+  function handleApplyBulkPreset(segment) {
+    const nextIds = filteredItems
+      .filter((item) => item.segment === segment)
+      .map((item) => item.id);
+    setSelectedItemIds(nextIds);
+    if (nextIds[0]) {
+      setSelectedItemId(nextIds[0]);
+    }
+    setSuccess(\`Bulk preset applied: \${segment}.\`);
     setError("");
   }
 
@@ -1011,6 +1101,28 @@ ${export_helpers_block}
     setSuccess(\`\${actionConfig.success} Replace this local state change with the first real mutation next.\`);
     setError("");
     setActionLoadingId("");
+  }
+
+  function handleApplyBulkAction() {
+    if (!selectedItemIds.length || !bulkStatusValue) {
+      setError("Select at least one queue item and a bulk status before applying the starter bulk action.");
+      setSuccess("");
+      return;
+    }
+
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        selectedItemIds.includes(item.id)
+          ? {
+              ...item,
+              status: bulkStatusValue,
+              note: \`\${item.note} Bulk starter applied.\`,
+            }
+          : item,
+      ),
+    );
+    setSuccess(\`Starter bulk action applied to \${selectedItemIds.length} item\${selectedItemIds.length === 1 ? "" : "s"}.\`);
+    setError("");
   }
 
   useEffect(() => {
@@ -1111,6 +1223,14 @@ ${export_helpers_block}
               <button
                 type="button"
                 className="secondaryButton"
+                data-testid={\`\${item.id}-select\`}
+                onClick={() => handleToggleSelection(item.id)}
+              >
+                {selectedItemIds.includes(item.id) ? "Selected" : "Select item"}
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
                 data-testid={\`\${item.id}-focus\`}
                 onClick={() => handleSelectItem(item.id)}
               >
@@ -1196,6 +1316,75 @@ ${export_helpers_block}
         )}
       </AdminDisclosureSection>
 
+      <AdminDisclosureSection
+        title="${BULK_SECTION_TITLE}"
+        subtitle="${BULK_SECTION_DESCRIPTION}"
+        badge="Bulk starter"
+        testId="${SURFACE_SLUG}-bulk-starter"
+      >
+        <div className="adminFilterActions">
+          <button
+            type="button"
+            className="secondaryButton"
+            data-testid="${SURFACE_SLUG}-bulk-preset-one"
+            onClick={() => handleApplyBulkPreset("${BULK_PRESET_ONE_SEGMENT}")}
+          >
+            ${BULK_PRESET_ONE_LABEL}
+          </button>
+          <button
+            type="button"
+            className="secondaryButton"
+            data-testid="${SURFACE_SLUG}-bulk-preset-two"
+            onClick={() => handleApplyBulkPreset("${BULK_PRESET_TWO_SEGMENT}")}
+          >
+            ${BULK_PRESET_TWO_LABEL}
+          </button>
+        </div>
+        <p className="formHint" data-testid="${SURFACE_SLUG}-bulk-selection-summary">
+          Selected {selectedItemIds.length} · Visible {filteredItems.length}
+        </p>
+        <label className="field">
+          <span>Bulk status</span>
+          <select
+            data-testid="${SURFACE_SLUG}-bulk-status"
+            value={bulkStatusValue}
+            onChange={(event) => setBulkStatusValue(event.target.value)}
+          >
+            {bulkStatusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="secondaryButton"
+          data-testid="${SURFACE_SLUG}-bulk-apply"
+          onClick={handleApplyBulkAction}
+          disabled={!selectedItemIds.length || !bulkStatusValue}
+        >
+          ${BULK_APPLY_LABEL}
+        </button>
+      </AdminDisclosureSection>
+
+      <AdminDisclosureSection
+        title="Starter mutation contract"
+        subtitle="Use this payload preview to wire the first real write path instead of inventing request shape from scratch."
+        badge="Mutation"
+        testId="${SURFACE_SLUG}-mutation-starter"
+      >
+        <p className="formHint">
+          <strong>Route:</strong> ${MUTATION_ROUTE_LABEL}
+        </p>
+        <p className="formHint">
+          <strong>Selected:</strong> {selectedItems.map((item) => item.label).join(", ") || "Nothing selected"}
+        </p>
+        <pre className="workspaceCodeBlock" data-testid="${SURFACE_SLUG}-mutation-payload">
+          {JSON.stringify(starterMutationPreview, null, 2)}
+        </pre>
+      </AdminDisclosureSection>
+
       <article className="card formCard">
         <AdminFilterFooter
           summary="Use this scaffold as the first pass for a real admin review surface, not as a permanent mock screen."
@@ -1223,6 +1412,7 @@ ${export_section}
           <li>Replace the static queue with the first real backend payload.</li>
           <li>Keep only the filters and secondary sections that support one concrete admin workflow.</li>
           <li>Replace ${PRIMARY_ACTION_LABEL} and ${SECONDARY_ACTION_LABEL} with the first real mutation path.</li>
+          <li>Reuse the starter bulk panel and mutation preview instead of designing first-write contracts from scratch.</li>
         </ol>
       </AdminDisclosureSection>
     </main>
@@ -1250,6 +1440,8 @@ def list_${PY_SLUG}_items(query: str = "") -> dict:
             if normalized_query in item["label"].lower()
             or normalized_query in item["status"].lower()
             or normalized_query in item["note"].lower()
+            or normalized_query in item.get("meta", "").lower()
+            or normalized_query in item.get("segment", "").lower()
         ]
 
     return {
@@ -1261,6 +1453,8 @@ def list_${PY_SLUG}_items(query: str = "") -> dict:
             "segment_filter_label": "${SEGMENT_FILTER_LABEL}",
             "primary_action_label": "${PRIMARY_ACTION_LABEL}",
             "secondary_action_label": "${SECONDARY_ACTION_LABEL}",
+            "bulk_action_label": "${BULK_APPLY_LABEL}",
+            "mutation_route": "${MUTATION_ROUTE_LABEL}",
             "next_step": "Replace stub data with the first real repository-backed workflow.",
         },
     }
@@ -1354,6 +1548,8 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
                 "segment_filter_label": "${SEGMENT_FILTER_LABEL}",
                 "primary_action_label": "${PRIMARY_ACTION_LABEL}",
                 "secondary_action_label": "${SECONDARY_ACTION_LABEL}",
+                "bulk_action_label": "${BULK_APPLY_LABEL}",
+                "mutation_route": "${MUTATION_ROUTE_LABEL}",
                 "next_step": "Replace stub data with the first real repository-backed workflow.",
             },
         }
@@ -1405,6 +1601,8 @@ class ${PASCAL_NAME}Summary(BaseModel):
     segment_filter_label: str
     primary_action_label: str
     secondary_action_label: str
+    bulk_action_label: str
+    mutation_route: str
     next_step: str
 
 

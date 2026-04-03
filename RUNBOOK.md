@@ -278,6 +278,7 @@ Those richer flags now also generate real starter wiring for URL state, filter c
 Add `--preset users`, `--preset upgrade-requests`, or `--preset servers` when the feature already clearly matches one of those common DeployMate surface families.
 Presets now also change the starter action flow itself, so the generated surface already includes the first local decision pattern for that family instead of a queue-only mock.
 The generated page now also gets a preset-specific segment/workflow filter and richer card context fields, so the starter slice is closer to the actual entity shape you will build next.
+The scaffold now also includes a starter bulk-action panel and a mutation payload preview, so the first write contract is visible immediately instead of being invented ad hoc later.
 
 The CI, staging, and production workflows now write a short GitHub job summary with the chosen surface, smoke mode, requested commit SHA, deployed SHA, and target URL so the result is readable without opening raw logs.
 

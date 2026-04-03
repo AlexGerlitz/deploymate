@@ -340,6 +340,8 @@ The scaffold is now also entity-aware inside the generated page itself:
 - richer sample fields like context/meta instead of only label + status
 - dynamic summary cards driven by the current filtered starter slice
 - queue cards that already show the extra entity context you will usually need in the first real review pass
+- bulk starter actions tied to the visible slice
+- mutation payload preview for the first real write path
 
 ## Product Starter
 
