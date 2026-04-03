@@ -207,6 +207,8 @@ Recommended PR-first daily flow:
 git switch develop
 git pull --ff-only origin develop
 make start-pr-branch SLUG=my-change
+make git-doctor
+make ship-pr SLUG=my-change MESSAGE="Describe the change"
 ```
 
 Then:
@@ -219,6 +221,14 @@ Then:
 6. wait with `make pr-watch`
 7. merge with `make pr-land`
 
+If you want to compress even more of the Git overhead into one path:
+
+```bash
+make ship-pr SLUG=my-change MESSAGE="Describe the change"
+make pr-watch
+make pr-land-sync
+```
+
 Notes:
 
 - PR CI already runs the same release gate as direct `develop` pushes
@@ -230,7 +240,9 @@ Notes:
 - `make pr-doctor` now also compares the current local commit, the last locally verified commit, and the PR head SHA on GitHub so stale local green runs or unpushed commits are obvious before review
 - `make pr-watch` waits on GitHub checks and then refreshes doctor output
 - `make pr-land` refuses to merge unless doctor is clean, local `HEAD` matches the PR head SHA, and PR checks are green
+- `make pr-land-sync` merges the PR and then fast-forwards `main` from `develop`
 - `make dev-doctor` gives one compact local summary of recommended loop, timing bottleneck, and PR doctor state
+- `make git-doctor` gives one compact Git-only summary of branch cleanliness, upstream drift, stale lock state, and the most useful next Git command
 - doctor commands now also support `--format shell`, so future repos can automate around them without parsing human-oriented text
 
 For daily iteration speed on staging:

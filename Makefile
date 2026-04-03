@@ -1,4 +1,4 @@
-.PHONY: scaffold-deploymate-surface scaffold-product-resource export-product-starter bootstrap-product-starter dev-doctor start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core bootstrap-core-init upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: scaffold-deploymate-surface scaffold-product-resource export-product-starter bootstrap-product-starter dev-doctor git-doctor ship-pr sync-main pr-land-sync start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core bootstrap-core-init upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
 
 scaffold-deploymate-surface:
 	bash scripts/scaffold_deploymate_surface.sh $(TARGET_DIR) $(SURFACE_FLAGS)
@@ -14,6 +14,18 @@ bootstrap-product-starter:
 
 dev-doctor:
 	bash scripts/dev_doctor.sh
+
+git-doctor:
+	bash scripts/git_doctor.sh $(GIT_DOCTOR_FLAGS)
+
+ship-pr:
+	bash scripts/ship_pr.sh --slug $(SLUG) --message $(MESSAGE) $(SHIP_PR_FLAGS)
+
+sync-main:
+	bash scripts/sync_main.sh $(SYNC_MAIN_FLAGS)
+
+pr-land-sync:
+	bash scripts/pr_land_sync.sh $(PR_LAND_SYNC_FLAGS)
 
 start-pr-branch:
 	bash scripts/start_pr_branch.sh $(SLUG)

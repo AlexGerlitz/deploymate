@@ -212,12 +212,15 @@ For daily coding, the shortest useful local checks are now:
 
 ```bash
 make start-pr-branch SLUG=my-change
+make git-doctor
+make ship-pr SLUG=my-change MESSAGE="Describe the change"
 make pr-ready
 make pr-open
 make pr-status
 make pr-doctor
 make pr-watch
 make pr-land
+make pr-land-sync
 make auto-local
 make dev-doctor
 make changed
@@ -236,7 +239,26 @@ make backend
 make fast
 make fast-hot
 make scaffold-deploymate-surface SURFACE_FLAGS="--name Review Inbox --slug review-inbox"
+make sync-main
 ```
+
+## Git Compression
+
+To spend less time on repetitive Git choreography, the repo now also has a compressed flow:
+
+```bash
+make git-doctor
+make ship-pr SLUG=my-change MESSAGE="Describe the change"
+make pr-watch
+make pr-land-sync
+```
+
+What these do:
+
+- `make git-doctor` tells you the next useful Git command from the current branch state
+- `make ship-pr ...` can create the feature branch, commit, run the PR-ready loop, push, and open the PR in one pass
+- `make sync-main` fast-forwards `main` from `develop`
+- `make pr-land-sync` lands the PR and then syncs `main`
 
 ## DeployMate Feature Scaffolds
 
