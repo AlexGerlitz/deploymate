@@ -724,6 +724,9 @@ export default function HomePage() {
       actionLabel: currentUser?.is_admin ? "Open upgrade inbox" : "Back to deployments",
     },
   ];
+  const firstRunContext = deployments.length > 0
+    ? "Start with the live service list and the priority card below. Open one deployment detail next, then open team/admin review only after the runtime story is clear."
+    : "Start with the workspace summary below. This environment has no live deployments yet, so the next useful step is either creating one or reviewing saved targets and templates.";
   const workspaceGlanceItems = [
     ...workspaceStatusItems,
     {
@@ -2045,7 +2048,7 @@ export default function HomePage() {
               <p>
                 {currentUser
                   ? `Logged in as ${currentUser.username}. ${workspacePriority}`
-                  : "Deployments, exports, diagnostics, and rollout visibility."}
+                  : "Deployments, review flows, diagnostics, and clearer runtime visibility."}
               </p>
             </div>
             <div className="buttonRow workspaceHeroActions">
@@ -2150,13 +2153,16 @@ export default function HomePage() {
               .
             </div>
           ) : null}
+          <div className="banner subtle" data-testid="workspace-first-pass-banner">
+            <strong>New here?</strong> {firstRunContext}
+          </div>
 
           <article className="card formCard workspaceGuidePanel" data-testid="workspace-guide-card">
             <div className="sectionHeader workspaceGuideHeader">
               <div>
-                <h2 data-testid="workspace-guide-title">Use the workspace in three moves</h2>
+                <h2 data-testid="workspace-guide-title">Use the workspace in three simple moves</h2>
                 <p className="formHint">
-                  Start with the current state, take the next rollout action, then open deeper controls only when they are needed.
+                  Start with the current state, take the next practical action, then open deeper controls only when they are needed.
                 </p>
               </div>
             </div>
@@ -2224,7 +2230,7 @@ export default function HomePage() {
               <div className="workspaceReviewerHeader">
                 <div>
                   <span className="eyebrow">Reviewer path</span>
-                  <strong>Show the strongest surfaces in one short pass</strong>
+                  <strong>See the strongest parts of the product in one short pass</strong>
                 </div>
                 <span className="workspaceReviewerBadge">60-second route</span>
               </div>

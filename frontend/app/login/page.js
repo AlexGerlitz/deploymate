@@ -5,21 +5,21 @@ const publicSignupEnabled =
 const reviewerChecklist = [
   {
     label: "01",
-    title: "Open the live workspace first",
+    title: "Enter the live workspace first",
     detail:
-      "Use demo access to land inside the product immediately, without needing account setup or verbal guidance.",
+      "Use demo access to land inside the product immediately, without needing account setup or a technical walkthrough.",
   },
   {
     label: "02",
-    title: "Read runtime state before clicking around",
+    title: "Read the current state before clicking around",
     detail:
       "Start with deployments, health, and the current priority signal so the product story is visible in one pass.",
   },
   {
     label: "03",
-    title: "Then open admin review surfaces",
+    title: "Then open the deeper review surfaces",
     detail:
-      "Users and upgrade review show that the product goes beyond runtime CRUD into operational governance.",
+      "Users and upgrade review show that the product goes beyond basic deploy CRUD into operational governance.",
   },
 ];
 
@@ -32,25 +32,25 @@ export default async function LoginPage({ searchParams }) {
     <main className="page authPage">
       <div className="container authShell">
         <section className="authMarketingPanel">
-          <div className="eyebrow">Operator entry</div>
-          <h1>Log into the product, not just another admin form.</h1>
+          <div className="eyebrow">Live product access</div>
+          <h1>Open the product and understand what it does in a couple of minutes.</h1>
           <p className="landingLead authLead">
-            DeployMate is positioned as a B2B control surface for teams that want visible
-            operations, cleaner release workflows, and a product they can actually show.
+            DeployMate is built for small teams that want a clearer way to deploy apps,
+            see what is healthy, and review follow-up work without living in the shell.
           </p>
 
           <div className="authProofGrid">
             <article className="authProofCard">
-              <span className="cardKicker">Runtime</span>
-              <strong>Deployments, logs, health, diagnostics, and activity in one place.</strong>
+              <span className="cardKicker">See the state</span>
+              <strong>Deployments, health, activity, and the current priority are visible right away.</strong>
             </article>
             <article className="authProofCard">
-              <span className="cardKicker">Admin</span>
-              <strong>Saved views, exports, bulk actions, backup dry-runs, and audit workflows.</strong>
+              <span className="cardKicker">Work from one app</span>
+              <strong>Templates, servers, team access, and upgrade review stay in the same product.</strong>
             </article>
             <article className="authProofCard">
-              <span className="cardKicker">Release</span>
-              <strong>Smoke-tested rollout discipline around the product instead of manual guesswork.</strong>
+              <span className="cardKicker">Go deeper when needed</span>
+              <strong>Diagnostics, exports, backup dry-runs, and release discipline are already built around it.</strong>
             </article>
           </div>
 
@@ -66,7 +66,8 @@ export default async function LoginPage({ searchParams }) {
 
           <div className="authAsideNote">
             <span className="landingMetaBadge">Live app</span>
-            <span className="landingMetaBadge">B2B product framing</span>
+            <span className="landingMetaBadge">Public trial</span>
+            <span className="landingMetaBadge">Guided first pass</span>
             <span className="landingMetaBadge">Operational visibility</span>
           </div>
         </section>
@@ -77,7 +78,7 @@ export default async function LoginPage({ searchParams }) {
               <div className="eyebrow">Secure access</div>
               <h1 data-testid="auth-login-title">Login</h1>
               <p className="formHint">
-                Enter your account to access the live workspace and admin surfaces.
+                Enter your account to access the live workspace, deployment details, and review surfaces.
               </p>
             </div>
             <div className="authCardBadge">Live product access</div>
@@ -123,10 +124,10 @@ export default async function LoginPage({ searchParams }) {
               className="linkButton authDemoAction"
               data-testid="auth-demo-submit-button"
             >
-              Explore live demo without registration
+              Open live demo without registration
             </button>
             <p className="formHint">
-              Opens the current demo workspace immediately, so a reviewer can see the product
+              Opens the current demo workspace immediately so you can judge the product
               before creating an account.
             </p>
             <div className="authDemoGuide" data-testid="auth-demo-guide">
@@ -161,7 +162,7 @@ export default async function LoginPage({ searchParams }) {
             <Link href="/" className="linkButton">
               Back to homepage
             </Link>
-            <span className="authFooterNote">Built for B2B demos, operator workflows, and admin visibility.</span>
+            <span className="authFooterNote">Built to make deployment, review, and admin work easier to understand.</span>
           </div>
         </article>
       </div>
