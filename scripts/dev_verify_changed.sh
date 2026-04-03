@@ -136,6 +136,7 @@ runtime_audit_reason=""
 security_audit_reason=""
 backend_fast_reason=""
 frontend_fast_reason=""
+backend_syntax_reason=""
 while IFS='=' read -r key value; do
   case "$key" in
     surface)
@@ -204,6 +205,28 @@ done <<< "$security_audit_output"
 DEPLOYMATE_CHANGED_FILES="$(printf '%s\n' "${changed_files[@]}")"
 export DEPLOYMATE_CHANGED_FILES
 echo "[dev-verify-changed] security audit: ${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full} (${security_audit_reason})"
+
+backend_syntax_output="$(bash scripts/detect_backend_syntax_scope.sh "${changed_files[@]}")"
+printf '%s\n' "$backend_syntax_output"
+while IFS='=' read -r key value; do
+  case "$key" in
+    backend_syntax_mode)
+      DEPLOYMATE_BACKEND_SYNTAX_MODE="$value"
+      export DEPLOYMATE_BACKEND_SYNTAX_MODE
+      ;;
+    backend_python_files)
+      DEPLOYMATE_BACKEND_PYTHON_FILES="$value"
+      export DEPLOYMATE_BACKEND_PYTHON_FILES
+      ;;
+    reason)
+      backend_syntax_reason="$value"
+      ;;
+  esac
+done <<< "$backend_syntax_output"
+echo "[dev-verify-changed] backend syntax: ${DEPLOYMATE_BACKEND_SYNTAX_MODE:-full} (${backend_syntax_reason})"
+if [ -n "${DEPLOYMATE_BACKEND_PYTHON_FILES:-}" ]; then
+  echo "[dev-verify-changed] backend syntax files: $DEPLOYMATE_BACKEND_PYTHON_FILES"
+fi
 
 echo "[dev-verify-changed] running fast gate for surface: $surface"
 if [ "$surface" = "backend" ] || [ "$surface" = "full" ]; then

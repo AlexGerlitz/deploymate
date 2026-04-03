@@ -232,6 +232,7 @@ The fast gate intentionally uses fewer resources:
 - frontend mixed/shared diffs can now skip fast frontend smokes entirely when no frontend contract changed, instead of always booting the shared smoke server
 - backend: targeted tests from changed files when possible, otherwise the focused safety suite
 - backend mixed/shared diffs can now skip the fast backend suite entirely when no backend contract changed, instead of paying the safety-suite cost by default
+- backend syntax in preflight now narrows to changed backend Python files when possible and skips entirely for frontend-only local diffs
 - preflight: skips the production frontend build in fast mode
 - fast frontend mode now reuses one shared smoke dev server instead of starting a separate `next dev` process per smoke
 - the heavier frontend gate also reuses shared smoke servers for the main smoke pack

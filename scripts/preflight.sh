@@ -89,9 +89,17 @@ if [ -d "backend/app" ] && { [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full"
   backend_syntax_start_ts="$(date +%s)"
   echo "[preflight] backend syntax check"
   python_files=()
-  while IFS= read -r file; do
-    python_files+=("$file")
-  done < <(find backend/app -type f -name '*.py' | sort)
+  if [ "${DEPLOYMATE_BACKEND_SYNTAX_MODE:-full}" = "skip" ]; then
+    echo "[preflight] backend syntax skipped for this local diff"
+  elif [ "${DEPLOYMATE_BACKEND_SYNTAX_MODE:-full}" = "targeted" ] && [ -n "${DEPLOYMATE_BACKEND_PYTHON_FILES:-}" ]; then
+    IFS=' ' read -r -a python_files <<< "$DEPLOYMATE_BACKEND_PYTHON_FILES"
+    echo "[preflight] backend syntax scope: targeted"
+  else
+    while IFS= read -r file; do
+      python_files+=("$file")
+    done < <(find backend/app -type f -name '*.py' | sort)
+    echo "[preflight] backend syntax scope: full"
+  fi
   if [ "${#python_files[@]}" -gt 0 ]; then
     python3 -m py_compile "${python_files[@]}"
   fi
