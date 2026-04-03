@@ -33,6 +33,9 @@ For the fastest local loop, use the new lightweight commands:
 ```bash
 make changed
 make profile-changed
+make profile-frontend
+make profile-backend
+make profile-fast
 make frontend
 make backend
 make fast
