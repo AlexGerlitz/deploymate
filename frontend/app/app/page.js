@@ -118,6 +118,23 @@ async function readJsonOrError(response, fallbackMessage) {
   return payload;
 }
 
+async function readErrorMessageFromResponse(response, fallbackMessage) {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload.detail === "string" && payload.detail.trim()) {
+        return payload.detail;
+      }
+    } catch {
+      return fallbackMessage;
+    }
+  }
+
+  return fallbackMessage;
+}
+
 function buildTemplateDiff(template, currentDraft, servers) {
   if (!template) {
     return [];
@@ -609,6 +626,9 @@ export default function HomePage() {
     templates,
   });
   const opsSnapshot = opsOverview || derivedOpsSnapshot;
+  const degradedOpsAttentionItems = opsSnapshot.attention_items.filter((item) =>
+    item.title.includes("temporarily unavailable"),
+  );
   const workspacePriority =
     opsSnapshot.attention_items[0]?.title ||
     (opsSnapshot.deployments.failed > 0
@@ -1912,7 +1932,13 @@ export default function HomePage() {
         credentials: "include",
       });
       if (!response.ok) {
-        throw new Error("Export request failed.");
+        const detail = await readErrorMessageFromResponse(
+          response,
+          `Failed to download ${filename}.`,
+        );
+        const error = new Error(detail);
+        error.status = response.status;
+        throw error;
       }
       const blob = await response.blob();
       triggerFileDownload(filename, blob);
@@ -2072,6 +2098,12 @@ export default function HomePage() {
           {templateDeployError ? <div className="banner error">{templateDeployError}</div> : null}
           {opsActionError ? <div className="banner error">{opsActionError}</div> : null}
           {opsActionMessage ? <div className="banner success">{opsActionMessage}</div> : null}
+          {degradedOpsAttentionItems.length > 0 ? (
+            <div className="banner subtle" data-testid="ops-degraded-banner">
+              Some workspace signals are in degraded mode right now:{" "}
+              {degradedOpsAttentionItems.map((item) => item.title).join(" · ")}.
+            </div>
+          ) : null}
           {currentUser?.must_change_password ? (
             <div className="banner error">
               You are still using the default admin password.{" "}

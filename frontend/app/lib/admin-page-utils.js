@@ -17,6 +17,23 @@ export async function readJsonOrError(response, fallbackMessage) {
   return payload;
 }
 
+export async function readErrorMessageFromResponse(response, fallbackMessage) {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload.detail === "string" && payload.detail.trim()) {
+        return payload.detail;
+      }
+    } catch {
+      return fallbackMessage;
+    }
+  }
+
+  return fallbackMessage;
+}
+
 export function triggerFileDownload(filename, blob) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

@@ -2278,6 +2278,17 @@ button.landingButton.primaryButton:disabled {
 }
 
 @media (max-width: 640px) {
+  .page,
+  .landingSection {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .page {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
   .landingTopbar {
     position: static;
   }
@@ -2286,6 +2297,146 @@ button.landingButton.primaryButton:disabled {
   .header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .landingTopbarInner .buttonRow,
+  .landingHeroCopy .buttonRow,
+  .workspaceHeroActions,
+  .formActions,
+  .runtimePrimaryActions,
+  .actionCluster,
+  .adminFilterActions,
+  .adminSavedViewActions {
+    width: 100%;
+  }
+
+  .landingTopbarInner .buttonRow > *,
+  .landingHeroCopy .buttonRow > *,
+  .workspaceHeroActions > *,
+  .formActions > *,
+  .runtimePrimaryActions > *,
+  .actionCluster > *,
+  .adminFilterActions > *,
+  .adminSavedViewActions > * {
+    width: 100%;
+  }
+
+  .landingHero,
+  .workspaceHero,
+  .authMarketingPanel,
+  .authCard,
+  .landingCard,
+  .stepCard,
+  .pricingCard,
+  .formCard,
+  .card,
+  .adminDisclosureSummary,
+  .adminDisclosureBody {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .landingHero,
+  .workspaceHero,
+  .authMarketingPanel,
+  .authCard,
+  .formCard {
+    border-radius: 24px;
+  }
+
+  .landingHeroCopy h1,
+  .authMarketingPanel h1,
+  .header h1 {
+    font-size: clamp(30px, 9vw, 40px);
+    line-height: 1;
+  }
+
+  .landingLead,
+  .authLead,
+  .sectionLead {
+    font-size: 16px;
+  }
+
+  .overviewValue,
+  .workspaceHeroMetric strong,
+  .showcaseMetric strong {
+    font-size: 28px;
+  }
+
+  .workspaceHeroMetric,
+  .workspaceHeroBadge,
+  .showcaseMetric,
+  .showcasePanel,
+  .showcaseCommandDeck,
+  .landingCard,
+  .capabilityCard,
+  .proofCard,
+  .workspaceStatusCard,
+  .overviewCard,
+  .overviewAttentionItem,
+  .authProofCard {
+    padding: 14px 15px;
+  }
+
+  .workspaceHeroSummary,
+  .landingHeroSummary,
+  .landingPathGrid,
+  .landingSignalRail,
+  .showcaseScoreboard,
+  .showcasePanels,
+  .workspaceGuideGrid,
+  .workspaceStatusStrip,
+  .overviewGrid,
+  .bulkActionsGrid,
+  .backupManifestGrid {
+    gap: 10px;
+  }
+
+  .workspaceHeroActions {
+    justify-content: stretch;
+  }
+
+  .workspacePrimaryAction,
+  .runtimePrimaryActions .landingButton,
+  .deploymentSearch,
+  .toolbarField {
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+  }
+
+  .workspaceMetaLine,
+  .adminDisclosureSummary,
+  .adminSavedViewCard,
+  .showcaseCommandHeader,
+  .sectionHeader,
+  .authCardHeader,
+  .authCardFooter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .adminDisclosureMeta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .adminSavedViewCard {
+    align-items: stretch;
+  }
+
+  .adminSavedViewActions,
+  .overviewActionRail,
+  .backupActionGroup,
+  .actions {
+    width: 100%;
+  }
+
+  .adminSavedViewActions > *,
+  .overviewActionRail > *,
+  .backupActionGroup > *,
+  .actions > * {
+    width: 100%;
   }
 
   .authCardHeader,
@@ -2301,6 +2452,19 @@ button.landingButton.primaryButton:disabled {
 
   .envRow {
     grid-template-columns: 1fr;
+  }
+
+  .bulkActionToolbar,
+  .bulkQuickActions,
+  .bulkApplyPanel,
+  .workspaceGlancePanel {
+    padding: 14px;
+  }
+
+  .showcaseCommandStatus,
+  .authCardBadge,
+  .landingMetaBadge {
+    white-space: normal;
   }
 }
 

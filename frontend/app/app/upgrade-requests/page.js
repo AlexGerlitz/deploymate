@@ -836,8 +836,8 @@ function UpgradeRequestsPageContent() {
         ) : null}
 
         <AdminDisclosureSection
-          title="Audit and review tools"
-          subtitle="Recent activity and saved audit presets stay available here without crowding the main queue."
+          title="Audit history"
+          subtitle="Open this after queue review when you need activity detail, exports, or an audit preset."
           badge={`${visibleAuditEvents.length} activity`}
           testId="upgrade-advanced-tools"
         >
@@ -914,8 +914,8 @@ function UpgradeRequestsPageContent() {
 
         <article className="card formCard">
           <div className="sectionHeader">
-            <h2>Inbox filters</h2>
-            <p className="formHint">Filter by status or current plan, then search requester details.</p>
+            <h2>Start with inbox review</h2>
+            <p className="formHint">Filter the queue first, then work through the request cards below. Bulk and audit tools come after that.</p>
           </div>
           <div className="deploymentControls">
             <div className="filterTabs" role="tablist" aria-label="Upgrade status filters">
@@ -1025,6 +1025,23 @@ function UpgradeRequestsPageContent() {
           />
         </article>
 
+        <article className="card formCard">
+          <div className="sectionHeader">
+            <div>
+              <h2>Current queue slice</h2>
+              <p className="formHint">
+                Treat the request cards below as the primary review surface. Saved views, bulk changes, and audit stay secondary.
+              </p>
+            </div>
+          </div>
+          <div className="backupSummaryBadges">
+            <span className="status info">visible {filteredRequests.length}</span>
+            <span className="status unknown">selected {selectedRequestIds.length}</span>
+            <span className="status unknown">new {filteredRequests.filter((item) => item.status === "new").length}</span>
+            <span className="status unknown">in review {filteredRequests.filter((item) => item.status === "in_review").length}</span>
+          </div>
+        </article>
+
         {loading && requests.length === 0 ? (
           <div className="empty">Loading review queue...</div>
         ) : null}
@@ -1034,8 +1051,8 @@ function UpgradeRequestsPageContent() {
         ) : null}
 
         <AdminDisclosureSection
-          title="Saved views and bulk tools"
-          subtitle="Reusable queue presets and larger review actions stay one click away."
+          title="After review: saved views and bulk changes"
+          subtitle="Use these controls once the current queue is filtered to the slice you want to act on."
           badge={`${savedViews.length} saved`}
           testId="upgrade-power-tools"
         >
@@ -1133,8 +1150,8 @@ function UpgradeRequestsPageContent() {
           <div className="sectionHeader">
             <div>
               <span className="adminToolEyebrow">Review actions</span>
-              <h2 data-testid="upgrade-bulk-title">Bulk inbox actions</h2>
-              <p className="formHint">Bulk selection follows the current review queue, so status changes stay tied to what is on screen.</p>
+              <h2 data-testid="upgrade-bulk-title">Bulk status changes</h2>
+              <p className="formHint">Bulk selection follows the current review queue, so status changes stay tied to the requests on screen.</p>
               <p className="formHint" data-testid="upgrade-bulk-selection-summary">
                 Selected {selectedRequestIds.length} · Visible {filteredRequests.length}
               </p>

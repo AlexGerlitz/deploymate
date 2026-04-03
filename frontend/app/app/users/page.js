@@ -40,6 +40,7 @@ import {
   copyTextToClipboard,
   createChoiceFilterDefinition,
   createTextFilterDefinition,
+  readErrorMessageFromResponse,
   readJsonOrError,
   sortItemsByDateMode,
   triggerFileDownload,
@@ -767,7 +768,9 @@ function UsersPageContent() {
         credentials: "include",
       });
       if (!response.ok) {
-        throw new Error("Failed to download users export.");
+        throw new Error(
+          await readErrorMessageFromResponse(response, "Failed to download users export."),
+        );
       }
       const blob = await response.blob();
       triggerFileDownload("deploymate-admin-users.csv", blob);
@@ -786,7 +789,9 @@ function UsersPageContent() {
         credentials: "include",
       });
       if (!response.ok) {
-        throw new Error("Failed to download admin audit export.");
+        throw new Error(
+          await readErrorMessageFromResponse(response, "Failed to download admin audit export."),
+        );
       }
       const blob = await response.blob();
       triggerFileDownload("deploymate-admin-audit-events.csv", blob);
@@ -826,7 +831,9 @@ function UsersPageContent() {
         credentials: "include",
       });
       if (!response.ok) {
-        throw new Error("Failed to download backup bundle.");
+        throw new Error(
+          await readErrorMessageFromResponse(response, "Failed to download backup bundle."),
+        );
       }
       const blob = await response.blob();
       triggerFileDownload("deploymate-backup-bundle.json", blob);
@@ -1123,8 +1130,8 @@ function UsersPageContent() {
         ) : null}
 
         <AdminDisclosureSection
-          title="Recovery and audit tools"
-          subtitle="Advanced review utilities, restore validation, and saved audit presets live here."
+          title="Advanced audit and recovery"
+          subtitle="Open this when review needs an audit trail, export artifact, or restore validation."
           badge={`${visibleAuditEvents.length} activity`}
           testId="users-advanced-tools"
         >
@@ -1443,9 +1450,9 @@ function UsersPageContent() {
 
         <article className="card formCard">
           <div className="sectionHeader">
-            <h2>Users overview</h2>
+            <h2>Start with team access review</h2>
             <p className="formHint">
-              Filter by role or plan, and search by username.
+              Narrow the list first, then review or edit the teammate cards below. Creation and bulk tools come after that.
             </p>
           </div>
           <div className="deploymentControls">
@@ -1550,12 +1557,29 @@ function UsersPageContent() {
           />
         </article>
 
+        <article className="card formCard">
+          <div className="sectionHeader">
+            <div>
+              <h2>Current review slice</h2>
+              <p className="formHint">
+                Use the list below as the main working surface for access changes. Secondary tools stay lower on the page.
+              </p>
+            </div>
+          </div>
+          <div className="backupSummaryBadges">
+            <span className="status info">visible {filteredUsers.length}</span>
+            <span className="status unknown">selected {selectedUserIds.length}</span>
+            <span className="status unknown">admins {filteredUsers.filter((user) => user.role === "admin").length}</span>
+            <span className="status unknown">security follow-up {filteredUsers.filter((user) => user.must_change_password).length}</span>
+          </div>
+        </article>
+
         <article className="card formCard adminToolCard">
           <div className="adminToolHeader">
-            <span className="adminToolEyebrow">Access setup</span>
-            <h2>Create user</h2>
+            <span className="adminToolEyebrow">After review</span>
+            <h2>Add teammate</h2>
             <p className="adminToolMeta">
-              Add a teammate with a temporary password, then tighten access and plan after the account is created.
+              Create a new account once the current access view is settled.
             </p>
           </div>
           <form className="form" onSubmit={handleCreateUser}>
@@ -1607,8 +1631,8 @@ function UsersPageContent() {
         </article>
 
         <AdminDisclosureSection
-          title="Saved views and bulk tools"
-          subtitle="Power-user shortcuts for repeated access reviews and larger edits."
+          title="After review: saved views and bulk changes"
+          subtitle="Use these shortcuts once the current team-access view looks right."
           badge={`${savedViews.length} saved`}
           testId="users-power-tools"
         >
@@ -1706,9 +1730,9 @@ function UsersPageContent() {
           <div className="sectionHeader">
             <div>
               <span className="adminToolEyebrow">Admin actions</span>
-              <h2 data-testid="users-bulk-title">Bulk user actions</h2>
+              <h2 data-testid="users-bulk-title">Bulk access changes</h2>
               <p className="formHint">
-                Bulk selection follows the current server-side list, so every change stays aligned with the view above.
+                Bulk selection follows the current server-side list, so changes stay aligned with the review view above.
               </p>
               <p className="formHint" data-testid="users-bulk-selection-summary">
                 Selected {selectedUserIds.length} · Visible {filteredUsers.length}
