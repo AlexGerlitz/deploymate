@@ -1034,6 +1034,40 @@ def build_${PY_SLUG}_starter_summary(query: str = "") -> dict:
         "mutation_route": "${MUTATION_ROUTE_LABEL}",
         "next_step": "Replace stub data with the first real repository-backed workflow.",
     }
+
+
+def apply_${PY_SLUG}_starter_action(item_id: str, action: str, note: str = "") -> dict:
+    matched_item = next((item for item in STARTER_ITEMS if item["id"] == item_id), None)
+    if matched_item is None:
+        return {
+            "item": None,
+            "mutation": {
+                "action": action,
+                "applied": False,
+                "item_id": item_id,
+                "note": note,
+                "reason": "starter item not found",
+            },
+        }
+
+    next_status = "${PRIMARY_ACTION_STATUS}" if action == "primary" else "${SECONDARY_ACTION_STATUS}"
+    next_note = "${PRIMARY_ACTION_NOTE}" if action == "primary" else "${SECONDARY_ACTION_NOTE}"
+
+    updated_item = {
+        **matched_item,
+        "status": next_status,
+        "note": f"{next_note} Note: {note}".strip() if note else next_note,
+    }
+    return {
+        "item": updated_item,
+        "mutation": {
+            "action": action,
+            "applied": True,
+            "item_id": item_id,
+            "note": note,
+            "reason": "starter mutation applied locally",
+        },
+    }
 EOF
 )"
 
@@ -1490,8 +1524,13 @@ safe_write "$backend_route_path" "$(cat <<EOF
 from fastapi import APIRouter, Depends, Query
 
 from app.services.auth import require_admin
-from app.schemas import ${PASCAL_NAME}ListResponse
+from app.schemas import (
+    ${PASCAL_NAME}ListResponse,
+    ${PASCAL_NAME}StarterActionRequest,
+    ${PASCAL_NAME}StarterActionResponse,
+)
 from app.services.${PY_SLUG} import list_${PY_SLUG}_items
+from app.services.${PY_SLUG}_starter import apply_${PY_SLUG}_starter_action
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -1500,6 +1539,20 @@ router = APIRouter(dependencies=[Depends(require_admin)])
 @router.get("${API_PREFIX}", response_model=${PASCAL_NAME}ListResponse)
 def get_${PY_SLUG}(q: str = Query(default="")) -> ${PASCAL_NAME}ListResponse:
     return ${PASCAL_NAME}ListResponse(**list_${PY_SLUG}_items(query=q))
+
+
+@router.post("${API_PREFIX}/{item_id}/starter-action", response_model=${PASCAL_NAME}StarterActionResponse)
+def run_${PY_SLUG}_starter_action(
+    item_id: str,
+    payload: ${PASCAL_NAME}StarterActionRequest,
+) -> ${PASCAL_NAME}StarterActionResponse:
+    return ${PASCAL_NAME}StarterActionResponse(
+        **apply_${PY_SLUG}_starter_action(
+            item_id=item_id,
+            action=payload.action,
+            note=payload.note or "",
+        )
+    )
 EOF
 )"
 
@@ -1531,6 +1584,10 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
                 "app.routes.${PY_SLUG}.list_${PY_SLUG}_items",
                 side_effect=self._list_items,
             ),
+            patch(
+                "app.routes.${PY_SLUG}.apply_${PY_SLUG}_starter_action",
+                side_effect=self._apply_action,
+            ),
         ]
 
         for patcher in self.patchers:
@@ -1540,8 +1597,8 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
         self.addCleanup(app.dependency_overrides.clear)
         self.client = TestClient(app)
 
-    def _list_items(self):
-        return self._list_items_for_query("")
+    def _list_items(self, query=""):
+        return self._list_items_for_query(query)
 
     def _list_items_for_query(self, query):
         return {
@@ -1600,6 +1657,36 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["query"], "follow")
         self.assertEqual(len(payload["items"]), 1)
 
+    def _apply_action(self, item_id, action, note=""):
+        return {
+            "item": {
+                "id": item_id,
+                "label": "Primary review queue",
+                "status": "${PRIMARY_ACTION_STATUS}" if action == "primary" else "${SECONDARY_ACTION_STATUS}",
+                "segment": "triage",
+                "meta": "Starter queue",
+                "note": note or "Starter mutation applied.",
+            },
+            "mutation": {
+                "action": action,
+                "applied": True,
+                "item_id": item_id,
+                "note": note,
+                "reason": "starter mutation applied locally",
+            },
+        }
+
+    def test_${PY_SLUG}_starter_action_flow(self):
+        response = self.client.post(
+            "${API_PREFIX}/${SURFACE_SLUG}-sample-1/starter-action",
+            json={"action": "primary", "note": "Ship this first"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["item"]["id"], "${SURFACE_SLUG}-sample-1")
+        self.assertEqual(payload["mutation"]["action"], "primary")
+        self.assertTrue(payload["mutation"]["applied"])
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -1634,6 +1721,24 @@ class ${PASCAL_NAME}Summary(BaseModel):
 class ${PASCAL_NAME}ListResponse(BaseModel):
     items: list[${PASCAL_NAME}Item] = Field(default_factory=list)
     summary: ${PASCAL_NAME}Summary
+
+
+class ${PASCAL_NAME}StarterActionRequest(BaseModel):
+    action: str
+    note: Optional[str] = None
+
+
+class ${PASCAL_NAME}StarterMutation(BaseModel):
+    action: str
+    applied: bool = False
+    item_id: str
+    note: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class ${PASCAL_NAME}StarterActionResponse(BaseModel):
+    item: Optional[${PASCAL_NAME}Item] = None
+    mutation: ${PASCAL_NAME}StarterMutation
 EOF
 fi
 
