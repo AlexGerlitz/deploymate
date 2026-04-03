@@ -295,6 +295,15 @@ summary:focus-visible {
   align-items: center;
 }
 
+.runtimePrimaryActions {
+  align-items: center;
+}
+
+.runtimePrimaryActions .landingButton {
+  min-width: 220px;
+  justify-content: center;
+}
+
 .backupUploadButton {
   position: relative;
   overflow: hidden;
@@ -2090,6 +2099,10 @@ button.landingButton.primaryButton:disabled {
   border-radius: 28px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(246, 249, 252, 0.97) 100%);
+}
+
+.workspaceGuidePanel .adminDisclosure {
+  margin-bottom: 0;
 }
 
 .workspaceGuideHeader {

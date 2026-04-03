@@ -748,6 +748,13 @@ export default function DeploymentDetailsPage({ params }) {
               <Link href="/app" className="linkButton workspaceSecondaryAction">
                 Back
               </Link>
+              <Link
+                href="#runtime-detail-redeploy"
+                className="landingButton primaryButton workspacePrimaryAction"
+                data-testid="runtime-detail-open-redeploy-button"
+              >
+                Prepare rollout change
+              </Link>
               {deploymentUrl ? (
                 <a
                   href={deploymentUrl}
@@ -761,26 +768,12 @@ export default function DeploymentDetailsPage({ params }) {
               ) : null}
               <button
                 type="button"
-                onClick={() => copyText(runtimeSummaryText, "Runtime summary")}
-                disabled={!runtimeSummaryText}
-                className="landingButton primaryButton workspacePrimaryAction"
-                data-testid="runtime-detail-copy-summary-button"
+                onClick={() => loadDeploymentDetails()}
+                disabled={loading}
+                className="workspaceGhostAction"
+                data-testid="runtime-detail-refresh-button"
               >
-                Copy summary
-              </button>
-              <button type="button" onClick={() => loadDeploymentDetails()} disabled={loading} className="workspaceGhostAction" data-testid="runtime-detail-refresh-button">
                 {loading ? "Refreshing..." : "Refresh"}
-              </button>
-              <button type="button" onClick={handleLogout} className="workspaceGhostAction">
-                Logout
-              </button>
-              <button
-                type="button"
-                className="dangerButton"
-                onClick={handleDelete}
-                disabled={deleting}
-              >
-                {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
@@ -940,8 +933,14 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </div>
 
-        <article className="card formCard" id="runtime-detail-redeploy">
-          <h2>Redeploy</h2>
+        <article className="card formCard adminToolCard" id="runtime-detail-redeploy">
+          <div className="adminToolHeader">
+            <span className="adminToolEyebrow">Next step</span>
+            <h2>Prepare the next rollout change</h2>
+            <p>
+              Adjust image, ports, or env vars here, then redeploy deliberately once this runtime is ready for an update.
+            </p>
+          </div>
           <form className="form" onSubmit={handleRedeploy}>
             <label className="field">
               <span>Image</span>
@@ -1052,8 +1051,8 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </div>
 
-            <div className="formActions">
-              <button type="submit" disabled={redeploying}>
+            <div className="formActions runtimePrimaryActions">
+              <button type="submit" className="landingButton primaryButton" disabled={redeploying}>
                 {redeploying ? "Redeploying..." : "Redeploy"}
               </button>
               {redeploying ? <span className="formHint">Redeploying container...</span> : null}
@@ -1064,7 +1063,54 @@ export default function DeploymentDetailsPage({ params }) {
           {redeploySuccess ? <div className="banner success">{redeploySuccess}</div> : null}
         </article>
 
-            <article className="card compactCard" data-testid="runtime-detail-summary-card">
+            <AdminDisclosureSection
+              title="Templates and runtime tools"
+              subtitle="Save this configuration for later, then open diagnostics, logs, and activity only when you need deeper runtime context."
+              badge={`${attentionItems.length} attention`}
+              testId="runtime-detail-secondary-tools"
+            >
+            <AdminDisclosureSection
+              title="Share and safety controls"
+              subtitle="Handoff actions, refresh, session exit, and deletion stay here so the main runtime path stays focused on review and rollout."
+              badge={deployment?.status || "unknown"}
+              testId="runtime-detail-utility-disclosure"
+            >
+            <article className="card compactCard adminToolCard" data-testid="runtime-detail-summary-card">
+              <div className="adminToolHeader">
+                <span className="adminToolEyebrow">Utility layer</span>
+                <h3>Share the current runtime or use account-level controls</h3>
+                <p>Use these controls for handoff, quick copy actions, or final destructive steps after review.</p>
+              </div>
+              <div className="actionCluster">
+                <button
+                  type="button"
+                  className="landingButton secondaryButton"
+                  onClick={() => copyText(runtimeSummaryText, "Runtime summary")}
+                  disabled={!runtimeSummaryText}
+                  data-testid="runtime-detail-copy-summary-button"
+                >
+                  Copy summary
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => loadDeploymentDetails()}
+                  disabled={loading}
+                >
+                  {loading ? "Refreshing..." : "Refresh runtime"}
+                </button>
+                <button type="button" className="secondaryButton" onClick={handleLogout}>
+                  Logout
+                </button>
+                <button
+                  type="button"
+                  className="dangerButton"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? "Deleting..." : "Delete deployment"}
+                </button>
+              </div>
               <div className="row">
                 <span className="label">Status</span>
                 <span className={`status ${deployment.status || "unknown"}`}>
@@ -1182,13 +1228,8 @@ export default function DeploymentDetailsPage({ params }) {
                 </span>
               </div>
             </article>
+            </AdminDisclosureSection>
 
-            <AdminDisclosureSection
-              title="Templates and runtime tools"
-              subtitle="Save this configuration for later, then open diagnostics, logs, and activity only when you need deeper runtime context."
-              badge={`${attentionItems.length} attention`}
-              testId="runtime-detail-secondary-tools"
-            >
             <article className="card compactCard" data-testid="runtime-detail-template-card">
               <div className="sectionHeader">
                 <div>
