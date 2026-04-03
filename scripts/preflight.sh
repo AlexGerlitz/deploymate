@@ -15,6 +15,13 @@ format_duration() {
   printf '%ss' "$seconds"
 }
 
+phase_cache_fingerprint() {
+  local cache_key="$1"
+  local metadata="$2"
+  shift 2 || true
+  audit_cache_fingerprint_inputs "$cache_key" "$metadata" "$@"
+}
+
 clean_frontend_build_artifacts() {
   local frontend_dir=""
   frontend_dir="$(automation_frontend_dir_rel)"
@@ -80,9 +87,27 @@ if [ -f "$(automation_frontend_dir_rel)/package.json" ] && { [ "$SURFACE" = "fro
     echo "[preflight] frontend build skipped in fast mode"
   else
     frontend_build_start_ts="$(date +%s)"
-    clean_frontend_build_artifacts
-    echo "[preflight] frontend build"
-    automation_frontend_npm run build
+    frontend_build_cache_key="preflight_frontend_build"
+    frontend_build_metadata="$(printf 'surface=%s\nfast=%s\nfrontend_dir=%s\n' "$SURFACE" "$FAST_MODE" "$(automation_frontend_dir_rel)")"
+    frontend_build_files=()
+    while IFS= read -r file; do
+      [ -n "$file" ] && frontend_build_files+=("$file")
+    done < <(git ls-files "$(automation_frontend_dir_rel)")
+    if [ -f ".env.production.example" ]; then
+      frontend_build_files+=(".env.production.example")
+    fi
+    frontend_build_fingerprint="$(phase_cache_fingerprint "$frontend_build_cache_key" "$frontend_build_metadata" "${frontend_build_files[@]}")"
+    if audit_cache_persistent_has "$frontend_build_cache_key" "$frontend_build_fingerprint"; then
+      echo "[preflight] frontend build cache hit"
+      audit_cache_record_event phase_hit "$frontend_build_cache_key"
+    else
+      echo "[preflight] frontend build cache miss"
+      audit_cache_record_event phase_miss "$frontend_build_cache_key"
+      clean_frontend_build_artifacts
+      echo "[preflight] frontend build"
+      automation_frontend_npm run build
+      audit_cache_persistent_mark "$frontend_build_cache_key" "$frontend_build_fingerprint"
+    fi
     frontend_build_duration=$(( $(date +%s) - frontend_build_start_ts ))
   fi
 fi
@@ -104,7 +129,18 @@ if [ -d "$(automation_backend_app_dir_rel)" ] && { [ "$SURFACE" = "backend" ] ||
     echo "[preflight] backend syntax scope: full"
   fi
   if [ "${#python_files[@]}" -gt 0 ]; then
-    python3 -m py_compile "${python_files[@]}"
+    backend_syntax_cache_key="preflight_backend_syntax"
+    backend_syntax_metadata="$(printf 'surface=%s\nfast=%s\nmode=%s\nfiles=%s\n' "$SURFACE" "$FAST_MODE" "${DEPLOYMATE_BACKEND_SYNTAX_MODE:-full}" "${python_files[*]}")"
+    backend_syntax_fingerprint="$(phase_cache_fingerprint "$backend_syntax_cache_key" "$backend_syntax_metadata" "${python_files[@]}")"
+    if audit_cache_persistent_has "$backend_syntax_cache_key" "$backend_syntax_fingerprint"; then
+      echo "[preflight] backend syntax cache hit"
+      audit_cache_record_event phase_hit "$backend_syntax_cache_key"
+    else
+      echo "[preflight] backend syntax cache miss"
+      audit_cache_record_event phase_miss "$backend_syntax_cache_key"
+      python3 -m py_compile "${python_files[@]}"
+      audit_cache_persistent_mark "$backend_syntax_cache_key" "$backend_syntax_fingerprint"
+    fi
   fi
   backend_syntax_duration=$(( $(date +%s) - backend_syntax_start_ts ))
 fi
