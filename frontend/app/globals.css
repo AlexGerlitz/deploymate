@@ -32,6 +32,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
 ::selection {
   background: rgba(201, 147, 56, 0.22);
 }
@@ -88,6 +93,83 @@ summary:focus-visible {
 .container {
   max-width: 880px;
   margin: 0 auto;
+}
+
+.siteFooter {
+  margin-top: 12px;
+  padding: 0 16px 28px;
+}
+
+.siteFooterInner {
+  display: grid;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(247, 249, 252, 0.9) 100%);
+  box-shadow: 0 20px 44px rgba(17, 24, 39, 0.06);
+  backdrop-filter: blur(14px);
+}
+
+.siteFooterBrand {
+  display: grid;
+  gap: 6px;
+}
+
+.siteFooterBrand strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.siteFooterBrand p,
+.siteFooterMeta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.siteFooterEyebrow {
+  color: #7a6240;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.siteFooterLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.siteFooterLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.siteFooterLink:hover {
+  transform: translateY(-1px);
+  border-color: rgba(19, 34, 56, 0.16);
+  box-shadow: 0 12px 24px rgba(17, 24, 39, 0.08);
+}
+
+.siteFooterMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
 }
 
 .narrowContainer {
@@ -2488,6 +2570,7 @@ button.landingButton.primaryButton:disabled {
 
   .landingTopbarInner .buttonRow,
   .landingHeroCopy .buttonRow,
+  .siteFooterLinks,
   .workspaceHeroActions,
   .formActions,
   .runtimePrimaryActions,
@@ -2499,6 +2582,7 @@ button.landingButton.primaryButton:disabled {
 
   .landingTopbarInner .buttonRow > *,
   .landingHeroCopy .buttonRow > *,
+  .siteFooterLinks > *,
   .workspaceHeroActions > *,
   .formActions > *,
   .runtimePrimaryActions > *,
@@ -2599,6 +2683,7 @@ button.landingButton.primaryButton:disabled {
   .sectionHeader,
   .authCardHeader,
   .authCardFooter,
+  .siteFooterMeta,
   .workspaceReviewerHeader {
     flex-direction: column;
     align-items: flex-start;
@@ -2653,6 +2738,17 @@ button.landingButton.primaryButton:disabled {
   .authCardBadge,
   .landingMetaBadge {
     white-space: normal;
+  }
+
+  .siteFooter {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-bottom: 20px;
+  }
+
+  .siteFooterInner {
+    padding: 16px;
+    border-radius: 22px;
   }
 }
 
