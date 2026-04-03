@@ -36,4 +36,4 @@ Two adapter files are expected to change first in another project:
 
 Everything else is intended to be the reusable core.
 
-The fast auth/ops/runtime smoke layer already reads checks from this adapter instead of hardcoding DeployMate page assertions inside the core scripts.
+Both the fast auth/ops/runtime smoke layer and the heavier admin/restore/servers/templates smoke layers now read checks from this adapter instead of hardcoding DeployMate page assertions inside the core scripts.
