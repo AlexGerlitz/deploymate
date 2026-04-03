@@ -36,3 +36,58 @@ jobs:
         run: bash scripts/release_workflow.sh --surface full
         env:
           BACKEND_PYTHON: python
+
+  staging-release:
+    needs: release-gate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect deploy surface
+        id: detect-surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$(bash scripts/detect_release_surface.sh '${{ github.event.before }}' '${{ github.sha }}')"
+          printf '%s\n' "$output"
+          while IFS='=' read -r key value; do
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done <<< "$output"
+
+      - name: Skip staging deploy
+        if: steps.detect-surface.outputs.should_deploy != '1'
+        run: echo "[ci] skipping staging deploy: ${{ steps.detect-surface.outputs.reason }}"
+
+      - name: Run staging release
+        if: steps.detect-surface.outputs.should_deploy == '1'
+        uses: ./.github/actions/remote-release
+        with:
+          surface: ${{ steps.detect-surface.outputs.surface }}
+          deploy_host: ${{ secrets.DEPLOY_HOST }}
+          base_url: ${{ secrets.DEPLOYMATE_BASE_URL }}
+          admin_username: ${{ secrets.DEPLOYMATE_ADMIN_USERNAME }}
+          admin_password: ${{ secrets.DEPLOYMATE_ADMIN_PASSWORD }}
+          deploy_ssh_private_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          deploy_ssh_known_hosts: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+          runtime_smoke_enabled: '1'
+          deploy_repo_dir: ${{ secrets.DEPLOY_REPO_DIR }}
+          deploy_branch: ${{ secrets.DEPLOY_BRANCH }}
+          deploy_ref: ${{ github.sha }}
+          deploy_env_file: ${{ secrets.DEPLOY_ENV_FILE }}
+          runtime_smoke_ssh_private_key: ${{ secrets.RUNTIME_SMOKE_SSH_PRIVATE_KEY }}
+          runtime_smoke_server_id: ${{ secrets.RUNTIME_SMOKE_SERVER_ID }}
+          runtime_smoke_server_name: ${{ secrets.RUNTIME_SMOKE_SERVER_NAME }}
+          runtime_smoke_server_host: ${{ secrets.RUNTIME_SMOKE_SERVER_HOST }}
+          runtime_smoke_server_port: ${{ secrets.RUNTIME_SMOKE_SERVER_PORT }}
+          runtime_smoke_server_username: ${{ secrets.RUNTIME_SMOKE_SERVER_USERNAME }}
+          runtime_smoke_image: ${{ secrets.RUNTIME_SMOKE_IMAGE }}
+          runtime_smoke_internal_port: ${{ secrets.RUNTIME_SMOKE_INTERNAL_PORT }}
+          runtime_smoke_external_port: ${{ secrets.RUNTIME_SMOKE_EXTERNAL_PORT }}
+          runtime_smoke_start_port: ${{ secrets.RUNTIME_SMOKE_START_PORT }}
+          runtime_smoke_health_timeout: ${{ secrets.RUNTIME_SMOKE_HEALTH_TIMEOUT }}

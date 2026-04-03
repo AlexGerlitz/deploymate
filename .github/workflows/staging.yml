@@ -17,42 +17,30 @@ on:
         required: true
         type: boolean
         default: true
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
-    branches:
-      - develop
 
 jobs:
   staging-release:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop')
     runs-on: ubuntu-latest
     environment: staging
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Run staging release
         uses: ./.github/actions/remote-release
         with:
-          surface: ${{ github.event_name == 'workflow_dispatch' && inputs.surface || 'full' }}
+          surface: ${{ inputs.surface }}
           deploy_host: ${{ secrets.DEPLOY_HOST }}
           base_url: ${{ secrets.DEPLOYMATE_BASE_URL }}
           admin_username: ${{ secrets.DEPLOYMATE_ADMIN_USERNAME }}
           admin_password: ${{ secrets.DEPLOYMATE_ADMIN_PASSWORD }}
           deploy_ssh_private_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           deploy_ssh_known_hosts: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
-          runtime_smoke_enabled: ${{ github.event_name == 'workflow_dispatch' && (inputs.runtime_smoke && '1' || '0') || '1' }}
+          runtime_smoke_enabled: ${{ inputs.runtime_smoke && '1' || '0' }}
           deploy_repo_dir: ${{ secrets.DEPLOY_REPO_DIR }}
           deploy_branch: ${{ secrets.DEPLOY_BRANCH }}
-          deploy_ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          deploy_ref: ${{ github.sha }}
           deploy_env_file: ${{ secrets.DEPLOY_ENV_FILE }}
           runtime_smoke_ssh_private_key: ${{ secrets.RUNTIME_SMOKE_SSH_PRIVATE_KEY }}
           runtime_smoke_server_id: ${{ secrets.RUNTIME_SMOKE_SERVER_ID }}

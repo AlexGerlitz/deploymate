@@ -87,12 +87,28 @@ If you want the same flow from GitHub instead of a workstation shell, use the ma
 
 Recommended promotion order:
 
-1. `develop` passes CI in `.github/workflows/ci.yml`
-2. staging deploy runs through `.github/workflows/staging.yml`
+1. push reviewed changes to `develop`
+2. `.github/workflows/ci.yml` runs the release gate and then auto-deploys the same commit to staging
 3. production deploy stays behind `.github/workflows/release.yml` or a manual `scripts/remote_release.sh` run
 
-The staging and production GitHub workflows both call the same reusable composite action in `.github/actions/remote-release/action.yml`, so deploy behavior stays aligned with `scripts/remote_release.sh`.
+The CI and release workflows call the same reusable composite action in `.github/actions/remote-release/action.yml`, so staging and production deploy behavior stays aligned with `scripts/remote_release.sh`.
 Those workflows pass the exact checked-out commit SHA into the remote helper, so the release host deploys the reviewed commit rather than whichever newer commit happens to land on the branch later.
+
+For daily iteration speed on staging:
+
+```bash
+git push origin develop
+```
+
+After the push:
+
+1. CI runs the local release gate
+2. if the commit changes only `frontend/`, staging deploy rebuilds `frontend`
+3. if the commit changes only `backend/`, staging deploy rebuilds `backend`
+4. mixed or shared changes fall back to a full staging deploy
+5. docs-only or workflow-only changes skip staging deploy entirely
+
+Use `.github/workflows/staging.yml` only as a manual fallback when you need to redeploy staging on demand.
 
 To verify that the release workflows and the documented GitHub secret contract still match:
 
