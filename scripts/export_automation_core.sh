@@ -104,6 +104,34 @@ make full
 Do not rewrite the orchestration first.
 
 Port the adapter files first, then only patch core scripts when the new project has a truly different workflow contract.
+
+## Upgrade An Existing Project
+
+For a project that already has this core installed:
+
+```bash
+bash scripts/upgrade_project_automation.sh /absolute/path/to/project
+```
+
+Or through `make`:
+
+```bash
+make upgrade-core TARGET_DIR=/absolute/path/to/project
+```
+
+Default behavior is safe:
+
+- adapter files are skipped
+- changed existing files are skipped
+- only missing or unchanged core files are updated automatically
+
+Useful flags:
+
+```bash
+bash scripts/upgrade_project_automation.sh /absolute/path/to/project --dry-run
+bash scripts/upgrade_project_automation.sh /absolute/path/to/project --force
+bash scripts/upgrade_project_automation.sh /absolute/path/to/project --force --include-adapters
+```
 EOF
 
 echo "[export-automation-core] bundle written to: $OUTPUT_DIR"

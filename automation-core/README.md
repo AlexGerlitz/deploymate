@@ -38,6 +38,18 @@ Or through `make`:
 make bootstrap-core TARGET_DIR=/absolute/path/to/project
 ```
 
+To upgrade an existing project safely:
+
+```bash
+bash scripts/upgrade_project_automation.sh /absolute/path/to/project
+```
+
+Or through `make`:
+
+```bash
+make upgrade-core TARGET_DIR=/absolute/path/to/project
+```
+
 ## What stays project-specific
 
 Two adapter files are expected to change first in another project:
