@@ -42,7 +42,20 @@ It controls:
 3. Edit only the adapter file first.
 4. Adjust project-specific target maps next:
    - `scripts/project_automation_targets.sh`
-5. Rename smoke scripts or backend suites only if the new repo uses different commands.
+5. Adjust project-specific smoke assertions next:
+   - `scripts/project_automation_smoke_checks.sh`
+6. Rename smoke scripts or backend suites only if the new repo uses different commands.
+
+## First Validation Pass
+
+After the three adapter files are updated, use this order:
+
+1. `make changed`
+2. `make profile-changed`
+3. `make frontend` or `make backend`
+4. `make full`
+
+That keeps the first migration pass cheap and makes the slowest mismatch obvious quickly.
 
 ## Why this matters
 
@@ -81,6 +94,14 @@ The easiest path is:
 5. sync selected changes back into product repos
 
 That gives you a private optimization base while keeping product repos independent.
+
+## Bootstrap Helper
+
+This repo now includes:
+
+- `scripts/bootstrap_project_automation.sh`
+
+It installs the manifest files into another project root, skips existing files by default, and only overwrites them when `--force` is passed explicitly.
 
 ## What Is Already Portable
 

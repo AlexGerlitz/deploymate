@@ -26,6 +26,18 @@ To export somewhere else:
 bash scripts/export_automation_core.sh /absolute/path/to/output
 ```
 
+To install the core into another project directly:
+
+```bash
+bash scripts/bootstrap_project_automation.sh /absolute/path/to/project
+```
+
+Or through `make`:
+
+```bash
+make bootstrap-core TARGET_DIR=/absolute/path/to/project
+```
+
 ## What stays project-specific
 
 Two adapter files are expected to change first in another project:

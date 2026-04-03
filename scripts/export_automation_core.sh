@@ -44,6 +44,66 @@ Recommended first edits in a new project:
 2. `scripts/project_automation_targets.sh`
 
 After that, adjust smoke commands or test suites only if the new repo uses different entrypoints.
+
+## Bootstrap In A New Project
+
+1. Bootstrap into the target project root:
+
+```bash
+bash scripts/bootstrap_project_automation.sh /absolute/path/to/project
+```
+
+Or through `make`:
+
+```bash
+make bootstrap-core TARGET_DIR=/absolute/path/to/project
+```
+
+Use `--force` only when you intentionally want to overwrite already copied core files.
+
+2. Review `Makefile` and keep only the commands that match the new project workflow.
+3. Edit `scripts/project_automation_config.sh` first:
+   - frontend and backend directories
+   - python/venv path
+   - default smoke routes
+4. Edit `scripts/project_automation_targets.sh` next:
+   - release surface rules
+   - frontend smoke target mapping
+   - backend test target mapping
+   - runtime and security sensitivity rules
+5. Edit `scripts/project_automation_smoke_checks.sh` last:
+   - selectors
+   - page copy assertions
+   - route-specific smoke expectations
+6. Run a cheap first validation:
+
+```bash
+make changed
+make profile-changed
+```
+
+7. Once that is stable, run the heavier loops you actually want to keep:
+
+```bash
+make frontend
+make backend
+make full
+```
+
+## What This Core Already Solves
+
+- diff-aware local verification
+- targeted frontend smokes
+- targeted backend tests
+- reusable local audit caches
+- local timing history, stats, and bottleneck hints
+- optional persistent frontend smoke server for hot loops
+
+## Migration Rule
+
+Do not rewrite the orchestration first.
+
+Port the adapter files first, then only patch core scripts when the new project has a truly different workflow contract.
 EOF
 
 echo "[export-automation-core] bundle written to: $OUTPUT_DIR"

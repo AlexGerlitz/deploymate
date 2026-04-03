@@ -1,4 +1,4 @@
-.PHONY: changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
 
 changed:
 	bash scripts/dev_verify_changed.sh
@@ -32,6 +32,9 @@ audit-cache-clear:
 
 export-automation-core:
 	bash scripts/export_automation_core.sh
+
+bootstrap-core:
+	bash scripts/bootstrap_project_automation.sh $(TARGET_DIR)
 
 fast:
 	bash scripts/dev_fast_check.sh full
