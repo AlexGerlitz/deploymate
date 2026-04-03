@@ -7,6 +7,7 @@ SURFACE="full"
 BACKEND_PYTHON="${BACKEND_PYTHON:-}"
 FAST_MODE=0
 BACKEND_FAST_TEST_MODULES="${BACKEND_FAST_TEST_MODULES:-}"
+DEPLOYMATE_BACKEND_FAST_MODE="${DEPLOYMATE_BACKEND_FAST_MODE:-}"
 FRONTEND_FAST_SMOKES="${FRONTEND_FAST_SMOKES:-}"
 source "$ROOT_DIR/scripts/timing_history.sh"
 SCRIPT_START_TS="$(date +%s)"
@@ -149,6 +150,9 @@ echo "[release] backend python: $BACKEND_PYTHON"
 if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
   echo "[release] backend fast targets: $BACKEND_FAST_TEST_MODULES"
 fi
+if [ -n "$DEPLOYMATE_BACKEND_FAST_MODE" ]; then
+  echo "[release] backend fast mode: $DEPLOYMATE_BACKEND_FAST_MODE"
+fi
 if [ -n "$FRONTEND_FAST_SMOKES" ]; then
   echo "[release] frontend fast smokes: $FRONTEND_FAST_SMOKES"
 fi
@@ -221,7 +225,9 @@ backend_duration=0
 if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
   backend_start_ts="$(date +%s)"
   if [ "$FAST_MODE" = "1" ]; then
-    if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
+    if [ "$DEPLOYMATE_BACKEND_FAST_MODE" = "skip" ]; then
+      echo "[release] backend fast suite skipped for this diff"
+    elif [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
       echo "[release] backend targeted fast suite"
       IFS=' ' read -r -a backend_fast_modules <<< "$BACKEND_FAST_TEST_MODULES"
       PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest "${backend_fast_modules[@]}"
@@ -254,7 +260,9 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
 fi
 if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
   if [ "$FAST_MODE" = "1" ]; then
-    if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
+    if [ "$DEPLOYMATE_BACKEND_FAST_MODE" = "skip" ]; then
+      echo "[release]   - backend preflight only; fast suite skipped for this diff"
+    elif [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
       echo "[release]   - backend preflight plus targeted fast suite"
     else
       echo "[release]   - backend preflight plus fast safety suite"

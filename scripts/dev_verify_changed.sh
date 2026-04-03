@@ -134,6 +134,7 @@ backend_changed_files=()
 frontend_changed_files=()
 runtime_audit_reason=""
 security_audit_reason=""
+backend_fast_reason=""
 while IFS='=' read -r key value; do
   case "$key" in
     surface)
@@ -205,9 +206,25 @@ echo "[dev-verify-changed] security audit: ${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-fu
 
 echo "[dev-verify-changed] running fast gate for surface: $surface"
 if [ "$surface" = "backend" ] || [ "$surface" = "full" ]; then
-  if [ "${#backend_changed_files[@]}" -gt 0 ]; then
-    BACKEND_FAST_TEST_MODULES="$(bash scripts/detect_backend_test_targets.sh "${backend_changed_files[@]}" | tr '\n' ' ' | xargs)"
-    export BACKEND_FAST_TEST_MODULES
+  backend_fast_output="$(bash scripts/detect_backend_fast_scope.sh "${changed_files[@]}")"
+  printf '%s\n' "$backend_fast_output"
+  while IFS='=' read -r key value; do
+    case "$key" in
+      backend_fast_mode)
+        DEPLOYMATE_BACKEND_FAST_MODE="$value"
+        export DEPLOYMATE_BACKEND_FAST_MODE
+        ;;
+      backend_fast_modules)
+        BACKEND_FAST_TEST_MODULES="$value"
+        export BACKEND_FAST_TEST_MODULES
+        ;;
+      reason)
+        backend_fast_reason="$value"
+        ;;
+    esac
+  done <<< "$backend_fast_output"
+  echo "[dev-verify-changed] backend fast mode: ${DEPLOYMATE_BACKEND_FAST_MODE:-safety} (${backend_fast_reason})"
+  if [ -n "${BACKEND_FAST_TEST_MODULES:-}" ]; then
     echo "[dev-verify-changed] backend fast targets: $BACKEND_FAST_TEST_MODULES"
   fi
 fi
