@@ -9,6 +9,12 @@
 </p>
 
 <p align="center">
+  <strong>Source-available:</strong> PolyForm Noncommercial 1.0.0
+  <br />
+  Commercial, internal business, client, SaaS, and resale use require a separate commercial license.
+</p>
+
+<p align="center">
   <a href="https://deploymatecloud.ru">Live App</a>
   ·
   <a href="https://deploymatecloud.ru/register">Create Trial Account</a>
@@ -28,7 +34,7 @@ This repository is source-available, not open source.
 - commercial/business use: not permitted under the public license
 - for business, internal company, client, SaaS, or resale use: request a separate commercial license first
 
-See [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for the business-use policy.
+See [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for the business-use policy and [NOTICE](NOTICE) for the short-form repository notice.
 
 ## Reviewer Package
 
