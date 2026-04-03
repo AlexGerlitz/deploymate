@@ -543,8 +543,11 @@ case "$PRESET" in
 esac
 
 admin_ui_imports="  AdminActiveFilters,
+  AdminSurfaceActionStarter,
+  AdminSurfaceBulkStarter,
   AdminDisclosureSection,
   AdminFeedbackBanners,
+  AdminSurfaceMutationPreview,
   AdminFilterFooter,
   AdminPageHeader,
   AdminSurfaceQueue,
@@ -1259,131 +1262,48 @@ ${export_helpers_block}
         ))}
       </AdminSurfaceQueue>
 
-      <AdminDisclosureSection
+      <AdminSurfaceActionStarter
         title="${ACTION_SECTION_TITLE}"
-        subtitle="${ACTION_SECTION_DESCRIPTION}"
-        badge="Action starter"
-        defaultOpen
+        description={\`${ACTION_SECTION_DESCRIPTION} ${ACTION_FOCUS_HINT}\`}
         testId="${SURFACE_SLUG}-action-starter"
-      >
-        <div className="sectionHeader">
-          <div>
-            <h3>Focused queue item</h3>
-            <p className="formHint">${ACTION_FOCUS_HINT}</p>
-          </div>
-          {selectedItem ? <span className="status unknown">{selectedItem.status}</span> : null}
-        </div>
-        {selectedItem ? (
-          <>
-            <p className="formHint">
-              <strong>{selectedItem.label}</strong> · {selectedItem.note}
-            </p>
-            <label className="field">
-              <span>Operator note</span>
-              <textarea
-                data-testid="${SURFACE_SLUG}-action-note"
-                rows={3}
-                value={actionNote}
-                onChange={(event) => setActionNote(event.target.value)}
-                placeholder="${ACTION_NOTE_PLACEHOLDER}"
-              />
-            </label>
-            <div className="adminFilterActions">
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid="${SURFACE_SLUG}-action-primary"
-                onClick={() => handleRunStarterAction("primary")}
-                disabled={actionLoadingId === selectedItem.id}
-              >
-                ${PRIMARY_ACTION_LABEL}
-              </button>
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid="${SURFACE_SLUG}-action-secondary"
-                onClick={() => handleRunStarterAction("secondary")}
-                disabled={actionLoadingId === selectedItem.id}
-              >
-                ${SECONDARY_ACTION_LABEL}
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="empty" data-testid="${SURFACE_SLUG}-action-empty">
-            No queue item selected yet.
-          </div>
-        )}
-      </AdminDisclosureSection>
+        status={selectedItem?.status || ""}
+        item={selectedItem}
+        noteValue={actionNote}
+        onNoteChange={(event) => setActionNote(event.target.value)}
+        notePlaceholder="${ACTION_NOTE_PLACEHOLDER}"
+        primaryActionLabel="${PRIMARY_ACTION_LABEL}"
+        secondaryActionLabel="${SECONDARY_ACTION_LABEL}"
+        onPrimaryAction={() => handleRunStarterAction("primary")}
+        onSecondaryAction={() => handleRunStarterAction("secondary")}
+        actionDisabled={selectedItem ? actionLoadingId === selectedItem.id : true}
+        emptyText="No queue item selected yet."
+      />
 
-      <AdminDisclosureSection
+      <AdminSurfaceBulkStarter
         title="${BULK_SECTION_TITLE}"
-        subtitle="${BULK_SECTION_DESCRIPTION}"
-        badge="Bulk starter"
+        description="${BULK_SECTION_DESCRIPTION}"
         testId="${SURFACE_SLUG}-bulk-starter"
-      >
-        <div className="adminFilterActions">
-          <button
-            type="button"
-            className="secondaryButton"
-            data-testid="${SURFACE_SLUG}-bulk-preset-one"
-            onClick={() => handleApplyBulkPreset("${BULK_PRESET_ONE_SEGMENT}")}
-          >
-            ${BULK_PRESET_ONE_LABEL}
-          </button>
-          <button
-            type="button"
-            className="secondaryButton"
-            data-testid="${SURFACE_SLUG}-bulk-preset-two"
-            onClick={() => handleApplyBulkPreset("${BULK_PRESET_TWO_SEGMENT}")}
-          >
-            ${BULK_PRESET_TWO_LABEL}
-          </button>
-        </div>
-        <p className="formHint" data-testid="${SURFACE_SLUG}-bulk-selection-summary">
-          Selected {selectedItemIds.length} · Visible {filteredItems.length}
-        </p>
-        <label className="field">
-          <span>Bulk status</span>
-          <select
-            data-testid="${SURFACE_SLUG}-bulk-status"
-            value={bulkStatusValue}
-            onChange={(event) => setBulkStatusValue(event.target.value)}
-          >
-            {bulkStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          className="secondaryButton"
-          data-testid="${SURFACE_SLUG}-bulk-apply"
-          onClick={handleApplyBulkAction}
-          disabled={!selectedItemIds.length || !bulkStatusValue}
-        >
-          ${BULK_APPLY_LABEL}
-        </button>
-      </AdminDisclosureSection>
+        presetOneLabel="${BULK_PRESET_ONE_LABEL}"
+        onPresetOne={() => handleApplyBulkPreset("${BULK_PRESET_ONE_SEGMENT}")}
+        presetTwoLabel="${BULK_PRESET_TWO_LABEL}"
+        onPresetTwo={() => handleApplyBulkPreset("${BULK_PRESET_TWO_SEGMENT}")}
+        selectedCount={selectedItemIds.length}
+        visibleCount={filteredItems.length}
+        statusValue={bulkStatusValue}
+        onStatusChange={(event) => setBulkStatusValue(event.target.value)}
+        statusOptions={bulkStatusOptions}
+        applyLabel="${BULK_APPLY_LABEL}"
+        onApply={handleApplyBulkAction}
+        applyDisabled={!selectedItemIds.length || !bulkStatusValue}
+      />
 
-      <AdminDisclosureSection
-        title="Starter mutation contract"
-        subtitle="Use this payload preview to wire the first real write path instead of inventing request shape from scratch."
-        badge="Mutation"
+      <AdminSurfaceMutationPreview
+        description="Use this payload preview to wire the first real write path instead of inventing request shape from scratch."
         testId="${SURFACE_SLUG}-mutation-starter"
-      >
-        <p className="formHint">
-          <strong>Route:</strong> ${MUTATION_ROUTE_LABEL}
-        </p>
-        <p className="formHint">
-          <strong>Selected:</strong> {selectedItems.map((item) => item.label).join(", ") || "Nothing selected"}
-        </p>
-        <pre className="workspaceCodeBlock" data-testid="${SURFACE_SLUG}-mutation-payload">
-          {JSON.stringify(starterMutationPreview, null, 2)}
-        </pre>
-      </AdminDisclosureSection>
+        routeLabel="${MUTATION_ROUTE_LABEL}"
+        selectedSummary={selectedItems.map((item) => item.label).join(", ") || "Nothing selected"}
+        payload={starterMutationPreview}
+      />
 
       <article className="card formCard">
         <AdminFilterFooter

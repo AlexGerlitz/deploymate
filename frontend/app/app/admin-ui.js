@@ -496,6 +496,162 @@ export function AdminSurfaceQueueCard({ title, body, status, children }) {
   );
 }
 
+export function AdminSurfaceActionStarter({
+  title,
+  description,
+  badge = "Action starter",
+  testId,
+  status,
+  item,
+  noteValue,
+  onNoteChange,
+  notePlaceholder,
+  primaryActionLabel,
+  secondaryActionLabel,
+  onPrimaryAction,
+  onSecondaryAction,
+  actionDisabled,
+  emptyText = "No queue item selected yet.",
+}) {
+  return (
+    <AdminDisclosureSection
+      title={title}
+      subtitle={description}
+      badge={badge}
+      defaultOpen
+      testId={testId}
+    >
+      <div className="sectionHeader">
+        <div>
+          <h3>Focused queue item</h3>
+        </div>
+        {status ? <span className="status unknown">{status}</span> : null}
+      </div>
+      {item ? (
+        <>
+          <p className="formHint">
+            <strong>{item.label}</strong> · {item.note}
+          </p>
+          <label className="field">
+            <span>Operator note</span>
+            <textarea
+              rows={3}
+              value={noteValue}
+              onChange={onNoteChange}
+              placeholder={notePlaceholder}
+            />
+          </label>
+          <div className="adminFilterActions">
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={onPrimaryAction}
+              disabled={actionDisabled}
+            >
+              {primaryActionLabel}
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={onSecondaryAction}
+              disabled={actionDisabled}
+            >
+              {secondaryActionLabel}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="empty">{emptyText}</div>
+      )}
+    </AdminDisclosureSection>
+  );
+}
+
+export function AdminSurfaceBulkStarter({
+  title,
+  description,
+  badge = "Bulk starter",
+  testId,
+  presetOneLabel,
+  onPresetOne,
+  presetTwoLabel,
+  onPresetTwo,
+  selectedCount,
+  visibleCount,
+  statusValue,
+  onStatusChange,
+  statusOptions = [],
+  applyLabel,
+  onApply,
+  applyDisabled,
+}) {
+  return (
+    <AdminDisclosureSection
+      title={title}
+      subtitle={description}
+      badge={badge}
+      testId={testId}
+    >
+      <div className="adminFilterActions">
+        <button type="button" className="secondaryButton" onClick={onPresetOne}>
+          {presetOneLabel}
+        </button>
+        <button type="button" className="secondaryButton" onClick={onPresetTwo}>
+          {presetTwoLabel}
+        </button>
+      </div>
+      <p className="formHint">
+        Selected {selectedCount} · Visible {visibleCount}
+      </p>
+      <label className="field">
+        <span>Bulk status</span>
+        <select value={statusValue} onChange={onStatusChange}>
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="button"
+        className="secondaryButton"
+        onClick={onApply}
+        disabled={applyDisabled}
+      >
+        {applyLabel}
+      </button>
+    </AdminDisclosureSection>
+  );
+}
+
+export function AdminSurfaceMutationPreview({
+  title = "Starter mutation contract",
+  description,
+  badge = "Mutation",
+  testId,
+  routeLabel,
+  selectedSummary,
+  payload,
+}) {
+  return (
+    <AdminDisclosureSection
+      title={title}
+      subtitle={description}
+      badge={badge}
+      testId={testId}
+    >
+      <p className="formHint">
+        <strong>Route:</strong> {routeLabel}
+      </p>
+      <p className="formHint">
+        <strong>Selected:</strong> {selectedSummary}
+      </p>
+      <pre className="workspaceCodeBlock">{JSON.stringify(payload, null, 2)}</pre>
+    </AdminDisclosureSection>
+  );
+}
+
 export function AdminAuditToolbar({
   title,
   description,
