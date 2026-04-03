@@ -58,6 +58,39 @@ for file in "${TRACKED_FILES[@]}"; do
   esac
 done
 
+security_phase_cache_key="security_audit_phase"
+security_phase_metadata="$(printf 'scope=%s\nsecret_scope=%s\nruntime_policy_scope=%s\nrun_release=%s\nrun_server_credentials=%s\nrun_runtime_audits=%s\nchanged=%s\n' \
+  "${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}" \
+  "${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}" \
+  "${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}" \
+  "${DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT:-1}" \
+  "${DEPLOYMATE_RUN_SERVER_CREDENTIALS_AUDIT:-1}" \
+  "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" \
+  "${DEPLOYMATE_CHANGED_FILES:-}")"
+security_phase_files=(
+  "scripts/security_audit.sh"
+  "scripts/detect_security_audit_scope.sh"
+  "scripts/release_workflow_audit.sh"
+  "scripts/server_credentials_audit.sh"
+  "scripts/local_runtime_audit.sh"
+  "scripts/runtime_capability_audit.sh"
+  "scripts/audit_cache.sh"
+  "scripts/project_automation_targets.sh"
+  "scripts/project_automation_config.sh"
+)
+for file in "${FILTERED_FILES[@]}"; do
+  security_phase_files+=("$file")
+done
+security_phase_fingerprint="$(audit_cache_fingerprint_inputs "$security_phase_cache_key" "$security_phase_metadata" "${security_phase_files[@]}")"
+if audit_cache_persistent_has "$security_phase_cache_key" "$security_phase_fingerprint"; then
+  echo "[security-audit] phase cache hit"
+  audit_cache_record_event phase_hit "$security_phase_cache_key"
+  audit_cache_mark security_audit
+  exit 0
+fi
+echo "[security-audit] phase cache miss"
+audit_cache_record_event phase_miss "$security_phase_cache_key"
+
 echo "[security-audit] scanning tracked files for high-signal secret patterns"
 echo "[security-audit] secret scan scope: ${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
 secret_seed="secret:${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
@@ -161,6 +194,7 @@ fi
 
 if [ "$WARNINGS" -eq 0 ]; then
   echo "[security-audit] no high-risk findings"
+  audit_cache_persistent_mark "$security_phase_cache_key" "$security_phase_fingerprint"
 else
   echo "[security-audit] warnings found; review recommended"
 fi

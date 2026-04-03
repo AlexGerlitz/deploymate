@@ -73,11 +73,12 @@ These commands:
 21. print a short cache-hit summary after local preflight, release, and profile commands so saved reruns are visible immediately
 22. reuse phase-level fingerprint caches for repeated fast frontend smoke targets and backend fast test modules when the diff and inputs stay the same
 23. reuse phase-level fingerprint caches for repeated preflight backend syntax checks and local frontend builds when their inputs stay the same
-24. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
-25. keep project-specific path and route assumptions inside `scripts/project_automation_config.sh`, so the automation core can be ported to another repo without rewriting every script first
-26. keep project-specific path-to-target and path-to-scope rules inside `scripts/project_automation_targets.sh`, so the `detect_*` layer is portable too
-27. export the reusable automation layer with `make export-automation-core` when you want to move the core into a separate private repository
-28. keep frontend smoke assertions inside `scripts/project_automation_smoke_checks.sh`, so both the fast and heavier smoke runners stay reusable across projects
+24. reuse a phase-level fingerprint cache for repeated `security_audit` blocks when the diff, scopes, and nested audit inputs stay the same
+25. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+26. keep project-specific path and route assumptions inside `scripts/project_automation_config.sh`, so the automation core can be ported to another repo without rewriting every script first
+27. keep project-specific path-to-target and path-to-scope rules inside `scripts/project_automation_targets.sh`, so the `detect_*` layer is portable too
+28. export the reusable automation layer with `make export-automation-core` when you want to move the core into a separate private repository
+29. keep frontend smoke assertions inside `scripts/project_automation_smoke_checks.sh`, so both the fast and heavier smoke runners stay reusable across projects
 
 To inspect the latest local timings quickly:
 
