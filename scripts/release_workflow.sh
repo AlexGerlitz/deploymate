@@ -46,6 +46,25 @@ frontend_target_changed_files() {
   done <<< "${DEPLOYMATE_CHANGED_FILES}"
 }
 
+backend_module_changed_files() {
+  local test_module="$1"
+  local changed_path=""
+  local target_line=""
+
+  [ -n "${DEPLOYMATE_CHANGED_FILES:-}" ] || return 0
+
+  while IFS= read -r changed_path; do
+    [ -n "$changed_path" ] || continue
+    while IFS= read -r target_line; do
+      [ -n "$target_line" ] || continue
+      if [ "$target_line" = "$test_module" ]; then
+        printf '%s\n' "$changed_path"
+        break
+      fi
+    done < <(bash scripts/detect_backend_test_targets.sh "$changed_path")
+  done <<< "${DEPLOYMATE_CHANGED_FILES}"
+}
+
 clean_frontend_build_artifacts() {
   local frontend_dir=""
   frontend_dir="$(automation_frontend_dir_rel)"
@@ -300,44 +319,55 @@ if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
     if [ "$DEPLOYMATE_BACKEND_FAST_MODE" = "skip" ]; then
       echo "[release] backend fast suite skipped for this diff"
     else
-      backend_phase_cache_key="backend_fast_phase"
-      backend_phase_metadata="$(printf 'surface=%s\nfast=%s\nmode=%s\nmodules=%s\nchanged=%s\n' "$SURFACE" "$FAST_MODE" "${DEPLOYMATE_BACKEND_FAST_MODE:-safety}" "${BACKEND_FAST_TEST_MODULES:-}" "${DEPLOYMATE_CHANGED_FILES:-}")"
-      backend_phase_files=(
-        "scripts/release_workflow.sh"
-        "scripts/dev_fast_check.sh"
-        "scripts/detect_backend_fast_scope.sh"
-        "scripts/detect_backend_test_targets.sh"
-        "scripts/project_automation_targets.sh"
-        "scripts/project_automation_config.sh"
-        "backend/requirements.txt"
-      )
-      if [ -n "${DEPLOYMATE_CHANGED_FILES:-}" ]; then
-        while IFS= read -r changed_path; do
-          [ -n "$changed_path" ] && backend_phase_files+=("$changed_path")
-        done <<< "${DEPLOYMATE_CHANGED_FILES}"
-      fi
-      backend_phase_fingerprint="$(phase_cache_fingerprint "$backend_phase_cache_key" "$backend_phase_metadata" "${backend_phase_files[@]}")"
-
-      if audit_cache_persistent_has "$backend_phase_cache_key" "$backend_phase_fingerprint"; then
-        echo "[release] backend fast phase cache hit"
-        audit_cache_record_event phase_hit "$backend_phase_cache_key"
+      if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
+        echo "[release] backend targeted fast suite"
+        IFS=' ' read -r -a backend_fast_modules <<< "$BACKEND_FAST_TEST_MODULES"
       else
-        echo "[release] backend fast phase cache miss"
-        audit_cache_record_event phase_miss "$backend_phase_cache_key"
-        if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
-          echo "[release] backend targeted fast suite"
-          IFS=' ' read -r -a backend_fast_modules <<< "$BACKEND_FAST_TEST_MODULES"
-          PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest "${backend_fast_modules[@]}"
-        else
-          echo "[release] backend fast safety suite"
-          PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest \
-            backend.tests.test_auth_security \
-            backend.tests.test_ops_api_flow \
-            backend.tests.test_restore_dry_run \
-            backend.tests.test_server_credentials_policy
-        fi
-        audit_cache_persistent_mark "$backend_phase_cache_key" "$backend_phase_fingerprint"
+        echo "[release] backend fast safety suite"
+        backend_fast_modules=(
+          backend.tests.test_auth_security
+          backend.tests.test_ops_api_flow
+          backend.tests.test_restore_dry_run
+          backend.tests.test_server_credentials_policy
+        )
       fi
+
+      for backend_fast_module in "${backend_fast_modules[@]}"; do
+        backend_phase_cache_key="backend_fast_phase_${backend_fast_module//./_}"
+        backend_phase_metadata="$(printf 'surface=%s\nfast=%s\nmode=%s\nmodule=%s\n' "$SURFACE" "$FAST_MODE" "${DEPLOYMATE_BACKEND_FAST_MODE:-safety}" "$backend_fast_module")"
+        backend_phase_files=(
+          "scripts/release_workflow.sh"
+          "scripts/dev_fast_check.sh"
+          "scripts/detect_backend_fast_scope.sh"
+          "scripts/detect_backend_test_targets.sh"
+          "scripts/project_automation_targets.sh"
+          "scripts/project_automation_config.sh"
+          "backend/requirements.txt"
+        )
+        backend_phase_changed_subset="$(backend_module_changed_files "$backend_fast_module")"
+        if [ -n "$backend_phase_changed_subset" ]; then
+          while IFS= read -r changed_path; do
+            [ -n "$changed_path" ] && backend_phase_files+=("$changed_path")
+          done <<< "$backend_phase_changed_subset"
+        elif [ -n "${DEPLOYMATE_CHANGED_FILES:-}" ]; then
+          while IFS= read -r changed_path; do
+            [ -n "$changed_path" ] && backend_phase_files+=("$changed_path")
+          done <<< "${DEPLOYMATE_CHANGED_FILES}"
+        fi
+        backend_phase_metadata="$(printf '%srelevant_changed=%s\n' "$backend_phase_metadata" "$backend_phase_changed_subset")"
+        backend_phase_fingerprint="$(phase_cache_fingerprint "$backend_phase_cache_key" "$backend_phase_metadata" "${backend_phase_files[@]}")"
+
+        if audit_cache_persistent_has "$backend_phase_cache_key" "$backend_phase_fingerprint"; then
+          echo "[release] backend ${backend_fast_module} phase cache hit"
+          audit_cache_record_event phase_hit "$backend_phase_cache_key"
+          continue
+        fi
+
+        echo "[release] backend ${backend_fast_module} phase cache miss"
+        audit_cache_record_event phase_miss "$backend_phase_cache_key"
+        PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest "$backend_fast_module"
+        audit_cache_persistent_mark "$backend_phase_cache_key" "$backend_phase_fingerprint"
+      done
     fi
   else
     echo "[release] backend test suite"
