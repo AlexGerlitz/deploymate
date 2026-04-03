@@ -221,6 +221,7 @@ What they do:
 The fast gate intentionally uses fewer resources:
 
 - frontend: targeted auth/ops/runtime smokes from changed files when possible, otherwise all three
+- frontend mixed/shared diffs can now skip fast frontend smokes entirely when no frontend contract changed, instead of always booting the shared smoke server
 - backend: targeted tests from changed files when possible, otherwise the focused safety suite
 - backend mixed/shared diffs can now skip the fast backend suite entirely when no backend contract changed, instead of paying the safety-suite cost by default
 - preflight: skips the production frontend build in fast mode

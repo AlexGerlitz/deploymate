@@ -44,14 +44,15 @@ These commands:
 3. skip the production frontend build in preflight fast mode
 4. keep backend verification on a targeted test set when changed files map cleanly, otherwise fall back to the focused safety suite
 5. skip the backend fast suite entirely when a mixed local diff does not actually touch backend or release-runtime backend contract
-6. keep frontend verification on targeted fast smokes when changed files map cleanly, otherwise fall back to the default `auth + ops + runtime`
-7. reuse one shared frontend smoke dev server in fast mode instead of starting a new `next dev` process for each smoke
-8. reuse shared frontend smoke servers in the heavier full gate too, so the main frontend smoke pack no longer starts a separate `next dev` process per script
-9. cache repeated local audit steps inside one gate run, so nested security/runtime audits do not re-run the same expensive checks twice
-10. skip runtime-oriented local audits automatically when the current diff does not touch runtime or deploy contract files
-11. narrow local `security_audit` to changed files and skip nested release or credentials audits unless the diff touches those contracts
-12. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
-13. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+6. skip the frontend fast smokes entirely when a mixed local diff does not actually touch frontend or frontend delivery contract
+7. keep frontend verification on targeted fast smokes when changed files map cleanly, otherwise fall back to the default `auth + ops + runtime`
+8. reuse one shared frontend smoke dev server in fast mode instead of starting a new `next dev` process for each smoke
+9. reuse shared frontend smoke servers in the heavier full gate too, so the main frontend smoke pack no longer starts a separate `next dev` process per script
+10. cache repeated local audit steps inside one gate run, so nested security/runtime audits do not re-run the same expensive checks twice
+11. skip runtime-oriented local audits automatically when the current diff does not touch runtime or deploy contract files
+12. narrow local `security_audit` to changed files and skip nested release or credentials audits unless the diff touches those contracts
+13. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
+14. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
 
 To inspect the latest local timings quickly:
 

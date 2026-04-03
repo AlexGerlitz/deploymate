@@ -135,6 +135,7 @@ frontend_changed_files=()
 runtime_audit_reason=""
 security_audit_reason=""
 backend_fast_reason=""
+frontend_fast_reason=""
 while IFS='=' read -r key value; do
   case "$key" in
     surface)
@@ -230,9 +231,25 @@ if [ "$surface" = "backend" ] || [ "$surface" = "full" ]; then
 fi
 
 if [ "$surface" = "frontend" ] || [ "$surface" = "full" ]; then
-  if [ "${#frontend_changed_files[@]}" -gt 0 ]; then
-    FRONTEND_FAST_SMOKES="$(bash scripts/detect_frontend_smoke_targets.sh "${frontend_changed_files[@]}" | tr '\n' ' ' | xargs)"
-    export FRONTEND_FAST_SMOKES
+  frontend_fast_output="$(bash scripts/detect_frontend_fast_scope.sh "${changed_files[@]}")"
+  printf '%s\n' "$frontend_fast_output"
+  while IFS='=' read -r key value; do
+    case "$key" in
+      frontend_fast_mode)
+        DEPLOYMATE_FRONTEND_FAST_MODE="$value"
+        export DEPLOYMATE_FRONTEND_FAST_MODE
+        ;;
+      frontend_fast_smokes)
+        FRONTEND_FAST_SMOKES="$value"
+        export FRONTEND_FAST_SMOKES
+        ;;
+      reason)
+        frontend_fast_reason="$value"
+        ;;
+    esac
+  done <<< "$frontend_fast_output"
+  echo "[dev-verify-changed] frontend fast mode: ${DEPLOYMATE_FRONTEND_FAST_MODE:-default} (${frontend_fast_reason})"
+  if [ -n "${FRONTEND_FAST_SMOKES:-}" ]; then
     echo "[dev-verify-changed] frontend fast smokes: $FRONTEND_FAST_SMOKES"
   fi
 fi

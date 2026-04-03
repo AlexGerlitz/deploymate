@@ -9,6 +9,7 @@ FAST_MODE=0
 BACKEND_FAST_TEST_MODULES="${BACKEND_FAST_TEST_MODULES:-}"
 DEPLOYMATE_BACKEND_FAST_MODE="${DEPLOYMATE_BACKEND_FAST_MODE:-}"
 FRONTEND_FAST_SMOKES="${FRONTEND_FAST_SMOKES:-}"
+DEPLOYMATE_FRONTEND_FAST_MODE="${DEPLOYMATE_FRONTEND_FAST_MODE:-}"
 source "$ROOT_DIR/scripts/timing_history.sh"
 SCRIPT_START_TS="$(date +%s)"
 
@@ -156,6 +157,9 @@ fi
 if [ -n "$FRONTEND_FAST_SMOKES" ]; then
   echo "[release] frontend fast smokes: $FRONTEND_FAST_SMOKES"
 fi
+if [ -n "$DEPLOYMATE_FRONTEND_FAST_MODE" ]; then
+  echo "[release] frontend fast mode: $DEPLOYMATE_FRONTEND_FAST_MODE"
+fi
 
 echo "[release] preflight"
 preflight_start_ts="$(date +%s)"
@@ -175,18 +179,22 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   fi
 
   if [ "$FAST_MODE" = "1" ]; then
-    for frontend_smoke in "${frontend_fast_smokes[@]}"; do
-      case "$frontend_smoke" in
-        auth|ops|runtime)
-          ;;
-        *)
-          echo "[release] unknown frontend fast smoke target: $frontend_smoke" >&2
-          exit 1
-          ;;
-      esac
-    done
+    if [ "$DEPLOYMATE_FRONTEND_FAST_MODE" = "skip" ]; then
+      echo "[release] frontend fast smokes skipped for this diff"
+    else
+      for frontend_smoke in "${frontend_fast_smokes[@]}"; do
+        case "$frontend_smoke" in
+          auth|ops|runtime)
+            ;;
+          *)
+            echo "[release] unknown frontend fast smoke target: $frontend_smoke" >&2
+            exit 1
+            ;;
+        esac
+      done
 
-    run_frontend_fast_smokes_shared "${frontend_fast_smokes[@]}"
+      run_frontend_fast_smokes_shared "${frontend_fast_smokes[@]}"
+    fi
   else
     frontend_fast_port=3001
     for frontend_smoke in "${frontend_fast_smokes[@]}"; do
@@ -249,7 +257,9 @@ fi
 echo "[release] executed phases:"
 if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   if [ "$FAST_MODE" = "1" ]; then
-    if [ -n "$FRONTEND_FAST_SMOKES" ]; then
+    if [ "$DEPLOYMATE_FRONTEND_FAST_MODE" = "skip" ]; then
+      echo "[release]   - frontend preflight only; fast smokes skipped for this diff"
+    elif [ -n "$FRONTEND_FAST_SMOKES" ]; then
       echo "[release]   - frontend preflight plus targeted fast smokes"
     else
       echo "[release]   - frontend preflight plus auth, ops, and runtime smokes"
