@@ -269,6 +269,7 @@ The fast gate intentionally uses fewer resources:
 - repeated security audit blocks now also reuse a phase-level fingerprint cache when the diff, scopes, and nested audit inputs did not change
 - changed-file security scans now reuse per-file fingerprints for secret and runtime-policy checks, so adding one new file does not force rescanning every unchanged file in the local diff
 - repeated local runtime audits now also reuse per-file fingerprints for static runtime-contract files, so one changed deploy/runtime file no longer invalidates every unchanged runtime contract check
+- repeated release workflow contract checks now reuse per-file extracted secret lists for `release.yml`, `staging.yml`, and `RUNBOOK.md`, so changing one contract file does not re-parse the other two
 - project-specific layout and route assumptions now live behind [scripts/project_automation_config.sh](scripts/project_automation_config.sh), so the reusable automation core is no longer welded directly to DeployMate paths
 - project-specific path-to-target rules now live behind [scripts/project_automation_targets.sh](scripts/project_automation_targets.sh), so moving this system to another repo no longer means rewriting every `detect_*` script
 - frontend smoke assertions now live behind [scripts/project_automation_smoke_checks.sh](scripts/project_automation_smoke_checks.sh), so both the fast and heavier smoke runners are no longer welded to DeployMate-specific selectors

@@ -42,6 +42,27 @@ for name in sorted(names):
 PY
 }
 
+cache_contract_output() {
+  local cache_key="$1"
+  local fingerprint="$2"
+  local output_file="$3"
+  local extractor="$4"
+  shift 4 || true
+
+  if audit_cache_persistent_has "$cache_key" "$fingerprint"; then
+    if audit_cache_persistent_read_value "$cache_key" >"$output_file"; then
+      audit_cache_record_event persistent_hit release_workflow_audit
+      return 0
+    fi
+  fi
+
+  audit_cache_record_event persistent_miss release_workflow_audit
+  "$extractor" "$@" >"$output_file"
+  audit_cache_persistent_mark "$cache_key" "$fingerprint"
+  audit_cache_persistent_store_value "$cache_key" "$(cat "$output_file")"
+  return 1
+}
+
 compare_lists() {
   local label="$1"
   local left_file="$2"
@@ -87,10 +108,34 @@ echo "[release-audit] repo: $ROOT_DIR"
 release_secrets_file="$TMP_DIR/release-secrets.txt"
 staging_secrets_file="$TMP_DIR/staging-secrets.txt"
 runbook_secrets_file="$TMP_DIR/runbook-secrets.txt"
+release_contract_cache_hits=0
+release_contract_cache_misses=0
 
-extract_workflow_secrets "$RELEASE_WORKFLOW" >"$release_secrets_file"
-extract_workflow_secrets "$STAGING_WORKFLOW" >"$staging_secrets_file"
-extract_runbook_secrets >"$runbook_secrets_file"
+release_file_key="$(audit_cache_key_for_input "release_workflow_contract" "$RELEASE_WORKFLOW")"
+release_file_fingerprint="$(audit_cache_fingerprint_files "release-workflow-contract:${RELEASE_WORKFLOW}" "$RELEASE_WORKFLOW")"
+if cache_contract_output "$release_file_key" "$release_file_fingerprint" "$release_secrets_file" extract_workflow_secrets "$RELEASE_WORKFLOW"; then
+  release_contract_cache_hits=$((release_contract_cache_hits + 1))
+else
+  release_contract_cache_misses=$((release_contract_cache_misses + 1))
+fi
+
+staging_file_key="$(audit_cache_key_for_input "release_workflow_contract" "$STAGING_WORKFLOW")"
+staging_file_fingerprint="$(audit_cache_fingerprint_files "release-workflow-contract:${STAGING_WORKFLOW}" "$STAGING_WORKFLOW")"
+if cache_contract_output "$staging_file_key" "$staging_file_fingerprint" "$staging_secrets_file" extract_workflow_secrets "$STAGING_WORKFLOW"; then
+  release_contract_cache_hits=$((release_contract_cache_hits + 1))
+else
+  release_contract_cache_misses=$((release_contract_cache_misses + 1))
+fi
+
+runbook_file_key="$(audit_cache_key_for_input "release_workflow_contract" "$RUNBOOK_FILE")"
+runbook_file_fingerprint="$(audit_cache_fingerprint_files "release-workflow-contract:${RUNBOOK_FILE}" "$RUNBOOK_FILE")"
+if cache_contract_output "$runbook_file_key" "$runbook_file_fingerprint" "$runbook_secrets_file" extract_runbook_secrets; then
+  release_contract_cache_hits=$((release_contract_cache_hits + 1))
+else
+  release_contract_cache_misses=$((release_contract_cache_misses + 1))
+fi
+
+echo "[release-audit] contract extraction reused ${release_contract_cache_hits} file results; rescanned ${release_contract_cache_misses}"
 
 compare_lists "release.yml vs staging.yml secrets" "$release_secrets_file" "$staging_secrets_file"
 compare_lists "workflow secrets vs RUNBOOK.md" "$release_secrets_file" "$runbook_secrets_file"

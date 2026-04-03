@@ -63,6 +63,11 @@ audit_cache_persistent_key_path() {
   printf '%s/%s.fingerprint\n' "$DEPLOYMATE_PERSISTENT_AUDIT_CACHE_DIR" "$key"
 }
 
+audit_cache_persistent_value_path() {
+  local key="$1"
+  printf '%s/%s.value\n' "$DEPLOYMATE_PERSISTENT_AUDIT_CACHE_DIR" "$key"
+}
+
 audit_cache_hash_cmd() {
   if command -v shasum >/dev/null 2>&1; then
     printf 'shasum -a 256\n'
@@ -144,6 +149,22 @@ audit_cache_persistent_mark() {
   local path=""
   path="$(audit_cache_persistent_key_path "$key")"
   printf '%s\n' "$fingerprint" >"$path"
+}
+
+audit_cache_persistent_store_value() {
+  local key="$1"
+  local value="${2:-}"
+  local path=""
+  path="$(audit_cache_persistent_value_path "$key")"
+  printf '%s' "$value" >"$path"
+}
+
+audit_cache_persistent_read_value() {
+  local key="$1"
+  local path=""
+  path="$(audit_cache_persistent_value_path "$key")"
+  [ -f "$path" ] || return 1
+  cat "$path"
 }
 
 audit_cache_persistent_clear() {
