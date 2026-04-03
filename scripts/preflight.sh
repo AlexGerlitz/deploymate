@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SURFACE="full"
 FAST_MODE=0
 source "$ROOT_DIR/scripts/audit_cache.sh"
+source "$ROOT_DIR/scripts/timing_history.sh"
 SCRIPT_START_TS="$(date +%s)"
 
 format_duration() {
@@ -118,10 +119,16 @@ if [ -f "scripts/runtime_capability_audit.sh" ]; then
 fi
 
 total_duration=$(( $(date +%s) - SCRIPT_START_TS ))
+timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "frontend_build" "$frontend_build_duration"
+timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "backend_syntax" "$backend_syntax_duration"
+timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "security_audit" "$security_audit_duration"
+timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "runtime_capability_audit" "$runtime_capability_duration"
+timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "total" "$total_duration"
 echo "[preflight] timing summary:"
 echo "[preflight]   - frontend build: $(format_duration "$frontend_build_duration")"
 echo "[preflight]   - backend syntax: $(format_duration "$backend_syntax_duration")"
 echo "[preflight]   - security audit: $(format_duration "$security_audit_duration")"
 echo "[preflight]   - runtime capability audit: $(format_duration "$runtime_capability_duration")"
 echo "[preflight]   - total: $(format_duration "$total_duration")"
+echo "[preflight] timing history: .logs/local_gate_timing.csv"
 echo "[preflight] done"

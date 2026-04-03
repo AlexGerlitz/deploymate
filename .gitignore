@@ -13,3 +13,4 @@ frontend/.env.*.local
 !.env.production.example
 !frontend/.env.example
 .playwright-mcp/
+.logs/

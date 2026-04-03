@@ -8,6 +8,7 @@ BACKEND_PYTHON="${BACKEND_PYTHON:-}"
 FAST_MODE=0
 BACKEND_FAST_TEST_MODULES="${BACKEND_FAST_TEST_MODULES:-}"
 FRONTEND_FAST_SMOKES="${FRONTEND_FAST_SMOKES:-}"
+source "$ROOT_DIR/scripts/timing_history.sh"
 SCRIPT_START_TS="$(date +%s)"
 
 format_duration() {
@@ -265,11 +266,16 @@ fi
 
 echo "[release] checks passed"
 total_duration=$(( $(date +%s) - SCRIPT_START_TS ))
+timing_history_append "release_workflow" "$SURFACE" "$FAST_MODE" "preflight" "$preflight_duration"
+timing_history_append "release_workflow" "$SURFACE" "$FAST_MODE" "frontend_phase" "$frontend_duration"
+timing_history_append "release_workflow" "$SURFACE" "$FAST_MODE" "backend_phase" "$backend_duration"
+timing_history_append "release_workflow" "$SURFACE" "$FAST_MODE" "total" "$total_duration"
 echo "[release] timing summary:"
 echo "[release]   - preflight: $(format_duration "$preflight_duration")"
 echo "[release]   - frontend phase: $(format_duration "$frontend_duration")"
 echo "[release]   - backend phase: $(format_duration "$backend_duration")"
 echo "[release]   - total: $(format_duration "$total_duration")"
+echo "[release] timing history: .logs/local_gate_timing.csv"
 echo "[release] next: git status --short"
 echo "[release] next: git push origin develop"
 echo "[release] next: follow RUNBOOK.md for deploy and post-deploy smoke"

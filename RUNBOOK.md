@@ -49,6 +49,13 @@ These commands:
 8. cache repeated local audit steps inside one gate run, so nested security/runtime audits do not re-run the same expensive checks twice
 9. skip runtime-oriented local audits automatically when the current diff does not touch runtime or deploy contract files
 10. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
+11. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+
+To inspect the latest local timings quickly:
+
+```bash
+make timing-history
+```
 
 Or run the broader local release gate:
 
