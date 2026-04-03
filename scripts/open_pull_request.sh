@@ -73,6 +73,11 @@ recommended_command=""
 recommendation_reason=""
 followup_command=""
 followup_reason=""
+doctor_output=""
+doctor_size_class=""
+doctor_commits_since_base=""
+doctor_files_changed=""
+doctor_line_changes=""
 
 while IFS='=' read -r key value; do
   case "$key" in
@@ -91,6 +96,24 @@ while IFS='=' read -r key value; do
   esac
 done <<< "$recommendation_output"
 
+doctor_output="$(bash scripts/pr_doctor.sh --base "$BASE_BRANCH" || true)"
+while IFS= read -r line; do
+  case "$line" in
+    "[pr-doctor] size class: "*)
+      doctor_size_class="${line#"[pr-doctor] size class: "}"
+      ;;
+    "[pr-doctor] commits since base: "*)
+      doctor_commits_since_base="${line#"[pr-doctor] commits since base: "}"
+      ;;
+    "[pr-doctor] files changed: "*)
+      doctor_files_changed="${line#"[pr-doctor] files changed: "}"
+      ;;
+    "[pr-doctor] line changes: "*)
+      doctor_line_changes="${line#"[pr-doctor] line changes: "}"
+      ;;
+  esac
+done <<< "$doctor_output"
+
 if [ -z "$TITLE" ]; then
   TITLE="$(git log -1 --pretty=%s)"
 fi
@@ -104,6 +127,12 @@ trap 'rm -f "$tmp_body"' EXIT
   echo
   echo "- Recommended local loop before opening: \`${recommended_command:-make changed}\`"
   echo "- Recommendation reason: ${recommendation_reason:-current diff}"
+  if [ -n "$doctor_size_class" ]; then
+    echo "- PR size class: \`${doctor_size_class}\`"
+    echo "- Commits since base: \`${doctor_commits_since_base:-0}\`"
+    echo "- Files changed: \`${doctor_files_changed:-0}\`"
+    echo "- Line changes: \`${doctor_line_changes:-+0 / -0}\`"
+  fi
   if [ -n "$followup_command" ]; then
     echo "- Cheap follow-up after first green pass: \`${followup_command}\`"
     echo "- Follow-up reason: ${followup_reason:-same diff can use a cheaper rerun}"

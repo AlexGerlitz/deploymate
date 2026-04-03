@@ -5,6 +5,7 @@
 ## Validation
 
 - [ ] `make auto-local`
+- [ ] `make pr-doctor -- --strict`
 - [ ] any extra targeted check worth calling out
 
 ## Release Notes

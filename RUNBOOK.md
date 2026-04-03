@@ -205,6 +205,7 @@ Notes:
 - auto-staging still happens only after merge into `develop`
 - `.github/pull_request_template.md` keeps the PR body short and predictable
 - `make pr-ready` uses the same recommendation and `auto-local` logic as the normal local loop, so the pre-PR check is not a second parallel process
+- `make pr-doctor` prints branch cleanliness, upstream state, PR state, local-loop freshness, and a PR size class so oversized branches get caught before review
 
 For daily iteration speed on staging:
 

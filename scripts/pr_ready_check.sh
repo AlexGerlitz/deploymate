@@ -64,6 +64,8 @@ else
   bash scripts/run_recommended_local_mode.sh
 fi
 
+bash scripts/pr_doctor.sh --base "$BASE_BRANCH" --strict
+
 base_ref="$(git merge-base HEAD "$BASE_BRANCH")"
 commit_count="$(git rev-list --count "${base_ref}..HEAD")"
 latest_subject="$(git log -1 --pretty=%s)"

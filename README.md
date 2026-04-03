@@ -210,6 +210,7 @@ make start-pr-branch SLUG=my-change
 make pr-ready
 make pr-open
 make pr-status
+make pr-doctor
 make auto-local
 make changed
 make profile-changed
@@ -244,6 +245,7 @@ What they do:
 - `make pr-ready` runs the recommended local loop for the current feature branch and prints the PR next step
 - `make pr-open` opens a GitHub PR against `develop` with the repo template plus local automation context
 - `make pr-status` shows the current PR state through GitHub CLI
+- `make pr-doctor` prints PR health, current size class, upstream status, PR status, and whether the last local green loop still matches the branch base
 - `make frontend` runs the fast frontend gate
 - `make frontend-hot` runs the same fast frontend gate but keeps the smoke server warm across runs
 - `make backend` runs the fast backend gate
@@ -326,6 +328,7 @@ PRs are not just ceremony here:
 - auto-staging still happens only after the reviewed PR lands in `develop`
 - `.github/pull_request_template.md` keeps the PR body short and consistent
 - `make pr-ready` and `make pr-open` keep the branch-to-PR flow aligned with the same automation core used for local verification
+- `make pr-doctor` warns when the branch has grown into a probably-too-large PR, so review cost stays under control
 
 ## Key Screens In The App
 
