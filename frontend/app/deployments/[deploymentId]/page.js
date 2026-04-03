@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { AdminDisclosureSection } from "../../app/admin-ui";
+import { escapeCsvCell, triggerFileDownload } from "../../lib/admin-page-utils";
 import {
   smokeActivity,
   smokeDeployment,
@@ -113,6 +114,169 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity) {
   return lines.join("\n");
 }
 
+function buildRecommendedNextStep(deployment, health, diagnostics, attentionItems) {
+  if (deployment?.status === "failed") {
+    return "Review diagnostics and recent failures first, then redeploy only after the root cause is clear.";
+  }
+
+  if (health?.status && health.status !== "healthy") {
+    return "Check health, logs, and recent activity before making another rollout change.";
+  }
+
+  if (diagnostics?.activity?.recent_failure_count > 0) {
+    return "Review the recent failure history and confirm the runtime is stable before the next rollout.";
+  }
+
+  if (attentionItems.length > 0) {
+    return "Work through the current attention items before changing this deployment.";
+  }
+
+  return "Keep the current rollout stable, and only redeploy when you are ready to change image, ports, or env vars deliberately.";
+}
+
+function buildPlainLanguageSummary(deployment, health, diagnostics, attentionItems, activity) {
+  if (!deployment) {
+    return "";
+  }
+
+  const deploymentName = deployment.container_name || deployment.image || deployment.id;
+  const endpoint = buildDeploymentUrl(deployment);
+  const latestEvent = Array.isArray(activity) && activity.length > 0 ? activity[0] : null;
+  const nextStep = buildRecommendedNextStep(deployment, health, diagnostics, attentionItems);
+
+  const lines = [
+    `What changed: the deployment "${deploymentName}" is currently ${deployment.status || "in an unknown state"}.`,
+    endpoint
+      ? `People can currently reach it at ${endpoint}.`
+      : "This deployment does not currently have a public URL.",
+    health?.status === "healthy"
+      ? `The latest health check passed${health?.response_time_ms || health?.response_time_ms === 0 ? ` in ${health.response_time_ms} ms` : ""}.`
+      : `The latest health check needs review${health?.status ? ` because the status is ${health.status}` : ""}${health?.error ? `: ${health.error}` : "."}`,
+    attentionItems.length > 0
+      ? `${attentionItems.length} issue${attentionItems.length === 1 ? "" : "s"} still need attention before the next rollout: ${attentionItems
+          .slice(0, 3)
+          .map((item) => item.label)
+          .join(", ")}.`
+      : "There are no active runtime warnings right now.",
+    diagnostics?.server_target
+      ? `The deployment is tied to ${diagnostics.server_target} for diagnostics and runtime review.`
+      : "No diagnostics target is available yet.",
+    latestEvent?.title
+      ? `The most recent recorded activity was "${latestEvent.title}" at ${formatDate(latestEvent.created_at)}.`
+      : "No recent activity has been recorded for this deployment yet.",
+    `What to do next: ${nextStep}`,
+  ];
+
+  return lines.join("\n");
+}
+
+function buildIncidentSnapshotPayload(
+  deployment,
+  health,
+  diagnostics,
+  activity,
+  attentionItems,
+  suggestedPorts,
+) {
+  if (!deployment) {
+    return null;
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    deployment_id: deployment.id,
+    status: deployment.status || "unknown",
+    next_step: buildRecommendedNextStep(deployment, health, diagnostics, attentionItems),
+    human_summary: buildPlainLanguageSummary(
+      deployment,
+      health,
+      diagnostics,
+      attentionItems,
+      activity,
+    ),
+    runtime_summary: buildRuntimeSummaryText(
+      deployment,
+      health,
+      diagnostics,
+      activity,
+    ),
+    attention_items: attentionItems,
+    suggested_ports: suggestedPorts,
+    deployment,
+    health,
+    diagnostics,
+    activity,
+  };
+}
+
+function buildIncidentMarkdown(snapshot) {
+  if (!snapshot) {
+    return "";
+  }
+
+  const lines = [
+    `# Deployment Incident Handoff`,
+    ``,
+    `Generated: ${formatDate(snapshot.generated_at)}`,
+    `Deployment ID: ${snapshot.deployment_id}`,
+    `Status: ${snapshot.status}`,
+    ``,
+    `## Plain-Language Summary`,
+    ``,
+    ...snapshot.human_summary.split("\n"),
+    ``,
+    `## Next Step`,
+    ``,
+    snapshot.next_step,
+    ``,
+    `## Runtime Snapshot`,
+    ``,
+    ...snapshot.runtime_summary.split("\n"),
+    ``,
+    `## Attention Items`,
+    ``,
+  ];
+
+  if (snapshot.attention_items.length === 0) {
+    lines.push(`- No active runtime warnings.`);
+  } else {
+    snapshot.attention_items.forEach((item) => {
+      lines.push(`- ${item.label}: ${item.message}`);
+    });
+  }
+
+  lines.push(``, `## Recent Activity`, ``);
+
+  if (!Array.isArray(snapshot.activity) || snapshot.activity.length === 0) {
+    lines.push(`- No activity recorded yet.`);
+  } else {
+    snapshot.activity.slice(0, 10).forEach((item) => {
+      lines.push(
+        `- ${formatDate(item.created_at)} · ${item.level || "unknown"} · ${item.title || "-"} · ${item.message || "-"}`,
+      );
+    });
+  }
+
+  return lines.join("\n");
+}
+
+function buildActivityExportCsv(items) {
+  const rows = [
+    ["created_at", "level", "category", "title", "message"],
+    ...items.map((item) => [
+      item.created_at || "",
+      item.level || "",
+      item.category || "",
+      item.title || "",
+      item.message || "",
+    ]),
+  ];
+
+  return rows
+    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
+    .join("\n");
+}
+
 function formatSuggestedPorts(ports) {
   if (!Array.isArray(ports) || ports.length === 0) {
     return "";
@@ -187,6 +351,9 @@ export default function DeploymentDetailsPage({ params }) {
   const [envExpanded, setEnvExpanded] = useState(false);
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
+  const [activityQuery, setActivityQuery] = useState("");
+  const [activityLevelFilter, setActivityLevelFilter] = useState("all");
+  const [activitySort, setActivitySort] = useState("newest");
   const [form, setForm] = useState({
     image: "",
     name: "",
@@ -202,6 +369,62 @@ export default function DeploymentDetailsPage({ params }) {
     diagnostics,
     activity,
   );
+  const plainLanguageSummary = buildPlainLanguageSummary(
+    deployment,
+    health,
+    diagnostics,
+    attentionItems,
+    activity,
+  );
+  const incidentSnapshot = buildIncidentSnapshotPayload(
+    deployment,
+    health,
+    diagnostics,
+    activity,
+    attentionItems,
+    suggestedPorts,
+  );
+  const filteredActivity = [...activity]
+    .filter((item) => {
+      if (activityLevelFilter !== "all" && (item.level || "unknown") !== activityLevelFilter) {
+        return false;
+      }
+
+      const query = activityQuery.trim().toLowerCase();
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [
+        item.level,
+        item.category,
+        item.title,
+        item.message,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    })
+    .sort((left, right) => {
+      const leftTime = new Date(left.created_at || 0).getTime();
+      const rightTime = new Date(right.created_at || 0).getTime();
+
+      if (activitySort === "oldest") {
+        return leftTime - rightTime;
+      }
+
+      if (activitySort === "errors-first") {
+        const leftWeight = left.level === "error" ? 0 : left.level === "warn" ? 1 : 2;
+        const rightWeight = right.level === "error" ? 0 : right.level === "warn" ? 1 : 2;
+        if (leftWeight !== rightWeight) {
+          return leftWeight - rightWeight;
+        }
+      }
+
+      return rightTime - leftTime;
+    });
   const detailPriority =
     attentionItems[0]?.message ||
     (deployment?.status === "failed"
@@ -567,6 +790,13 @@ export default function DeploymentDetailsPage({ params }) {
     return payload;
   }
 
+  function showTransientMessage(message) {
+    setCopyMessage(message);
+    window.setTimeout(() => {
+      setCopyMessage("");
+    }, 2000);
+  }
+
   async function copyText(value, label) {
     if (!value) {
       return;
@@ -574,13 +804,48 @@ export default function DeploymentDetailsPage({ params }) {
 
     try {
       await navigator.clipboard.writeText(value);
-      setCopyMessage(`${label} copied.`);
-      window.setTimeout(() => {
-        setCopyMessage("");
-      }, 2000);
+      showTransientMessage(`${label} copied.`);
     } catch {
-      setCopyMessage(`Failed to copy ${label.toLowerCase()}.`);
+      showTransientMessage(`Failed to copy ${label.toLowerCase()}.`);
     }
+  }
+
+  function handleDownloadIncidentSnapshot() {
+    if (!incidentSnapshot) {
+      return;
+    }
+
+    triggerFileDownload(
+      `deploymate-deployment-${deploymentId}-incident-snapshot.json`,
+      new Blob([JSON.stringify(incidentSnapshot, null, 2)], {
+        type: "application/json;charset=utf-8",
+      }),
+    );
+    showTransientMessage("Incident snapshot downloaded.");
+  }
+
+  function handleDownloadIncidentMarkdown() {
+    if (!incidentSnapshot) {
+      return;
+    }
+
+    triggerFileDownload(
+      `deploymate-deployment-${deploymentId}-handoff.md`,
+      new Blob([buildIncidentMarkdown(incidentSnapshot)], {
+        type: "text/markdown;charset=utf-8",
+      }),
+    );
+    showTransientMessage("Incident handoff markdown downloaded.");
+  }
+
+  function handleDownloadFilteredActivityCsv() {
+    triggerFileDownload(
+      `deploymate-deployment-${deploymentId}-activity.csv`,
+      new Blob([buildActivityExportCsv(filteredActivity)], {
+        type: "text/csv;charset=utf-8",
+      }),
+    );
+    showTransientMessage("Current activity view exported.");
   }
 
   async function handleRedeploy(event) {
@@ -1075,6 +1340,55 @@ export default function DeploymentDetailsPage({ params }) {
               badge={deployment?.status || "unknown"}
               testId="runtime-detail-utility-disclosure"
             >
+            <article className="card compactCard adminToolCard" data-testid="runtime-detail-handoff-card">
+              <div className="adminToolHeader">
+                <span className="adminToolEyebrow">Incident handoff</span>
+                <h3>Explain the current runtime in plain language</h3>
+                <p>Use this when you need to hand the situation to a teammate, reviewer, or operator who does not want to reconstruct it from raw diagnostics.</p>
+              </div>
+              <div className="row">
+                <span className="label">What this means</span>
+                <div className="stackedValue">
+                  <pre className="logs expandedBlock" data-testid="runtime-detail-plain-language-summary">
+                    {plainLanguageSummary || "Runtime summary is not available yet."}
+                  </pre>
+                </div>
+              </div>
+              <div className="row">
+                <span className="label">Recommended next step</span>
+                <span data-testid="runtime-detail-next-step">{incidentSnapshot?.next_step || detailPriority}</span>
+              </div>
+              <div className="actionCluster">
+                <button
+                  type="button"
+                  className="landingButton secondaryButton"
+                  onClick={() => copyText(plainLanguageSummary, "Plain-language summary")}
+                  disabled={!plainLanguageSummary}
+                  data-testid="runtime-detail-copy-plain-summary-button"
+                >
+                  Copy plain summary
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={handleDownloadIncidentSnapshot}
+                  disabled={!incidentSnapshot}
+                  data-testid="runtime-detail-download-snapshot-button"
+                >
+                  Download JSON snapshot
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={handleDownloadIncidentMarkdown}
+                  disabled={!incidentSnapshot}
+                  data-testid="runtime-detail-download-handoff-button"
+                >
+                  Download handoff markdown
+                </button>
+              </div>
+            </article>
+
             <article className="card compactCard adminToolCard" data-testid="runtime-detail-summary-card">
               <div className="adminToolHeader">
                 <span className="adminToolEyebrow">Utility layer</span>
@@ -1282,6 +1596,20 @@ export default function DeploymentDetailsPage({ params }) {
                     type="button"
                     className="smallButton"
                     onClick={() => copyText(runtimeSummaryText, "Runtime summary")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row">
+                <span className="label">Plain-language summary</span>
+                <span className="valueWithActions">
+                  <span>Human-readable explanation of the current runtime state.</span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(plainLanguageSummary, "Plain-language summary")}
+                    disabled={!plainLanguageSummary}
                   >
                     Copy
                   </button>
@@ -1529,12 +1857,63 @@ export default function DeploymentDetailsPage({ params }) {
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-activity-title">Activity</h2>
               </div>
+              <div className="form">
+                <label className="field">
+                  <span>Search activity</span>
+                  <input
+                    value={activityQuery}
+                    onChange={(event) => setActivityQuery(event.target.value)}
+                    placeholder="redeploy failed, health, delete"
+                    data-testid="runtime-detail-activity-search"
+                  />
+                </label>
+                <label className="field">
+                  <span>Level</span>
+                  <select
+                    value={activityLevelFilter}
+                    onChange={(event) => setActivityLevelFilter(event.target.value)}
+                    data-testid="runtime-detail-activity-level-filter"
+                  >
+                    <option value="all">All levels</option>
+                    <option value="error">Errors</option>
+                    <option value="warn">Warnings</option>
+                    <option value="success">Successes</option>
+                    <option value="info">Info</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Sort</span>
+                  <select
+                    value={activitySort}
+                    onChange={(event) => setActivitySort(event.target.value)}
+                    data-testid="runtime-detail-activity-sort"
+                  >
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                    <option value="errors-first">Errors first</option>
+                  </select>
+                </label>
+                <div className="formActions">
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={handleDownloadFilteredActivityCsv}
+                    disabled={filteredActivity.length === 0}
+                    data-testid="runtime-detail-activity-export-button"
+                  >
+                    Export current CSV
+                  </button>
+                </div>
+              </div>
+              <p className="formHint" data-testid="runtime-detail-activity-summary">
+                Showing {filteredActivity.length} of {activity.length} activity event{activity.length === 1 ? "" : "s"}.
+              </p>
 
-              {activity.length === 0 ? (
+              {filteredActivity.length === 0 ? (
                 <div className="empty">No activity yet.</div>
               ) : (
                 <div className="timeline">
-                  {activity.map((item) => (
+                  {filteredActivity.map((item) => (
                     <div className="timelineItem" key={item.id}>
                       <div className="row">
                         <span className="label">Level</span>

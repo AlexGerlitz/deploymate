@@ -70,6 +70,11 @@ automation_smoke_runtime_checks() {
 /deployments/smoke-deployment|runtime detail smoke banner|data-testid="runtime-detail-smoke-banner"
 /deployments/smoke-deployment|runtime detail header actions|data-testid="runtime-detail-header-actions"
 /deployments/smoke-deployment|runtime detail copy summary button|data-testid="runtime-detail-copy-summary-button"
+/deployments/smoke-deployment|runtime detail handoff card|data-testid="runtime-detail-handoff-card"
+/deployments/smoke-deployment|runtime detail plain summary button|data-testid="runtime-detail-copy-plain-summary-button"
+/deployments/smoke-deployment|runtime detail snapshot button|data-testid="runtime-detail-download-snapshot-button"
+/deployments/smoke-deployment|runtime detail handoff download button|data-testid="runtime-detail-download-handoff-button"
+/deployments/smoke-deployment|runtime detail next step|data-testid="runtime-detail-next-step"
 /deployments/smoke-deployment|runtime detail overview grid|data-testid="runtime-detail-overview-grid"
 /deployments/smoke-deployment|runtime detail endpoint card|data-testid="runtime-detail-endpoint-card"
 /deployments/smoke-deployment|runtime detail runtime card|data-testid="runtime-detail-runtime-card"
@@ -89,6 +94,11 @@ automation_smoke_runtime_checks() {
 /deployments/smoke-deployment|runtime detail logs card|data-testid="runtime-detail-logs-card"
 /deployments/smoke-deployment|runtime detail activity card|data-testid="runtime-detail-activity-card"
 /deployments/smoke-deployment|runtime detail activity title|data-testid="runtime-detail-activity-title"
+/deployments/smoke-deployment|runtime detail activity search|data-testid="runtime-detail-activity-search"
+/deployments/smoke-deployment|runtime detail activity level filter|data-testid="runtime-detail-activity-level-filter"
+/deployments/smoke-deployment|runtime detail activity sort|data-testid="runtime-detail-activity-sort"
+/deployments/smoke-deployment|runtime detail activity export|data-testid="runtime-detail-activity-export-button"
+/deployments/smoke-deployment|runtime detail activity summary|data-testid="runtime-detail-activity-summary"
 /deployments/smoke-deployment|runtime detail smoke host copy|Smoke VPS
 EOF
 }
