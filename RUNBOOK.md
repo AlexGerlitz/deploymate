@@ -182,6 +182,19 @@ Recommended promotion order:
 The CI and release workflows call the same reusable composite action in `.github/actions/remote-release/action.yml`, so staging and production deploy behavior stays aligned with `scripts/remote_release.sh`.
 Those workflows pass the exact checked-out commit SHA into the remote helper, so the release host deploys the reviewed commit rather than whichever newer commit happens to land on the branch later.
 
+For the next project, the fastest non-empty starting point is now the product starter:
+
+```bash
+make bootstrap-product-starter TARGET_DIR=/absolute/path/to/project PRODUCT_STARTER_FLAGS="--project-name MyApp --app-slug myapp --contact-email founder@example.com --frontend-dir web --backend-dir api"
+```
+
+That gives the new repo:
+
+- starter frontend shell
+- starter backend shell
+- starter docs
+- reusable automation core
+
 Recommended PR-first daily flow:
 
 ```bash

@@ -201,6 +201,8 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 - [AUTOMATION-CORE.md](AUTOMATION-CORE.md) reusable automation-core notes for porting this DX layer into another repo
 - `make export-automation-core` builds an exportable automation bundle for moving this DX layer into a separate private repository
 - `make bootstrap-core-init TARGET_DIR=... BOOTSTRAP_CORE_FLAGS="--project-name MyApp --frontend-dir web --backend-dir api"` installs the reusable core into another repo and prefills the first adapter config in one shot
+- [PRODUCT-STARTER.md](PRODUCT-STARTER.md) defines the reusable product starter layer for future projects
+- `make bootstrap-product-starter TARGET_DIR=... PRODUCT_STARTER_FLAGS="--project-name MyApp --app-slug myapp --contact-email founder@example.com --frontend-dir web --backend-dir api"` renders a starter product skeleton plus automation core into a new repo
 
 ## Fast Local Commands
 
@@ -232,6 +234,25 @@ make backend
 make fast
 make fast-hot
 ```
+
+## Product Starter
+
+Automation core is no longer the only reusable layer here.
+
+This repo now also contains a reusable **product starter** for the next project:
+
+- starter landing/auth/app shell
+- starter FastAPI backend shell
+- starter docs
+- optional automation-core bootstrap in the same command
+
+Fastest path for a brand new product repo:
+
+```bash
+make bootstrap-product-starter TARGET_DIR=/absolute/path/to/project PRODUCT_STARTER_FLAGS="--project-name MyApp --app-slug myapp --contact-email founder@example.com --frontend-dir web --backend-dir api"
+```
+
+That is the new shortest route from “empty folder” to “working product skeleton plus automation”.
 
 What they do:
 

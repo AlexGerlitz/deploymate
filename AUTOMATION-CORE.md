@@ -2,6 +2,8 @@
 
 This repo now separates reusable local automation logic from DeployMate-specific adapter values.
 
+If you want reusable product scaffolding, not just reusable automation, see [PRODUCT-STARTER.md](PRODUCT-STARTER.md).
+
 ## Reusable core
 
 These files are the portable part:

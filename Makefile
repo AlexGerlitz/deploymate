@@ -1,4 +1,10 @@
-.PHONY: dev-doctor start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core bootstrap-core-init upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: export-product-starter bootstrap-product-starter dev-doctor start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core bootstrap-core-init upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+
+export-product-starter:
+	bash scripts/export_product_starter.sh
+
+bootstrap-product-starter:
+	bash scripts/bootstrap_product_starter.sh $(TARGET_DIR) $(PRODUCT_STARTER_FLAGS)
 
 dev-doctor:
 	bash scripts/dev_doctor.sh

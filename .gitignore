@@ -16,3 +16,4 @@ frontend/.env.*.local
 .playwright-mcp/
 .logs/
 automation-core-dist/
+product-starter-dist/

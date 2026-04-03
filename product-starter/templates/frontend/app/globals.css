@@ -1,0 +1,137 @@
+:root {
+  --starter-bg: #f3efe7;
+  --starter-panel: #fffaf1;
+  --starter-ink: #1b1c18;
+  --starter-accent: #2f6d62;
+  --starter-accent-strong: #1d4a42;
+  --starter-line: rgba(27, 28, 24, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  background: radial-gradient(circle at top, #fffaf1 0%, var(--starter-bg) 60%);
+  color: var(--starter-ink);
+}
+
+a {
+  color: inherit;
+}
+
+.starterShell {
+  min-height: 100vh;
+  padding: 32px 20px 56px;
+}
+
+.starterWrap {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+}
+
+.starterHero,
+.starterCard,
+.starterGridCard {
+  background: var(--starter-panel);
+  border: 1px solid var(--starter-line);
+  border-radius: 24px;
+  box-shadow: 0 16px 48px rgba(27, 28, 24, 0.06);
+}
+
+.starterHero {
+  padding: 32px;
+}
+
+.starterEyebrow {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--starter-accent-strong);
+  margin: 0 0 12px;
+}
+
+.starterTitle {
+  font-size: clamp(36px, 8vw, 64px);
+  line-height: 0.96;
+  margin: 0 0 16px;
+}
+
+.starterLead {
+  max-width: 700px;
+  font-size: 18px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.starterActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.starterButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  text-decoration: none;
+  border: 1px solid var(--starter-accent);
+}
+
+.starterButtonPrimary {
+  color: #fff;
+  background: var(--starter-accent);
+}
+
+.starterButtonSecondary {
+  background: transparent;
+}
+
+.starterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.starterGridCard,
+.starterCard {
+  padding: 22px;
+}
+
+.starterMeta {
+  font-size: 13px;
+  color: rgba(27, 28, 24, 0.72);
+}
+
+@media (max-width: 640px) {
+  .starterShell {
+    padding: 20px 14px 36px;
+  }
+
+  .starterHero,
+  .starterCard,
+  .starterGridCard {
+    border-radius: 18px;
+  }
+
+  .starterHero {
+    padding: 22px;
+  }
+
+  .starterActions {
+    flex-direction: column;
+  }
+
+  .starterButton {
+    width: 100%;
+  }
+}
