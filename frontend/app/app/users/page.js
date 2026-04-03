@@ -47,6 +47,7 @@ import {
 } from "../../lib/admin-page-utils";
 import {
   analyzeBackupBundleText,
+  buildRestoreFilteredSectionsCsv,
   buildRestoreDryRunCsv,
   buildRestoreIssuesCsv,
   buildRestorePreparationMarkdown,
@@ -109,6 +110,8 @@ function UsersPageContent() {
   );
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [restoreSectionFilter, setRestoreSectionFilter] = useState("all");
+  const [restoreSectionQuery, setRestoreSectionQuery] = useState("");
+  const [restoreHighestRiskOnly, setRestoreHighestRiskOnly] = useState(false);
   const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -149,9 +152,36 @@ function UsersPageContent() {
   const bundleAnalysis = analyzeBackupBundleText(backupBundleText);
   const restoreReportDigest = buildRestoreReportDigest(restoreDryRun);
   const visibleRestoreSections = restoreDryRun
-    ? restoreDryRun.sections.filter(
-        (section) => restoreSectionFilter === "all" || section.status === restoreSectionFilter,
-      )
+    ? restoreDryRun.sections.filter((section) => {
+        if (restoreSectionFilter !== "all" && section.status !== restoreSectionFilter) {
+          return false;
+        }
+
+        if (
+          restoreHighestRiskOnly &&
+          !(restoreDryRun.summary.highest_risk_sections || []).includes(section.name)
+        ) {
+          return false;
+        }
+
+        const query = restoreSectionQuery.trim().toLowerCase();
+        if (!query) {
+          return true;
+        }
+
+        const haystack = [
+          section.name,
+          section.status,
+          ...(section.notes || []),
+          ...(section.blockers || []).map((issue) => issue.message),
+          ...(section.warnings || []).map((issue) => issue.message),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return haystack.includes(query);
+      })
     : [];
   const restorePreparationMarkdown = buildRestorePreparationMarkdown(restoreDryRun);
   const primaryFilterDefinitions = [
@@ -999,6 +1029,17 @@ function UsersPageContent() {
     setSuccess("Import preparation markdown downloaded.");
   }
 
+  function handleDownloadVisibleRestoreSectionsCsv() {
+    if (!restoreDryRun) {
+      return;
+    }
+    const blob = new Blob([buildRestoreFilteredSectionsCsv(visibleRestoreSections)], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-restore-current-sections.csv", blob);
+    setSuccess("Current restore sections CSV downloaded.");
+  }
+
   function handleDownloadRestoreIssuesCsv() {
     if (!restoreDryRun) {
       return;
@@ -1429,6 +1470,14 @@ function UsersPageContent() {
                   >
                     Preparation markdown
                   </button>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    data-testid="restore-visible-sections-csv-button"
+                    onClick={handleDownloadVisibleRestoreSectionsCsv}
+                  >
+                    Current sections CSV
+                  </button>
                 </div>
               </article>
               <div className="overviewGrid" data-testid="restore-attention-overview">
@@ -1463,7 +1512,30 @@ function UsersPageContent() {
                     <option value="error">Blocked</option>
                   </select>
                 </label>
+                <label className="field">
+                  <span>Search sections</span>
+                  <input
+                    data-testid="restore-section-search"
+                    value={restoreSectionQuery}
+                    onChange={(event) => setRestoreSectionQuery(event.target.value)}
+                    placeholder="servers, template, missing"
+                  />
+                </label>
+                <label className="field">
+                  <span>Risk focus</span>
+                  <select
+                    data-testid="restore-high-risk-filter"
+                    value={restoreHighestRiskOnly ? "high-risk" : "all"}
+                    onChange={(event) => setRestoreHighestRiskOnly(event.target.value === "high-risk")}
+                  >
+                    <option value="all">All sections</option>
+                    <option value="high-risk">Highest-risk only</option>
+                  </select>
+                </label>
               </div>
+              <p className="formHint" data-testid="restore-visible-sections-summary">
+                Showing {visibleRestoreSections.length} of {restoreDryRun.sections.length} section{restoreDryRun.sections.length === 1 ? "" : "s"}.
+              </p>
               <div className="backupManifestGrid" data-testid="restore-manifest-counts">
                 {Object.entries(restoreDryRun.manifest.sections || {}).map(([name, count]) => (
                   <div key={name} className="backupManifestItem">
@@ -1503,6 +1575,13 @@ function UsersPageContent() {
                     <div className="row">
                       <span className="label">Records</span>
                       <span>{section.incoming_count} incoming · {section.current_count} current</span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Issue summary</span>
+                      <span>
+                        {(section.blockers || []).length} blocker{(section.blockers || []).length === 1 ? "" : "s"} ·{" "}
+                        {(section.warnings || []).length} warning{(section.warnings || []).length === 1 ? "" : "s"}
+                      </span>
                     </div>
                     {section.blockers.length > 0 ? (
                       <div className="backupIssueList">

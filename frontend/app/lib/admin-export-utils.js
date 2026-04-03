@@ -124,6 +124,32 @@ export function buildRestorePreparationMarkdown(report) {
   return lines.join("\n");
 }
 
+export function buildRestoreFilteredSectionsCsv(sections = []) {
+  const rows = [[
+    "section",
+    "status",
+    "incoming_count",
+    "current_count",
+    "blocker_count",
+    "warning_count",
+    "notes",
+  ]];
+
+  for (const section of sections) {
+    rows.push([
+      section.name || "",
+      section.status || "",
+      section.incoming_count || 0,
+      section.current_count || 0,
+      (section.blockers || []).length,
+      (section.warnings || []).length,
+      (section.notes || []).join(" | "),
+    ]);
+  }
+
+  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+}
+
 export function analyzeBackupBundleText(bundleText) {
   if (!bundleText.trim()) {
     return { status: "empty", message: "Load or paste a backup bundle to inspect it." };
