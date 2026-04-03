@@ -291,4 +291,19 @@ if [ "$surface" = "frontend" ] || [ "$surface" = "full" ]; then
   fi
 fi
 
+recommendation_output="$(bash scripts/recommend_local_mode.sh --base-ref "$BASE_REF" --head-ref "$HEAD_REF")"
+while IFS='=' read -r key value; do
+  case "$key" in
+    recommended_command)
+      recommended_command="$value"
+      ;;
+    recommendation_reason)
+      recommendation_reason="$value"
+      ;;
+  esac
+done <<< "$recommendation_output"
+if [ -n "${recommended_command:-}" ]; then
+  echo "[dev-verify-changed] recommended next loop: ${recommended_command} (${recommendation_reason:-current diff})"
+fi
+
 bash scripts/dev_fast_check.sh "$surface"

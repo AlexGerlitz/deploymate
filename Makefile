@@ -1,4 +1,7 @@
-.PHONY: changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: recommend-local-mode changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+
+recommend-local-mode:
+	bash scripts/recommend_local_mode.sh
 
 changed:
 	bash scripts/dev_verify_changed.sh

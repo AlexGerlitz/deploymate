@@ -42,6 +42,22 @@ trap audit_cache_cleanup EXIT
 if [ "$PROFILE_MODE" = "changed" ]; then
   echo "[profile-surface] running changed-file fast gate"
   shift || true
+  recommendation_output="$(bash scripts/recommend_local_mode.sh "$@")"
+  recommended_command=""
+  recommendation_reason=""
+  while IFS='=' read -r key value; do
+    case "$key" in
+      recommended_command)
+        recommended_command="$value"
+        ;;
+      recommendation_reason)
+        recommendation_reason="$value"
+        ;;
+    esac
+  done <<< "$recommendation_output"
+  if [ -n "$recommended_command" ]; then
+    echo "[profile-surface] recommended loop: ${recommended_command} (${recommendation_reason:-current diff})"
+  fi
   bash scripts/dev_verify_changed.sh "$@"
 else
   echo "[profile-surface] running fast gate for surface: $PROFILE_MODE"
