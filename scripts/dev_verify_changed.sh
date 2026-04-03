@@ -132,6 +132,7 @@ surface=""
 reason=""
 backend_changed_files=()
 frontend_changed_files=()
+runtime_audit_reason=""
 while IFS='=' read -r key value; do
   case "$key" in
     surface)
@@ -158,6 +159,22 @@ if [ "$surface" = "skip" ]; then
   echo "[dev-verify-changed] skipping local gate: $reason"
   exit 0
 fi
+
+runtime_audit_output="$(bash scripts/detect_runtime_audit_need.sh "${changed_files[@]}")"
+printf '%s\n' "$runtime_audit_output"
+while IFS='=' read -r key value; do
+  case "$key" in
+    run_runtime_audits)
+      DEPLOYMATE_RUN_RUNTIME_AUDITS="$value"
+      export DEPLOYMATE_RUN_RUNTIME_AUDITS
+      ;;
+    reason)
+      runtime_audit_reason="$value"
+      ;;
+  esac
+done <<< "$runtime_audit_output"
+
+echo "[dev-verify-changed] runtime audits: ${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1} (${runtime_audit_reason})"
 
 echo "[dev-verify-changed] running fast gate for surface: $surface"
 if [ "$surface" = "backend" ] || [ "$surface" = "full" ]; then

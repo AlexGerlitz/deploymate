@@ -6,6 +6,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT_DIR/scripts/audit_cache.sh"
 cd "$ROOT_DIR"
 
+if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" != "1" ]; then
+  echo "[runtime-capability-audit] skipped for this local diff"
+  exit 0
+fi
+
 audit_cache_prepare
 
 if audit_cache_has runtime_capability_audit; then

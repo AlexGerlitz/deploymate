@@ -5,6 +5,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" != "1" ]; then
+  echo "[local-runtime-audit] skipped for this local diff"
+  exit 0
+fi
+
 if command -v rg >/dev/null 2>&1; then
   SEARCH_CMD=(rg -n)
 else

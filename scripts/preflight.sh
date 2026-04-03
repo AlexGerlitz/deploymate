@@ -91,8 +91,12 @@ if [ -f "scripts/security_audit.sh" ]; then
 fi
 
 if [ -f "scripts/runtime_capability_audit.sh" ]; then
-  echo "[preflight] runtime capability audit"
-  bash scripts/runtime_capability_audit.sh
+  if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" = "1" ]; then
+    echo "[preflight] runtime capability audit"
+    bash scripts/runtime_capability_audit.sh
+  else
+    echo "[preflight] runtime capability audit skipped for this local diff"
+  fi
 fi
 
 echo "[preflight] done"

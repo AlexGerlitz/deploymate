@@ -105,13 +105,21 @@ if [ -f "scripts/server_credentials_audit.sh" ]; then
 fi
 
 if [ -f "scripts/local_runtime_audit.sh" ]; then
-  echo "[security-audit] local runtime audit"
-  bash scripts/local_runtime_audit.sh
+  if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" = "1" ]; then
+    echo "[security-audit] local runtime audit"
+    bash scripts/local_runtime_audit.sh
+  else
+    echo "[security-audit] local runtime audit skipped for this local diff"
+  fi
 fi
 
 if [ -f "scripts/runtime_capability_audit.sh" ]; then
-  echo "[security-audit] runtime capability audit"
-  bash scripts/runtime_capability_audit.sh
+  if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" = "1" ]; then
+    echo "[security-audit] runtime capability audit"
+    bash scripts/runtime_capability_audit.sh
+  else
+    echo "[security-audit] runtime capability audit skipped for this local diff"
+  fi
 fi
 
 if [ "$WARNINGS" -eq 0 ]; then

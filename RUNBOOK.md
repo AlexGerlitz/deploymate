@@ -47,6 +47,7 @@ These commands:
 6. reuse one shared frontend smoke dev server in fast mode instead of starting a new `next dev` process for each smoke
 7. reuse shared frontend smoke servers in the heavier full gate too, so the main frontend smoke pack no longer starts a separate `next dev` process per script
 8. cache repeated local audit steps inside one gate run, so nested security/runtime audits do not re-run the same expensive checks twice
+9. skip runtime-oriented local audits automatically when the current diff does not touch runtime or deploy contract files
 
 Or run the broader local release gate:
 
