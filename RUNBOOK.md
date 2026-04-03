@@ -280,6 +280,7 @@ Presets now also change the starter action flow itself, so the generated surface
 The generated page now also gets a preset-specific segment/workflow filter and richer card context fields, so the starter slice is closer to the actual entity shape you will build next.
 The scaffold now also includes a starter bulk-action panel and a mutation payload preview, so the first write contract is visible immediately instead of being invented ad hoc later.
 New surfaces now also generate modular frontend starter files (`page.js`, `starter-data.js`, `starter-actions.js`) so the scaffold output is easier to extend without turning the page file into a dump of preset constants.
+The scaffold now also generates `starter-smoke.js` plus a backend `*_starter.py` helper, so route smoke placeholders and backend starter contracts are modular too.
 
 The CI, staging, and production workflows now write a short GitHub job summary with the chosen surface, smoke mode, requested commit SHA, deployed SHA, and target URL so the result is readable without opening raw logs.
 

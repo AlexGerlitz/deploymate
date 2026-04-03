@@ -122,7 +122,9 @@ API_PREFIX="${API_PREFIX:-/$SURFACE_SLUG}"
 frontend_page_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/page.js"
 frontend_data_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-data.js"
 frontend_actions_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-actions.js"
+frontend_smoke_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-smoke.js"
 backend_route_path="$TARGET_DIR/backend/app/routes/$PY_SLUG.py"
+backend_starter_path="$TARGET_DIR/backend/app/services/${PY_SLUG}_starter.py"
 backend_service_path="$TARGET_DIR/backend/app/services/$PY_SLUG.py"
 backend_test_path="$TARGET_DIR/backend/tests/test_${PY_SLUG}_api_flow.py"
 backend_main_path="$TARGET_DIR/backend/app/main.py"
@@ -983,6 +985,58 @@ export function buildStarterSummaryMetrics(filteredItems) {
 EOF
 )"
 
+safe_write "$frontend_smoke_path" "$(cat <<EOF
+export const starterSmokeRoute = "/app/${SURFACE_SLUG}";
+
+export const starterSmokeChecks = [
+  {
+    label: "${SURFACE_NAME} page title",
+    pattern: 'data-testid="${SURFACE_SLUG}-page-title"',
+  },
+  {
+    label: "Primary queue search",
+    pattern: 'data-testid="${SURFACE_SLUG}-search"',
+  },
+  {
+    label: "Starter action panel",
+    pattern: 'data-testid="${SURFACE_SLUG}-action-starter"',
+  },
+  {
+    label: "Starter bulk panel",
+    pattern: 'data-testid="${SURFACE_SLUG}-bulk-starter"',
+  },
+  {
+    label: "Starter mutation preview",
+    pattern: 'data-testid="${SURFACE_SLUG}-mutation-starter"',
+  },
+];
+
+export const starterSmokeFollowup = [
+  "Add this surface route to scripts/project_automation_smoke_checks.sh once the feature is real.",
+  "Promote the starter checks into a dedicated smoke only after the page stops being scaffold-only.",
+];
+EOF
+)"
+
+safe_write "$backend_starter_path" "$(cat <<EOF
+STARTER_ITEMS = ${SAMPLE_ITEMS_PY}
+
+
+def build_${PY_SLUG}_starter_summary(query: str = "") -> dict:
+    return {
+        "surface": "${SURFACE_SLUG}",
+        "total": len(STARTER_ITEMS),
+        "query": query,
+        "segment_filter_label": "${SEGMENT_FILTER_LABEL}",
+        "primary_action_label": "${PRIMARY_ACTION_LABEL}",
+        "secondary_action_label": "${SECONDARY_ACTION_LABEL}",
+        "bulk_action_label": "${BULK_APPLY_LABEL}",
+        "mutation_route": "${MUTATION_ROUTE_LABEL}",
+        "next_step": "Replace stub data with the first real repository-backed workflow.",
+    }
+EOF
+)"
+
 safe_write "$frontend_page_path" "$(cat <<EOF
 "use client";
 
@@ -1405,9 +1459,12 @@ EOF
 )"
 
 safe_write "$backend_service_path" "$(cat <<EOF
+from app.services.${PY_SLUG}_starter import STARTER_ITEMS, build_${PY_SLUG}_starter_summary
+
+
 def list_${PY_SLUG}_items(query: str = "") -> dict:
     normalized_query = query.strip().lower()
-    items = ${SAMPLE_ITEMS_PY}
+    items = STARTER_ITEMS
     if normalized_query:
         items = [
             item
@@ -1422,15 +1479,8 @@ def list_${PY_SLUG}_items(query: str = "") -> dict:
     return {
         "items": items,
         "summary": {
-            "surface": "${SURFACE_SLUG}",
+            **build_${PY_SLUG}_starter_summary(query=query),
             "total": len(items),
-            "query": query,
-            "segment_filter_label": "${SEGMENT_FILTER_LABEL}",
-            "primary_action_label": "${PRIMARY_ACTION_LABEL}",
-            "secondary_action_label": "${SECONDARY_ACTION_LABEL}",
-            "bulk_action_label": "${BULK_APPLY_LABEL}",
-            "mutation_route": "${MUTATION_ROUTE_LABEL}",
-            "next_step": "Replace stub data with the first real repository-backed workflow.",
         },
     }
 EOF
@@ -1616,6 +1666,10 @@ cat <<EOF
   - export: $WITH_EXPORT
 [scaffold-deploymate-surface] created:
   - ${frontend_page_path#$TARGET_DIR/}
+  - ${frontend_data_path#$TARGET_DIR/}
+  - ${frontend_actions_path#$TARGET_DIR/}
+  - ${frontend_smoke_path#$TARGET_DIR/}
+  - ${backend_starter_path#$TARGET_DIR/}
   - ${backend_route_path#$TARGET_DIR/}
   - ${backend_service_path#$TARGET_DIR/}
   - ${backend_test_path#$TARGET_DIR/}

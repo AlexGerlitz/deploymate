@@ -348,6 +348,8 @@ The generated surface now also ships in a more maintainable shape:
 - `page.js` as the orchestration layer
 - `starter-data.js` for preset data and strings
 - `starter-actions.js` for mutation preview and slice helpers
+- `starter-smoke.js` for route/check placeholders
+- backend `*_starter.py` module for sample items and summary contract
 
 ## Product Starter
 
