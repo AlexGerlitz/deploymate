@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import patch
 
+from fastapi import HTTPException
+
 from app.routes.root import _analyze_restore_bundle
 
 
@@ -123,6 +125,102 @@ class RestoreDryRunTests(unittest.TestCase):
         self.assertTrue(
             any(issue.code == "duplicate_username_bundle" for issue in sections["users"].blockers)
         )
+
+    @patch("app.routes.root.list_deployment_templates", return_value=[])
+    @patch("app.routes.root.list_deployment_records", return_value=[])
+    @patch("app.routes.root.list_servers", return_value=[])
+    @patch("app.routes.root.list_admin_audit_events", return_value=[])
+    @patch("app.routes.root.list_upgrade_requests", return_value=[])
+    @patch("app.routes.root.list_users", return_value=[])
+    def test_restore_dry_run_warns_on_manifest_mismatch_and_unknown_sections(
+        self,
+        _mock_list_users,
+        _mock_list_upgrade_requests,
+        _mock_list_admin_audit_events,
+        _mock_list_servers,
+        _mock_list_deployment_records,
+        _mock_list_deployment_templates,
+    ):
+        bundle = {
+            "manifest": {
+                "version": "2026-05-01.backup-bundle.v2",
+                "generated_at": "2026-04-01T00:00:00+00:00",
+                "bundle_name": "mismatch-sample",
+                "sections": {
+                    "users": 3,
+                    "upgrade_requests": 0,
+                    "audit_events": 0,
+                    "servers": 0,
+                    "deployments": 0,
+                    "templates": 0,
+                    "extra_section": 2,
+                },
+            },
+            "data": {
+                "users": [{"id": "user-1", "username": "alice"}],
+                "upgrade_requests": [],
+                "audit_events": [],
+                "servers": [],
+                "deployments": [],
+                "templates": [],
+                "legacy_records": [],
+            },
+        }
+
+        response = _analyze_restore_bundle(bundle)
+
+        users_section = next(section for section in response.sections if section.name == "users")
+        warning_codes = {issue.code for issue in users_section.warnings}
+        self.assertIn("manifest_count_mismatch", warning_codes)
+        self.assertIn("unknown_manifest_sections", warning_codes)
+        self.assertIn("unknown_data_sections", warning_codes)
+        self.assertIn("bundle_version_unrecognized", warning_codes)
+        self.assertEqual(users_section.status, "warn")
+
+    @patch("app.routes.root.list_deployment_templates", return_value=[])
+    @patch("app.routes.root.list_deployment_records", return_value=[])
+    @patch("app.routes.root.list_servers", return_value=[])
+    @patch("app.routes.root.list_admin_audit_events", return_value=[])
+    @patch("app.routes.root.list_upgrade_requests", return_value=[])
+    @patch("app.routes.root.list_users", return_value=[])
+    def test_restore_dry_run_rejects_non_list_section_payloads(
+        self,
+        _mock_list_users,
+        _mock_list_upgrade_requests,
+        _mock_list_admin_audit_events,
+        _mock_list_servers,
+        _mock_list_deployment_records,
+        _mock_list_deployment_templates,
+    ):
+        bundle = {
+            "manifest": {
+                "version": "2026-04-01.backup-bundle.v1",
+                "generated_at": "2026-04-01T00:00:00+00:00",
+                "bundle_name": "invalid-sample",
+                "sections": {
+                    "users": 0,
+                    "upgrade_requests": 0,
+                    "audit_events": 0,
+                    "servers": 0,
+                    "deployments": 0,
+                    "templates": 0,
+                },
+            },
+            "data": {
+                "users": {"id": "user-1", "username": "alice"},
+                "upgrade_requests": [],
+                "audit_events": [],
+                "servers": [],
+                "deployments": [],
+                "templates": [],
+            },
+        }
+
+        with self.assertRaises(HTTPException) as context:
+            _analyze_restore_bundle(bundle)
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn('section "users" must be a list', context.exception.detail)
 
 
 if __name__ == "__main__":

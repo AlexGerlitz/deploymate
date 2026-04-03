@@ -208,6 +208,26 @@ class OpsApiFlowTests(unittest.TestCase):
         categories = [item["category"] for item in activity_json["items"]]
         self.assertIn("deploy", categories)
 
+    def test_ops_overview_degrades_when_notifications_are_unavailable(self):
+        with patch("app.routes.ops.list_notifications", side_effect=RuntimeError("notifications unavailable")):
+            response = self.client.get("/ops/overview?notifications_limit=100")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["notifications"]["total"], 0)
+        degraded_titles = [item["title"] for item in payload["attention_items"]]
+        self.assertIn("Activity data is temporarily unavailable", degraded_titles)
+
+    def test_ops_export_returns_503_when_source_loader_fails(self):
+        with patch("app.routes.ops.list_servers", side_effect=RuntimeError("db unavailable")):
+            response = self.client.get("/ops/exports/servers?format=json")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json()["detail"],
+            "Servers export is temporarily unavailable.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

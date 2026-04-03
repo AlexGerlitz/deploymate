@@ -55,6 +55,14 @@ from app.services.auth import SESSION_COOKIE_NAME, hash_password, require_admin
 
 
 router = APIRouter()
+EXPECTED_BACKUP_SECTION_NAMES = (
+    "users",
+    "upgrade_requests",
+    "audit_events",
+    "servers",
+    "deployments",
+    "templates",
+)
 
 
 def _csv_response(filename: str, rows: list[dict], fieldnames: list[str]) -> Response:
@@ -124,6 +132,44 @@ def _finalize_section(section: RestoreDryRunSection) -> RestoreDryRunSection:
     return section
 
 
+def _get_bundle_section_items(data_raw: dict, section_name: str) -> list[dict]:
+    raw_items = data_raw.get(section_name)
+    if raw_items is None:
+        return []
+    if not isinstance(raw_items, list):
+        raise HTTPException(
+            status_code=400,
+            detail=f'Bundle data section "{section_name}" must be a list.',
+        )
+    return raw_items
+
+
+def _append_manifest_section_issues(
+    *,
+    section: RestoreDryRunSection,
+    manifest_sections: dict[str, int],
+    incoming_count: int,
+) -> None:
+    expected_count = manifest_sections.get(section.name)
+    if expected_count is None:
+        section.warnings.append(
+            _issue(
+                "warn",
+                "manifest_section_missing",
+                f'Manifest does not include section "{section.name}".',
+            )
+        )
+        return
+    if expected_count != incoming_count:
+        section.warnings.append(
+            _issue(
+                "warn",
+                "manifest_count_mismatch",
+                f'Manifest says {expected_count} record(s) for "{section.name}" but bundle data contains {incoming_count}.',
+            )
+        )
+
+
 def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     manifest_raw = bundle.get("manifest")
     data_raw = bundle.get("data")
@@ -134,6 +180,13 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
         raise HTTPException(status_code=400, detail="Bundle data is missing or invalid.")
 
     manifest = BackupBundleManifest(**manifest_raw)
+    manifest_sections = manifest.sections or {}
+    unknown_manifest_sections = sorted(
+        name for name in manifest_sections.keys() if name not in EXPECTED_BACKUP_SECTION_NAMES
+    )
+    unknown_data_sections = sorted(
+        name for name in data_raw.keys() if name not in EXPECTED_BACKUP_SECTION_NAMES
+    )
 
     current_users = list_users()
     current_upgrade_requests = list_upgrade_requests()
@@ -144,11 +197,16 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
 
     sections: list[RestoreDryRunSection] = []
 
-    incoming_users = data_raw.get("users") if isinstance(data_raw.get("users"), list) else []
+    incoming_users = _get_bundle_section_items(data_raw, "users")
     section = RestoreDryRunSection(
         name="users",
         incoming_count=len(incoming_users),
         current_count=len(current_users),
+    )
+    _append_manifest_section_issues(
+        section=section,
+        manifest_sections=manifest_sections,
+        incoming_count=len(incoming_users),
     )
     current_usernames = {item.get("username"): item for item in current_users}
     seen_usernames: set[str] = set()
@@ -168,11 +226,16 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     section.notes.append("Users can be validated safely, but restore apply should stay controlled because of credential state.")
     sections.append(_finalize_section(section))
 
-    incoming_requests = data_raw.get("upgrade_requests") if isinstance(data_raw.get("upgrade_requests"), list) else []
+    incoming_requests = _get_bundle_section_items(data_raw, "upgrade_requests")
     section = RestoreDryRunSection(
         name="upgrade_requests",
         incoming_count=len(incoming_requests),
         current_count=len(current_upgrade_requests),
+    )
+    _append_manifest_section_issues(
+        section=section,
+        manifest_sections=manifest_sections,
+        incoming_count=len(incoming_requests),
     )
     current_request_ids = {item.get("id") for item in current_upgrade_requests}
     seen_request_ids: set[str] = set()
@@ -189,11 +252,16 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     section.notes.append("Upgrade requests can usually be restored after ID and linking review.")
     sections.append(_finalize_section(section))
 
-    incoming_audit = data_raw.get("audit_events") if isinstance(data_raw.get("audit_events"), list) else []
+    incoming_audit = _get_bundle_section_items(data_raw, "audit_events")
     section = RestoreDryRunSection(
         name="audit_events",
         incoming_count=len(incoming_audit),
         current_count=len(current_audit_events),
+    )
+    _append_manifest_section_issues(
+        section=section,
+        manifest_sections=manifest_sections,
+        incoming_count=len(incoming_audit),
     )
     current_audit_ids = {item.get("id") for item in current_audit_events}
     seen_audit_ids: set[str] = set()
@@ -210,11 +278,16 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     section.notes.append("Audit history is append-only and low-risk, but duplicate IDs should be deduplicated on restore.")
     sections.append(_finalize_section(section))
 
-    incoming_servers = data_raw.get("servers") if isinstance(data_raw.get("servers"), list) else []
+    incoming_servers = _get_bundle_section_items(data_raw, "servers")
     section = RestoreDryRunSection(
         name="servers",
         incoming_count=len(incoming_servers),
         current_count=len(current_servers),
+    )
+    _append_manifest_section_issues(
+        section=section,
+        manifest_sections=manifest_sections,
+        incoming_count=len(incoming_servers),
     )
     current_server_names = {item.get("name"): item for item in current_servers}
     current_server_targets = {f'{item.get("username")}@{item.get("host")}:{item.get("port")}': item for item in current_servers}
@@ -239,11 +312,16 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     section.notes.append("Server restore is sensitive because credentials and remote targets may have changed.")
     sections.append(_finalize_section(section))
 
-    incoming_templates = data_raw.get("templates") if isinstance(data_raw.get("templates"), list) else []
+    incoming_templates = _get_bundle_section_items(data_raw, "templates")
     section = RestoreDryRunSection(
         name="templates",
         incoming_count=len(incoming_templates),
         current_count=len(current_templates),
+    )
+    _append_manifest_section_issues(
+        section=section,
+        manifest_sections=manifest_sections,
+        incoming_count=len(incoming_templates),
     )
     current_template_names = {item.get("template_name"): item for item in current_templates}
     seen_template_names: set[str] = set()
@@ -263,11 +341,16 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     section.notes.append("Templates are good restore candidates after conflict cleanup.")
     sections.append(_finalize_section(section))
 
-    incoming_deployments = data_raw.get("deployments") if isinstance(data_raw.get("deployments"), list) else []
+    incoming_deployments = _get_bundle_section_items(data_raw, "deployments")
     section = RestoreDryRunSection(
         name="deployments",
         incoming_count=len(incoming_deployments),
         current_count=len(current_deployments),
+    )
+    _append_manifest_section_issues(
+        section=section,
+        manifest_sections=manifest_sections,
+        incoming_count=len(incoming_deployments),
     )
     current_container_names = {item.get("container_name"): item for item in current_deployments}
     current_ports = {
@@ -298,9 +381,36 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     section.notes.append("Deployment restore is runtime-sensitive and should stay dry-run only for now.")
     sections.append(_finalize_section(section))
 
+    total_records = sum(section.incoming_count for section in sections)
+
+    if unknown_manifest_sections:
+        sections[0].warnings.append(
+            _issue(
+                "warn",
+                "unknown_manifest_sections",
+                f'Manifest includes unknown section(s): {", ".join(unknown_manifest_sections)}.',
+            )
+        )
+    if unknown_data_sections:
+        sections[0].warnings.append(
+            _issue(
+                "warn",
+                "unknown_data_sections",
+                f'Bundle data includes unknown section(s): {", ".join(unknown_data_sections)}.',
+            )
+        )
+    if not manifest.version.startswith("2026-04-01.backup-bundle.v1"):
+        sections[0].warnings.append(
+            _issue(
+                "warn",
+                "bundle_version_unrecognized",
+                f'Bundle version "{manifest.version}" is not the current expected backup format.',
+            )
+        )
+    sections[0] = _finalize_section(sections[0])
+
     blocker_count = sum(len(section.blockers) for section in sections)
     warning_count = sum(len(section.warnings) for section in sections)
-    total_records = sum(section.incoming_count for section in sections)
     ok_sections = sum(1 for section in sections if section.status == "ok")
     review_required_sections = sum(1 for section in sections if section.status == "warn")
     blocked_sections = sum(1 for section in sections if section.status == "error")

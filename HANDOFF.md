@@ -1,167 +1,154 @@
 # DeployMate Handoff
 
-Updated: 2026-04-02
+Updated: 2026-04-03
 
 ## Current State
 
 - Branch: `main`
-- Working tree: clean
-- Latest commit: `e2e9d2a` `Refine shared admin filter helpers`
-- `origin/main` and `origin/develop` are aligned to the same commit
-- Remote checkout on `deploymate` is still behind at `d4cf16a`
+- Working tree: dirty
+- Latest commit: `b8b59d1` `Simplify deployment detail actions`
+- `main`, `develop`, `origin/main`, and `origin/develop` are aligned
+- Remote checkout on `deploymate` is on:
+  - branch: `main`
+  - commit: `b8b59d1c0a9c30c8ecd960a6acff22b13e003191`
 
-## What Was Already Completed
+## What Was Completed In The Latest Session
 
-### Runtime, release, and security
+### Frontend product polish
 
-- backend HTTP-level API flow tests added for:
-  - deployments
-  - servers
-  - admin
-  - templates
-  - ops
-  - auth
-- live release path was validated against `deploymatecloud.ru`
-- full runtime smoke flow was validated live:
-  - `create -> health -> diagnostics -> logs -> activity -> delete`
-- release tooling was built out:
-  - `scripts/preflight.sh`
-  - `scripts/release_workflow.sh`
-  - `scripts/remote_release.sh`
-  - `.github/workflows/ci.yml`
-  - `.github/workflows/staging.yml`
-  - `.github/workflows/release.yml`
-- security posture was hardened:
-  - strict SSH known-hosts handling
-  - helper for pinned known hosts
-  - encrypted server credentials fail-fast policy
-  - local Docker explicit opt-in / remote-only production defaults
-  - capability audits wired into release/security gates
+- workspace and public surfaces were calmed and simplified:
+  - [landing page](/Users/alexgerlitz/deploymate/frontend/app/page.js)
+  - [workspace page](/Users/alexgerlitz/deploymate/frontend/app/app/page.js)
+  - [global styles](/Users/alexgerlitz/deploymate/frontend/app/globals.css)
+- deployment detail flow was simplified in:
+  - [deployment detail page](/Users/alexgerlitz/deploymate/frontend/app/deployments/[deploymentId]/page.js)
+- admin surfaces were simplified in:
+  - [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js)
+  - [upgrade requests page](/Users/alexgerlitz/deploymate/frontend/app/app/upgrade-requests/page.js)
+- mobile / compact viewport polish was added for:
+  - `/`
+  - `/login`
+  - `/app`
+  - `/deployments/[deploymentId]`
+- frontend now surfaces clearer degraded / export error states in:
+  - [workspace page](/Users/alexgerlitz/deploymate/frontend/app/app/page.js)
+  - [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js)
+  - [admin page utils](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-utils.js)
 
-### Backend architecture
+Key UX direction now in place:
 
-- runtime executors split out of deployment service
-- server diagnostics extracted into its own service
-- deployment observability extracted into its own service
-- deployment mutations extracted into their own service
-- deployment templates extracted into their own service
-- deployment routes split into dedicated router modules
+- one obvious next step on primary screens
+- calmer premium visual layer
+- progressive disclosure for secondary tools
+- less button noise in runtime/detail flows
 
-### Frontend product and smoke coverage
+Latest frontend batch commits:
 
-- smoke coverage exists for:
-  - auth
-  - admin
-  - admin interactions
-  - ops
-  - restore
-  - runtime
-  - servers
-  - templates
-- deployment detail UX was improved
-- restore dry-run report UX was improved
+- `4e41e54` `Calm frontend surfaces and harden auth flows`
+- `b8b59d1` `Simplify deployment detail actions`
 
-## Latest Frontend Architecture Cleanup
+### Backend auth and security hardening
 
-The recent work was focused on shrinking the two heaviest admin pages:
+- session TTL support added
+- auth failed-attempt rate limiting added
+- cookie max-age / expiry now follow session TTL
+- stricter auth/admin credential validation added
+- lightweight security headers middleware added
+- authenticated write requests are now origin-guarded in:
+  - [backend/app/main.py](/Users/alexgerlitz/deploymate/backend/app/main.py)
 
-- [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js)
-- [upgrade requests page](/Users/alexgerlitz/deploymate/frontend/app/app/upgrade-requests/page.js)
+Latest backend/security batch commits:
 
-Shared frontend libs added recently:
+- `c48eb24` `Guard authenticated writes by origin`
+- `c6d91c6` `Harden backend observability and server exports`
+- `fc7ad18` `Harden deployment observability fallbacks`
 
-- [smoke-fixtures.js](/Users/alexgerlitz/deploymate/frontend/app/lib/smoke-fixtures.js)
-- [admin-smoke-fixtures.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-smoke-fixtures.js)
-- [admin-page-hooks.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-hooks.js)
-- [admin-saved-views.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-saved-views.js)
-- [admin-page-utils.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-utils.js)
-- [admin-export-utils.js](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-export-utils.js)
+### Backend safety follow-up now implemented locally
 
-The previous cleanup commit sequence in git was:
+- restore dry-run validation was tightened in:
+  - [backend restore routes](/Users/alexgerlitz/deploymate/backend/app/routes/root.py)
+- ops overview now degrades more safely and ops exports return clearer `503` responses in:
+  - [backend ops routes](/Users/alexgerlitz/deploymate/backend/app/routes/ops.py)
+- backend negative-path coverage was extended in:
+  - [restore dry-run tests](/Users/alexgerlitz/deploymate/backend/tests/test_restore_dry_run.py)
+  - [ops api flow tests](/Users/alexgerlitz/deploymate/backend/tests/test_ops_api_flow.py)
 
-- `467143d` `Extract shared admin smoke fixtures`
-- `444831d` `Consolidate auth smoke fixtures`
-- `1fe613f` `Stabilize frontend build gate`
-- `8a891cc` `Extract admin saved view helpers`
-- `4c5a0ea` `Extract admin page utilities`
-- `7009c09` `Extract admin export utilities`
+### CI / staging automation now implemented locally
 
-The recent frontend refactor moved the remaining repeated admin-page state into shared helpers:
+- `develop` push flow was changed so CI can auto-deploy the same reviewed commit to staging after the release gate passes
+- deploy surface is now auto-detected as `frontend`, `backend`, `full`, or `skip` using:
+  - [release surface detector](/Users/alexgerlitz/deploymate/scripts/detect_release_surface.sh)
+- workflow wiring and operator docs were updated in:
+  - [CI workflow](/Users/alexgerlitz/deploymate/.github/workflows/ci.yml)
+  - [staging workflow](/Users/alexgerlitz/deploymate/.github/workflows/staging.yml)
+  - [runbook](/Users/alexgerlitz/deploymate/RUNBOOK.md)
 
-- shared debounced value hook
-- shared localStorage load helpers
-- shared saved-views manager hook
-- shared audit-views manager hook
-- shared saved-view CRUD/import/export helpers
-- shared query/filter-state helpers
-- shared filter-chip builders
-- shared audit-event sort helper
+## What Was Verified
 
-Current file sizes after the refactor:
+Frontend:
 
-- [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js) -> `1983` lines
-- [upgrade requests page](/Users/alexgerlitz/deploymate/frontend/app/app/upgrade-requests/page.js) -> `1525` lines
+- `npm --prefix frontend run build` -> ok
+- `FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:auth` -> ok
+- `FRONTEND_SMOKE_PORT=3003 npm --prefix frontend run smoke:ops` -> ok
+- `FRONTEND_SMOKE_PORT=3004 npm --prefix frontend run smoke:runtime` -> ok
+- `FRONTEND_SMOKE_PORT=3005 npm --prefix frontend run smoke:admin` -> ok
 
-GitHub/repository presentation posture now matters explicitly:
+Backend:
 
-- keep `main` as the presentation branch
-- keep `main` and `develop` aligned when a batch is stable enough for public review
-- prefer reviewer-friendly commit history over noisy incremental push history
-- update docs/changelog together with meaningful product or architecture changes
-
-## What Was Verified Recently
-
-- `FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:admin` -> ok
-- `npm --prefix frontend run build` -> ok in clean single-process runs
-- `bash scripts/preflight.sh` -> ok
+- `venv/bin/python -m unittest tests.test_auth_api_flow tests.test_auth_security` -> ok
+- `venv/bin/python -m unittest tests.test_admin_api_flow tests.test_ops_api_flow tests.test_restore_dry_run tests.test_server_credentials_policy` -> ok
 - `bash scripts/security_audit.sh` -> ok
-- `bash scripts/local_runtime_audit.sh` -> ok
 
-## Important Local Caveat
+Automation:
 
-Next.js build/dev in this environment can give false negatives if multiple frontend processes touch `frontend/.next` at the same time.
+- `bash -n scripts/detect_release_surface.sh` -> ok
+- `bash scripts/detect_release_surface.sh HEAD~1 HEAD` -> ok
 
-Typical symptoms:
+Production:
 
-- `PageNotFoundError` for random routes like `/change-password`, `/_document`, `/_not-found`
-- `ENOENT` around `.next/export/...`
+- full release for `4e41e54` -> passed
+- backend-only release for `c48eb24` -> passed
+- frontend-only release for `b8b59d1` -> passed
+- post-deploy smoke -> passed
 
-What already fixed the real release gate:
+## Production Notes
 
-- `scripts/preflight.sh` now clears stale `frontend/.next` before build
-- `scripts/release_workflow.sh` now does the same
+- current production admin demo credentials were used during smoke:
+  - username: `admin`
+  - password currently exists on the server in `/opt/deploymate/.env.production`
+- current server disk usage concern was raised manually; repo state is fine, but VPS capacity planning may be needed later if images, logs, and backups keep growing
 
-Practical rule:
+## Important Resume Note About Sandbox
 
-- run `npm --prefix frontend run build` alone
-- avoid overlapping `next dev` / smoke scripts with `next build`
+- this chat session remained in `workspace-write` sandbox mode
+- starting a separate Codex process with `--dangerously-bypass-approvals-and-sandbox` does not retroactively change an already open session
+- if resuming in a fresh unrestricted session, start a new Codex process and continue from this handoff
 
-## Best Next Step
+## Best Next Steps
 
-The admin-page shared-state cleanup is already merged and both main branches are aligned.
+Highest-value next slices:
 
-The next high-value step is one of these:
-
-- update the production VPS checkout from `d4cf16a` to `e2e9d2a` if you want server checkout parity with GitHub
-- improve public repo presentation further:
-  - screenshots / GIFs in [README.md](/Users/alexgerlitz/deploymate/README.md)
-  - stronger release notes in [CHANGELOG.md](/Users/alexgerlitz/deploymate/CHANGELOG.md)
-  - optional GitHub Release for `v0.1.0`
-- continue product/security depth in reviewer-friendly batches
-
-If continuing implementation work, keep this rule:
-
-- `develop` is the active integration branch
-- `main` is the public presentation branch
-- once a batch is stable and tells a coherent story, align `main` again
+1. Split and commit the current work in clean batches:
+   - CI / staging automation
+   - frontend product + mobile polish
+   - backend safety follow-up
+2. Push `develop` after the automation commit and confirm the new auto-staging path works end-to-end in GitHub Actions
+3. After the first auto-staging run, document any missing staging secrets or timing issues directly in [RUNBOOK.md](/Users/alexgerlitz/deploymate/RUNBOOK.md) and this handoff
 
 ## If You Need To Resume Fast
 
 1. Open [HANDOFF.md](/Users/alexgerlitz/deploymate/HANDOFF.md)
-2. Confirm current commit with `git rev-parse --short HEAD`
-3. Confirm both public branches are still aligned if presentation matters:
-   - `git log --oneline --decorate -n 4 --all --simplify-by-decoration`
-4. If deploying from git, update `/opt/deploymate` as needed
-5. Re-run when touching frontend/admin surfaces:
-   - `FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:admin`
-   - `npm --prefix frontend run build`
+2. Confirm head:
+   - `git rev-parse --short HEAD`
+3. Confirm public branches:
+   - `git log --oneline --decorate -n 6`
+4. Confirm server checkout if deploying:
+   - `ssh deploymate "cd /opt/deploymate && git rev-parse HEAD && git rev-parse --abbrev-ref HEAD"`
+5. Re-run relevant checks for the next batch:
+   - frontend batch: `npm --prefix frontend run build`
+   - auth batch: `FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:auth`
+   - workspace batch: `FRONTEND_SMOKE_PORT=3003 npm --prefix frontend run smoke:ops`
+   - runtime batch: `FRONTEND_SMOKE_PORT=3004 npm --prefix frontend run smoke:runtime`
+   - admin batch: `FRONTEND_SMOKE_PORT=3005 npm --prefix frontend run smoke:admin`
+   - backend safety batch: `cd backend && venv/bin/python -m unittest tests.test_restore_dry_run tests.test_admin_api_flow tests.test_ops_api_flow tests.test_auth_security tests.test_server_credentials_policy`
+   - automation batch: `bash -n scripts/detect_release_surface.sh && bash scripts/detect_release_surface.sh HEAD~1 HEAD`

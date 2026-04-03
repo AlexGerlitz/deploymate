@@ -2,9 +2,9 @@ import csv
 import io
 import os
 from datetime import datetime, timezone
-from typing import Iterable
+from typing import Callable, Iterable
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from app.db import list_deployment_records, list_deployment_templates, list_notifications, list_servers
@@ -24,6 +24,35 @@ from app.services.server_credentials import SERVER_CREDENTIALS_KEY_ENV
 
 
 router = APIRouter(prefix="/ops", dependencies=[Depends(require_auth)])
+
+
+def _collection_or_empty(
+    loader: Callable[[], list[dict]],
+    *,
+    degraded_label: str,
+    attention_items: list[OpsAttentionItem],
+) -> list[dict]:
+    try:
+        return loader()
+    except Exception:
+        attention_items.append(
+            OpsAttentionItem(
+                level="warn",
+                title=f"{degraded_label} data is temporarily unavailable",
+                detail=f"DeployMate returned a degraded overview because {degraded_label.lower()} could not be loaded.",
+            )
+        )
+        return []
+
+
+def _collection_or_503(loader: Callable[[], list[dict]], *, label: str) -> list[dict]:
+    try:
+        return loader()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"{label} export is temporarily unavailable.",
+        ) from exc
 
 
 def _infer_activity_category(title: str | None, message: str | None) -> str:
@@ -81,10 +110,27 @@ def _sanitize_server_export(item: dict) -> dict:
 
 
 def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOverviewResponse:
-    deployments = list_deployment_records()
-    servers = list_servers()
-    templates = list_deployment_templates()
-    notifications = list_notifications(limit=notifications_limit)
+    attention_items: list[OpsAttentionItem] = []
+    deployments = _collection_or_empty(
+        lambda: list_deployment_records(),
+        degraded_label="Deployments",
+        attention_items=attention_items,
+    )
+    servers = _collection_or_empty(
+        lambda: list_servers(),
+        degraded_label="Servers",
+        attention_items=attention_items,
+    )
+    templates = _collection_or_empty(
+        lambda: list_deployment_templates(),
+        degraded_label="Templates",
+        attention_items=attention_items,
+    )
+    notifications = _collection_or_empty(
+        lambda: list_notifications(limit=notifications_limit),
+        degraded_label="Activity",
+        attention_items=attention_items,
+    )
 
     active_server_ids = {deployment.get("server_id") for deployment in deployments if deployment.get("server_id")}
     failed_deployments = [item for item in deployments if item.get("status") == "failed"]
@@ -113,8 +159,6 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
     )
     top_template = popular_templates[0] if popular_templates else None
     capabilities = _build_runtime_capabilities_summary()
-
-    attention_items: list[OpsAttentionItem] = []
 
     if user.get("must_change_password"):
         attention_items.append(
@@ -263,7 +307,7 @@ def get_ops_overview(
 
 @router.get("/exports/deployments")
 def export_deployments(format: str = Query(default="json", pattern="^(json|csv)$")):
-    items = list_deployment_records()
+    items = _collection_or_503(lambda: list_deployment_records(), label="Deployments")
     if format == "csv":
         return _csv_response(
             "deploymate-deployments.csv",
@@ -288,7 +332,10 @@ def export_deployments(format: str = Query(default="json", pattern="^(json|csv)$
 
 @router.get("/exports/servers")
 def export_servers(format: str = Query(default="json", pattern="^(json|csv)$")):
-    items = [_sanitize_server_export(item) for item in list_servers()]
+    items = [
+        _sanitize_server_export(item)
+        for item in _collection_or_503(lambda: list_servers(), label="Servers")
+    ]
     if format == "csv":
         return _csv_response(
             "deploymate-servers.csv",
@@ -300,7 +347,7 @@ def export_servers(format: str = Query(default="json", pattern="^(json|csv)$")):
 
 @router.get("/exports/templates")
 def export_templates(format: str = Query(default="json", pattern="^(json|csv)$")):
-    items = list_deployment_templates()
+    items = _collection_or_503(lambda: list_deployment_templates(), label="Templates")
     if format == "csv":
         return _csv_response(
             "deploymate-templates.csv",
@@ -329,7 +376,10 @@ def export_activity(
     format: str = Query(default="json", pattern="^(json|csv)$"),
     limit: int = Query(default=200, ge=1, le=1000),
 ):
-    items = list_notifications(limit=limit)
+    items = _collection_or_503(
+        lambda: list_notifications(limit=limit),
+        label="Activity",
+    )
     normalized = [
         {
             **item,
