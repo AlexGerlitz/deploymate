@@ -370,6 +370,53 @@ Runtime smoke notes:
 - the script always attempts to delete the temporary smoke deployment before exit
 - if it created a temporary smoke server target, it also deletes that target before exit
 
+## Deploy notifications
+
+Release workflows can send a best-effort notification when `DEPLOY_NOTIFICATION_WEBHOOK` is configured in the target GitHub environment.
+
+Compatible receivers:
+
+- Slack Incoming Webhooks
+- Discord channel webhooks
+- any endpoint that accepts a JSON body with either `text` or `content`
+
+Minimal Slack setup:
+
+1. Open `Slack -> Apps -> Incoming Webhooks`.
+2. Create a webhook for the channel that should receive deploy results.
+3. Copy the webhook URL into the GitHub environment secret `DEPLOY_NOTIFICATION_WEBHOOK`.
+
+Minimal Discord setup:
+
+1. Open the target channel settings.
+2. Create a channel webhook.
+3. Copy the webhook URL into the GitHub environment secret `DEPLOY_NOTIFICATION_WEBHOOK`.
+
+Local receiver test:
+
+```bash
+bash scripts/send_workflow_notification.sh \
+  --webhook-url 'https://hooks.slack.com/services/...' \
+  --workflow 'Auto staging deploy' \
+  --environment staging \
+  --status success \
+  --surface frontend \
+  --smoke 'runtime enabled' \
+  --commit 4ac9f9e94edae459bd97b3572ac15bfdaaa547ed \
+  --ref develop \
+  --run-url 'https://github.com/AlexGerlitz/deploymate/actions/runs/23931028894' \
+  --details 'frontend-only change detected'
+```
+
+Expected message shape:
+
+- status line with workflow name
+- environment, surface, and smoke mode
+- short commit SHA and ref
+- direct link to the workflow run
+
+If `DEPLOY_NOTIFICATION_WEBHOOK` is unset or the receiver is temporarily unavailable, deploys still continue because notification steps are best-effort.
+
 The scripted smoke currently validates:
 
 - `/login`
