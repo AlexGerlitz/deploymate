@@ -2536,3 +2536,5 @@ button.landingButton.primaryButton:disabled {
     display: block;
   }
 }
+
+/* Frontend-only no-op marker for staging automation validation. */
