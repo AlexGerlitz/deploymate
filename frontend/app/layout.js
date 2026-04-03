@@ -1,6 +1,7 @@
 import "./globals.css";
 import Link from "next/link";
 import { Manrope, Space_Grotesk } from "next/font/google";
+import { buildBusinessMailto } from "./lib/public-contact";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -48,7 +49,7 @@ export default function RootLayout({ children }) {
                 Request access
               </Link>
               <a
-                href="mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license"
+                href={buildBusinessMailto("DeployMate commercial license")}
                 className="siteFooterLink"
               >
                 Email licensing

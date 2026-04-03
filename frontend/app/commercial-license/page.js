@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildBusinessMailto, businessContactEmail } from "../lib/public-contact";
 
 const commercialUseCases = [
   "Internal company deployment operations",
@@ -16,8 +17,8 @@ const requestChecklist = [
 const contactChannels = [
   {
     label: "Business email",
-    value: "alexgerlitz@users.noreply.github.com",
-    href: "mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license",
+    value: businessContactEmail,
+    href: buildBusinessMailto("DeployMate commercial license"),
   },
   {
     label: "Request form",
@@ -137,7 +138,7 @@ export default function CommercialLicensePage() {
               Request commercial license
             </Link>
             <a
-              href="mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license"
+              href={buildBusinessMailto("DeployMate commercial license")}
               className="linkButton"
             >
               Email licensing request

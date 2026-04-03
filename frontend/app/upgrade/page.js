@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { buildBusinessMailto, businessContactEmail } from "../lib/public-contact";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -261,10 +262,10 @@ export default function UpgradePage() {
           <div className="banner subtle">
             Prefer email? Write to{" "}
             <a
-              href="mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license"
+              href={buildBusinessMailto("DeployMate commercial license")}
               className="inlineLink"
             >
-              alexgerlitz@users.noreply.github.com
+              {businessContactEmail}
             </a>
             . The first reply usually comes within 2 business days.
           </div>
@@ -326,10 +327,10 @@ export default function UpgradePage() {
             <div className="banner subtle">
               Next step: review scope, support needs, and whether your request is for a paid plan or a separate commercial license. If needed, you can also follow up through{" "}
               <a
-                href="mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license%20follow-up"
+                href={buildBusinessMailto("DeployMate commercial license follow-up")}
                 className="inlineLink"
               >
-                alexgerlitz@users.noreply.github.com
+                {businessContactEmail}
               </a>
               . The first reply usually comes within 2 business days.
             </div>

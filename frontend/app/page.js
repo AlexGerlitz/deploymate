@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildBusinessMailto } from "./lib/public-contact";
 
 const publicSignupEnabled =
   process.env.NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED === "1";
@@ -451,7 +452,7 @@ export default function LandingPage() {
             </div>
             <div className="landingCommercialActions">
               <a
-                href="mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license"
+                href={buildBusinessMailto("DeployMate commercial license")}
                 className="landingButton primaryButton"
               >
                 Email licensing

@@ -42,6 +42,7 @@ Commercial licensing entry points:
 - request flow: `https://deploymatecloud.ru/upgrade`
 - owner contact: `mailto:alexgerlitz@users.noreply.github.com`
 - expected first reply: usually within 2 business days
+- production contact alias is configurable via `NEXT_PUBLIC_BUSINESS_CONTACT_EMAIL`
 
 ## Reviewer Package
 
