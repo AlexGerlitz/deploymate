@@ -252,6 +252,7 @@ That generator creates:
 - `backend/app/routes/<slug>.py`
 - `backend/app/services/<slug>.py`
 - `backend/tests/test_<slug>_api_flow.py`
+- `backend/app/schemas.py` list-response contract
 - route registration in `backend/app/main.py`
 
 It also now starts the page on top of reusable DeployMate review blocks instead of raw duplicated JSX:
@@ -259,6 +260,13 @@ It also now starts the page on top of reusable DeployMate review blocks instead 
 - `AdminSurfaceSummary`
 - `AdminSurfaceQueue`
 - `AdminSurfaceQueueCard`
+
+The backend side now also starts closer to a real DeployMate admin slice:
+
+- typed `ListResponse` contract in `schemas.py`
+- `response_model` on the generated route
+- a built-in `q` filter path
+- an API flow test that already exercises filtered and unfiltered responses
 
 Use it when the next feature is another admin/resource surface inside DeployMate itself, not when bootstrapping a brand-new product.
 

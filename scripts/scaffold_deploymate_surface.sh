@@ -106,6 +106,7 @@ backend_route_path="$TARGET_DIR/backend/app/routes/$PY_SLUG.py"
 backend_service_path="$TARGET_DIR/backend/app/services/$PY_SLUG.py"
 backend_test_path="$TARGET_DIR/backend/tests/test_${PY_SLUG}_api_flow.py"
 backend_main_path="$TARGET_DIR/backend/app/main.py"
+backend_schemas_path="$TARGET_DIR/backend/app/schemas.py"
 
 safe_write "$frontend_page_path" "$(cat <<EOF
 "use client";
@@ -251,23 +252,37 @@ EOF
 )"
 
 safe_write "$backend_service_path" "$(cat <<EOF
-def list_${PY_SLUG}_items() -> dict:
+def list_${PY_SLUG}_items(query: str = "") -> dict:
+    normalized_query = query.strip().lower()
+    items = [
+        {
+            "id": "${SURFACE_SLUG}-sample-1",
+            "label": "Primary review queue",
+            "status": "needs-review",
+            "note": "Replace this with the first real review slice for ${SURFACE_NAME}.",
+        },
+        {
+            "id": "${SURFACE_SLUG}-sample-2",
+            "label": "Follow-up backlog",
+            "status": "ready",
+            "note": "Keep only the actions and fields that support an actual admin decision.",
+        },
+    ]
+    if normalized_query:
+        items = [
+            item
+            for item in items
+            if normalized_query in item["label"].lower()
+            or normalized_query in item["status"].lower()
+            or normalized_query in item["note"].lower()
+        ]
+
     return {
-        "items": [
-            {
-                "id": "${SURFACE_SLUG}-sample-1",
-                "label": "Primary review queue",
-                "status": "needs-review",
-            },
-            {
-                "id": "${SURFACE_SLUG}-sample-2",
-                "label": "Follow-up backlog",
-                "status": "ready",
-            },
-        ],
+        "items": items,
         "summary": {
             "surface": "${SURFACE_SLUG}",
-            "total": 2,
+            "total": len(items),
+            "query": query,
             "next_step": "Replace stub data with the first real repository-backed workflow.",
         },
     }
@@ -275,18 +290,19 @@ EOF
 )"
 
 safe_write "$backend_route_path" "$(cat <<EOF
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.services.auth import require_admin
+from app.schemas import ${PASCAL_NAME}ListResponse
 from app.services.${PY_SLUG} import list_${PY_SLUG}_items
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
 
-@router.get("${API_PREFIX}")
-def get_${PY_SLUG}() -> dict:
-    return list_${PY_SLUG}_items()
+@router.get("${API_PREFIX}", response_model=${PASCAL_NAME}ListResponse)
+def get_${PY_SLUG}(q: str = Query(default="")) -> ${PASCAL_NAME}ListResponse:
+    return ${PASCAL_NAME}ListResponse(**list_${PY_SLUG}_items(query=q))
 EOF
 )"
 
@@ -328,17 +344,31 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def _list_items(self):
+        return self._list_items_for_query("")
+
+    def _list_items_for_query(self, query):
         return {
             "items": [
                 {
                     "id": "${SURFACE_SLUG}-sample-1",
                     "label": "Primary review queue",
                     "status": "needs-review",
+                    "note": "Replace this with the first real review slice for ${SURFACE_NAME}.",
+                }
+            ]
+            if not query
+            else [
+                {
+                    "id": "${SURFACE_SLUG}-sample-2",
+                    "label": "Follow-up backlog",
+                    "status": "ready",
+                    "note": "Keep only the actions and fields that support an actual admin decision.",
                 }
             ],
             "summary": {
                 "surface": "${SURFACE_SLUG}",
                 "total": 1,
+                "query": query,
                 "next_step": "Replace stub data with the first real repository-backed workflow.",
             },
         }
@@ -350,12 +380,49 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["surface"], "${SURFACE_SLUG}")
         self.assertEqual(len(payload["items"]), 1)
         self.assertEqual(payload["items"][0]["status"], "needs-review")
+        self.assertEqual(payload["summary"]["query"], "")
+
+    def test_${PY_SLUG}_query_filter_flow(self):
+        with patch(
+            "app.routes.${PY_SLUG}.list_${PY_SLUG}_items",
+            side_effect=lambda query="": self._list_items_for_query(query),
+        ):
+            response = self.client.get("${API_PREFIX}?q=follow")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["summary"]["query"], "follow")
+        self.assertEqual(payload["items"][0]["label"], "Follow-up backlog")
 
 
 if __name__ == "__main__":
     unittest.main()
 EOF
 )"
+
+if [ -f "$backend_schemas_path" ] && ! grep -q "class ${PASCAL_NAME}ListResponse" "$backend_schemas_path"; then
+  cat >>"$backend_schemas_path" <<EOF
+
+
+class ${PASCAL_NAME}Item(BaseModel):
+    id: str
+    label: str
+    status: str
+    note: Optional[str] = None
+
+
+class ${PASCAL_NAME}Summary(BaseModel):
+    surface: str
+    total: int = 0
+    query: str = ""
+    next_step: str
+
+
+class ${PASCAL_NAME}ListResponse(BaseModel):
+    items: list[${PASCAL_NAME}Item] = Field(default_factory=list)
+    summary: ${PASCAL_NAME}Summary
+EOF
+fi
 
 ruby -e '
   file, py_slug = ARGV
@@ -396,6 +463,7 @@ cat <<EOF
   - ${backend_test_path#$TARGET_DIR/}
 [scaffold-deploymate-surface] updated:
   - ${backend_main_path#$TARGET_DIR/}
+  - ${backend_schemas_path#$TARGET_DIR/}
 [scaffold-deploymate-surface] next useful steps:
   - replace the sample queue with a real backend payload
   - keep the first workflow narrow before adding bulk actions or exports
