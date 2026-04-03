@@ -205,6 +205,7 @@ For daily coding, the shortest useful local checks are now:
 
 ```bash
 make changed
+make profile-changed
 make frontend
 make backend
 make fast
@@ -213,6 +214,7 @@ make fast
 What they do:
 
 - `make changed` detects the changed release surface from the local diff and runs only the lightweight matching gate
+- `make profile-changed` runs the same changed-file gate and then prints recent timings, grouped stats, and the latest bottleneck hint
 - `make frontend` runs the fast frontend gate
 - `make backend` runs the fast backend gate
 - `make fast` runs the fast full gate

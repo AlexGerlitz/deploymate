@@ -1,7 +1,10 @@
-.PHONY: changed fast frontend backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: changed profile-changed fast frontend backend full timing-history timing-stats timing-hint ship-staging
 
 changed:
 	bash scripts/dev_verify_changed.sh
+
+profile-changed:
+	bash scripts/profile_changed.sh
 
 fast:
 	bash scripts/dev_fast_check.sh full
