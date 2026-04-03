@@ -254,6 +254,12 @@ That generator creates:
 - `backend/tests/test_<slug>_api_flow.py`
 - route registration in `backend/app/main.py`
 
+It also now starts the page on top of reusable DeployMate review blocks instead of raw duplicated JSX:
+
+- `AdminSurfaceSummary`
+- `AdminSurfaceQueue`
+- `AdminSurfaceQueueCard`
+
 Use it when the next feature is another admin/resource surface inside DeployMate itself, not when bootstrapping a brand-new product.
 
 ## Product Starter

@@ -259,6 +259,7 @@ make scaffold-deploymate-surface SURFACE_FLAGS="--name Review Inbox --slug revie
 ```
 
 That gives you the frontend page shell, backend route/service stub, backend API flow test, and `backend/app/main.py` registration in one pass.
+The generated page now also uses shared review-shell blocks from `frontend/app/app/admin-ui.js`, so new admin surfaces start from the same summary-and-queue pattern instead of ad hoc JSX.
 
 The CI, staging, and production workflows now write a short GitHub job summary with the chosen surface, smoke mode, requested commit SHA, deployed SHA, and target URL so the result is readable without opening raw logs.
 

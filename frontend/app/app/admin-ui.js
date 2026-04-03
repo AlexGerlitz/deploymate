@@ -407,6 +407,95 @@ export function AdminDisclosureSection({
   );
 }
 
+export function AdminSurfaceSummary({
+  title,
+  description,
+  metrics = [],
+  spotlightTitle = "What this surface should do",
+  spotlightBody,
+}) {
+  return (
+    <article className="card formCard">
+      <div className="sectionHeader">
+        <div>
+          <h2>{title}</h2>
+          <p className="formHint">{description}</p>
+        </div>
+      </div>
+      <div className="workspaceHeroSummary">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="workspaceHeroMetric">
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <p>{metric.description}</p>
+          </div>
+        ))}
+        <div className="workspaceHeroBadge workspaceHeroSpotlight">
+          <span>Scaffold focus</span>
+          <strong>{spotlightTitle}</strong>
+          <p>{spotlightBody}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export function AdminSurfaceQueue({
+  title,
+  description,
+  searchLabel,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
+  searchTestId,
+  emptyTestId,
+  emptyText,
+  items = [],
+  children,
+}) {
+  return (
+    <article className="card formCard">
+      <div className="sectionHeader">
+        <div>
+          <h2>{title}</h2>
+          <p className="formHint">{description}</p>
+        </div>
+      </div>
+      <label className="field deploymentSearch">
+        <span>{searchLabel}</span>
+        <input
+          data-testid={searchTestId}
+          value={searchValue}
+          onChange={onSearchChange}
+          placeholder={searchPlaceholder}
+        />
+      </label>
+      {items.length === 0 ? (
+        <div className="empty" data-testid={emptyTestId}>
+          {emptyText}
+        </div>
+      ) : (
+        <div className="adminSavedViewsList">{children}</div>
+      )}
+    </article>
+  );
+}
+
+export function AdminSurfaceQueueCard({ title, body, status, children }) {
+  return (
+    <article className="card formCard">
+      <div className="sectionHeader">
+        <div>
+          <h3>{title}</h3>
+          <p className="formHint">{body}</p>
+        </div>
+        {status ? <span className="status unknown">{status}</span> : null}
+      </div>
+      {children}
+    </article>
+  );
+}
+
 export function AdminAuditToolbar({
   title,
   description,

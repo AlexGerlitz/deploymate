@@ -116,6 +116,9 @@ import {
   AdminFeedbackBanners,
   AdminFilterFooter,
   AdminPageHeader,
+  AdminSurfaceQueue,
+  AdminSurfaceQueueCard,
+  AdminSurfaceSummary,
 } from "../admin-ui";
 
 const sampleItems = [
@@ -172,45 +175,53 @@ export default function ${PASCAL_NAME}Page() {
         successTestId="${SURFACE_SLUG}-success"
       />
 
-      <article className="card formCard">
-        <div className="sectionHeader">
-          <div>
-            <h2>Current queue slice</h2>
-            <p className="formHint">
-              Start with one useful list, one clear filter, and one action that helps the operator decide what to do next.
-            </p>
-          </div>
-        </div>
-        <label className="field deploymentSearch">
-          <span>Search ${SURFACE_NAME}</span>
-          <input
-            data-testid="${SURFACE_SLUG}-search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search the first real review queue"
+      <AdminSurfaceSummary
+        title="Review shape"
+        description="Every new admin surface should start with a narrow review slice, not with every possible panel turned on at once."
+        metrics={[
+          {
+            label: "First pass",
+            value: "Queue",
+            description: "Ship one useful list with one real decision before adding richer tooling.",
+          },
+          {
+            label: "Second pass",
+            value: "Action",
+            description: "Add the first action that actually resolves the queue or moves work forward.",
+          },
+          {
+            label: "Later",
+            value: "Audit/export",
+            description: "Bring in audit, saved views, and exports only after the main review flow earns them.",
+          },
+        ]}
+        spotlightTitle="${SURFACE_NAME}"
+        spotlightBody="Use this scaffold to establish the first real operator workflow, then layer in richer controls only where they reduce repeated admin work."
+      />
+
+      <AdminSurfaceQueue
+        title="Current queue slice"
+        description="Start with one useful list, one clear filter, and one action that helps the operator decide what to do next."
+        searchLabel="Search ${SURFACE_NAME}"
+        searchValue={query}
+        onSearchChange={(event) => setQuery(event.target.value)}
+        searchPlaceholder="Search the first real review queue"
+        searchTestId="${SURFACE_SLUG}-search"
+        emptyTestId="${SURFACE_SLUG}-empty"
+        emptyText="No items match the current search."
+        items={filteredItems}
+      >
+        {filteredItems.map((item) => (
+          <AdminSurfaceQueueCard
+            key={item.id}
+            title={item.label}
+            body={item.note}
+            status={item.status}
           />
-        </label>
+        ))}
+      </AdminSurfaceQueue>
 
-        {filteredItems.length === 0 ? (
-          <div className="empty" data-testid="${SURFACE_SLUG}-empty">
-            No items match the current search.
-          </div>
-        ) : (
-          <div className="adminSavedViewsList" data-testid="${SURFACE_SLUG}-list">
-            {filteredItems.map((item) => (
-              <article key={item.id} className="card formCard">
-                <div className="sectionHeader">
-                  <div>
-                    <h3>{item.label}</h3>
-                    <p className="formHint">{item.note}</p>
-                  </div>
-                  <span className="status unknown">{item.status}</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-
+      <article className="card formCard">
         <AdminFilterFooter
           summary="Use this scaffold as the first pass for a real admin review surface, not as a permanent mock screen."
           hint="Next step: replace sampleItems with fetched data and wire one genuine action end to end."
