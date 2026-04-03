@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SURFACE="full"
 FAST_MODE=0
+source "$ROOT_DIR/scripts/lib/project_automation.sh"
 source "$ROOT_DIR/scripts/audit_cache.sh"
 source "$ROOT_DIR/scripts/timing_history.sh"
 SCRIPT_START_TS="$(date +%s)"
@@ -15,9 +16,11 @@ format_duration() {
 }
 
 clean_frontend_build_artifacts() {
-  if [ -d "frontend/.next" ]; then
-    echo "[preflight] removing stale frontend/.next"
-    rm -rf "frontend/.next"
+  local frontend_dir=""
+  frontend_dir="$(automation_frontend_dir_rel)"
+  if [ -d "${frontend_dir}/.next" ]; then
+    echo "[preflight] removing stale ${frontend_dir}/.next"
+    rm -rf "${frontend_dir}/.next"
   fi
 }
 
@@ -72,20 +75,20 @@ echo "[preflight] git status"
 git status --short
 
 frontend_build_duration=0
-if [ -f "frontend/package.json" ] && { [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; }; then
+if [ -f "$(automation_frontend_dir_rel)/package.json" ] && { [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; }; then
   if [ "$FAST_MODE" = "1" ]; then
     echo "[preflight] frontend build skipped in fast mode"
   else
     frontend_build_start_ts="$(date +%s)"
     clean_frontend_build_artifacts
     echo "[preflight] frontend build"
-    npm --prefix frontend run build
+    automation_frontend_npm run build
     frontend_build_duration=$(( $(date +%s) - frontend_build_start_ts ))
   fi
 fi
 
 backend_syntax_duration=0
-if [ -d "backend/app" ] && { [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; }; then
+if [ -d "$(automation_backend_app_dir_rel)" ] && { [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; }; then
   backend_syntax_start_ts="$(date +%s)"
   echo "[preflight] backend syntax check"
   python_files=()
@@ -97,7 +100,7 @@ if [ -d "backend/app" ] && { [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full"
   else
     while IFS= read -r file; do
       python_files+=("$file")
-    done < <(find backend/app -type f -name '*.py' | sort)
+    done < <(find "$(automation_backend_app_dir_rel)" -type f -name '*.py' | sort)
     echo "[preflight] backend syntax scope: full"
   fi
   if [ "${#python_files[@]}" -gt 0 ]; then

@@ -3,19 +3,16 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/lib/project_automation.sh"
 cd "$ROOT_DIR"
 
 BACKEND_PYTHON="${BACKEND_PYTHON:-}"
 if [ -z "$BACKEND_PYTHON" ]; then
-  if [ -x "backend/venv/bin/python" ]; then
-    BACKEND_PYTHON="backend/venv/bin/python"
-  else
-    BACKEND_PYTHON="python3"
-  fi
+  BACKEND_PYTHON="$(automation_backend_python)"
 fi
 
 AUDIT_OUTPUT="$(
-  PYTHONPATH=backend "$BACKEND_PYTHON" -c '
+  PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -c '
 import json
 from app.db import get_server_credentials_audit
 print(json.dumps(get_server_credentials_audit()))

@@ -10,6 +10,7 @@ APP_HTML="$(mktemp)"
 DETAIL_HTML="$(mktemp)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/lib/project_automation.sh"
 source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
 cleanup() {
@@ -25,10 +26,10 @@ if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
   start_frontend_smoke_server
 fi
 
-wait_for_frontend_smoke_url "/app"
+wait_for_frontend_smoke_url "$(automation_frontend_ready_path)"
 
-curl -sS "$BASE_URL/app" >"$APP_HTML"
-curl -sS "$BASE_URL/deployments/smoke-deployment" >"$DETAIL_HTML"
+curl -sS "$BASE_URL$(automation_frontend_ready_path)" >"$APP_HTML"
+curl -sS "$BASE_URL$(automation_frontend_runtime_detail_path)" >"$DETAIL_HTML"
 
 grep -q 'data-testid="runtime-page-title"' "$APP_HTML"
 grep -q 'data-testid="runtime-smoke-banner"' "$APP_HTML"

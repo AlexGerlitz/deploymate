@@ -24,9 +24,9 @@ if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
   start_frontend_smoke_server
 fi
 
-wait_for_frontend_smoke_url "/app"
+wait_for_frontend_smoke_url "$(automation_frontend_ready_path)"
 
-curl -sS "$BASE_URL/app" >"$APP_HTML"
+curl -sS "$BASE_URL$(automation_frontend_ready_path)" >"$APP_HTML"
 
 check_contains() {
   local label="$1"

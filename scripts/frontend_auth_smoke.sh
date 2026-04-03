@@ -11,6 +11,7 @@ REGISTER_HTML="$(mktemp)"
 CHANGE_PASSWORD_HTML="$(mktemp)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/lib/project_automation.sh"
 source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
 cleanup() {
@@ -26,7 +27,7 @@ if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
   start_frontend_smoke_server
 fi
 
-wait_for_frontend_smoke_url "/login"
+wait_for_frontend_smoke_url "$(automation_frontend_auth_ready_path)"
 
 curl -sS "$BASE_URL/login" >"$LOGIN_HTML"
 curl -sS "$BASE_URL/register" >"$REGISTER_HTML"

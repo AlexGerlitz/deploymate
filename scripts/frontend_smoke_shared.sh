@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/lib/project_automation.sh"
 
 PORT="${FRONTEND_SMOKE_PORT:-3001}"
 BASE_URL="http://127.0.0.1:${PORT}"
@@ -11,7 +12,9 @@ SERVER_LOG="${FRONTEND_SMOKE_LOG:-/tmp/deploymate-frontend-shared-smoke.log}"
 DIST_DIR="${FRONTEND_SMOKE_DIST_DIR:-.next-smoke-${PORT}}"
 PERSIST_SERVER="${FRONTEND_SMOKE_PERSIST_SERVER:-0}"
 KEEP_ALIVE_ON_EXIT="${FRONTEND_SMOKE_KEEP_ALIVE_ON_EXIT:-0}"
-SERVER_REGISTRY_DIR="${FRONTEND_SMOKE_REGISTRY_DIR:-/tmp/deploymate-frontend-smoke-registry}"
+SERVER_REGISTRY_DIR="${FRONTEND_SMOKE_REGISTRY_DIR:-$(automation_frontend_smoke_registry_dir)}"
+FRONTEND_DIR="$(automation_frontend_dir)"
+FRONTEND_READY_PATH="$(automation_frontend_ready_path)"
 
 frontend_smoke_server_key() {
   printf '%s\n' "port-${PORT}_dist-${DIST_DIR}_restore-${NEXT_PUBLIC_SMOKE_RESTORE_REPORT:-0}" | tr '/ :' '___'
@@ -28,7 +31,7 @@ frontend_smoke_pid_alive() {
 }
 
 frontend_smoke_url_alive() {
-  curl -sS -o /dev/null "$BASE_URL/app"
+  curl -sS -o /dev/null "$BASE_URL$FRONTEND_READY_PATH"
 }
 
 frontend_smoke_kill_port() {
@@ -88,7 +91,7 @@ start_frontend_smoke_server() {
     frontend_smoke_clear_state
     python3 "$SCRIPT_DIR/frontend_smoke_daemon.py" start \
       --state-file "$state_file" \
-      --frontend-dir "$REPO_ROOT/frontend" \
+      --frontend-dir "$FRONTEND_DIR" \
       --port "$PORT" \
       --dist-dir "$DIST_DIR" \
       --log-file "$SERVER_LOG" \
@@ -97,14 +100,14 @@ start_frontend_smoke_server() {
     FRONTEND_SMOKE_SERVER_PID="${FRONTEND_SMOKE_SERVER_PID:-}"
   else
     NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_DIST_DIR="$DIST_DIR" \
-      bash -lc "cd \"$REPO_ROOT/frontend\" && exec npm run dev -- --hostname 127.0.0.1 --port \"$PORT\"" >"$SERVER_LOG" 2>&1 &
+      bash -lc "cd \"$FRONTEND_DIR\" && exec npm run dev -- --hostname 127.0.0.1 --port \"$PORT\"" >"$SERVER_LOG" 2>&1 &
     FRONTEND_SMOKE_SERVER_PID=$!
   fi
   export FRONTEND_SMOKE_SERVER_PID
 }
 
 wait_for_frontend_smoke_url() {
-  local path="${1:-/app}"
+  local path="${1:-$FRONTEND_READY_PATH}"
 
   for _ in $(seq 1 60); do
     if [ -n "${FRONTEND_SMOKE_SERVER_PID:-}" ] && ! kill -0 "$FRONTEND_SMOKE_SERVER_PID" 2>/dev/null; then
@@ -144,7 +147,7 @@ stop_frontend_smoke_server() {
 
   frontend_smoke_clear_state
 
-  if [ -n "${DIST_DIR:-}" ] && [ -d "$REPO_ROOT/frontend/$DIST_DIR" ]; then
-    rm -rf "$REPO_ROOT/frontend/$DIST_DIR"
+  if [ -n "${DIST_DIR:-}" ] && [ -d "$FRONTEND_DIR/$DIST_DIR" ]; then
+    rm -rf "$FRONTEND_DIR/$DIST_DIR"
   fi
 }

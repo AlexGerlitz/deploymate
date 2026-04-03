@@ -198,6 +198,7 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 - `scripts/` release, smoke, and preflight automation
 - `deploy/` production reverse-proxy config
 - `docker-compose.prod.yml` production stack definition
+- [AUTOMATION-CORE.md](AUTOMATION-CORE.md) reusable automation-core notes for porting this DX layer into another repo
 
 ## Fast Local Commands
 
@@ -262,6 +263,7 @@ The fast gate intentionally uses fewer resources:
 - successful local secret-scan and runtime-policy results now persist by file fingerprint, so repeating the same loop does not re-run those scans unnecessarily
 - repeated local release-contract and runtime-contract audits now also reuse fingerprint-cached results when their inputs did not change
 - preflight, release, and profile commands now print a short cache summary so it is obvious when repeated checks were skipped
+- project-specific layout and route assumptions now live behind [scripts/project_automation_config.sh](scripts/project_automation_config.sh), so the reusable automation core is no longer welded directly to DeployMate paths
 - preflight: skips the production frontend build in fast mode
 - fast frontend mode now reuses one shared smoke dev server instead of starting a separate `next dev` process per smoke
 - the repo now has experimental local persistent frontend smoke-server controls, but the default fast loop stays on the safer per-command lifecycle unless `FRONTEND_SMOKE_PERSIST_SERVER=1` is set explicitly

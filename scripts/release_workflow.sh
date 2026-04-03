@@ -10,6 +10,7 @@ BACKEND_FAST_TEST_MODULES="${BACKEND_FAST_TEST_MODULES:-}"
 DEPLOYMATE_BACKEND_FAST_MODE="${DEPLOYMATE_BACKEND_FAST_MODE:-}"
 FRONTEND_FAST_SMOKES="${FRONTEND_FAST_SMOKES:-}"
 DEPLOYMATE_FRONTEND_FAST_MODE="${DEPLOYMATE_FRONTEND_FAST_MODE:-}"
+source "$ROOT_DIR/scripts/lib/project_automation.sh"
 source "$ROOT_DIR/scripts/audit_cache.sh"
 source "$ROOT_DIR/scripts/timing_history.sh"
 SCRIPT_START_TS="$(date +%s)"
@@ -20,9 +21,11 @@ format_duration() {
 }
 
 clean_frontend_build_artifacts() {
-  if [ -d "frontend/.next" ]; then
-    echo "[release] removing stale frontend/.next"
-    rm -rf "frontend/.next"
+  local frontend_dir=""
+  frontend_dir="$(automation_frontend_dir_rel)"
+  if [ -d "${frontend_dir}/.next" ]; then
+    echo "[release] removing stale ${frontend_dir}/.next"
+    rm -rf "${frontend_dir}/.next"
   fi
 }
 
@@ -48,11 +51,11 @@ run_frontend_fast_smokes_shared() {
   start_frontend_smoke_server
   trap 'stop_frontend_smoke_server' RETURN
 
-  wait_for_frontend_smoke_url "/app"
+  wait_for_frontend_smoke_url "$(automation_frontend_ready_path)"
 
   for smoke_target in "${smoke_targets[@]}"; do
     echo "[release] frontend ${smoke_target} smoke"
-    npm --prefix frontend run "smoke:${smoke_target}"
+    automation_frontend_npm run "smoke:${smoke_target}"
   done
 }
 
@@ -79,11 +82,11 @@ run_frontend_smokes_shared() {
   start_frontend_smoke_server
   trap 'stop_frontend_smoke_server' RETURN
 
-  wait_for_frontend_smoke_url "/app"
+  wait_for_frontend_smoke_url "$(automation_frontend_ready_path)"
 
   for smoke_target in "${smoke_targets[@]}"; do
     echo "[release] frontend ${smoke_target} smoke"
-    npm --prefix frontend run "smoke:${smoke_target}"
+    automation_frontend_npm run "smoke:${smoke_target}"
   done
 }
 
@@ -141,11 +144,7 @@ audit_cache_prepare
 trap audit_cache_cleanup EXIT
 
 if [ -z "$BACKEND_PYTHON" ]; then
-  if [ -x "backend/venv/bin/python" ]; then
-    BACKEND_PYTHON="backend/venv/bin/python"
-  else
-    BACKEND_PYTHON="python3"
-  fi
+  BACKEND_PYTHON="$(automation_backend_python)"
 fi
 
 echo "[release] repo: $ROOT_DIR"
@@ -177,7 +176,7 @@ preflight_duration=$(( $(date +%s) - preflight_start_ts ))
 frontend_duration=0
 if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   frontend_start_ts="$(date +%s)"
-  frontend_fast_smokes=(auth ops runtime)
+  IFS=' ' read -r -a frontend_fast_smokes <<< "$(automation_frontend_fast_smokes_default)"
   if [ -n "$FRONTEND_FAST_SMOKES" ]; then
     IFS=' ' read -r -a frontend_fast_smokes <<< "$FRONTEND_FAST_SMOKES"
   fi
@@ -205,7 +204,7 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
       case "$frontend_smoke" in
         auth|ops|runtime)
           echo "[release] frontend ${frontend_smoke} smoke"
-          FRONTEND_SMOKE_PORT="$frontend_fast_port" npm --prefix frontend run "smoke:${frontend_smoke}"
+          FRONTEND_SMOKE_PORT="$frontend_fast_port" automation_frontend_npm run "smoke:${frontend_smoke}"
           frontend_fast_port=$((frontend_fast_port + 1))
           ;;
         *)
@@ -228,7 +227,7 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
 
     clean_frontend_build_artifacts
     echo "[release] frontend build"
-    npm --prefix frontend run build
+    automation_frontend_npm run build
   fi
   frontend_duration=$(( $(date +%s) - frontend_start_ts ))
 fi
@@ -242,10 +241,10 @@ if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
     elif [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
       echo "[release] backend targeted fast suite"
       IFS=' ' read -r -a backend_fast_modules <<< "$BACKEND_FAST_TEST_MODULES"
-      PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest "${backend_fast_modules[@]}"
+      PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest "${backend_fast_modules[@]}"
     else
       echo "[release] backend fast safety suite"
-      PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest \
+      PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest \
         backend.tests.test_auth_security \
         backend.tests.test_ops_api_flow \
         backend.tests.test_restore_dry_run \
@@ -253,7 +252,7 @@ if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
     fi
   else
     echo "[release] backend test suite"
-    PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest discover -s backend/tests -p 'test_*.py'
+    PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest discover -s "$(automation_backend_tests_dir_rel)" -p 'test_*.py'
   fi
   backend_duration=$(( $(date +%s) - backend_start_ts ))
 fi
