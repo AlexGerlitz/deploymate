@@ -231,6 +231,7 @@ The fast gate intentionally uses fewer resources:
 - local preflight and release flows now append timing data into `.logs/local_gate_timing.csv`, so you can compare runs over time
 - `make timing-history` prints the latest local timing rows without opening the CSV manually
 - `make timing-stats` prints grouped `avg/min/max/latest` phase timings from the recent local history
+- local preflight and release flows now print a short bottleneck hint from recent matching runs, so the next optimization target is obvious
 
 ## Key Screens In The App
 

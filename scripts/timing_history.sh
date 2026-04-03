@@ -113,6 +113,65 @@ timing_history_print_stats() {
   fi
 }
 
+timing_history_print_hint() {
+  local script_name="$1"
+  local surface="$2"
+  local fast_mode="$3"
+  local row_count="${4:-160}"
+  local hint_line=""
+
+  timing_history_prepare
+
+  hint_line="$(awk -F',' \
+    -v row_count="$row_count" \
+    -v script_name="$script_name" \
+    -v surface="$surface" \
+    -v fast_mode="$fast_mode" '
+    NR == 1 {
+      next
+    }
+    {
+      rows[buffer_size % row_count] = $0
+      buffer_size++
+    }
+    END {
+      start = buffer_size > row_count ? buffer_size - row_count : 0
+      for (i = start; i < buffer_size; i++) {
+        split(rows[i % row_count], fields, ",")
+        if (fields[2] != script_name || fields[3] != surface || fields[4] != fast_mode) {
+          continue
+        }
+        if (fields[5] == "total") {
+          continue
+        }
+        duration = fields[6] + 0
+        count[fields[5]]++
+        sum[fields[5]] += duration
+      }
+      best_phase = ""
+      best_avg = -1
+      for (phase in count) {
+        avg = sum[phase] / count[phase]
+        if (avg > best_avg) {
+          best_avg = avg
+          best_phase = phase
+        }
+      }
+      if (best_phase != "") {
+        printf "%s|%.2f|%d\n", best_phase, best_avg, count[best_phase]
+      }
+    }
+  ' "$TIMING_FILE")"
+
+  if [ -z "$hint_line" ]; then
+    return 0
+  fi
+
+  IFS='|' read -r hint_phase hint_avg hint_count <<< "$hint_line"
+  printf '[timing-history] recent bottleneck for %s/%s/fast=%s: %s avg %.2fs across %s runs\n' \
+    "$script_name" "$surface" "$fast_mode" "$hint_phase" "$hint_avg" "$hint_count"
+}
+
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   command="${1:-print_recent}"
   case "$command" in
@@ -124,9 +183,13 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
       shift || true
       timing_history_print_stats "${1:-160}"
       ;;
+    print_hint)
+      shift || true
+      timing_history_print_hint "${1:-}" "${2:-}" "${3:-}" "${4:-160}"
+      ;;
     *)
       echo "[timing-history] unknown command: $command" >&2
-      echo "Usage: bash scripts/timing_history.sh [print_recent|print_stats] [count]" >&2
+      echo "Usage: bash scripts/timing_history.sh [print_recent|print_stats|print_hint] [args]" >&2
       exit 1
       ;;
   esac

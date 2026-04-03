@@ -56,6 +56,7 @@ To inspect the latest local timings quickly:
 ```bash
 make timing-history
 make timing-stats
+make timing-hint
 ```
 
 Or run the broader local release gate:
