@@ -32,6 +32,54 @@ classify_pr_size() {
   fi
 }
 
+collect_split_hint() {
+  local base_ref="$1"
+  local frontend_count=0
+  local backend_count=0
+  local shared_count=0
+  local docs_count=0
+  local path=""
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    case "$path" in
+      frontend/*)
+        frontend_count=$((frontend_count + 1))
+        ;;
+      backend/*)
+        backend_count=$((backend_count + 1))
+        ;;
+      README.md|RUNBOOK.md|HANDOFF.md|LICENSE|.gitignore|.github/*)
+        docs_count=$((docs_count + 1))
+        ;;
+      *)
+        shared_count=$((shared_count + 1))
+        ;;
+    esac
+  done < <(git diff --name-only "${base_ref}..HEAD")
+
+  printf 'frontend_count=%s\n' "$frontend_count"
+  printf 'backend_count=%s\n' "$backend_count"
+  printf 'shared_count=%s\n' "$shared_count"
+  printf 'docs_count=%s\n' "$docs_count"
+
+  if [ "$frontend_count" -gt 0 ] && [ "$backend_count" -gt 0 ] && [ "$shared_count" -eq 0 ]; then
+    printf 'split_hint=consider separate frontend and backend PRs\n'
+  elif [ "$shared_count" -gt 0 ] && [ "$frontend_count" -gt 0 ] && [ "$backend_count" -eq 0 ]; then
+    printf 'split_hint=consider separating shared/docs changes from frontend product work\n'
+  elif [ "$shared_count" -gt 0 ] && [ "$backend_count" -gt 0 ] && [ "$frontend_count" -eq 0 ]; then
+    printf 'split_hint=consider separating shared/docs changes from backend/runtime work\n'
+  elif [ "$shared_count" -gt 0 ] && [ "$frontend_count" -gt 0 ] && [ "$backend_count" -gt 0 ]; then
+    printf 'split_hint=consider one PR for shared contract changes and one PR per product surface\n'
+  elif [ "$docs_count" -gt 0 ] && [ "$frontend_count" -gt 0 ] && [ "$backend_count" -eq 0 ] && [ "$shared_count" -eq 0 ]; then
+    printf 'split_hint=consider moving docs/runbook edits into a small follow-up PR\n'
+  elif [ "$docs_count" -gt 0 ] && [ "$backend_count" -gt 0 ] && [ "$frontend_count" -eq 0 ] && [ "$shared_count" -eq 0 ]; then
+    printf 'split_hint=consider moving docs/runbook edits into a small follow-up PR\n'
+  else
+    printf 'split_hint=\n'
+  fi
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --base)
@@ -86,13 +134,64 @@ fi
 
 pr_number=""
 pr_state="missing"
+pr_checks_state="missing"
+pr_checks_summary=""
 if pr_view_output="$(gh pr view --json number,state,isDraft,url 2>/dev/null)"; then
   pr_number="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); puts data["number"] || ""')"
   pr_state="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); draft=data["isDraft"] ? "draft" : "ready"; puts "#{data["state"]}:#{draft}"')"
   pr_url="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); puts data["url"] || ""')"
+  if pr_checks_output="$(gh pr checks "$pr_number" --json bucket,name,workflow,state 2>/dev/null)"; then
+    pr_checks_state="$(printf '%s\n' "$pr_checks_output" | ruby -rjson -e '
+      data=JSON.parse(STDIN.read)
+      if data.empty?
+        puts "missing"
+      elsif data.any? { |item| item["bucket"] == "fail" }
+        puts "fail"
+      elsif data.any? { |item| item["bucket"] == "pending" }
+        puts "pending"
+      elsif data.all? { |item| ["pass","skipping"].include?(item["bucket"]) }
+        puts "pass"
+      else
+        puts "mixed"
+      end
+    ')"
+    pr_checks_summary="$(printf '%s\n' "$pr_checks_output" | ruby -rjson -e '
+      data=JSON.parse(STDIN.read)
+      counts=Hash.new(0)
+      data.each { |item| counts[item["bucket"] || "unknown"] += 1 }
+      order=%w[fail pending pass skipping cancel unknown]
+      parts=order.filter_map { |key| counts[key] > 0 ? "#{key}=#{counts[key]}" : nil }
+      puts(parts.join(", "))
+    ')"
+  fi
 else
   pr_url=""
 fi
+
+frontend_count=0
+backend_count=0
+shared_count=0
+docs_count=0
+split_hint=""
+while IFS='=' read -r key value; do
+  case "$key" in
+    frontend_count)
+      frontend_count="$value"
+      ;;
+    backend_count)
+      backend_count="$value"
+      ;;
+    shared_count)
+      shared_count="$value"
+      ;;
+    docs_count)
+      docs_count="$value"
+      ;;
+    split_hint)
+      split_hint="$value"
+      ;;
+  esac
+done < <(collect_split_hint "$base_ref")
 
 last_base_ref=""
 last_mode=""
@@ -127,6 +226,10 @@ echo "[pr-doctor] commits since base: $commit_count"
 echo "[pr-doctor] files changed: $files_changed"
 echo "[pr-doctor] line changes: +$insertions / -$deletions"
 echo "[pr-doctor] size class: $size_class"
+echo "[pr-doctor] diff mix: frontend=$frontend_count backend=$backend_count shared=$shared_count docs=$docs_count"
+if [ -n "$split_hint" ]; then
+  echo "[pr-doctor] split hint: $split_hint"
+fi
 if [ "$has_upstream" = "1" ]; then
   echo "[pr-doctor] upstream: $upstream_ref"
 else
@@ -135,6 +238,10 @@ fi
 if [ -n "$pr_number" ]; then
   echo "[pr-doctor] pull request: #$pr_number ($pr_state)"
   echo "[pr-doctor] pull request url: $pr_url"
+  echo "[pr-doctor] PR checks: $pr_checks_state"
+  if [ -n "$pr_checks_summary" ]; then
+    echo "[pr-doctor] PR checks summary: $pr_checks_summary"
+  fi
 else
   echo "[pr-doctor] pull request: missing"
 fi
@@ -162,9 +269,18 @@ if [ "$size_class" = "split" ]; then
 elif [ "$size_class" = "large" ]; then
   echo "[pr-doctor] warning: this PR is getting large; split it if the change is not one coherent unit" >&2
 fi
+if [ -n "$split_hint" ] && { [ "$size_class" = "split" ] || [ "$size_class" = "large" ]; }; then
+  echo "[pr-doctor] split hint: $split_hint" >&2
+fi
 if [ "$local_loop_state" != "ready" ]; then
   echo "[pr-doctor] warning: run make pr-ready before opening or updating the PR" >&2
   issues=1
+fi
+if [ -n "$pr_number" ] && [ "$pr_checks_state" = "fail" ]; then
+  echo "[pr-doctor] warning: PR checks are failing" >&2
+  issues=1
+elif [ -n "$pr_number" ] && [ "$pr_checks_state" = "pending" ]; then
+  echo "[pr-doctor] warning: PR checks are still pending" >&2
 fi
 
 if [ "$STRICT" = "1" ] && [ "$issues" != "0" ]; then

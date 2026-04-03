@@ -246,6 +246,7 @@ What they do:
 - `make pr-open` opens a GitHub PR against `develop` with the repo template plus local automation context
 - `make pr-status` shows the current PR state through GitHub CLI
 - `make pr-doctor` prints PR health, current size class, upstream status, PR status, and whether the last local green loop still matches the branch base
+- `make pr-doctor` also reads PR CI status from GitHub and gives a split hint from the actual diff mix when the branch gets too large
 - `make frontend` runs the fast frontend gate
 - `make frontend-hot` runs the same fast frontend gate but keeps the smoke server warm across runs
 - `make backend` runs the fast backend gate
@@ -329,6 +330,7 @@ PRs are not just ceremony here:
 - `.github/pull_request_template.md` keeps the PR body short and consistent
 - `make pr-ready` and `make pr-open` keep the branch-to-PR flow aligned with the same automation core used for local verification
 - `make pr-doctor` warns when the branch has grown into a probably-too-large PR, so review cost stays under control
+- `make pr-doctor` now also surfaces PR check health and a practical split direction, so the next action is clearer than a generic “too big” warning
 
 ## Key Screens In The App
 

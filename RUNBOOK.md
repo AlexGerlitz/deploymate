@@ -206,6 +206,7 @@ Notes:
 - `.github/pull_request_template.md` keeps the PR body short and predictable
 - `make pr-ready` uses the same recommendation and `auto-local` logic as the normal local loop, so the pre-PR check is not a second parallel process
 - `make pr-doctor` prints branch cleanliness, upstream state, PR state, local-loop freshness, and a PR size class so oversized branches get caught before review
+- `make pr-doctor` also reads the current PR check state from GitHub and suggests a likely split direction from the diff mix when a branch has grown too large
 
 For daily iteration speed on staging:
 

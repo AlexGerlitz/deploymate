@@ -78,6 +78,8 @@ doctor_size_class=""
 doctor_commits_since_base=""
 doctor_files_changed=""
 doctor_line_changes=""
+doctor_diff_mix=""
+doctor_split_hint=""
 
 while IFS='=' read -r key value; do
   case "$key" in
@@ -111,6 +113,12 @@ while IFS= read -r line; do
     "[pr-doctor] line changes: "*)
       doctor_line_changes="${line#"[pr-doctor] line changes: "}"
       ;;
+    "[pr-doctor] diff mix: "*)
+      doctor_diff_mix="${line#"[pr-doctor] diff mix: "}"
+      ;;
+    "[pr-doctor] split hint: "*)
+      doctor_split_hint="${line#"[pr-doctor] split hint: "}"
+      ;;
   esac
 done <<< "$doctor_output"
 
@@ -132,6 +140,12 @@ trap 'rm -f "$tmp_body"' EXIT
     echo "- Commits since base: \`${doctor_commits_since_base:-0}\`"
     echo "- Files changed: \`${doctor_files_changed:-0}\`"
     echo "- Line changes: \`${doctor_line_changes:-+0 / -0}\`"
+    if [ -n "$doctor_diff_mix" ]; then
+      echo "- Diff mix: \`${doctor_diff_mix}\`"
+    fi
+    if [ -n "$doctor_split_hint" ]; then
+      echo "- Split hint: ${doctor_split_hint}"
+    fi
   fi
   if [ -n "$followup_command" ]; then
     echo "- Cheap follow-up after first green pass: \`${followup_command}\`"
