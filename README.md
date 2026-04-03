@@ -43,6 +43,7 @@ If you are opening this repository as a hiring reviewer, these are the fastest e
 - live app: `https://deploymatecloud.ru`
 - public signup: `https://deploymatecloud.ru/register`
 - release notes: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)
+- roadmap: [ROADMAP.md](ROADMAP.md)
 - architecture overview: [ARCHITECTURE.md](ARCHITECTURE.md)
 - production/release discipline: [RUNBOOK.md](RUNBOOK.md), [SAFE-RELEASE.md](SAFE-RELEASE.md), [SECURITY.md](SECURITY.md)
 
@@ -51,6 +52,22 @@ What to evaluate quickly:
 - product depth: deployments, templates, servers, admin users, upgrade requests, backup dry-run
 - engineering maturity: scripted preflight, smoke coverage, remote release flow, production docs
 - operational thinking: security posture, runtime capability boundaries, release safety checks
+
+## Five-Minute Evaluation Path
+
+If you want the shortest coherent pass through the project:
+
+1. open the live app at `https://deploymatecloud.ru/login`
+2. use demo access or create a trial account
+3. inspect `/app` and one deployment detail page for the runtime story
+4. inspect `/app/users` and `/app/upgrade-requests` for admin depth
+5. return to [ARCHITECTURE.md](ARCHITECTURE.md), [RUNBOOK.md](RUNBOOK.md), and [ROADMAP.md](ROADMAP.md) for system and release framing
+
+If you are evaluating whether this is more than a UI shell, the quickest evidence is:
+
+- live demo surface
+- release workflow and smoke discipline
+- roadmap and documentation continuity from product to operations
 
 ## Product Preview
 
@@ -220,6 +237,14 @@ If I were demoing the project to a reviewer, I would open it in this order:
 2. `/deployments/[deploymentId]` for runtime state, logs, and health
 3. `/app/users` for saved views, bulk actions, audit, and backup tooling
 4. `/app/upgrade-requests` for admin workflow depth and export/reporting features
+
+## Release Story
+
+The repository is meant to show not only a UI, but a product plus delivery discipline:
+
+- [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the initial public release framing
+- [RUNBOOK.md](RUNBOOK.md) for local gate, remote release, post-deploy smoke, and workflow contract
+- [ROADMAP.md](ROADMAP.md) for what is intentionally next rather than vaguely planned
 
 ## Local Development
 
