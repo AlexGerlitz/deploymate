@@ -26,6 +26,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
+SECRET_CACHE_MAX_FILES="${DEPLOYMATE_SECRET_SCAN_CACHE_MAX_FILES:-24}"
+RUNTIME_POLICY_CACHE_MAX_FILES="${DEPLOYMATE_RUNTIME_POLICY_CACHE_MAX_FILES:-16}"
+
+scan_single_file_or_fail() {
+  local label="$1"
+  shift
+  local file="$1"
+  shift
+
+  if "${SEARCH_CMD[@]}" "$@" -- "$file" >"$TMP_FILE"; then
+    echo "[security-audit] ${label}: ${file}"
+    cat "$TMP_FILE"
+    exit 1
+  fi
+}
+
 echo "[security-audit] repo: $ROOT_DIR"
 
 TRACKED_FILES=()
@@ -94,25 +110,54 @@ audit_cache_record_event phase_miss "$security_phase_cache_key"
 echo "[security-audit] scanning tracked files for high-signal secret patterns"
 echo "[security-audit] secret scan scope: ${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
 secret_seed="secret:${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
-secret_fingerprint="$(audit_cache_fingerprint_files "$secret_seed" "${FILTERED_FILES[@]}")"
-if audit_cache_persistent_has "security_secret_scan" "$secret_fingerprint"; then
-  echo "[security-audit] secret scan cache hit"
-  audit_cache_record_event persistent_hit security_secret_scan
+if [ "${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}" = "changed" ] \
+  && [ "${#FILTERED_FILES[@]}" -gt 0 ] \
+  && [ "${#FILTERED_FILES[@]}" -le "$SECRET_CACHE_MAX_FILES" ]; then
+  secret_cache_hits=0
+  secret_cache_misses=0
+  echo "[security-audit] secret scan cache mode: per-file"
+  for file in "${FILTERED_FILES[@]}"; do
+    secret_file_key="$(audit_cache_key_for_input "security_secret_scan_file" "$file")"
+    secret_file_fingerprint="$(audit_cache_fingerprint_files "${secret_seed}:${file}" "$file")"
+    if audit_cache_persistent_has "$secret_file_key" "$secret_file_fingerprint"; then
+      audit_cache_record_event persistent_hit security_secret_scan
+      secret_cache_hits=$((secret_cache_hits + 1))
+      continue
+    fi
+
+    audit_cache_record_event persistent_miss security_secret_scan
+    secret_cache_misses=$((secret_cache_misses + 1))
+    scan_single_file_or_fail "potential secret material found" "$file" \
+      -e 'gh[opusr]_[A-Za-z0-9_]+' \
+      -e 'github_pat_[A-Za-z0-9_]+' \
+      -e 'AKIA[0-9A-Z]{16}' \
+      -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+      -e 'xox[baprs]-[A-Za-z0-9-]+' \
+      -e 'sk_live_[A-Za-z0-9]+'
+    audit_cache_persistent_mark "$secret_file_key" "$secret_file_fingerprint"
+  done
+  echo "[security-audit] secret scan reused ${secret_cache_hits} file results; rescanned ${secret_cache_misses}"
 else
-  audit_cache_record_event persistent_miss security_secret_scan
-  if "${SEARCH_CMD[@]}" \
-    -e 'gh[opusr]_[A-Za-z0-9_]+' \
-    -e 'github_pat_[A-Za-z0-9_]+' \
-    -e 'AKIA[0-9A-Z]{16}' \
-    -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
-    -e 'xox[baprs]-[A-Za-z0-9-]+' \
-    -e 'sk_live_[A-Za-z0-9]+' \
-    -- "${FILTERED_FILES[@]}" >"$TMP_FILE"; then
-    echo "[security-audit] potential secret material found:"
-    cat "$TMP_FILE"
-    exit 1
+  secret_fingerprint="$(audit_cache_fingerprint_files "$secret_seed" "${FILTERED_FILES[@]}")"
+  if audit_cache_persistent_has "security_secret_scan" "$secret_fingerprint"; then
+    echo "[security-audit] secret scan cache hit"
+    audit_cache_record_event persistent_hit security_secret_scan
+  else
+    audit_cache_record_event persistent_miss security_secret_scan
+    if "${SEARCH_CMD[@]}" \
+      -e 'gh[opusr]_[A-Za-z0-9_]+' \
+      -e 'github_pat_[A-Za-z0-9_]+' \
+      -e 'AKIA[0-9A-Z]{16}' \
+      -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+      -e 'xox[baprs]-[A-Za-z0-9-]+' \
+      -e 'sk_live_[A-Za-z0-9]+' \
+      -- "${FILTERED_FILES[@]}" >"$TMP_FILE"; then
+      echo "[security-audit] potential secret material found:"
+      cat "$TMP_FILE"
+      exit 1
+    fi
+    audit_cache_persistent_mark "security_secret_scan" "$secret_fingerprint"
   fi
-  audit_cache_persistent_mark "security_secret_scan" "$secret_fingerprint"
 fi
 
 echo "[security-audit] scanning for risky runtime defaults"
@@ -135,26 +180,62 @@ else
     echo "[security-audit] no runtime policy files in current scope"
   else
     runtime_seed="runtime-policy:${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}"
-    runtime_fingerprint="$(audit_cache_fingerprint_files "$runtime_seed" "${RUNTIME_FILES[@]}")"
-    if audit_cache_persistent_has "security_runtime_policy_scan" "$runtime_fingerprint"; then
-      echo "[security-audit] runtime policy scan cache hit"
-      audit_cache_record_event persistent_hit security_runtime_policy_scan
+    if [ "${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}" = "changed" ] \
+      && [ "${#RUNTIME_FILES[@]}" -le "$RUNTIME_POLICY_CACHE_MAX_FILES" ]; then
+      runtime_policy_cache_hits=0
+      runtime_policy_cache_misses=0
+      echo "[security-audit] runtime policy cache mode: per-file"
+      for file in "${RUNTIME_FILES[@]}"; do
+        runtime_file_key="$(audit_cache_key_for_input "security_runtime_policy_scan_file" "$file")"
+        runtime_file_fingerprint="$(audit_cache_fingerprint_files "${runtime_seed}:${file}" "$file")"
+        if audit_cache_persistent_has "$runtime_file_key" "$runtime_file_fingerprint"; then
+          audit_cache_record_event persistent_hit security_runtime_policy_scan
+          runtime_policy_cache_hits=$((runtime_policy_cache_hits + 1))
+          continue
+        fi
+
+        audit_cache_record_event persistent_miss security_runtime_policy_scan
+        runtime_policy_cache_misses=$((runtime_policy_cache_misses + 1))
+
+        if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "$file" >"$TMP_FILE"; then
+          echo "[security-audit] warning: StrictHostKeyChecking=no found"
+          cat "$TMP_FILE"
+          WARNINGS=1
+        fi
+
+        if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "$file" >"$TMP_FILE"; then
+          echo "[security-audit] warning: docker.sock reference found"
+          cat "$TMP_FILE"
+          WARNINGS=1
+        fi
+
+        if [ "$WARNINGS" -eq 0 ]; then
+          audit_cache_persistent_mark "$runtime_file_key" "$runtime_file_fingerprint"
+        fi
+      done
+      echo "[security-audit] runtime policy reused ${runtime_policy_cache_hits} file results; rescanned ${runtime_policy_cache_misses}"
     else
-      audit_cache_record_event persistent_miss security_runtime_policy_scan
-      if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
-        echo "[security-audit] warning: StrictHostKeyChecking=no found"
-        cat "$TMP_FILE"
-        WARNINGS=1
-      fi
+      runtime_fingerprint="$(audit_cache_fingerprint_files "$runtime_seed" "${RUNTIME_FILES[@]}")"
+      if audit_cache_persistent_has "security_runtime_policy_scan" "$runtime_fingerprint"; then
+        echo "[security-audit] runtime policy scan cache hit"
+        audit_cache_record_event persistent_hit security_runtime_policy_scan
+      else
+        audit_cache_record_event persistent_miss security_runtime_policy_scan
+        if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
+          echo "[security-audit] warning: StrictHostKeyChecking=no found"
+          cat "$TMP_FILE"
+          WARNINGS=1
+        fi
 
-      if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
-        echo "[security-audit] warning: docker.sock reference found"
-        cat "$TMP_FILE"
-        WARNINGS=1
-      fi
+        if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
+          echo "[security-audit] warning: docker.sock reference found"
+          cat "$TMP_FILE"
+          WARNINGS=1
+        fi
 
-      if [ "$WARNINGS" -eq 0 ]; then
-        audit_cache_persistent_mark "security_runtime_policy_scan" "$runtime_fingerprint"
+        if [ "$WARNINGS" -eq 0 ]; then
+          audit_cache_persistent_mark "security_runtime_policy_scan" "$runtime_fingerprint"
+        fi
       fi
     fi
   fi

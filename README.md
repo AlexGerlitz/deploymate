@@ -267,6 +267,7 @@ The fast gate intentionally uses fewer resources:
 - repeated fast frontend smoke targets and backend fast test modules now reuse phase-level fingerprint caches when the diff and inputs did not change
 - repeated preflight backend syntax checks and local frontend builds now also reuse phase-level fingerprint caches when their inputs did not change
 - repeated security audit blocks now also reuse a phase-level fingerprint cache when the diff, scopes, and nested audit inputs did not change
+- changed-file security scans now reuse per-file fingerprints for secret and runtime-policy checks, so adding one new file does not force rescanning every unchanged file in the local diff
 - project-specific layout and route assumptions now live behind [scripts/project_automation_config.sh](scripts/project_automation_config.sh), so the reusable automation core is no longer welded directly to DeployMate paths
 - project-specific path-to-target rules now live behind [scripts/project_automation_targets.sh](scripts/project_automation_targets.sh), so moving this system to another repo no longer means rewriting every `detect_*` script
 - frontend smoke assertions now live behind [scripts/project_automation_smoke_checks.sh](scripts/project_automation_smoke_checks.sh), so both the fast and heavier smoke runners are no longer welded to DeployMate-specific selectors

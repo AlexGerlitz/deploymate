@@ -71,6 +71,21 @@ audit_cache_hash_cmd() {
   fi
 }
 
+audit_cache_hash_string() {
+  local data="${1:-}"
+  local hash_cmd=""
+
+  hash_cmd="$(audit_cache_hash_cmd)"
+  printf '%s' "$data" | eval "$hash_cmd" | awk '{print $1}'
+}
+
+audit_cache_key_for_input() {
+  local prefix="$1"
+  local raw_input="${2:-}"
+
+  printf '%s_%s' "$prefix" "$(audit_cache_hash_string "$raw_input")"
+}
+
 audit_cache_fingerprint_files() {
   local seed="$1"
   shift || true
