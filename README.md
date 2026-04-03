@@ -68,8 +68,9 @@ If you want the shortest coherent pass through the project:
 1. open the live app at `https://deploymatecloud.ru/login`
 2. use demo access or create a trial account
 3. inspect `/app` and one deployment detail page for the runtime story
-4. inspect `/app/users` and `/app/upgrade-requests` for admin depth
-5. return to [ARCHITECTURE.md](ARCHITECTURE.md), [RUNBOOK.md](RUNBOOK.md), and [ROADMAP.md](ROADMAP.md) for system and release framing
+4. inspect `/app/server-review` for the dedicated server workspace
+5. inspect `/app/users` and `/app/upgrade-requests` for admin depth
+6. return to [ARCHITECTURE.md](ARCHITECTURE.md), [RUNBOOK.md](RUNBOOK.md), and [ROADMAP.md](ROADMAP.md) for system and release framing
 
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
@@ -107,8 +108,9 @@ Reviewer path:
 
 1. create a trial account
 2. land in the app immediately after signup
-3. open `/app/users` and `/app/upgrade-requests` to inspect the richer admin surface
-4. review saved views, bulk actions, audit trail, backup bundle, and restore dry-run tooling
+3. open `/app/server-review` to inspect the dedicated server workspace
+4. open `/app/users` and `/app/upgrade-requests` to inspect the richer admin surface
+5. review saved views, bulk actions, audit trail, backup bundle, and restore dry-run tooling
 
 ![Reviewer demo flow](docs/demo-flow.svg)
 
@@ -116,8 +118,9 @@ Recommended reviewer order:
 
 1. `/app` for the operator overview
 2. `/deployments/[deploymentId]` for runtime state and observability
-3. `/app/users` for admin saved views, bulk actions, audit, and recovery tooling
-4. `/app/upgrade-requests` for workflow depth, exports, and admin triage surface
+3. `/app/server-review` for live server create/edit/test/diagnostics/delete flow
+4. `/app/users` for admin saved views, bulk actions, audit, and recovery tooling
+5. `/app/upgrade-requests` for workflow depth, exports, and admin triage surface
 
 ## Why This Project Is Interesting
 
@@ -131,7 +134,7 @@ Recommended reviewer order:
 | Area | What is already implemented |
 | --- | --- |
 | Deployments | create, redeploy, inspect, delete, logs, health, activity |
-| Servers | saved SSH targets, connection tests, diagnostics, suggested ports |
+| Servers | dedicated `/app/server-review` workspace with saved SSH targets, create/edit/test/diagnostics/delete, and suggested ports |
 | Templates | reusable presets, usage tracking, preview, duplicate, filters |
 | Admin users | filters, saved views, bulk actions, exports, audit trail |
 | Upgrade inbox | filters, saved views, bulk actions, exports, audit trail |
@@ -150,9 +153,10 @@ Recommended reviewer order:
 
 ### Server management
 
+- use the dedicated `/app/server-review` workspace as the main server surface
 - register remote servers with SSH-key auth for new targets
-- test connectivity before using a target
-- run diagnostics and fetch suggested free ports
+- edit, test, diagnose, and delete saved targets from the same review flow
+- fetch suggested free ports before runtime work
 
 ### Admin tooling
 
@@ -259,6 +263,13 @@ What these do:
 - `make ship-pr ...` can create the feature branch, commit, run the PR-ready loop, push, and open the PR in one pass
 - `make sync-main` fast-forwards `main` from `develop`
 - `make pr-land-sync` lands the PR and then syncs `main`
+
+Preferred Git cadence for a presentable GitHub history:
+
+- commit per finished logical slice, not per tiny keystroke
+- push after one good commit or a small clean series of 2-3 related commits
+- avoid noisy `wip` / `tmp` / broken intermediate commits when a cleaner split is possible
+- prefer one platform/scaffold commit plus one product-surface commit over one mixed dump commit
 
 ## DeployMate Feature Scaffolds
 
@@ -496,6 +507,7 @@ PRs are not just ceremony here:
 
 - `/app` operations dashboard
 - `/deployments/[deploymentId]` deployment detail view
+- `/app/server-review` dedicated server workspace
 - `/app/users` admin users workspace
 - `/app/upgrade-requests` admin upgrade inbox
 - `/login` and `/change-password` auth flow
@@ -536,8 +548,9 @@ If I were demoing the project to a reviewer, I would open it in this order:
 
 1. `/app` for the operations overview
 2. `/deployments/[deploymentId]` for runtime state, logs, and health
-3. `/app/users` for saved views, bulk actions, audit, and backup tooling
-4. `/app/upgrade-requests` for admin workflow depth and export/reporting features
+3. `/app/server-review` for the live server-management loop
+4. `/app/users` for saved views, bulk actions, audit, and backup tooling
+5. `/app/upgrade-requests` for admin workflow depth and export/reporting features
 
 ## Release Story
 

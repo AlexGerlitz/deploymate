@@ -19,6 +19,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail
 docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=50 frontend
 curl -I https://your-domain
 curl -I https://your-domain/app
+curl -I https://your-domain/app/server-review
 curl -I https://your-domain/api/health
 ```
 
@@ -159,6 +160,8 @@ For server-management frontend changes, also run:
 npm --prefix frontend run smoke:servers
 ```
 
+That smoke covers the dedicated `/app/server-review` workspace, which is now the main UI path for create/edit/test/diagnostics/delete server actions.
+
 For a single remote deploy command that also runs post-deploy smoke:
 
 ```bash
@@ -228,6 +231,19 @@ make ship-pr SLUG=my-change MESSAGE="Describe the change"
 make pr-watch
 make pr-land-sync
 ```
+
+Preferred cadence:
+
+1. finish one logical slice
+2. run the cheapest relevant local verification
+3. commit that slice cleanly
+4. push when one clean commit or a short series of 2-3 related commits is ready
+
+Use this to keep GitHub readable:
+
+- do not push every tiny fix
+- do not mix unrelated scaffold, backend, and UI work into one opaque commit
+- prefer a small number of coherent commits that tell a clear story in PR review
 
 Notes:
 
