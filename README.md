@@ -256,6 +256,7 @@ The fast gate intentionally uses fewer resources:
 - backend syntax in preflight now narrows to changed backend Python files when possible and skips entirely for frontend-only local diffs
 - explicit surface commands like `make frontend`, `make backend`, `make profile-frontend`, and `make profile-backend` now auto-derive the same local diff context, so scoped audits and syntax checks still stay cheap outside `make changed`
 - release-workflow and runbook diffs now keep `release_workflow_audit` enabled while still letting `security_audit` stay on changed-file scope during local explicit surface loops
+- local `security_audit` now splits cheap secret scanning from runtime-policy scanning, so release/docs/script-heavy diffs keep the relevant checks without paying for unnecessary risky-default scans
 - preflight: skips the production frontend build in fast mode
 - fast frontend mode now reuses one shared smoke dev server instead of starting a separate `next dev` process per smoke
 - the repo now has experimental local persistent frontend smoke-server controls, but the default fast loop stays on the safer per-command lifecycle unless `FRONTEND_SMOKE_PERSIST_SERVER=1` is set explicitly

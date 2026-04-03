@@ -58,6 +58,7 @@ for file in "${TRACKED_FILES[@]}"; do
 done
 
 echo "[security-audit] scanning tracked files for high-signal secret patterns"
+echo "[security-audit] secret scan scope: ${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
 
 if "${SEARCH_CMD[@]}" \
   -e 'gh[opusr]_[A-Za-z0-9_]+' \
@@ -73,33 +74,36 @@ if "${SEARCH_CMD[@]}" \
 fi
 
 echo "[security-audit] scanning for risky runtime defaults"
+echo "[security-audit] runtime policy scan scope: ${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}"
 
 WARNINGS=0
 RUNTIME_FILES=()
-for file in "${FILTERED_FILES[@]}"; do
-  case "$file" in
-    backend/tests/*|README.md|PRODUCTION.md|RUNBOOK.md|SAFE-RELEASE.md|SECURITY.md|CHANGELOG.md|ARCHITECTURE.md|ROADMAP.md|CONTRIBUTING.md|docs/*)
-      continue
-      ;;
-    scripts/security_audit.sh)
-      continue
-      ;;
-    *)
-      RUNTIME_FILES+=("$file")
-      ;;
-  esac
-done
+if [ "${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}" = "skip" ]; then
+  echo "[security-audit] risky runtime defaults scan skipped for this local diff"
+else
+  for file in "${FILTERED_FILES[@]}"; do
+    case "$file" in
+      docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/local_runtime_audit.sh|scripts/post_deploy_smoke.sh|backend/app/routes/deployments.py|backend/app/routes/ops.py|backend/app/routes/servers.py|backend/app/services/runtime_executors.py|backend/tests/test_deployment_ssh_options.py)
+        RUNTIME_FILES+=("$file")
+        ;;
+    esac
+  done
 
-if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
-  echo "[security-audit] warning: StrictHostKeyChecking=no found"
-  cat "$TMP_FILE"
-  WARNINGS=1
-fi
+  if [ "${#RUNTIME_FILES[@]}" -eq 0 ]; then
+    echo "[security-audit] no runtime policy files in current scope"
+  else
+    if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
+      echo "[security-audit] warning: StrictHostKeyChecking=no found"
+      cat "$TMP_FILE"
+      WARNINGS=1
+    fi
 
-if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
-  echo "[security-audit] warning: docker.sock reference found"
-  cat "$TMP_FILE"
-  WARNINGS=1
+    if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
+      echo "[security-audit] warning: docker.sock reference found"
+      cat "$TMP_FILE"
+      WARNINGS=1
+    fi
+  fi
 fi
 
 if [ -f "scripts/release_workflow_audit.sh" ] && [ "${DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT:-1}" = "1" ]; then

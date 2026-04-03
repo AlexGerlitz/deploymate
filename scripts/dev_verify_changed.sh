@@ -134,6 +134,8 @@ backend_changed_files=()
 frontend_changed_files=()
 runtime_audit_reason=""
 security_audit_reason=""
+secret_scan_reason=""
+runtime_policy_scan_reason=""
 backend_fast_reason=""
 frontend_fast_reason=""
 backend_syntax_reason=""
@@ -188,6 +190,14 @@ while IFS='=' read -r key value; do
       DEPLOYMATE_SECURITY_AUDIT_SCOPE="$value"
       export DEPLOYMATE_SECURITY_AUDIT_SCOPE
       ;;
+    secret_scan_scope)
+      DEPLOYMATE_SECRET_SCAN_SCOPE="$value"
+      export DEPLOYMATE_SECRET_SCAN_SCOPE
+      ;;
+    runtime_policy_scan_scope)
+      DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE="$value"
+      export DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE
+      ;;
     run_release_workflow_audit)
       DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT="$value"
       export DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT
@@ -207,6 +217,8 @@ export DEPLOYMATE_CHANGED_FILES
 DEPLOYMATE_CONTEXT_DERIVED=1
 export DEPLOYMATE_CONTEXT_DERIVED
 echo "[dev-verify-changed] security audit: ${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full} (${security_audit_reason})"
+echo "[dev-verify-changed] secret scan: ${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
+echo "[dev-verify-changed] runtime policy scan: ${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}"
 
 backend_syntax_output="$(bash scripts/detect_backend_syntax_scope.sh "${changed_files[@]}")"
 printf '%s\n' "$backend_syntax_output"

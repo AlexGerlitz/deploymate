@@ -5,6 +5,7 @@ codex-summary.txt
 log.txt
 frontend/node_modules/
 frontend/.next/
+frontend/.next-smoke-*/
 backend/venv/
 .env
 .env.*

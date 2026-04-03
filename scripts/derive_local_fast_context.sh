@@ -102,6 +102,8 @@ print_export DEPLOYMATE_CHANGED_FILES "$(printf '%s\n' "${changed_files[@]}")"
 if [ "${#changed_files[@]}" -eq 0 ]; then
   print_export DEPLOYMATE_RUN_RUNTIME_AUDITS 1
   print_export DEPLOYMATE_SECURITY_AUDIT_SCOPE full
+  print_export DEPLOYMATE_SECRET_SCAN_SCOPE full
+  print_export DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE full
   print_export DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT 1
   print_export DEPLOYMATE_RUN_SERVER_CREDENTIALS_AUDIT 1
   print_export DEPLOYMATE_BACKEND_SYNTAX_MODE full
@@ -125,6 +127,12 @@ while IFS='=' read -r key value; do
   case "$key" in
     security_audit_scope)
       print_export DEPLOYMATE_SECURITY_AUDIT_SCOPE "$value"
+      ;;
+    secret_scan_scope)
+      print_export DEPLOYMATE_SECRET_SCAN_SCOPE "$value"
+      ;;
+    runtime_policy_scan_scope)
+      print_export DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE "$value"
       ;;
     run_release_workflow_audit)
       print_export DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT "$value"
