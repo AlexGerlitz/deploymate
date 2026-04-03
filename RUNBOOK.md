@@ -113,7 +113,7 @@ After the push:
 Use `.github/workflows/staging.yml` only as a manual fallback when you need to redeploy staging on demand.
 That manual fallback now also supports `skip_smoke` when you need a faster redeploy for operator-only checks.
 
-The CI, staging, and production workflows now write a short GitHub job summary with the chosen surface, smoke mode, and commit SHA so the result is readable without opening raw logs.
+The CI, staging, and production workflows now write a short GitHub job summary with the chosen surface, smoke mode, requested commit SHA, deployed SHA, and target URL so the result is readable without opening raw logs.
 
 To verify that the release workflows and the documented GitHub secret contract still match:
 

@@ -1,6 +1,17 @@
 name: Remote Release
 description: Prepare SSH materials and run the repository remote release helper.
 
+outputs:
+  deployed_sha:
+    description: Commit SHA reported by the remote deploy target
+    value: ${{ steps.run_remote_release.outputs.deployed_sha }}
+  smoke_mode:
+    description: Effective post-deploy smoke mode
+    value: ${{ steps.run_remote_release.outputs.smoke_mode }}
+  target_url:
+    description: Base URL used for post-deploy smoke
+    value: ${{ steps.run_remote_release.outputs.target_url }}
+
 inputs:
   surface:
     description: Remote release surface
@@ -128,6 +139,7 @@ runs:
         fi
 
     - name: Run remote release helper
+      id: run_remote_release
       shell: bash
       env:
         DEPLOYMATE_DEPLOY_HOST: ${{ inputs.deploy_host }}
@@ -151,6 +163,9 @@ runs:
         DEPLOYMATE_SMOKE_HEALTH_TIMEOUT: ${{ inputs.runtime_smoke_health_timeout }}
       run: |
         set -euo pipefail
+
+        log_file="$(mktemp)"
+        trap 'rm -f "$log_file"' EXIT
 
         if [ -f "$HOME/.ssh/runtime_smoke_id_ed25519" ]; then
           export DEPLOYMATE_SMOKE_SSH_KEY_FILE="$HOME/.ssh/runtime_smoke_id_ed25519"
@@ -184,4 +199,25 @@ runs:
           args+=(--skip-smoke)
         fi
 
-        bash scripts/remote_release.sh "${args[@]}"
+        bash scripts/remote_release.sh "${args[@]}" 2>&1 | tee "$log_file"
+
+        deployed_sha="$(grep -oE '\[remote-release\] deployed sha: [0-9a-f]+' "$log_file" | tail -n 1 | awk '{print $4}')"
+        if [ -z "$deployed_sha" ]; then
+          echo "[remote-release-action] failed to capture deployed sha from remote release output" >&2
+          exit 1
+        fi
+
+        smoke_mode="post-deploy enabled"
+        if [ "${{ inputs.skip_smoke }}" = "1" ]; then
+          smoke_mode="post-deploy skipped"
+        elif [ "${{ inputs.runtime_smoke_enabled }}" = "1" ]; then
+          smoke_mode="runtime enabled"
+        else
+          smoke_mode="runtime disabled"
+        fi
+
+        {
+          echo "deployed_sha=$deployed_sha"
+          echo "smoke_mode=$smoke_mode"
+          echo "target_url=$DEPLOYMATE_BASE_URL"
+        } >> "$GITHUB_OUTPUT"

@@ -40,6 +40,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run staging release
+        id: remote_release
         uses: ./.github/actions/remote-release
         with:
           surface: ${{ inputs.surface }}
@@ -75,9 +76,10 @@ jobs:
             echo "## Manual Staging Deploy"
             echo
             echo "- Surface: \`${{ inputs.surface }}\`"
-            echo "- Runtime smoke: \`${{ inputs.runtime_smoke && 'enabled' || 'disabled' }}\`"
-            echo "- Post-deploy smoke: \`${{ inputs.skip_smoke && 'skipped' || 'enabled' }}\`"
             echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Deployed SHA: \`${{ steps.remote_release.outputs.deployed_sha || 'unavailable' }}\`"
+            echo "- Smoke mode: \`${{ steps.remote_release.outputs.smoke_mode || (inputs.skip_smoke && 'post-deploy skipped' || (inputs.runtime_smoke && 'runtime enabled' || 'runtime disabled')) }}\`"
+            echo "- URL: ${{ steps.remote_release.outputs.target_url || secrets.DEPLOYMATE_BASE_URL }}"
             echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -99,7 +101,7 @@ jobs:
             --environment "staging" \
             --status "${{ job.status }}" \
             --surface "${{ inputs.surface }}" \
-            --smoke "${{ inputs.skip_smoke && 'post-deploy skipped' || (inputs.runtime_smoke && 'runtime enabled' || 'runtime disabled') }}" \
+            --smoke "${{ steps.remote_release.outputs.smoke_mode || (inputs.skip_smoke && 'post-deploy skipped' || (inputs.runtime_smoke && 'runtime enabled' || 'runtime disabled')) }}" \
             --commit "${{ github.sha }}" \
             --ref "${{ github.ref_name }}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
