@@ -204,6 +204,7 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 - [PRODUCT-STARTER.md](PRODUCT-STARTER.md) defines the reusable product starter layer for future projects
 - `make bootstrap-product-starter TARGET_DIR=... PRODUCT_STARTER_FLAGS="--project-name MyApp --app-slug myapp --contact-email founder@example.com --frontend-dir web --backend-dir api"` renders a starter product skeleton plus automation core into a new repo
 - `make scaffold-product-resource TARGET_DIR=... RESOURCE_FLAGS="--name Projects --slug projects --frontend-dir web --backend-dir api"` generates the first real feature slice after the starter shell
+- `make scaffold-deploymate-surface SURFACE_FLAGS="--name Review Inbox --slug review-inbox"` generates a new DeployMate-specific admin surface page, backend route/service stub, route registration, and API flow test inside this repo
 
 ## Fast Local Commands
 
@@ -234,7 +235,26 @@ make frontend-hot
 make backend
 make fast
 make fast-hot
+make scaffold-deploymate-surface SURFACE_FLAGS="--name Review Inbox --slug review-inbox"
 ```
+
+## DeployMate Feature Scaffolds
+
+For current DeployMate work, the fastest route from idea to a real new surface is now:
+
+```bash
+make scaffold-deploymate-surface SURFACE_FLAGS="--name Review Inbox --slug review-inbox"
+```
+
+That generator creates:
+
+- `frontend/app/app/<slug>/page.js`
+- `backend/app/routes/<slug>.py`
+- `backend/app/services/<slug>.py`
+- `backend/tests/test_<slug>_api_flow.py`
+- route registration in `backend/app/main.py`
+
+Use it when the next feature is another admin/resource surface inside DeployMate itself, not when bootstrapping a brand-new product.
 
 ## Product Starter
 
