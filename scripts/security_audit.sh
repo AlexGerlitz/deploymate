@@ -28,12 +28,20 @@ trap cleanup EXIT
 echo "[security-audit] repo: $ROOT_DIR"
 
 TRACKED_FILES=()
-while IFS= read -r file; do
-  TRACKED_FILES+=("$file")
-done < <(git ls-files)
+if [ "${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}" = "changed" ] && [ -n "${DEPLOYMATE_CHANGED_FILES:-}" ]; then
+  while IFS= read -r file; do
+    [ -n "$file" ] && [ -f "$file" ] && TRACKED_FILES+=("$file")
+  done <<< "$DEPLOYMATE_CHANGED_FILES"
+  echo "[security-audit] file scope: changed files"
+else
+  while IFS= read -r file; do
+    TRACKED_FILES+=("$file")
+  done < <(git ls-files)
+  echo "[security-audit] file scope: full tracked files"
+fi
 
 if [ "${#TRACKED_FILES[@]}" -eq 0 ]; then
-  echo "[security-audit] no tracked files"
+  echo "[security-audit] no files in current scope"
   exit 0
 fi
 
@@ -94,14 +102,18 @@ if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FIL
   WARNINGS=1
 fi
 
-if [ -f "scripts/release_workflow_audit.sh" ]; then
+if [ -f "scripts/release_workflow_audit.sh" ] && [ "${DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT:-1}" = "1" ]; then
   echo "[security-audit] release workflow audit"
   bash scripts/release_workflow_audit.sh
+elif [ -f "scripts/release_workflow_audit.sh" ]; then
+  echo "[security-audit] release workflow audit skipped for this local diff"
 fi
 
-if [ -f "scripts/server_credentials_audit.sh" ]; then
+if [ -f "scripts/server_credentials_audit.sh" ] && [ "${DEPLOYMATE_RUN_SERVER_CREDENTIALS_AUDIT:-1}" = "1" ]; then
   echo "[security-audit] server credentials audit"
   bash scripts/server_credentials_audit.sh
+elif [ -f "scripts/server_credentials_audit.sh" ]; then
+  echo "[security-audit] server credentials audit skipped for this local diff"
 fi
 
 if [ -f "scripts/local_runtime_audit.sh" ]; then

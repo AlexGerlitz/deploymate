@@ -133,6 +133,7 @@ reason=""
 backend_changed_files=()
 frontend_changed_files=()
 runtime_audit_reason=""
+security_audit_reason=""
 while IFS='=' read -r key value; do
   case "$key" in
     surface)
@@ -175,6 +176,32 @@ while IFS='=' read -r key value; do
 done <<< "$runtime_audit_output"
 
 echo "[dev-verify-changed] runtime audits: ${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1} (${runtime_audit_reason})"
+
+security_audit_output="$(bash scripts/detect_security_audit_scope.sh "${changed_files[@]}")"
+printf '%s\n' "$security_audit_output"
+while IFS='=' read -r key value; do
+  case "$key" in
+    security_audit_scope)
+      DEPLOYMATE_SECURITY_AUDIT_SCOPE="$value"
+      export DEPLOYMATE_SECURITY_AUDIT_SCOPE
+      ;;
+    run_release_workflow_audit)
+      DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT="$value"
+      export DEPLOYMATE_RUN_RELEASE_WORKFLOW_AUDIT
+      ;;
+    run_server_credentials_audit)
+      DEPLOYMATE_RUN_SERVER_CREDENTIALS_AUDIT="$value"
+      export DEPLOYMATE_RUN_SERVER_CREDENTIALS_AUDIT
+      ;;
+    reason)
+      security_audit_reason="$value"
+      ;;
+  esac
+done <<< "$security_audit_output"
+
+DEPLOYMATE_CHANGED_FILES="$(printf '%s\n' "${changed_files[@]}")"
+export DEPLOYMATE_CHANGED_FILES
+echo "[dev-verify-changed] security audit: ${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full} (${security_audit_reason})"
 
 echo "[dev-verify-changed] running fast gate for surface: $surface"
 if [ "$surface" = "backend" ] || [ "$surface" = "full" ]; then

@@ -227,6 +227,7 @@ The fast gate intentionally uses fewer resources:
 - the heavier frontend gate also reuses shared smoke servers for the main smoke pack
 - repeated local audits are cached within one gate run, so nested security/runtime checks do not repeat unnecessarily
 - local changed-file verification now skips runtime-oriented audits automatically when the diff does not touch deploy/runtime contract files
+- local changed-file verification now narrows `security_audit` to the changed files and skips nested release/credentials audits unless the diff touches those contracts
 - local preflight and release flows now print a timing summary so the slowest phase is obvious after each run
 - local preflight and release flows now append timing data into `.logs/local_gate_timing.csv`, so you can compare runs over time
 - `make timing-history` prints the latest local timing rows without opening the CSV manually
