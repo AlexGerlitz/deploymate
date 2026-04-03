@@ -46,6 +46,12 @@ const planCards = [
     features: ["Up to 10 servers", "Up to 100 deployments", "Custom onboarding"],
   },
 ];
+const commercialUseCases = [
+  "Internal company rollout tooling",
+  "Client project or agency delivery",
+  "Commercial SaaS or managed service",
+  "Redistribution, white-label, or resale",
+];
 
 export default function UpgradePage() {
   const router = useRouter();
@@ -133,13 +139,13 @@ export default function UpgradePage() {
       <div className="container">
         <div className="header">
           <div>
-            <h1>Upgrade DeployMate</h1>
+            <h1>Plans and commercial licensing</h1>
             <p>
               {loadingUser
                 ? "Loading plan..."
                 : currentUser
                   ? `Current plan: ${currentUser.plan}`
-                  : "Request trial or upgrade access"}
+                  : "Request trial, team, or commercial-use access"}
             </p>
           </div>
           <div className="buttonRow">
@@ -157,6 +163,10 @@ export default function UpgradePage() {
         <article className="card formCard">
           <div className="sectionHeader">
             <h2>Plans</h2>
+            <p className="formHint">
+              Trial and paid plans cover normal product access. Commercial use of the public codebase
+              still requires a separate license.
+            </p>
           </div>
           <div className="pricingGrid">
             {planCards.map((plan) => (
@@ -189,9 +199,54 @@ export default function UpgradePage() {
           </div>
         ) : null}
 
+        <article className="card formCard onboardingCard">
+          <div className="sectionHeader">
+            <div>
+              <h2>Commercial use policy</h2>
+              <p className="formHint">
+                DeployMate is source-available under a noncommercial public license. Business use,
+                internal company use, client work, SaaS use, resale, and redistribution require a
+                separate commercial license.
+              </p>
+            </div>
+            <a
+              href="https://github.com/AlexGerlitz/deploymate/blob/main/COMMERCIAL-LICENSE.md"
+              className="linkButton"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Read policy
+            </a>
+          </div>
+
+          <div className="overviewGrid">
+            <article className="overviewCard">
+              <span className="overviewLabel">Use the public license when</span>
+              <div className="overviewMeta">
+                <span>Personal evaluation or hobby use</span>
+                <span>Research, learning, or noncommercial experimentation</span>
+                <span>Educational or internal noncommercial review</span>
+              </div>
+            </article>
+            <article className="overviewCard">
+              <span className="overviewLabel">Request a commercial license when</span>
+              <div className="overviewMeta">
+                {commercialUseCases.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </article>
+          </div>
+        </article>
+
         <article className="card formCard">
           <div className="sectionHeader">
-            <h2>Request upgrade</h2>
+            <div>
+              <h2>Request plan or commercial access</h2>
+              <p className="formHint">
+                Use this form for paid plans, team onboarding, or a separate commercial license request.
+              </p>
+            </div>
           </div>
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
@@ -234,13 +289,13 @@ export default function UpgradePage() {
                 value={form.use_case}
                 onChange={updateFormField}
                 disabled={submitting}
-                placeholder="What are you deploying, how many apps or servers do you need, and what plan are you interested in?"
+                placeholder="What are you deploying, how many apps or servers do you need, and are you asking for a paid plan or a commercial license?"
               />
             </label>
 
             <div className="formActions">
               <button type="submit" disabled={submitting}>
-                {submitting ? "Submitting..." : "Request upgrade"}
+                {submitting ? "Submitting..." : "Send request"}
               </button>
             </div>
           </form>

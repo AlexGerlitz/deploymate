@@ -493,9 +493,10 @@ export default function LandingPage() {
                 <li>Up to 100 deployments</li>
                 <li>Workflow tuning for internal teams</li>
                 <li>Custom onboarding</li>
+                <li>Commercial licensing path</li>
               </ul>
               <Link href="/upgrade" className="landingButton secondaryButton">
-                Talk to sales
+                Talk to sales / licensing
               </Link>
             </article>
           </div>
