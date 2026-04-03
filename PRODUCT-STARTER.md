@@ -26,6 +26,7 @@ The goal of the starter is simple:
   - `docs/ARCHITECTURE.md`
   - `docs/ROADMAP.md`
 - optional automation core bootstrap during starter install
+- first-resource scaffolding for the first real product slice
 
 ## Fastest path
 
@@ -42,6 +43,14 @@ That gives you:
 - app/auth/admin skeleton pages
 - backend starter routes and services
 - automation core installed into the same target repo
+
+After that, the next fastest move is:
+
+```bash
+bash scripts/scaffold_product_resource.sh /absolute/path/to/project --name "Projects" --slug projects --frontend-dir web --backend-dir api
+```
+
+So the project starts moving from shell to actual product workflow immediately.
 
 ## Why this matters
 

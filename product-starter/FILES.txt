@@ -23,3 +23,4 @@ product-starter/templates/backend/app/services/__init__.py
 product-starter/templates/backend/app/services/auth.py
 scripts/bootstrap_product_starter.sh
 scripts/export_product_starter.sh
+scripts/scaffold_product_resource.sh

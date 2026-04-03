@@ -195,6 +195,12 @@ That gives the new repo:
 - starter docs
 - reusable automation core
 
+Then immediately scaffold the first product slice:
+
+```bash
+make scaffold-product-resource TARGET_DIR=/absolute/path/to/project RESOURCE_FLAGS="--name Projects --slug projects --frontend-dir web --backend-dir api"
+```
+
 Recommended PR-first daily flow:
 
 ```bash

@@ -41,3 +41,19 @@ make changed
 make profile-changed
 make dev-doctor
 ```
+
+## First real feature slice
+
+After bootstrap, generate the first resource scaffold with:
+
+```bash
+bash scripts/scaffold_product_resource.sh /absolute/path/to/project --name "Projects" --slug projects --frontend-dir web --backend-dir api
+```
+
+That gives the new repo:
+
+- one frontend resource page shell
+- one backend route stub
+- one backend service stub
+- schema placeholders
+- a docs reminder that this should become the first real feature
