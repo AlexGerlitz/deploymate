@@ -120,6 +120,8 @@ PY_SLUG="${SURFACE_SLUG//-/_}"
 API_PREFIX="${API_PREFIX:-/$SURFACE_SLUG}"
 
 frontend_page_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/page.js"
+frontend_data_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-data.js"
+frontend_actions_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-actions.js"
 backend_route_path="$TARGET_DIR/backend/app/routes/$PY_SLUG.py"
 backend_service_path="$TARGET_DIR/backend/app/services/$PY_SLUG.py"
 backend_test_path="$TARGET_DIR/backend/tests/test_${PY_SLUG}_api_flow.py"
@@ -925,6 +927,62 @@ EOF
 )"
 fi
 
+safe_write "$frontend_data_path" "$(cat <<EOF
+export const sampleItems = ${SAMPLE_ITEMS_FRONTEND};
+export const starterMetrics = ${METRICS_JS};
+export const segmentFilterOptions = ${SEGMENT_FILTER_OPTIONS};
+export const bulkStatusOptions = ${BULK_STATUS_OPTIONS};
+
+export const starterStrings = {
+  searchPlaceholder: "${SEARCH_PLACEHOLDER}",
+  queueTitle: "${QUEUE_TITLE}",
+  queueDescription: "${QUEUE_DESCRIPTION}",
+  summaryTitle: "${SUMMARY_TITLE}",
+  summaryDescription: "${SUMMARY_DESCRIPTION}",
+  spotlightBody: "${SPOTLIGHT_BODY}",
+  segmentFilterLabel: "${SEGMENT_FILTER_LABEL}",
+  segmentFilterDefault: "${SEGMENT_FILTER_DEFAULT}",
+  cardMetaLabel: "${CARD_META_LABEL}",
+  actionSectionTitle: "${ACTION_SECTION_TITLE}",
+  actionSectionDescription: "${ACTION_SECTION_DESCRIPTION}",
+  actionFocusHint: "${ACTION_FOCUS_HINT}",
+  actionNotePlaceholder: "${ACTION_NOTE_PLACEHOLDER}",
+  primaryActionLabel: "${PRIMARY_ACTION_LABEL}",
+  secondaryActionLabel: "${SECONDARY_ACTION_LABEL}",
+  bulkSectionTitle: "${BULK_SECTION_TITLE}",
+  bulkSectionDescription: "${BULK_SECTION_DESCRIPTION}",
+  bulkPresetOneLabel: "${BULK_PRESET_ONE_LABEL}",
+  bulkPresetOneSegment: "${BULK_PRESET_ONE_SEGMENT}",
+  bulkPresetTwoLabel: "${BULK_PRESET_TWO_LABEL}",
+  bulkPresetTwoSegment: "${BULK_PRESET_TWO_SEGMENT}",
+  bulkApplyLabel: "${BULK_APPLY_LABEL}",
+  mutationRouteLabel: "${MUTATION_ROUTE_LABEL}",
+};
+EOF
+)"
+
+safe_write "$frontend_actions_path" "$(cat <<EOF
+export function buildStarterMutationPreview(selectedItem, actionNote) {
+  if (!selectedItem) {
+    return null;
+  }
+
+  return ${MUTATION_PAYLOAD_JS};
+}
+
+export function buildStarterSummaryMetrics(filteredItems) {
+  const segmentCounts = filteredItems.reduce((acc, item) => {
+    acc[item.segment] = (acc[item.segment] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(segmentCounts)
+    .map(([segment, count]) => \`\${segment} · \${count}\`)
+    .join(" / ");
+}
+EOF
+)"
+
 safe_write "$frontend_page_path" "$(cat <<EOF
 "use client";
 
@@ -938,11 +996,17 @@ ${hook_imports}
 import {
 ${utils_imports}
 } from "../../lib/admin-page-utils";
-
-const sampleItems = ${SAMPLE_ITEMS_FRONTEND};
-const starterMetrics = ${METRICS_JS};
-const segmentFilterOptions = ${SEGMENT_FILTER_OPTIONS};
-const bulkStatusOptions = ${BULK_STATUS_OPTIONS};
+import {
+  bulkStatusOptions,
+  sampleItems,
+  segmentFilterOptions,
+  starterMetrics,
+  starterStrings,
+} from "./starter-data";
+import {
+  buildStarterMutationPreview,
+  buildStarterSummaryMetrics,
+} from "./starter-actions";
 
 ${constants_block}
 ${helpers_block}
@@ -999,14 +1063,7 @@ ${audit_state_block}
     });
   }, [currentFilters.q, currentFilters.segment, items]);
   const summaryMetrics = useMemo(() => {
-    const segmentCounts = filteredItems.reduce((acc, item) => {
-      acc[item.segment] = (acc[item.segment] || 0) + 1;
-      return acc;
-    }, {});
-    const segmentSummary = Object.entries(segmentCounts)
-      .map(([segment, count]) => \`\${segment} · \${count}\`)
-      .join(" / ");
-
+    const segmentSummary = buildStarterSummaryMetrics(filteredItems);
     if (!segmentSummary) {
       return starterMetrics;
     }
@@ -1026,9 +1083,7 @@ ${audit_state_block}
     || items[0]
     || null;
   const selectedItems = items.filter((item) => selectedItemIds.includes(item.id));
-  const starterMutationPreview = selectedItem
-    ? ${MUTATION_PAYLOAD_JS}
-    : null;
+  const starterMutationPreview = buildStarterMutationPreview(selectedItem, actionNote);
 ${export_helpers_block}
 
   function handleSelectItem(itemId) {
@@ -1175,20 +1230,20 @@ ${export_helpers_block}
       />
 
       <AdminSurfaceSummary
-        title="${SUMMARY_TITLE}"
-        description="${SUMMARY_DESCRIPTION}"
+        title={starterStrings.summaryTitle}
+        description={starterStrings.summaryDescription}
         metrics={summaryMetrics}
         spotlightTitle="${SURFACE_NAME}"
-        spotlightBody="${SPOTLIGHT_BODY}"
+        spotlightBody={starterStrings.spotlightBody}
       />
 
       <AdminSurfaceQueue
-        title="${QUEUE_TITLE}"
-        description="${QUEUE_DESCRIPTION}"
+        title={starterStrings.queueTitle}
+        description={starterStrings.queueDescription}
         searchLabel="Search ${SURFACE_NAME}"
         searchValue={query}
         onSearchChange={(event) => setQuery(event.target.value)}
-        searchPlaceholder="${SEARCH_PLACEHOLDER}"
+        searchPlaceholder={starterStrings.searchPlaceholder}
         searchTestId="${SURFACE_SLUG}-search"
         emptyTestId="${SURFACE_SLUG}-empty"
         emptyText="No items match the current search."
@@ -1196,7 +1251,7 @@ ${export_helpers_block}
       >
         <AdminActiveFilters filters={activeFilterChips} />
         <label className="field">
-          <span>${SEGMENT_FILTER_LABEL}</span>
+          <span>{starterStrings.segmentFilterLabel}</span>
           <select
             data-testid="${SURFACE_SLUG}-segment-filter"
             value={segmentFilter}
@@ -1217,10 +1272,10 @@ ${export_helpers_block}
             status={item.id === selectedItemId ? \`\${item.status} · focused\` : item.status}
           >
             <p className="formHint">
-              <strong>${CARD_META_LABEL}:</strong> {item.meta}
+              <strong>{starterStrings.cardMetaLabel}:</strong> {item.meta}
             </p>
             <p className="formHint">
-              <strong>${SEGMENT_FILTER_LABEL}:</strong> {item.segment}
+              <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
             </p>
             <div className="adminFilterActions">
               <button
@@ -1264,15 +1319,15 @@ ${export_helpers_block}
 
       <AdminSurfaceActionStarter
         title="${ACTION_SECTION_TITLE}"
-        description={\`${ACTION_SECTION_DESCRIPTION} ${ACTION_FOCUS_HINT}\`}
+        description={\`\${starterStrings.actionSectionDescription} \${starterStrings.actionFocusHint}\`}
         testId="${SURFACE_SLUG}-action-starter"
         status={selectedItem?.status || ""}
         item={selectedItem}
         noteValue={actionNote}
         onNoteChange={(event) => setActionNote(event.target.value)}
-        notePlaceholder="${ACTION_NOTE_PLACEHOLDER}"
-        primaryActionLabel="${PRIMARY_ACTION_LABEL}"
-        secondaryActionLabel="${SECONDARY_ACTION_LABEL}"
+        notePlaceholder={starterStrings.actionNotePlaceholder}
+        primaryActionLabel={starterStrings.primaryActionLabel}
+        secondaryActionLabel={starterStrings.secondaryActionLabel}
         onPrimaryAction={() => handleRunStarterAction("primary")}
         onSecondaryAction={() => handleRunStarterAction("secondary")}
         actionDisabled={selectedItem ? actionLoadingId === selectedItem.id : true}
@@ -1280,19 +1335,19 @@ ${export_helpers_block}
       />
 
       <AdminSurfaceBulkStarter
-        title="${BULK_SECTION_TITLE}"
-        description="${BULK_SECTION_DESCRIPTION}"
+        title={starterStrings.bulkSectionTitle}
+        description={starterStrings.bulkSectionDescription}
         testId="${SURFACE_SLUG}-bulk-starter"
-        presetOneLabel="${BULK_PRESET_ONE_LABEL}"
-        onPresetOne={() => handleApplyBulkPreset("${BULK_PRESET_ONE_SEGMENT}")}
-        presetTwoLabel="${BULK_PRESET_TWO_LABEL}"
-        onPresetTwo={() => handleApplyBulkPreset("${BULK_PRESET_TWO_SEGMENT}")}
+        presetOneLabel={starterStrings.bulkPresetOneLabel}
+        onPresetOne={() => handleApplyBulkPreset(starterStrings.bulkPresetOneSegment)}
+        presetTwoLabel={starterStrings.bulkPresetTwoLabel}
+        onPresetTwo={() => handleApplyBulkPreset(starterStrings.bulkPresetTwoSegment)}
         selectedCount={selectedItemIds.length}
         visibleCount={filteredItems.length}
         statusValue={bulkStatusValue}
         onStatusChange={(event) => setBulkStatusValue(event.target.value)}
         statusOptions={bulkStatusOptions}
-        applyLabel="${BULK_APPLY_LABEL}"
+        applyLabel={starterStrings.bulkApplyLabel}
         onApply={handleApplyBulkAction}
         applyDisabled={!selectedItemIds.length || !bulkStatusValue}
       />
@@ -1300,7 +1355,7 @@ ${export_helpers_block}
       <AdminSurfaceMutationPreview
         description="Use this payload preview to wire the first real write path instead of inventing request shape from scratch."
         testId="${SURFACE_SLUG}-mutation-starter"
-        routeLabel="${MUTATION_ROUTE_LABEL}"
+        routeLabel={starterStrings.mutationRouteLabel}
         selectedSummary={selectedItems.map((item) => item.label).join(", ") || "Nothing selected"}
         payload={starterMutationPreview}
       />

@@ -343,6 +343,12 @@ The scaffold is now also entity-aware inside the generated page itself:
 - bulk starter actions tied to the visible slice
 - mutation payload preview for the first real write path
 
+The generated surface now also ships in a more maintainable shape:
+
+- `page.js` as the orchestration layer
+- `starter-data.js` for preset data and strings
+- `starter-actions.js` for mutation preview and slice helpers
+
 ## Product Starter
 
 Automation core is no longer the only reusable layer here.
