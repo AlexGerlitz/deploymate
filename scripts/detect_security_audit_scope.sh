@@ -17,8 +17,7 @@ reason="changed files limited to local verification scope"
 
 for path in "$@"; do
   case "$path" in
-    .github/*|RUNBOOK.md|SAFE-RELEASE.md|scripts/release_workflow.sh|scripts/release_workflow_audit.sh|scripts/remote_release.sh|scripts/preflight.sh|scripts/security_audit.sh)
-      security_scope="full"
+    .github/*|RUNBOOK.md|SAFE-RELEASE.md|scripts/release_workflow.sh|scripts/release_workflow_audit.sh|scripts/remote_release.sh|scripts/preflight.sh|scripts/security_audit.sh|scripts/dev_fast_check.sh|scripts/dev_verify_changed.sh|scripts/derive_local_fast_context.sh)
       run_release_workflow_audit=1
       reason="release workflow contract changed"
       ;;
