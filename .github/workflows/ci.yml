@@ -145,7 +145,6 @@ jobs:
     needs:
       - detect-changes
       - release-gate
-      - release-gate-skipped
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/develop' &&
