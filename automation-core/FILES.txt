@@ -1,5 +1,8 @@
+.gitignore
 AUTOMATION-CORE.md
 Makefile
+automation-core/FILES.txt
+automation-core/README.md
 scripts/audit_cache.sh
 scripts/derive_local_fast_context.sh
 scripts/dev_fast_check.sh
@@ -33,7 +36,10 @@ scripts/detect_backend_fast_scope.sh
 scripts/detect_runtime_audit_need.sh
 scripts/detect_backend_syntax_scope.sh
 scripts/detect_security_audit_scope.sh
+scripts/export_automation_core.sh
 scripts/project_automation_config.sh
+scripts/project_automation_smoke_checks.sh
 scripts/project_automation_targets.sh
+scripts/lib/frontend_smoke_checks.sh
 scripts/lib/project_automation.sh
 scripts/lib/project_automation_targets.sh

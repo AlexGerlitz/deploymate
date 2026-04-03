@@ -32,5 +32,8 @@ Two adapter files are expected to change first in another project:
 
 - `scripts/project_automation_config.sh`
 - `scripts/project_automation_targets.sh`
+- `scripts/project_automation_smoke_checks.sh`
 
 Everything else is intended to be the reusable core.
+
+The fast auth/ops/runtime smoke layer already reads checks from this adapter instead of hardcoding DeployMate page assertions inside the core scripts.

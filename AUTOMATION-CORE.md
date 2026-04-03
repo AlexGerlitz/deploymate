@@ -62,8 +62,9 @@ The adapter split is now two-layered:
 
 - `scripts/project_automation_config.sh`: directory and route assumptions
 - `scripts/project_automation_targets.sh`: path-to-surface, path-to-smoke, path-to-test, and path-to-audit rules
+- `scripts/project_automation_smoke_checks.sh`: reusable fast-smoke routes and assertions
 
-That means a new project can usually keep the orchestration scripts and only replace these two adapter files.
+That means a new project can usually keep the orchestration scripts and only replace these adapter files.
 
 That turns this from one-off repo glue into an automation base you can reuse.
 
@@ -80,3 +81,17 @@ The easiest path is:
 5. sync selected changes back into product repos
 
 That gives you a private optimization base while keeping product repos independent.
+
+## What Is Already Portable
+
+These parts are now explicitly adapter-driven:
+
+- project layout
+- path classification
+- release surface rules
+- frontend fast smoke target rules
+- backend test target rules
+- security/runtime scope rules
+- frontend fast smoke assertions
+
+The remaining heavier admin/restore/template smoke packs are still more product-shaped and can be split further if you want the core to become even cleaner.
