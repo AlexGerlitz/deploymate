@@ -682,6 +682,65 @@ summary:focus-visible {
   flex-wrap: wrap;
 }
 
+.adminSurfaceTableWrap {
+  overflow-x: auto;
+  margin-top: 14px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.adminSurfaceTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.adminSurfaceTable th,
+.adminSurfaceTable td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(19, 34, 56, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.adminSurfaceTable th {
+  color: #5f6675;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(246, 249, 252, 0.96);
+}
+
+.adminSurfaceTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.adminSurfaceTable tbody tr.isSelected td {
+  background: rgba(240, 181, 90, 0.12);
+}
+
+.adminSurfaceTablePrimary {
+  display: grid;
+  gap: 4px;
+}
+
+.adminSurfaceTablePrimary strong {
+  color: #132238;
+}
+
+.adminSurfaceTablePrimary p {
+  margin: 0;
+}
+
+.adminSurfaceTableActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 170px;
+}
+
 .adminPageHero {
   margin-bottom: 18px;
 }
@@ -2742,6 +2801,7 @@ button.landingButton.primaryButton:disabled {
   }
 
   .adminSavedViewActions,
+  .adminSurfaceTableActions,
   .overviewActionRail,
   .backupActionGroup,
   .actions {

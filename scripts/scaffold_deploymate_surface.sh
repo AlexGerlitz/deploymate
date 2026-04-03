@@ -10,6 +10,7 @@ FORCE=0
 WITH_SAVED_VIEWS=0
 WITH_AUDIT=0
 WITH_EXPORT=0
+WITH_TABLE=0
 PRESET="generic"
 
 usage() {
@@ -23,6 +24,7 @@ Options:
   --with-saved-views     Include a saved-views starter section in the generated page
   --with-audit           Include an audit starter section in the generated page
   --with-export          Include an export/recovery starter section in the generated page
+  --with-table           Include a review-table starter section in the generated page
   --force                Overwrite generated files if they already exist
 EOF
 }
@@ -74,6 +76,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --with-export)
       WITH_EXPORT=1
+      shift
+      ;;
+    --with-table)
+      WITH_TABLE=1
       shift
       ;;
     --force)
@@ -572,6 +578,20 @@ audit_state_block=""
 audit_section=""
 export_helpers_block=""
 export_section=""
+table_section=""
+smoke_table_check_block=""
+
+if [ "$WITH_TABLE" = "1" ]; then
+  admin_ui_imports="${admin_ui_imports}
+  AdminSurfaceTable,"
+  smoke_table_check_block="$(cat <<EOF
+  {
+    label: "Review table starter",
+    pattern: 'data-testid="${SURFACE_SLUG}-table"',
+  },
+EOF
+)"
+fi
 
 if [ "$WITH_SAVED_VIEWS" = "1" ]; then
   admin_ui_imports="${admin_ui_imports}
@@ -930,6 +950,55 @@ EOF
 )"
 fi
 
+if [ "$WITH_TABLE" = "1" ]; then
+  table_section="$(cat <<EOF
+
+      <AdminSurfaceTable
+        title="Review table starter"
+        description="Use this alongside the queue cards when the first real admin flow needs denser scanning across status, context, and workflow slice."
+        columns={starterTableColumns}
+        rows={visibleTableRows}
+        rowKey={(row) => row.id}
+        selectedRowId={selectedItemId}
+        emptyText="No rows match the current search."
+        emptyTestId="${SURFACE_SLUG}-table-empty"
+        tableTestId="${SURFACE_SLUG}-table"
+        renderCell={(row, column) => {
+          if (column.key === "label") {
+            return (
+              <div className="adminSurfaceTablePrimary">
+                <strong>{row.label}</strong>
+                <p className="formHint">{row.note}</p>
+              </div>
+            );
+          }
+          return row[column.key];
+        }}
+        renderActions={(row) => (
+          <>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid={\`\${row.id}-table-select\`}
+              onClick={() => handleToggleSelection(row.id)}
+            >
+              {selectedItemIds.includes(row.id) ? "Selected" : "Select"}
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid={\`\${row.id}-table-focus\`}
+              onClick={() => handleSelectItem(row.id)}
+            >
+              {row.id === selectedItemId ? "Focused" : "Focus"}
+            </button>
+          </>
+        )}
+      />
+EOF
+)"
+fi
+
 safe_write "$frontend_data_path" "$(cat <<EOF
 export const sampleItems = ${SAMPLE_ITEMS_FRONTEND};
 export const starterMetrics = ${METRICS_JS};
@@ -961,6 +1030,14 @@ export const starterStrings = {
   bulkApplyLabel: "${BULK_APPLY_LABEL}",
   mutationRouteLabel: "${MUTATION_ROUTE_LABEL}",
 };
+
+export const starterTableColumns = [
+  { key: "label", label: "Queue item" },
+  { key: "status", label: "Status" },
+  { key: "meta", label: "${CARD_META_LABEL}" },
+  { key: "segment", label: "${SEGMENT_FILTER_LABEL}" },
+];
+
 export const starterRuntimeMode = "local";
 EOF
 )"
@@ -1034,6 +1111,7 @@ export const starterSmokeChecks = [
     label: "Primary queue search",
     pattern: 'data-testid="${SURFACE_SLUG}-search"',
   },
+${smoke_table_check_block}
   {
     label: "Starter action panel",
     pattern: 'data-testid="${SURFACE_SLUG}-action-starter"',
@@ -1127,6 +1205,7 @@ import {
   segmentFilterOptions,
   starterMetrics,
   starterRuntimeMode,
+  starterTableColumns,
   starterStrings,
 } from "./starter-data";
 import {
@@ -1359,6 +1438,15 @@ ${export_helpers_block}
     });
   }, [pathname, router, searchParams, syncedSearchParams]);
 
+  const visibleTableRows = useMemo(
+    () =>
+      filteredItems.map((item) => ({
+        ...item,
+        status: item.id === selectedItemId ? \`\${item.status} · focused\` : item.status,
+      })),
+    [filteredItems, selectedItemId],
+  );
+
   return (
     <main className="workspaceShell">
       <AdminPageHeader
@@ -1486,6 +1574,7 @@ ${export_helpers_block}
           </AdminSurfaceQueueCard>
         ))}
       </AdminSurfaceQueue>
+${table_section}
 
       <AdminSurfaceActionStarter
         title="${ACTION_SECTION_TITLE}"
@@ -1848,6 +1937,7 @@ cat <<EOF
 [scaffold-deploymate-surface] api prefix: $API_PREFIX
 [scaffold-deploymate-surface] preset: $PRESET
 [scaffold-deploymate-surface] frontend options:
+  - table: $WITH_TABLE
   - saved views: $WITH_SAVED_VIEWS
   - audit: $WITH_AUDIT
   - export: $WITH_EXPORT

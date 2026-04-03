@@ -496,6 +496,71 @@ export function AdminSurfaceQueueCard({ title, body, status, children }) {
   );
 }
 
+export function AdminSurfaceTable({
+  title,
+  description,
+  columns = [],
+  rows = [],
+  rowKey = (row) => row.id,
+  selectedRowId = "",
+  emptyText,
+  emptyTestId,
+  tableTestId,
+  renderCell,
+  renderActions,
+}) {
+  return (
+    <article className="card formCard">
+      <div className="sectionHeader">
+        <div>
+          <h2>{title}</h2>
+          <p className="formHint">{description}</p>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <div className="empty" data-testid={emptyTestId}>
+          {emptyText}
+        </div>
+      ) : (
+        <div className="adminSurfaceTableWrap">
+          <table className="adminSurfaceTable" data-testid={tableTestId}>
+            <thead>
+              <tr>
+                {columns.map((column) => (
+                  <th key={column.key} scope="col">
+                    {column.label}
+                  </th>
+                ))}
+                {renderActions ? <th scope="col">Actions</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const key = rowKey(row);
+                const isSelected = key === selectedRowId;
+                return (
+                  <tr key={key} className={isSelected ? "isSelected" : ""}>
+                    {columns.map((column) => (
+                      <td key={column.key} data-label={column.label}>
+                        {renderCell ? renderCell(row, column) : row[column.key]}
+                      </td>
+                    ))}
+                    {renderActions ? (
+                      <td data-label="Actions">
+                        <div className="adminSurfaceTableActions">{renderActions(row)}</div>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
+  );
+}
+
 export function AdminSurfaceActionStarter({
   title,
   description,

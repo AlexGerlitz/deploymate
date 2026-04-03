@@ -273,7 +273,8 @@ make scaffold-deploymate-surface SURFACE_FLAGS="--name Review Inbox --slug revie
 That gives you the frontend page shell, backend route/service stub, backend API flow test, and `backend/app/main.py` registration in one pass.
 The generated page now also uses shared review-shell blocks from `frontend/app/app/admin-ui.js`, so new admin surfaces start from the same summary-and-queue pattern instead of ad hoc JSX.
 The backend side now also gets typed response models in `backend/app/schemas.py`, a built-in `q` filter path, and a generated API flow test for both default and filtered list responses.
-Add `--with-saved-views`, `--with-audit`, and `--with-export` when the first useful version of the surface should already include those secondary sections.
+Add `--with-table`, `--with-saved-views`, `--with-audit`, and `--with-export` when the first useful version of the surface should already include those richer review sections.
+`--with-table` adds a denser starter table over the same queue data, so the first real operator pass can compare status, context, and workflow slice without hand-building a second view.
 Those richer flags now also generate real starter wiring for URL state, filter chips, saved-views manager hooks, audit filtering, and local JSON/CSV exports, so the surface starts closer to a live DeployMate workflow than a blank mock.
 Add `--preset users`, `--preset upgrade-requests`, or `--preset servers` when the feature already clearly matches one of those common DeployMate surface families.
 Presets now also change the starter action flow itself, so the generated surface already includes the first local decision pattern for that family instead of a queue-only mock.

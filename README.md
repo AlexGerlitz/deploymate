@@ -296,12 +296,13 @@ For a richer first pass, the same scaffold can also add optional sections:
 
 ```bash
 make scaffold-deploymate-surface \
-  SURFACE_FLAGS="--name Review Inbox --slug review-inbox --with-saved-views --with-audit --with-export"
+  SURFACE_FLAGS="--name Review Inbox --slug review-inbox --with-table --with-saved-views --with-audit --with-export"
 ```
 
 These flags let the generator start with:
 
 - base queue-only surface
+- queue + table review starter
 - queue + saved views
 - queue + audit
 - queue + export/recovery notes
@@ -311,6 +312,7 @@ The generated page is now more than a static mock:
 
 - URL/search-param sync for the primary query
 - active filter chips
+- optional review-table starter for denser scanning across the same queue data
 - saved-views manager wiring when `--with-saved-views` is enabled
 - audit filter/sort starter wiring when `--with-audit` is enabled
 - working local JSON/CSV starter exports when `--with-export` is enabled
