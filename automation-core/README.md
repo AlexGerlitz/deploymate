@@ -50,6 +50,18 @@ Or through `make`:
 make upgrade-core TARGET_DIR=/absolute/path/to/project
 ```
 
+To inspect version, integrity, and drift before upgrading:
+
+```bash
+bash scripts/automation_core_doctor.sh /absolute/path/to/project
+```
+
+Or through `make`:
+
+```bash
+make doctor-core TARGET_DIR=/absolute/path/to/project
+```
+
 ## What stays project-specific
 
 Two adapter files are expected to change first in another project:

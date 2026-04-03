@@ -3,6 +3,7 @@ AUTOMATION-CORE.md
 Makefile
 automation-core/FILES.txt
 automation-core/README.md
+automation-core/VERSION
 scripts/audit_cache.sh
 scripts/derive_local_fast_context.sh
 scripts/dev_fast_check.sh
@@ -43,5 +44,6 @@ scripts/project_automation_config.sh
 scripts/project_automation_smoke_checks.sh
 scripts/project_automation_targets.sh
 scripts/lib/frontend_smoke_checks.sh
+scripts/lib/automation_core_bundle.sh
 scripts/lib/project_automation.sh
 scripts/lib/project_automation_targets.sh

@@ -3,13 +3,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MANIFEST_FILE="$ROOT_DIR/automation-core/FILES.txt"
+source "${ROOT_DIR}/scripts/lib/automation_core_bundle.sh"
+MANIFEST_FILE="$(automation_core_manifest_file "$ROOT_DIR")"
 OUTPUT_DIR="${1:-$ROOT_DIR/automation-core-dist}"
 
-if [ ! -f "$MANIFEST_FILE" ]; then
-  echo "[export-automation-core] manifest missing: $MANIFEST_FILE" >&2
-  exit 1
-fi
+automation_core_validate_manifest "$ROOT_DIR"
 
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
@@ -37,6 +35,8 @@ cat > "$OUTPUT_DIR/README.md" <<'EOF'
 # Exported Automation Core
 
 This bundle was exported from DeployMate so the automation layer can be reused elsewhere.
+
+Core version: VERSION_PLACEHOLDER
 
 Recommended first edits in a new project:
 
@@ -134,5 +134,8 @@ bash scripts/upgrade_project_automation.sh /absolute/path/to/project --force --i
 ```
 EOF
 
+perl -0pi -e 's/VERSION_PLACEHOLDER/'"$(automation_core_version "$ROOT_DIR" | sed 's/[\/&]/\\&/g')"'/g' "$OUTPUT_DIR/README.md"
+
 echo "[export-automation-core] bundle written to: $OUTPUT_DIR"
 echo "[export-automation-core] manifest: $MANIFEST_FILE"
+echo "[export-automation-core] core version: $(automation_core_version "$ROOT_DIR")"

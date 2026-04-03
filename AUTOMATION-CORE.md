@@ -101,6 +101,7 @@ This repo now includes:
 
 - `scripts/bootstrap_project_automation.sh`
 - `scripts/upgrade_project_automation.sh`
+- `scripts/automation_core_doctor.sh`
 
 It installs the manifest files into another project root, skips existing files by default, and only overwrites them when `--force` is passed explicitly.
 
@@ -109,6 +110,13 @@ The upgrade helper is stricter by default:
 - reusable core files can be refreshed in place
 - adapter files stay untouched unless `--include-adapters` is passed
 - changed existing files stay untouched unless `--force` is passed
+
+The doctor helper reports:
+
+- source core version
+- target installed version
+- reusable-core drift or missing files
+- adapter drift separately from core drift
 
 ## What Is Already Portable
 

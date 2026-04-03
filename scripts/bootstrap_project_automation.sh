@@ -4,7 +4,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-MANIFEST="${REPO_ROOT}/automation-core/FILES.txt"
+source "${SCRIPT_DIR}/lib/automation_core_bundle.sh"
+MANIFEST="$(automation_core_manifest_file "$REPO_ROOT")"
 FORCE=0
 TARGET_DIR=""
 
@@ -55,10 +56,7 @@ if [ ! -d "$TARGET_DIR" ]; then
   exit 1
 fi
 
-if [ ! -f "$MANIFEST" ]; then
-  echo "[bootstrap-automation-core] manifest not found: $MANIFEST" >&2
-  exit 1
-fi
+automation_core_validate_manifest "$REPO_ROOT"
 
 copy_count=0
 skip_count=0
@@ -94,6 +92,7 @@ cat <<EOF
 [bootstrap-automation-core] copied files: $copy_count
 [bootstrap-automation-core] skipped existing files: $skip_count
 [bootstrap-automation-core] overwritten files: $overwrite_count
+[bootstrap-automation-core] core version: $(automation_core_version "$REPO_ROOT")
 [bootstrap-automation-core] next files to edit first:
   - scripts/project_automation_config.sh
   - scripts/project_automation_targets.sh

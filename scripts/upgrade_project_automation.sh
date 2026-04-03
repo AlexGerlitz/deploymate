@@ -4,22 +4,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-MANIFEST="${REPO_ROOT}/automation-core/FILES.txt"
+source "${SCRIPT_DIR}/lib/automation_core_bundle.sh"
+MANIFEST="$(automation_core_manifest_file "$REPO_ROOT")"
 TARGET_DIR=""
 FORCE=0
 INCLUDE_ADAPTERS=0
 DRY_RUN=0
-
-is_adapter_path() {
-  case "$1" in
-    scripts/project_automation_config.sh|scripts/project_automation_targets.sh|scripts/project_automation_smoke_checks.sh)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
 
 usage() {
   cat <<'EOF'
@@ -75,10 +65,7 @@ if [ ! -d "$TARGET_DIR" ]; then
   exit 1
 fi
 
-if [ ! -f "$MANIFEST" ]; then
-  echo "[upgrade-automation-core] manifest not found: $MANIFEST" >&2
-  exit 1
-fi
+automation_core_validate_manifest "$REPO_ROOT"
 
 installed_count=0
 updated_count=0
@@ -96,7 +83,7 @@ while IFS= read -r rel_path; do
     exit 1
   fi
 
-  if is_adapter_path "$rel_path" && [ "$INCLUDE_ADAPTERS" != "1" ]; then
+  if automation_core_is_adapter_path "$rel_path" && [ "$INCLUDE_ADAPTERS" != "1" ]; then
     echo "[upgrade-automation-core] skip adapter file: $rel_path"
     skipped_adapter_count=$((skipped_adapter_count + 1))
     continue
@@ -140,6 +127,7 @@ cat <<EOF
 [upgrade-automation-core] unchanged files: $unchanged_count
 [upgrade-automation-core] skipped changed files: $skipped_changed_count
 [upgrade-automation-core] skipped adapter files: $skipped_adapter_count
+[upgrade-automation-core] source core version: $(automation_core_version "$REPO_ROOT")
 [upgrade-automation-core] next recommended checks:
   - review skipped changed files if any
   - adapt adapter files manually unless --include-adapters was used
