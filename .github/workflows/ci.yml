@@ -199,3 +199,27 @@ jobs:
             echo "- Runtime smoke: \`enabled\`"
             echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify staging result
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          DEPLOY_NOTIFICATION_WEBHOOK: ${{ secrets.DEPLOY_NOTIFICATION_WEBHOOK }}
+        run: |
+          if [ -z "$DEPLOY_NOTIFICATION_WEBHOOK" ]; then
+            echo "[notify] DEPLOY_NOTIFICATION_WEBHOOK is not configured"
+            exit 0
+          fi
+
+          bash scripts/send_workflow_notification.sh \
+            --webhook-url "$DEPLOY_NOTIFICATION_WEBHOOK" \
+            --workflow "Auto staging deploy" \
+            --environment "staging" \
+            --status "${{ job.status }}" \
+            --surface "${{ needs.detect-changes.outputs.surface }}" \
+            --smoke "runtime enabled" \
+            --commit "${{ github.sha }}" \
+            --ref "${{ github.ref_name }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --details "${{ needs.detect-changes.outputs.reason }}"

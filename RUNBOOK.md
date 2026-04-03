@@ -356,8 +356,10 @@ Optional GitHub Actions release workflow secrets:
 - `DEPLOY_REPO_DIR`
 - `DEPLOY_BRANCH`
 - `DEPLOY_ENV_FILE`
+- `DEPLOY_NOTIFICATION_WEBHOOK` for best-effort Slack/Discord-compatible deploy notifications
 
 The staging workflow uses the same secret names, but scoped under the `staging` environment instead of `production`.
+If `DEPLOY_NOTIFICATION_WEBHOOK` is unset, the workflows simply skip notifications.
 
 Runtime smoke notes:
 
