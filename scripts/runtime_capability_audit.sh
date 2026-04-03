@@ -19,6 +19,8 @@ if audit_cache_has runtime_capability_audit; then
   exit 0
 fi
 
+RUNTIME_AUDIT_FILE_CACHE_MAX_FILES="${DEPLOYMATE_RUNTIME_AUDIT_FILE_CACHE_MAX_FILES:-12}"
+
 runtime_capability_files=(
   "frontend/Dockerfile"
   "docker-compose.prod.yml"
@@ -48,6 +50,36 @@ else
   SEARCH_CMD=(grep -nE)
 fi
 
+check_runtime_capability_file() {
+  local file="$1"
+
+  case "$file" in
+    frontend/Dockerfile)
+      if ! "${SEARCH_CMD[@]}" 'ARG NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0' "$file" >/dev/null; then
+        fail "frontend/Dockerfile does not default NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED to 0"
+      fi
+      ;;
+    docker-compose.prod.yml)
+      if ! "${SEARCH_CMD[@]}" 'DEPLOYMATE_LOCAL_DOCKER_ENABLED: \$\{DEPLOYMATE_LOCAL_DOCKER_ENABLED:-false\}' "$file" >/dev/null; then
+        fail "docker-compose.prod.yml does not default DEPLOYMATE_LOCAL_DOCKER_ENABLED to false"
+      fi
+
+      if ! "${SEARCH_CMD[@]}" 'NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED: \$\{NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED:-0\}' "$file" >/dev/null; then
+        fail "docker-compose.prod.yml does not default NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED to 0"
+      fi
+      ;;
+    .env.production.example)
+      if ! "${SEARCH_CMD[@]}" '^DEPLOYMATE_LOCAL_DOCKER_ENABLED=false$' "$file" >/dev/null; then
+        fail ".env.production.example does not keep DEPLOYMATE_LOCAL_DOCKER_ENABLED=false"
+      fi
+
+      if ! "${SEARCH_CMD[@]}" '^NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0$' "$file" >/dev/null; then
+        fail ".env.production.example does not keep NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0"
+      fi
+      ;;
+  esac
+}
+
 fail() {
   echo "[runtime-capability-audit] fail: $1" >&2
   exit 1
@@ -67,25 +99,35 @@ read_env_value() {
 }
 
 echo "[runtime-capability-audit] checking production defaults"
+runtime_capability_static_files=(
+  "frontend/Dockerfile"
+  "docker-compose.prod.yml"
+  ".env.production.example"
+)
+runtime_capability_cache_hits=0
+runtime_capability_cache_misses=0
 
-if ! "${SEARCH_CMD[@]}" 'ARG NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0' frontend/Dockerfile >/dev/null; then
-  fail "frontend/Dockerfile does not default NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED to 0"
-fi
+if [ "${#runtime_capability_static_files[@]}" -le "$RUNTIME_AUDIT_FILE_CACHE_MAX_FILES" ]; then
+  echo "[runtime-capability-audit] static contract cache mode: per-file"
+  for file in "${runtime_capability_static_files[@]}"; do
+    runtime_capability_file_key="$(audit_cache_key_for_input "runtime_capability_audit_file" "$file")"
+    runtime_capability_file_fingerprint="$(audit_cache_fingerprint_files "runtime-capability-audit:${file}" "$file")"
+    if audit_cache_persistent_has "$runtime_capability_file_key" "$runtime_capability_file_fingerprint"; then
+      audit_cache_record_event persistent_hit runtime_capability_audit
+      runtime_capability_cache_hits=$((runtime_capability_cache_hits + 1))
+      continue
+    fi
 
-if ! "${SEARCH_CMD[@]}" 'DEPLOYMATE_LOCAL_DOCKER_ENABLED: \$\{DEPLOYMATE_LOCAL_DOCKER_ENABLED:-false\}' docker-compose.prod.yml >/dev/null; then
-  fail "docker-compose.prod.yml does not default DEPLOYMATE_LOCAL_DOCKER_ENABLED to false"
-fi
-
-if ! "${SEARCH_CMD[@]}" 'NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED: \$\{NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED:-0\}' docker-compose.prod.yml >/dev/null; then
-  fail "docker-compose.prod.yml does not default NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED to 0"
-fi
-
-if ! "${SEARCH_CMD[@]}" '^DEPLOYMATE_LOCAL_DOCKER_ENABLED=false$' .env.production.example >/dev/null; then
-  fail ".env.production.example does not keep DEPLOYMATE_LOCAL_DOCKER_ENABLED=false"
-fi
-
-if ! "${SEARCH_CMD[@]}" '^NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0$' .env.production.example >/dev/null; then
-  fail ".env.production.example does not keep NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0"
+    audit_cache_record_event persistent_miss runtime_capability_audit
+    runtime_capability_cache_misses=$((runtime_capability_cache_misses + 1))
+    check_runtime_capability_file "$file"
+    audit_cache_persistent_mark "$runtime_capability_file_key" "$runtime_capability_file_fingerprint"
+  done
+  echo "[runtime-capability-audit] static contract reused ${runtime_capability_cache_hits} file results; rescanned ${runtime_capability_cache_misses}"
+else
+  check_runtime_capability_file "frontend/Dockerfile"
+  check_runtime_capability_file "docker-compose.prod.yml"
+  check_runtime_capability_file ".env.production.example"
 fi
 
 echo "[runtime-capability-audit] checking production env alignment"
