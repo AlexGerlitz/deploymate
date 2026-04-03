@@ -209,11 +209,15 @@ make profile-changed
 make profile-frontend
 make profile-backend
 make profile-fast
+make profile-frontend-hot
+make profile-fast-hot
 make frontend-smoke-server-status
 make frontend-smoke-server-stop
 make frontend
+make frontend-hot
 make backend
 make fast
+make fast-hot
 ```
 
 What they do:
@@ -223,11 +227,24 @@ What they do:
 - `make profile-frontend` runs the fast frontend gate and then prints the same timing profile bundle
 - `make profile-backend` runs the fast backend gate and then prints the same timing profile bundle
 - `make profile-fast` runs the fast full gate and then prints the same timing profile bundle
+- `make profile-frontend-hot` runs the frontend profile bundle with the persistent smoke server enabled
+- `make profile-fast-hot` runs the full profile bundle with the persistent frontend smoke server enabled
 - `make frontend-smoke-server-status` shows reusable local frontend smoke servers kept alive between commands
 - `make frontend-smoke-server-stop` stops those reusable local frontend smoke servers explicitly
 - `make frontend` runs the fast frontend gate
+- `make frontend-hot` runs the same fast frontend gate but keeps the smoke server warm across runs
 - `make backend` runs the fast backend gate
 - `make fast` runs the fast full gate
+- `make fast-hot` runs the fast full gate with the persistent frontend smoke server enabled
+
+Recommended hot frontend loop:
+
+```bash
+make frontend-hot
+make frontend-hot
+make frontend-smoke-server-status
+make frontend-smoke-server-stop
+```
 - `make full` still runs the heavier full local release workflow
 
 The fast gate intentionally uses fewer resources:

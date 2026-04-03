@@ -36,11 +36,15 @@ make profile-changed
 make profile-frontend
 make profile-backend
 make profile-fast
+make profile-frontend-hot
+make profile-fast-hot
 make frontend-smoke-server-status
 make frontend-smoke-server-stop
 make frontend
+make frontend-hot
 make backend
 make fast
+make fast-hot
 ```
 
 These commands:
@@ -70,6 +74,15 @@ To inspect the latest local timings quickly:
 make timing-history
 make timing-stats
 make timing-hint
+```
+
+For repeated frontend iterations, the faster hot loop is:
+
+```bash
+make frontend-hot
+make profile-frontend-hot
+make frontend-smoke-server-status
+make frontend-smoke-server-stop
 ```
 
 Or run the broader local release gate:
