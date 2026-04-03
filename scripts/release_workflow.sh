@@ -20,6 +20,13 @@ format_duration() {
   printf '%ss' "$seconds"
 }
 
+phase_cache_fingerprint() {
+  local cache_key="$1"
+  local metadata="$2"
+  shift 2 || true
+  audit_cache_fingerprint_inputs "$cache_key" "$metadata" "$@"
+}
+
 clean_frontend_build_artifacts() {
   local frontend_dir=""
   frontend_dir="$(automation_frontend_dir_rel)"
@@ -185,6 +192,27 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
     if [ "$DEPLOYMATE_FRONTEND_FAST_MODE" = "skip" ]; then
       echo "[release] frontend fast smokes skipped for this diff"
     else
+      frontend_phase_cache_key="frontend_fast_phase"
+      frontend_phase_metadata="$(printf 'surface=%s\nfast=%s\nmode=%s\ntargets=%s\nchanged=%s\n' "$SURFACE" "$FAST_MODE" "${DEPLOYMATE_FRONTEND_FAST_MODE:-default}" "${frontend_fast_smokes[*]}" "${DEPLOYMATE_CHANGED_FILES:-}")"
+      frontend_phase_files=(
+        "scripts/release_workflow.sh"
+        "scripts/frontend_smoke_shared.sh"
+        "scripts/frontend_auth_smoke.sh"
+        "scripts/frontend_ops_smoke.sh"
+        "scripts/frontend_runtime_smoke.sh"
+        "scripts/lib/frontend_smoke_checks.sh"
+        "scripts/project_automation_smoke_checks.sh"
+        "scripts/project_automation_config.sh"
+        "scripts/project_automation_targets.sh"
+        "frontend/package.json"
+      )
+      if [ -n "${DEPLOYMATE_CHANGED_FILES:-}" ]; then
+        while IFS= read -r changed_path; do
+          [ -n "$changed_path" ] && frontend_phase_files+=("$changed_path")
+        done <<< "${DEPLOYMATE_CHANGED_FILES}"
+      fi
+      frontend_phase_fingerprint="$(phase_cache_fingerprint "$frontend_phase_cache_key" "$frontend_phase_metadata" "${frontend_phase_files[@]}")"
+
       for frontend_smoke in "${frontend_fast_smokes[@]}"; do
         case "$frontend_smoke" in
           auth|ops|runtime)
@@ -195,8 +223,15 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
             ;;
         esac
       done
-
-      run_frontend_fast_smokes_shared "${frontend_fast_smokes[@]}"
+      if audit_cache_persistent_has "$frontend_phase_cache_key" "$frontend_phase_fingerprint"; then
+        echo "[release] frontend fast phase cache hit"
+        audit_cache_record_event phase_hit "$frontend_phase_cache_key"
+      else
+        echo "[release] frontend fast phase cache miss"
+        audit_cache_record_event phase_miss "$frontend_phase_cache_key"
+        run_frontend_fast_smokes_shared "${frontend_fast_smokes[@]}"
+        audit_cache_persistent_mark "$frontend_phase_cache_key" "$frontend_phase_fingerprint"
+      fi
     fi
   else
     frontend_fast_port=3001
@@ -238,17 +273,45 @@ if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
   if [ "$FAST_MODE" = "1" ]; then
     if [ "$DEPLOYMATE_BACKEND_FAST_MODE" = "skip" ]; then
       echo "[release] backend fast suite skipped for this diff"
-    elif [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
-      echo "[release] backend targeted fast suite"
-      IFS=' ' read -r -a backend_fast_modules <<< "$BACKEND_FAST_TEST_MODULES"
-      PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest "${backend_fast_modules[@]}"
     else
-      echo "[release] backend fast safety suite"
-      PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest \
-        backend.tests.test_auth_security \
-        backend.tests.test_ops_api_flow \
-        backend.tests.test_restore_dry_run \
-        backend.tests.test_server_credentials_policy
+      backend_phase_cache_key="backend_fast_phase"
+      backend_phase_metadata="$(printf 'surface=%s\nfast=%s\nmode=%s\nmodules=%s\nchanged=%s\n' "$SURFACE" "$FAST_MODE" "${DEPLOYMATE_BACKEND_FAST_MODE:-safety}" "${BACKEND_FAST_TEST_MODULES:-}" "${DEPLOYMATE_CHANGED_FILES:-}")"
+      backend_phase_files=(
+        "scripts/release_workflow.sh"
+        "scripts/dev_fast_check.sh"
+        "scripts/detect_backend_fast_scope.sh"
+        "scripts/detect_backend_test_targets.sh"
+        "scripts/project_automation_targets.sh"
+        "scripts/project_automation_config.sh"
+        "backend/requirements.txt"
+      )
+      if [ -n "${DEPLOYMATE_CHANGED_FILES:-}" ]; then
+        while IFS= read -r changed_path; do
+          [ -n "$changed_path" ] && backend_phase_files+=("$changed_path")
+        done <<< "${DEPLOYMATE_CHANGED_FILES}"
+      fi
+      backend_phase_fingerprint="$(phase_cache_fingerprint "$backend_phase_cache_key" "$backend_phase_metadata" "${backend_phase_files[@]}")"
+
+      if audit_cache_persistent_has "$backend_phase_cache_key" "$backend_phase_fingerprint"; then
+        echo "[release] backend fast phase cache hit"
+        audit_cache_record_event phase_hit "$backend_phase_cache_key"
+      else
+        echo "[release] backend fast phase cache miss"
+        audit_cache_record_event phase_miss "$backend_phase_cache_key"
+        if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
+          echo "[release] backend targeted fast suite"
+          IFS=' ' read -r -a backend_fast_modules <<< "$BACKEND_FAST_TEST_MODULES"
+          PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest "${backend_fast_modules[@]}"
+        else
+          echo "[release] backend fast safety suite"
+          PYTHONPATH="$(automation_backend_dir_rel)" "$BACKEND_PYTHON" -m unittest \
+            backend.tests.test_auth_security \
+            backend.tests.test_ops_api_flow \
+            backend.tests.test_restore_dry_run \
+            backend.tests.test_server_credentials_policy
+        fi
+        audit_cache_persistent_mark "$backend_phase_cache_key" "$backend_phase_fingerprint"
+      fi
     fi
   else
     echo "[release] backend test suite"

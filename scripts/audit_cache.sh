@@ -92,6 +92,29 @@ audit_cache_fingerprint_files() {
   printf '%b' "$combined" | eval "$hash_cmd" | awk '{print $1}'
 }
 
+audit_cache_fingerprint_inputs() {
+  local seed="$1"
+  local metadata="${2:-}"
+  shift 2 || true
+  local hash_cmd=""
+  local combined=""
+  local file=""
+
+  hash_cmd="$(audit_cache_hash_cmd)"
+  combined="$(printf 'seed=%s\nmetadata=%s\n' "$seed" "$metadata")"
+
+  for file in "$@"; do
+    if [ -f "$file" ]; then
+      combined="${combined}file=${file}\n"
+      combined="${combined}$(eval "$hash_cmd" "\"$file\"" | awk '{print $1}')\n"
+    else
+      combined="${combined}missing=${file}\n"
+    fi
+  done
+
+  printf '%b' "$combined" | eval "$hash_cmd" | awk '{print $1}'
+}
+
 audit_cache_persistent_has() {
   local key="$1"
   local fingerprint="$2"
@@ -126,12 +149,12 @@ audit_cache_print_summary() {
       counts[$1]++
     }
     END {
-      printf "persistent_hit=%d persistent_miss=%d run_hit=%d", counts["persistent_hit"] + 0, counts["persistent_miss"] + 0, counts["run_hit"] + 0
+      printf "persistent_hit=%d persistent_miss=%d run_hit=%d phase_hit=%d phase_miss=%d", counts["persistent_hit"] + 0, counts["persistent_miss"] + 0, counts["run_hit"] + 0, counts["phase_hit"] + 0, counts["phase_miss"] + 0
     }
   ' "$stats_file")"
 
   case "$summary" in
-    "persistent_hit=0 persistent_miss=0 run_hit=0")
+    "persistent_hit=0 persistent_miss=0 run_hit=0 phase_hit=0 phase_miss=0")
       return 0
       ;;
   esac
