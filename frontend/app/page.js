@@ -440,6 +440,32 @@ export default function LandingPage() {
             <h2>Simple packaging for first customers</h2>
           </div>
 
+          <div className="landingCommercialStrip">
+            <div>
+              <div className="eyebrow">Business use</div>
+              <strong>Need internal company use, SaaS rights, client delivery, or resale?</strong>
+              <p className="sectionLead">
+                The public product stays open for evaluation, but commercial code use goes through
+                a separate license. The fastest direct path is email or the request form.
+              </p>
+            </div>
+            <div className="landingCommercialActions">
+              <a
+                href="mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license"
+                className="landingButton primaryButton"
+              >
+                Email licensing
+              </a>
+              <Link href="/commercial-license" className="landingButton secondaryButton">
+                See licensing terms
+              </Link>
+            </div>
+            <div className="landingCommercialMeta">
+              <span>First reply usually within 2 business days.</span>
+              <span>Use `/upgrade` if you want plan and licensing discussion in one step.</span>
+            </div>
+          </div>
+
           <div className="pricingGrid">
             <article className="pricingCard">
               <h3>Trial</h3>
