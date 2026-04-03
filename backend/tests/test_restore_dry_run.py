@@ -190,6 +190,65 @@ class RestoreDryRunTests(unittest.TestCase):
     @patch("app.routes.root.list_admin_audit_events", return_value=[])
     @patch("app.routes.root.list_upgrade_requests", return_value=[])
     @patch("app.routes.root.list_users", return_value=[])
+    def test_restore_dry_run_surfaces_missing_cross_section_references(
+        self,
+        _mock_list_users,
+        _mock_list_upgrade_requests,
+        _mock_list_admin_audit_events,
+        _mock_list_servers,
+        _mock_list_deployment_records,
+        _mock_list_deployment_templates,
+    ):
+        bundle = {
+            "manifest": {
+                "version": "2026-04-01.backup-bundle.v1",
+                "generated_at": "2026-04-01T00:00:00+00:00",
+                "bundle_name": "refs-sample",
+                "sections": {
+                    "users": 1,
+                    "upgrade_requests": 1,
+                    "audit_events": 0,
+                    "servers": 0,
+                    "deployments": 1,
+                    "templates": 1,
+                },
+            },
+            "data": {
+                "users": [{"id": "user-1", "username": "alice"}],
+                "upgrade_requests": [
+                    {"id": "req-1", "email": "alice@example.com", "target_user_id": "missing-user"}
+                ],
+                "audit_events": [],
+                "servers": [],
+                "deployments": [
+                    {"id": "dep-1", "container_name": "web", "server_id": "missing-server", "template_id": "missing-template"}
+                ],
+                "templates": [
+                    {"id": "tmpl-1", "template_name": "web-template", "server_id": "missing-server"}
+                ],
+            },
+        }
+
+        response = _analyze_restore_bundle(bundle)
+
+        sections = {section.name: section for section in response.sections}
+        upgrade_warning_codes = {issue.code for issue in sections["upgrade_requests"].warnings}
+        deployment_blocker_codes = {issue.code for issue in sections["deployments"].blockers}
+        deployment_warning_codes = {issue.code for issue in sections["deployments"].warnings}
+        template_warning_codes = {issue.code for issue in sections["templates"].warnings}
+
+        self.assertIn("target_user_missing", upgrade_warning_codes)
+        self.assertIn("deployment_server_missing", deployment_blocker_codes)
+        self.assertIn("deployment_template_missing", deployment_warning_codes)
+        self.assertIn("template_server_missing", template_warning_codes)
+        self.assertEqual(response.summary.readiness_status, "blocked")
+
+    @patch("app.routes.root.list_deployment_templates", return_value=[])
+    @patch("app.routes.root.list_deployment_records", return_value=[])
+    @patch("app.routes.root.list_servers", return_value=[])
+    @patch("app.routes.root.list_admin_audit_events", return_value=[])
+    @patch("app.routes.root.list_upgrade_requests", return_value=[])
+    @patch("app.routes.root.list_users", return_value=[])
     def test_restore_dry_run_rejects_non_list_section_payloads(
         self,
         _mock_list_users,

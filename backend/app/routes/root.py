@@ -181,6 +181,16 @@ def _get_bundle_section_items(data_raw: dict, section_name: str) -> list[dict]:
     return raw_items
 
 
+def _collect_item_ids(items: list[dict]) -> set[str]:
+    return {item.get("id") for item in items if item.get("id")}
+
+
+def _has_known_reference(reference_id: str | None, incoming_ids: set[str], current_ids: set[str]) -> bool:
+    if not reference_id:
+        return False
+    return reference_id in incoming_ids or reference_id in current_ids
+
+
 def _append_manifest_section_issues(
     *,
     section: RestoreDryRunSection,
@@ -231,10 +241,14 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     current_servers = list_servers()
     current_deployments = list_deployment_records()
     current_templates = list_deployment_templates()
+    current_user_ids = _collect_item_ids(current_users)
+    current_server_ids = _collect_item_ids(current_servers)
+    current_template_ids = _collect_item_ids(current_templates)
 
     sections: list[RestoreDryRunSection] = []
 
     incoming_users = _get_bundle_section_items(data_raw, "users")
+    incoming_user_ids = _collect_item_ids(incoming_users)
     section = RestoreDryRunSection(
         name="users",
         incoming_count=len(incoming_users),
@@ -286,6 +300,24 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
         seen_request_ids.add(request_id)
         if request_id in current_request_ids:
             section.warnings.append(_issue("warn", "request_id_exists", f'Upgrade request "{request_id}" already exists in current system.'))
+        target_user_id = item.get("target_user_id")
+        if target_user_id and not _has_known_reference(target_user_id, incoming_user_ids, current_user_ids):
+            section.warnings.append(
+                _issue(
+                    "warn",
+                    "target_user_missing",
+                    f'Upgrade request "{request_id}" points to missing target_user_id "{target_user_id}".',
+                )
+            )
+        handled_by_user_id = item.get("handled_by_user_id")
+        if handled_by_user_id and not _has_known_reference(handled_by_user_id, incoming_user_ids, current_user_ids):
+            section.warnings.append(
+                _issue(
+                    "warn",
+                    "handled_by_user_missing",
+                    f'Upgrade request "{request_id}" points to missing handled_by_user_id "{handled_by_user_id}".',
+                )
+            )
     section.notes.append("Upgrade requests can usually be restored after ID and linking review.")
     sections.append(_finalize_section(section))
 
@@ -316,6 +348,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     sections.append(_finalize_section(section))
 
     incoming_servers = _get_bundle_section_items(data_raw, "servers")
+    incoming_server_ids = _collect_item_ids(incoming_servers)
     section = RestoreDryRunSection(
         name="servers",
         incoming_count=len(incoming_servers),
@@ -350,6 +383,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     sections.append(_finalize_section(section))
 
     incoming_templates = _get_bundle_section_items(data_raw, "templates")
+    incoming_template_ids = _collect_item_ids(incoming_templates)
     section = RestoreDryRunSection(
         name="templates",
         incoming_count=len(incoming_templates),
@@ -375,6 +409,15 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
             section.blockers.append(_issue("error", "template_name_conflict", f'Template "{name}" already exists in current system.'))
         elif existing:
             section.warnings.append(_issue("warn", "template_id_exists", f'Template "{name}" already exists and would require merge handling.'))
+        server_id = item.get("server_id")
+        if server_id and not _has_known_reference(server_id, incoming_server_ids, current_server_ids):
+            section.warnings.append(
+                _issue(
+                    "warn",
+                    "template_server_missing",
+                    f'Template "{name}" points to missing server_id "{server_id}".',
+                )
+            )
     section.notes.append("Templates are good restore candidates after conflict cleanup.")
     sections.append(_finalize_section(section))
 
@@ -407,6 +450,24 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
         seen_container_names.add(container_name)
         if container_name in current_container_names and current_container_names[container_name].get("id") != item.get("id"):
             section.blockers.append(_issue("error", "container_name_conflict", f'Container "{container_name}" already exists in current system.'))
+        server_id = item.get("server_id")
+        if server_id and not _has_known_reference(server_id, incoming_server_ids, current_server_ids):
+            section.blockers.append(
+                _issue(
+                    "error",
+                    "deployment_server_missing",
+                    f'Deployment "{container_name}" points to missing server_id "{server_id}".',
+                )
+            )
+        template_id = item.get("template_id")
+        if template_id and not _has_known_reference(template_id, incoming_template_ids, current_template_ids):
+            section.warnings.append(
+                _issue(
+                    "warn",
+                    "deployment_template_missing",
+                    f'Deployment "{container_name}" points to missing template_id "{template_id}".',
+                )
+            )
         external_port = item.get("external_port")
         if external_port is not None:
             port_key = f'{item.get("server_id") or "local"}:{external_port}'
