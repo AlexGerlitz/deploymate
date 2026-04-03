@@ -28,6 +28,50 @@ def normalize_runtime_error(message: str | None, fallback: str) -> str:
     return text.strip() or fallback
 
 
+def describe_runtime_target(server: dict | None) -> str:
+    if not server:
+        return "local Docker target"
+    return f'{server.get("username") or "deploy"}@{server.get("host") or "unknown-host"}:{server.get("port") or 22}'
+
+
+def describe_port_mapping(internal_port: int | None, external_port: int | None) -> str:
+    if internal_port is None and external_port is None:
+        return "no published ports"
+    return f"{internal_port or '-'} -> {external_port or '-'}"
+
+
+def describe_env_shape(env: dict | None) -> str:
+    count = len(env or {})
+    return f"{count} env var{'s' if count != 1 else ''}"
+
+
+def build_create_start_message(payload: DeploymentCreateRequest, server: dict | None, container_name: str) -> str:
+    return (
+        f"Starting deployment for {payload.image} as {container_name} on "
+        f"{describe_runtime_target(server)} with ports "
+        f"{describe_port_mapping(payload.internal_port, payload.external_port)} "
+        f"and {describe_env_shape(payload.env)}."
+    )
+
+
+def build_redeploy_start_message(existing: dict, payload: DeploymentCreateRequest, server: dict | None, container_name: str) -> str:
+    return (
+        f"Starting redeploy for {existing['id']} from {existing.get('image') or 'unknown image'} "
+        f"to {payload.image} on {describe_runtime_target(server)}. "
+        f"Container: {existing.get('container_name') or existing['id']} -> {container_name}. "
+        f"Ports: {describe_port_mapping(existing.get('internal_port'), existing.get('external_port'))} -> "
+        f"{describe_port_mapping(payload.internal_port, payload.external_port)}. "
+        f"Env: {describe_env_shape(existing.get('env') or {})} -> {describe_env_shape(payload.env)}."
+    )
+
+
+def build_delete_start_message(deployment: dict, server: dict | None) -> str:
+    return (
+        f"Starting delete for {deployment['id']} on {describe_runtime_target(server)}. "
+        f"Container {deployment.get('container_name') or deployment['id']} will be removed if it still exists."
+    )
+
+
 def create_deployment(
     payload: DeploymentCreateRequest,
     user,
@@ -76,6 +120,12 @@ def create_deployment(
     }
 
     insert_deployment_record_fn(deployment_record)
+    create_activity_event_fn(
+        deployment_id=deployment_id,
+        level="success",
+        title="Deployment started",
+        message=build_create_start_message(payload, server, container_name),
+    )
 
     result = run_container_fn(
         image=payload.image,
@@ -107,7 +157,10 @@ def create_deployment(
             deployment_id=deployment_id,
             level="error",
             title="Deployment failed",
-            message=f"Deployment {deployment_id} failed: {error_message}",
+            message=(
+                f"Deployment {deployment_id} failed on {describe_runtime_target(server)}: "
+                f"{error_message}"
+            ),
         )
         saved_record = get_deployment_record_or_404_fn(deployment_id)
         return DeploymentResponse(**saved_record)
@@ -171,6 +224,17 @@ def redeploy_deployment(
     container_name = payload.name or existing_deployment["container_name"]
     if container_name != existing_deployment["container_name"]:
         ensure_container_name_is_available_fn(container_name, server)
+    create_activity_event_fn(
+        deployment_id=deployment_id,
+        level="success",
+        title="Redeploy started",
+        message=build_redeploy_start_message(
+            existing_deployment,
+            payload,
+            server,
+            container_name,
+        ),
+    )
 
     try:
         remove_container_if_exists_fn(existing_deployment["container_name"], server)
@@ -192,7 +256,10 @@ def redeploy_deployment(
             deployment_id=deployment_id,
             level="error",
             title="Redeploy failed",
-            message=f"Redeploy for {deployment_id} failed: {error_message}",
+            message=(
+                f"Redeploy for {deployment_id} failed on {describe_runtime_target(server)} "
+                f"while preparing {payload.image}: {error_message}"
+            ),
         )
         raise HTTPException(status_code=exc.status_code, detail=error_message) from exc
 
@@ -241,7 +308,10 @@ def redeploy_deployment(
             deployment_id=deployment_id,
             level="error",
             title="Redeploy failed",
-            message=f"Redeploy for {deployment_id} failed: {error_message}",
+            message=(
+                f"Redeploy for {deployment_id} failed on {describe_runtime_target(server)} "
+                f"while starting {container_name}: {error_message}"
+            ),
         )
         saved_record = get_deployment_record_or_404_fn(deployment_id)
         return DeploymentResponse(**saved_record)
@@ -284,6 +354,12 @@ def delete_deployment(
     deployment = get_deployment_record_or_404_fn(deployment_id)
     server = get_server_or_404_fn(deployment["server_id"]) if deployment.get("server_id") else None
     ensure_docker_is_available_fn(server)
+    create_activity_event_fn(
+        deployment_id=deployment_id,
+        level="success",
+        title="Delete started",
+        message=build_delete_start_message(deployment, server),
+    )
     try:
         remove_container_if_exists_fn(deployment["container_name"], server)
     except HTTPException as exc:
@@ -298,7 +374,10 @@ def delete_deployment(
             deployment_id=deployment_id,
             level="error",
             title="Delete failed",
-            message=f"Delete for {deployment_id} failed: {error_message}",
+            message=(
+                f"Delete for {deployment_id} failed on {describe_runtime_target(server)}: "
+                f"{error_message}"
+            ),
         )
         raise HTTPException(status_code=exc.status_code, detail=error_message) from exc
 

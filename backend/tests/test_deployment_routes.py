@@ -127,6 +127,9 @@ class DeploymentRouteTests(unittest.TestCase):
         )
         self.assertEqual(notify.call_args.kwargs["title"], "Redeploy succeeded")
         self.assertEqual(activity.call_args.kwargs["title"], "Redeploy succeeded")
+        self.assertEqual(activity.call_args_list[0].kwargs["title"], "Redeploy started")
+        self.assertIn("Starting redeploy for dep-1", activity.call_args_list[0].kwargs["message"])
+        self.assertIn("nginx:1.27", activity.call_args_list[0].kwargs["message"])
 
     def test_redeploy_runtime_failure_marks_deployment_failed(self):
         payload = DeploymentCreateRequest(
@@ -182,6 +185,9 @@ class DeploymentRouteTests(unittest.TestCase):
         self.assertEqual(notify.call_args.kwargs["title"], "Redeploy failed")
         self.assertIn("port 8080 is already allocated", notify.call_args.kwargs["message"])
         self.assertEqual(activity.call_args.kwargs["title"], "Redeploy failed")
+        self.assertEqual(activity.call_args_list[0].kwargs["title"], "Redeploy started")
+        self.assertIn("Starting redeploy for dep-1", activity.call_args_list[0].kwargs["message"])
+        self.assertIn("while starting demo-app", activity.call_args_list[1].kwargs["message"])
 
     def test_delete_failure_emits_error_events_and_raises_clean_message(self):
         deployment = _deployment_record()
@@ -205,6 +211,8 @@ class DeploymentRouteTests(unittest.TestCase):
         self.assertEqual(context.exception.detail, "No such container: demo-app")
         self.assertEqual(notify.call_args.kwargs["title"], "Delete failed")
         self.assertEqual(activity.call_args.kwargs["title"], "Delete failed")
+        self.assertEqual(activity.call_args_list[0].kwargs["title"], "Delete started")
+        self.assertIn("Starting delete for dep-1", activity.call_args_list[0].kwargs["message"])
 
     def test_build_deployment_diagnostics_handles_missing_external_port_and_missing_runtime_state(self):
         deployment = _deployment_record(

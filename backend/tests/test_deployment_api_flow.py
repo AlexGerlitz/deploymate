@@ -199,6 +199,11 @@ class DeploymentApiFlowTests(unittest.TestCase):
         activity = activity_response.json()
         self.assertGreaterEqual(len(activity), 1)
         self.assertEqual(activity[0]["category"], "deploy")
+        titles = [item["title"] for item in activity]
+        self.assertIn("Deployment started", titles)
+        self.assertIn("Deployment succeeded", titles)
+        started_event = next(item for item in activity if item["title"] == "Deployment started")
+        self.assertIn("Starting deployment for nginx:alpine", started_event["message"])
 
         delete_response = self.client.delete(f"/deployments/{deployment_id}")
         self.assertEqual(delete_response.status_code, 200)
