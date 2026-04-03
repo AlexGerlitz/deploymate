@@ -102,11 +102,11 @@ git push origin develop
 
 After the push:
 
-1. CI runs the local release gate
+1. CI detects the changed surface once and uses that same decision for the release gate and the staging deploy
 2. if the commit changes only `frontend/`, staging deploy rebuilds `frontend`
 3. if the commit changes only `backend/`, staging deploy rebuilds `backend`
 4. mixed or shared changes fall back to a full staging deploy
-5. docs-only or workflow-only changes skip staging deploy entirely
+5. docs-only or workflow-only changes skip both the release gate and staging deploy entirely
 6. older in-progress CI runs on the same branch are cancelled automatically so only the newest iteration keeps running
 
 Use `.github/workflows/staging.yml` only as a manual fallback when you need to redeploy staging on demand.

@@ -15,7 +15,61 @@ permissions:
   contents: read
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+
+    outputs:
+      surface: ${{ steps.detect.outputs.surface }}
+      should_deploy: ${{ steps.detect.outputs.should_deploy }}
+      reason: ${{ steps.detect.outputs.reason }}
+      base_ref: ${{ steps.detect.outputs.base_ref }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect release surface
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref='${{ github.event.pull_request.base.sha }}'
+          else
+            base_ref='${{ github.event.before }}'
+          fi
+
+          if [ -z "$base_ref" ] || [ "$base_ref" = "0000000000000000000000000000000000000000" ]; then
+            base_ref="$(git hash-object -t tree /dev/null)"
+          fi
+
+          output="$(bash scripts/detect_release_surface.sh "$base_ref" '${{ github.sha }}')"
+          printf '%s\n' "$output"
+          echo "base_ref=$base_ref" >> "$GITHUB_OUTPUT"
+          while IFS='=' read -r key value; do
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done <<< "$output"
+
+      - name: Write detection summary
+        shell: bash
+        run: |
+          {
+            echo "## Change Detection"
+            echo
+            echo "- Event: \`${{ github.event_name }}\`"
+            echo "- Base ref: \`${{ steps.detect.outputs.base_ref }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Surface: \`${{ steps.detect.outputs.surface }}\`"
+            echo "- Reason: ${{ steps.detect.outputs.reason }}"
+            echo "- Should deploy: \`${{ steps.detect.outputs.should_deploy }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release-gate:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should_deploy == '1'
     runs-on: ubuntu-latest
 
     steps:
@@ -41,7 +95,7 @@ jobs:
         run: python -m pip install -r backend/requirements.txt
 
       - name: Run release workflow
-        run: bash scripts/release_workflow.sh --surface full
+        run: bash scripts/release_workflow.sh --surface "${{ needs.detect-changes.outputs.surface }}"
         env:
           BACKEND_PYTHON: python
 
@@ -55,42 +109,53 @@ jobs:
             echo "- Event: \`${{ github.event_name }}\`"
             echo "- Ref: \`${{ github.ref_name }}\`"
             echo "- Commit: \`${{ github.sha }}\`"
-            echo "- Surface: \`full\`"
+            echo "- Base ref: \`${{ needs.detect-changes.outputs.base_ref }}\`"
+            echo "- Surface: \`${{ needs.detect-changes.outputs.surface }}\`"
+            echo "- Reason: ${{ needs.detect-changes.outputs.reason }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release-gate-skipped:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should_deploy != '1'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Write skipped release gate summary
+        shell: bash
+        run: |
+          {
+            echo "## Release Gate"
+            echo
+            echo "- Event: \`${{ github.event_name }}\`"
+            echo "- Ref: \`${{ github.ref_name }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Base ref: \`${{ needs.detect-changes.outputs.base_ref }}\`"
+            echo "- Surface: \`${{ needs.detect-changes.outputs.surface }}\`"
+            echo "- Reason: ${{ needs.detect-changes.outputs.reason }}"
+            echo "- Status: skipped"
           } >> "$GITHUB_STEP_SUMMARY"
 
   staging-release:
-    needs: release-gate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs:
+      - detect-changes
+      - release-gate
+      - release-gate-skipped
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop' &&
+      needs.detect-changes.outputs.should_deploy == '1' &&
+      needs.release-gate.result == 'success'
     runs-on: ubuntu-latest
     environment: staging
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect deploy surface
-        id: detect-surface
-        shell: bash
-        run: |
-          set -euo pipefail
-          output="$(bash scripts/detect_release_surface.sh '${{ github.event.before }}' '${{ github.sha }}')"
-          printf '%s\n' "$output"
-          while IFS='=' read -r key value; do
-            echo "$key=$value" >> "$GITHUB_OUTPUT"
-          done <<< "$output"
-
-      - name: Skip staging deploy
-        if: steps.detect-surface.outputs.should_deploy != '1'
-        run: |
-          echo "[ci] skipping staging deploy: ${{ steps.detect-surface.outputs.reason }}"
 
       - name: Run staging release
-        if: steps.detect-surface.outputs.should_deploy == '1'
         uses: ./.github/actions/remote-release
         with:
-          surface: ${{ steps.detect-surface.outputs.surface }}
+          surface: ${{ needs.detect-changes.outputs.surface }}
           deploy_host: ${{ secrets.DEPLOY_HOST }}
           base_url: ${{ secrets.DEPLOYMATE_BASE_URL }}
           admin_username: ${{ secrets.DEPLOYMATE_ADMIN_USERNAME }}
@@ -122,9 +187,9 @@ jobs:
             echo "## Staging Deploy"
             echo
             echo "- Commit: \`${{ github.sha }}\`"
-            echo "- Surface: \`${{ steps.detect-surface.outputs.surface }}\`"
-            echo "- Reason: ${{ steps.detect-surface.outputs.reason }}"
-            echo "- Should deploy: \`${{ steps.detect-surface.outputs.should_deploy }}\`"
+            echo "- Surface: \`${{ needs.detect-changes.outputs.surface }}\`"
+            echo "- Reason: ${{ needs.detect-changes.outputs.reason }}"
+            echo "- Should deploy: \`${{ needs.detect-changes.outputs.should_deploy }}\`"
             echo "- Runtime smoke: \`enabled\`"
             echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } >> "$GITHUB_STEP_SUMMARY"
