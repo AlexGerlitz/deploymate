@@ -209,6 +209,7 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 - `make bootstrap-product-starter TARGET_DIR=... PRODUCT_STARTER_FLAGS="--project-name MyApp --app-slug myapp --contact-email founder@example.com --frontend-dir web --backend-dir api"` renders a starter product skeleton plus automation core into a new repo
 - `make scaffold-product-resource TARGET_DIR=... RESOURCE_FLAGS="--name Projects --slug projects --frontend-dir web --backend-dir api"` generates the first real feature slice after the starter shell
 - `make scaffold-deploymate-surface SURFACE_FLAGS="--name Review Inbox --slug review-inbox"` generates a new DeployMate-specific admin surface page, backend route/service stub, route registration, and API flow test inside this repo
+- `make scaffold-deploymate-feature FEATURE_FLAGS="--name Controlled Import Plan --slug controlled-import-plan --feature-kind recovery-workflow"` wraps the surface scaffold with a DeployMate-specific feature pack: frontend helper stub, generated smoke checks, and a dedicated smoke runner script
 
 ## Fast Local Commands
 

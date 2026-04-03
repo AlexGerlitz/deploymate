@@ -1,7 +1,10 @@
-.PHONY: scaffold-deploymate-surface scaffold-product-resource export-product-starter bootstrap-product-starter dev-doctor git-doctor ship-pr sync-main pr-land-sync start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core bootstrap-core-init upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: scaffold-deploymate-surface scaffold-deploymate-feature scaffold-product-resource export-product-starter bootstrap-product-starter dev-doctor git-doctor ship-pr sync-main pr-land-sync start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core bootstrap-core-init upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
 
 scaffold-deploymate-surface:
 	bash scripts/scaffold_deploymate_surface.sh $(TARGET_DIR) $(SURFACE_FLAGS)
+
+scaffold-deploymate-feature:
+	bash scripts/scaffold_deploymate_feature.sh $(TARGET_DIR) $(FEATURE_FLAGS)
 
 scaffold-product-resource:
 	bash scripts/scaffold_product_resource.sh $(TARGET_DIR) $(RESOURCE_FLAGS)
