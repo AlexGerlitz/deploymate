@@ -24,8 +24,13 @@ Examples include:
 
 Contact the repository owner through one of these channels:
 
-- GitHub repository owner contact/profile
+- [https://github.com/AlexGerlitz](https://github.com/AlexGerlitz)
 - [https://deploymatecloud.ru](https://deploymatecloud.ru)
+
+Suggested first path:
+
+- read the commercial licensing page: `https://deploymatecloud.ru/commercial-license`
+- submit the request form: `https://deploymatecloud.ru/upgrade`
 
 Include:
 

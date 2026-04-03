@@ -40,6 +40,7 @@ Commercial licensing entry points:
 
 - public explanation: `https://deploymatecloud.ru/commercial-license`
 - request flow: `https://deploymatecloud.ru/upgrade`
+- owner contact: `https://github.com/AlexGerlitz`
 
 ## Reviewer Package
 

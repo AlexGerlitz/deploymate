@@ -13,6 +13,23 @@ const requestChecklist = [
   "Expected number of apps, servers, or environments",
   "Whether you need support, customization, or redistribution rights",
 ];
+const contactChannels = [
+  {
+    label: "Request form",
+    value: "Use the in-product request flow",
+    href: "/upgrade",
+  },
+  {
+    label: "Project site",
+    value: "https://deploymatecloud.ru",
+    href: "https://deploymatecloud.ru",
+  },
+  {
+    label: "GitHub owner profile",
+    value: "https://github.com/AlexGerlitz",
+    href: "https://github.com/AlexGerlitz",
+  },
+];
 
 export default function CommercialLicensePage() {
   return (
@@ -73,6 +90,19 @@ export default function CommercialLicensePage() {
                 ))}
               </div>
             </article>
+            <article className="overviewCard">
+              <span className="overviewLabel">Contact channels</span>
+              <div className="overviewMeta">
+                {contactChannels.map((item) => (
+                  <span key={item.label}>
+                    {item.label}:{" "}
+                    <a href={item.href} className="inlineLink" target={item.href.startsWith("http") ? "_blank" : undefined} rel={item.href.startsWith("http") ? "noreferrer" : undefined}>
+                      {item.value}
+                    </a>
+                  </span>
+                ))}
+              </div>
+            </article>
           </div>
 
           <div className="authDecisionRow">
@@ -83,6 +113,17 @@ export default function CommercialLicensePage() {
             <div className="authDecisionCard">
               <strong>Just evaluating the product?</strong>
               <p>You can keep using the live app, the public docs, and the trial flow without starting a licensing request.</p>
+            </div>
+          </div>
+
+          <div className="authDecisionRow">
+            <div className="authDecisionCard">
+              <strong>What happens next?</strong>
+              <p>After you submit the request, the next step is a short scope review: intended use, deployment scale, support needs, and whether redistribution rights are required.</p>
+            </div>
+            <div className="authDecisionCard">
+              <strong>What to prepare</strong>
+              <p>Have your company/project name, commercial use case, estimated footprint, and any support or customization requirements ready before the conversation.</p>
             </div>
           </div>
 

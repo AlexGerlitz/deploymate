@@ -251,6 +251,13 @@ export default function UpgradePage() {
               </p>
             </div>
           </div>
+          <div className="banner subtle">
+            Prefer a direct explanation first? Start on{" "}
+            <Link href="/commercial-license" className="inlineLink">
+              the commercial licensing page
+            </Link>
+            {" "}for the policy, contact channels, and what happens next.
+          </div>
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
               <span>Name</span>
@@ -305,6 +312,20 @@ export default function UpgradePage() {
 
           {error ? <div className="banner error">{error}</div> : null}
           {success ? <div className="banner success">{success}</div> : null}
+          {success ? (
+            <div className="banner subtle">
+              Next step: review scope, support needs, and whether your request is for a paid plan or a separate commercial license. If needed, you can also follow up through{" "}
+              <a
+                href="https://github.com/AlexGerlitz"
+                className="inlineLink"
+                target="_blank"
+                rel="noreferrer"
+              >
+                the repository owner profile
+              </a>
+              .
+            </div>
+          ) : null}
         </article>
       </div>
     </main>
