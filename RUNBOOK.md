@@ -212,6 +212,7 @@ Notes:
 - `make pr-watch` waits on GitHub checks and then refreshes doctor output
 - `make pr-land` refuses to merge unless doctor is clean, local `HEAD` matches the PR head SHA, and PR checks are green
 - `make dev-doctor` gives one compact local summary of recommended loop, timing bottleneck, and PR doctor state
+- doctor commands now also support `--format shell`, so future repos can automate around them without parsing human-oriented text
 
 For daily iteration speed on staging:
 

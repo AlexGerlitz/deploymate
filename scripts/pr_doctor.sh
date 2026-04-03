@@ -5,12 +5,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE_BRANCH="${BASE_BRANCH:-develop}"
 STRICT=0
+OUTPUT_FORMAT="human"
 STATE_FILE="$ROOT_DIR/.logs/auto_local_last.env"
 
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/pr_doctor.sh [--base <branch>] [--strict]
+  bash scripts/pr_doctor.sh [--base <branch>] [--strict] [--format human|shell]
 
 Print branch, PR, diff-size, and local verification health for the current PR branch.
 EOF
@@ -89,6 +90,10 @@ while [ "$#" -gt 0 ]; do
     --strict)
       STRICT=1
       shift
+      ;;
+    --format)
+      OUTPUT_FORMAT="${2:-human}"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -236,6 +241,51 @@ elif [ -n "$last_verified_head_sha" ] && [ "$last_verified_head_sha" != "$curren
   local_loop_state="stale-head"
 fi
 
+overall_status="ready"
+if [ "$dirty_state" = "dirty" ] || [ "$has_upstream" != "1" ] || [ "$local_loop_state" != "ready" ]; then
+  overall_status="blocked"
+fi
+if [ -n "$pr_number" ] && [ "$pr_checks_state" = "fail" ]; then
+  overall_status="blocked"
+fi
+if [ -n "$pr_number" ] && [ "$pr_state" != "MERGED:ready" ] && [ -n "$pr_head_sha" ] && [ "$pr_head_sha" != "$current_head_sha" ]; then
+  overall_status="blocked"
+fi
+if [ -n "$pr_number" ] && [ "$pr_state" != "MERGED:ready" ] && [ -n "$pr_head_sha" ] && [ -n "$last_verified_head_sha" ] && [ "$pr_head_sha" != "$last_verified_head_sha" ]; then
+  overall_status="blocked"
+fi
+if [ "$overall_status" = "ready" ] && { [ "$size_class" = "large" ] || [ "$size_class" = "split" ] || [ -n "$split_hint" ] || [ "$pr_checks_state" = "pending" ]; }; then
+  overall_status="warn"
+fi
+
+if [ "$OUTPUT_FORMAT" = "shell" ]; then
+  cat <<EOF
+branch=$current_branch
+base_branch=$BASE_BRANCH
+working_tree=$dirty_state
+commits_since_base=$commit_count
+files_changed=$files_changed
+line_changes=$line_changes
+size_class=$size_class
+frontend_count=$frontend_count
+backend_count=$backend_count
+shared_count=$shared_count
+docs_count=$docs_count
+split_hint=$split_hint
+has_upstream=$has_upstream
+upstream_ref=$upstream_ref
+pr_number=$pr_number
+pr_state=$pr_state
+pr_checks_state=$pr_checks_state
+pr_head_sha=$pr_head_sha
+current_head_sha=$current_head_sha
+local_loop_state=$local_loop_state
+last_mode=$last_mode
+last_verified_head_sha=$last_verified_head_sha
+overall_status=$overall_status
+EOF
+else
+
 echo "[pr-doctor] branch: $current_branch"
 echo "[pr-doctor] base branch: $BASE_BRANCH"
 echo "[pr-doctor] working tree: $dirty_state"
@@ -280,42 +330,64 @@ elif [ "$local_loop_state" = "stale-head" ]; then
 else
   echo "[pr-doctor] local verification: missing or stale for this base ref"
 fi
+echo "[pr-doctor] overall status: $overall_status"
+fi
 
 issues=0
 if [ "$dirty_state" = "dirty" ]; then
-  echo "[pr-doctor] warning: working tree is dirty" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: working tree is dirty" >&2
+  fi
   issues=1
 fi
 if [ "$has_upstream" != "1" ]; then
-  echo "[pr-doctor] warning: branch has no upstream yet" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: branch has no upstream yet" >&2
+  fi
   issues=1
 fi
 if [ "$size_class" = "split" ]; then
-  echo "[pr-doctor] warning: this branch is large enough that it probably wants 2 PRs" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: this branch is large enough that it probably wants 2 PRs" >&2
+  fi
   issues=1
 elif [ "$size_class" = "large" ]; then
-  echo "[pr-doctor] warning: this PR is getting large; split it if the change is not one coherent unit" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: this PR is getting large; split it if the change is not one coherent unit" >&2
+  fi
 fi
 if [ -n "$split_hint" ] && { [ "$size_class" = "split" ] || [ "$size_class" = "large" ]; }; then
-  echo "[pr-doctor] split hint: $split_hint" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] split hint: $split_hint" >&2
+  fi
 fi
 if [ "$local_loop_state" != "ready" ]; then
-  echo "[pr-doctor] warning: run make pr-ready before opening or updating the PR" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: run make pr-ready before opening or updating the PR" >&2
+  fi
   issues=1
 fi
 if [ -n "$pr_head_sha" ] && [ "$pr_state" != "MERGED:ready" ] && [ "$pr_head_sha" != "$current_head_sha" ]; then
-  echo "[pr-doctor] warning: current local HEAD is not the same as the PR head on GitHub; push the branch or refresh the local branch" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: current local HEAD is not the same as the PR head on GitHub; push the branch or refresh the local branch" >&2
+  fi
   issues=1
 fi
 if [ -n "$pr_head_sha" ] && [ "$pr_state" != "MERGED:ready" ] && [ -n "$last_verified_head_sha" ] && [ "$pr_head_sha" != "$last_verified_head_sha" ]; then
-  echo "[pr-doctor] warning: the last local green loop does not match the PR head SHA" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: the last local green loop does not match the PR head SHA" >&2
+  fi
   issues=1
 fi
 if [ -n "$pr_number" ] && [ "$pr_checks_state" = "fail" ]; then
-  echo "[pr-doctor] warning: PR checks are failing" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: PR checks are failing" >&2
+  fi
   issues=1
 elif [ -n "$pr_number" ] && [ "$pr_checks_state" = "pending" ]; then
-  echo "[pr-doctor] warning: PR checks are still pending" >&2
+  if [ "$OUTPUT_FORMAT" != "shell" ]; then
+    echo "[pr-doctor] warning: PR checks are still pending" >&2
+  fi
 fi
 
 if [ "$STRICT" = "1" ] && [ "$issues" != "0" ]; then

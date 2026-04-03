@@ -80,6 +80,13 @@ For shell-friendly automation:
 bash scripts/automation_core_doctor.sh /absolute/path/to/project --format shell
 ```
 
+The local/project doctor layer is machine-readable too:
+
+```bash
+bash scripts/dev_doctor.sh --format shell
+bash scripts/pr_doctor.sh --format shell
+```
+
 ## What stays project-specific
 
 Three adapter files are expected to change first in another project:

@@ -115,6 +115,8 @@ elif [ "$adapter_missing" -gt 0 ]; then
   readiness_status="adapters-missing"
 elif [ "$adapter_matching" -gt 0 ] && [ "$adapter_drift" -eq 0 ] && [ "$adapter_missing" -eq 0 ]; then
   readiness_status="adapters-unedited"
+elif [ "$adapter_drift" -gt 0 ] && [ "$adapter_matching" -gt 0 ]; then
+  readiness_status="adapters-in-progress"
 fi
 
 if [ "$OUTPUT_FORMAT" = "shell" ]; then
@@ -155,6 +157,13 @@ if [ "$readiness_status" = "adapters-unedited" ]; then
 [automation-core-doctor] next step:
   - adapter files are still identical to the exported defaults
   - edit config, targets, and smoke checks before trusting the local loops
+EOF
+fi
+if [ "$readiness_status" = "adapters-in-progress" ]; then
+  cat <<'EOF'
+[automation-core-doctor] next step:
+  - at least one adapter file was customized, but some still match the defaults
+  - finish adapting targets and smoke checks before relying on the fast loops
 EOF
 fi
 fi

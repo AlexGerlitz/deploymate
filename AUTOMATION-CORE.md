@@ -130,9 +130,18 @@ The doctor helper reports:
 - adapter drift separately from core drift
 - a readiness status:
   - `ready`
+  - `adapters-in-progress`
   - `adapters-unedited`
   - `adapters-missing`
   - `core-needs-sync`
+
+Both doctor layers now also have a machine-readable mode:
+
+- `bash scripts/automation_core_doctor.sh /path/to/project --format shell`
+- `bash scripts/dev_doctor.sh --format shell`
+- `bash scripts/pr_doctor.sh --format shell`
+
+That matters when you want the next project to automate decisions instead of scraping human text.
 
 ## What Is Already Portable
 

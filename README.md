@@ -253,6 +253,7 @@ What they do:
 - `make pr-watch` waits on PR checks and then prints the latest doctor summary
 - `make pr-land` merges the current PR only when doctor is clean, the PR head SHA matches local `HEAD`, and GitHub checks are green
 - `make dev-doctor` prints the cheapest useful local loop, the latest timing bottleneck, and the current PR doctor summary in one command
+- `make dev-doctor` is also backed by a shell-readable `bash scripts/dev_doctor.sh --format shell` mode for future automation on top of the core
 - `make pr-doctor` also reads PR CI status from GitHub and gives a split hint from the actual diff mix when the branch gets too large
 - `make pr-doctor` now also compares the current local `HEAD`, the last locally verified `HEAD`, and the PR head SHA on GitHub, so stale local green runs stop being mistaken for current verification
 - `make frontend` runs the fast frontend gate
