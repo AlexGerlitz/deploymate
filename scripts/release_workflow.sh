@@ -16,6 +16,36 @@ clean_frontend_build_artifacts() {
   fi
 }
 
+run_frontend_fast_smokes_shared() {
+  local smoke_targets=("$@")
+  local shared_port=3001
+  local shared_log="/tmp/deploymate-frontend-fast-smoke.log"
+  local shared_dist=".next-smoke-fast-${shared_port}"
+  local smoke_target=""
+
+  source scripts/frontend_smoke_shared.sh
+
+  PORT="$shared_port"
+  BASE_URL="http://127.0.0.1:${PORT}"
+  SERVER_LOG="$shared_log"
+  DIST_DIR="$shared_dist"
+
+  export FRONTEND_SMOKE_PORT="$shared_port"
+  export FRONTEND_SMOKE_LOG="$shared_log"
+  export FRONTEND_SMOKE_DIST_DIR="$shared_dist"
+  export FRONTEND_SMOKE_REUSE_SERVER=1
+
+  start_frontend_smoke_server
+  trap 'stop_frontend_smoke_server' RETURN
+
+  wait_for_frontend_smoke_url "/app"
+
+  for smoke_target in "${smoke_targets[@]}"; do
+    echo "[release] frontend ${smoke_target} smoke"
+    npm --prefix frontend run "smoke:${smoke_target}"
+  done
+}
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -98,20 +128,35 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
     IFS=' ' read -r -a frontend_fast_smokes <<< "$FRONTEND_FAST_SMOKES"
   fi
 
-  frontend_fast_port=3001
-  for frontend_smoke in "${frontend_fast_smokes[@]}"; do
-    case "$frontend_smoke" in
-      auth|ops|runtime)
-        echo "[release] frontend ${frontend_smoke} smoke"
-        FRONTEND_SMOKE_PORT="$frontend_fast_port" npm --prefix frontend run "smoke:${frontend_smoke}"
-        frontend_fast_port=$((frontend_fast_port + 1))
-        ;;
-      *)
-        echo "[release] unknown frontend fast smoke target: $frontend_smoke" >&2
-        exit 1
-        ;;
-    esac
-  done
+  if [ "$FAST_MODE" = "1" ]; then
+    for frontend_smoke in "${frontend_fast_smokes[@]}"; do
+      case "$frontend_smoke" in
+        auth|ops|runtime)
+          ;;
+        *)
+          echo "[release] unknown frontend fast smoke target: $frontend_smoke" >&2
+          exit 1
+          ;;
+      esac
+    done
+
+    run_frontend_fast_smokes_shared "${frontend_fast_smokes[@]}"
+  else
+    frontend_fast_port=3001
+    for frontend_smoke in "${frontend_fast_smokes[@]}"; do
+      case "$frontend_smoke" in
+        auth|ops|runtime)
+          echo "[release] frontend ${frontend_smoke} smoke"
+          FRONTEND_SMOKE_PORT="$frontend_fast_port" npm --prefix frontend run "smoke:${frontend_smoke}"
+          frontend_fast_port=$((frontend_fast_port + 1))
+          ;;
+        *)
+          echo "[release] unknown frontend fast smoke target: $frontend_smoke" >&2
+          exit 1
+          ;;
+      esac
+    done
+  fi
 
   if [ "$FAST_MODE" != "1" ]; then
     echo "[release] frontend admin smoke"

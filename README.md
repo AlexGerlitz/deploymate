@@ -223,6 +223,7 @@ The fast gate intentionally uses fewer resources:
 - frontend: targeted auth/ops/runtime smokes from changed files when possible, otherwise all three
 - backend: targeted tests from changed files when possible, otherwise the focused safety suite
 - preflight: skips the production frontend build in fast mode
+- fast frontend mode now reuses one shared smoke dev server instead of starting a separate `next dev` process per smoke
 
 ## Key Screens In The App
 

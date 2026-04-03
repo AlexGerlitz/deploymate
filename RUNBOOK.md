@@ -44,6 +44,7 @@ These commands:
 3. skip the production frontend build in preflight fast mode
 4. keep backend verification on a targeted test set when changed files map cleanly, otherwise fall back to the focused safety suite
 5. keep frontend verification on targeted fast smokes when changed files map cleanly, otherwise fall back to the default `auth + ops + runtime`
+6. reuse one shared frontend smoke dev server in fast mode instead of starting a new `next dev` process for each smoke
 
 Or run the broader local release gate:
 
