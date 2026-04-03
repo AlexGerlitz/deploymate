@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Live demo
+    url: https://deploymatecloud.ru
+    about: Review the public DeployMate demo before opening UX or product issues.
+  - name: Runbook
+    url: https://github.com/AlexGerlitz/deploymate/blob/main/RUNBOOK.md
+    about: Check deploy and operator guidance before reporting release workflow problems.
