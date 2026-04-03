@@ -68,6 +68,9 @@ class RestoreDryRunTests(unittest.TestCase):
         self.assertEqual(response.summary.ok_sections, 4)
         self.assertEqual(response.summary.review_required_sections, 2)
         self.assertEqual(response.summary.blocked_sections, 0)
+        self.assertEqual(response.summary.readiness_status, "review")
+        self.assertIn("manual review", response.summary.plain_language_summary.lower())
+        self.assertTrue(response.summary.next_step)
 
         sections = {section.name: section for section in response.sections}
         self.assertEqual(sections["users"].status, "warn")
@@ -120,6 +123,9 @@ class RestoreDryRunTests(unittest.TestCase):
 
         self.assertGreaterEqual(response.summary.blocker_count, 1)
         self.assertEqual(response.summary.blocked_sections, 1)
+        self.assertEqual(response.summary.readiness_status, "blocked")
+        self.assertIn("not ready", response.summary.plain_language_summary.lower())
+        self.assertIn("users", response.summary.highest_risk_sections)
         sections = {section.name: section for section in response.sections}
         self.assertEqual(sections["users"].status, "error")
         self.assertTrue(
@@ -176,6 +182,7 @@ class RestoreDryRunTests(unittest.TestCase):
         self.assertIn("unknown_data_sections", warning_codes)
         self.assertIn("bundle_version_unrecognized", warning_codes)
         self.assertEqual(users_section.status, "warn")
+        self.assertEqual(response.summary.readiness_status, "review")
 
     @patch("app.routes.root.list_deployment_templates", return_value=[])
     @patch("app.routes.root.list_deployment_records", return_value=[])

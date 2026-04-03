@@ -245,7 +245,16 @@ automation_smoke_restore_checks() {
   cat <<'EOF'
 /app/users|restore report surface|data-testid="restore-report"
 /app/users|restore summary badges|data-testid="restore-summary-badges"
+/app/users|restore preparation overview|data-testid="restore-preparation-overview"
+/app/users|restore readiness card|data-testid="restore-readiness-card"
+/app/users|restore next step card|data-testid="restore-next-step-card"
 /app/users|restore summary digest|data-testid="restore-summary-digest"
+/app/users|restore preparation card|data-testid="restore-preparation-card"
+/app/users|restore preparation title|data-testid="restore-preparation-title"
+/app/users|restore plain language summary|data-testid="restore-plain-language-summary"
+/app/users|restore next step summary|data-testid="restore-next-step-summary"
+/app/users|restore copy preparation button|data-testid="restore-copy-preparation-button"
+/app/users|restore preparation markdown button|data-testid="restore-preparation-markdown-button"
 /app/users|restore attention overview|data-testid="restore-attention-overview"
 /app/users|restore issues csv button|data-testid="restore-report-issues-csv-button"
 /app/users|restore copy summary button|data-testid="restore-copy-summary-button"
@@ -255,6 +264,8 @@ automation_smoke_restore_checks() {
 /app/users|restore users section|data-testid="restore-section-users"
 /app/users|restore servers section|data-testid="restore-section-servers"
 /app/users|restore deployments section|data-testid="restore-section-deployments"
+/app/users|restore readiness copy|This backup is not ready for any real import work yet
+/app/users|restore next step copy|Resolve the blocked sections first
 /app/users|restore digest copy|priority: users, servers, deployment_templates
 /app/users|restore issues copy|Server credentials and host trust must be reviewed before any import\.
 /app/users|restore issues csv label|Issues CSV

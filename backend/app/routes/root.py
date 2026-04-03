@@ -65,6 +65,43 @@ EXPECTED_BACKUP_SECTION_NAMES = (
 )
 
 
+def _build_restore_readiness_summary(sections: list[RestoreDryRunSection]) -> tuple[str, str, str, list[str]]:
+    blocked_sections = [section.name for section in sections if section.status == "error"]
+    review_sections = [section.name for section in sections if section.status == "warn"]
+
+    highest_risk_sections = blocked_sections[:]
+    for name in review_sections:
+        if len(highest_risk_sections) >= 3:
+            break
+        highest_risk_sections.append(name)
+
+    if blocked_sections:
+        next_step = (
+            "Do not plan a live import yet. Resolve the blocked sections first, then rerun dry-run validation."
+        )
+        plain_language_summary = (
+            f"This backup is not ready for any real import work yet because "
+            f"{len(blocked_sections)} section(s) are blocked: {', '.join(blocked_sections)}."
+        )
+        return "blocked", next_step, plain_language_summary, highest_risk_sections
+
+    if review_sections:
+        next_step = (
+            "This bundle can move into import preparation only after the review-required sections are cleaned up and validated again."
+        )
+        plain_language_summary = (
+            f"This backup is not blocked, but it still needs manual review in "
+            f"{len(review_sections)} section(s): {', '.join(review_sections)}."
+        )
+        return "review", next_step, plain_language_summary, highest_risk_sections
+
+    next_step = "This bundle looks safe for structured import preparation. Keep the final apply flow behind manual review."
+    plain_language_summary = (
+        "This backup passed dry-run validation without active blockers or review-required sections."
+    )
+    return "safe", next_step, plain_language_summary, highest_risk_sections
+
+
 def _csv_response(filename: str, rows: list[dict], fieldnames: list[str]) -> Response:
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=fieldnames)
@@ -414,6 +451,9 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     ok_sections = sum(1 for section in sections if section.status == "ok")
     review_required_sections = sum(1 for section in sections if section.status == "warn")
     blocked_sections = sum(1 for section in sections if section.status == "error")
+    readiness_status, next_step, plain_language_summary, highest_risk_sections = _build_restore_readiness_summary(
+        sections
+    )
 
     return RestoreDryRunResponse(
         generated_at=datetime.now(timezone.utc).isoformat(),
@@ -426,6 +466,10 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
             ok_sections=ok_sections,
             review_required_sections=review_required_sections,
             blocked_sections=blocked_sections,
+            readiness_status=readiness_status,
+            next_step=next_step,
+            plain_language_summary=plain_language_summary,
+            highest_risk_sections=highest_risk_sections,
         ),
         sections=sections,
     )

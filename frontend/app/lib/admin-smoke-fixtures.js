@@ -117,6 +117,11 @@ export const smokeRestoreDryRun = {
     ok_sections: 2,
     review_required_sections: 2,
     blocked_sections: 2,
+    readiness_status: "blocked",
+    next_step: "Do not plan a live import yet. Resolve the blocked sections first, then rerun dry-run validation.",
+    plain_language_summary:
+      "This backup is not ready for any real import work yet because 2 sections are blocked: servers, deployments.",
+    highest_risk_sections: ["servers", "deployments", "users"],
   },
   sections: [
     {

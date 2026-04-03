@@ -438,6 +438,10 @@ class RestoreDryRunSummary(BaseModel):
     ok_sections: int = 0
     review_required_sections: int = 0
     blocked_sections: int = 0
+    readiness_status: Literal["safe", "review", "blocked"] = "review"
+    next_step: str = ""
+    plain_language_summary: str = ""
+    highest_risk_sections: list[str] = Field(default_factory=list)
 
 
 class RestoreDryRunResponse(BaseModel):

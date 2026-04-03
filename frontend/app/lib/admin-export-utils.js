@@ -83,6 +83,47 @@ export function buildRestoreReportDigest(report) {
     .join(" · ");
 }
 
+export function buildRestorePreparationMarkdown(report) {
+  if (!report) {
+    return "";
+  }
+
+  const lines = [
+    "# Restore Import Preparation",
+    "",
+    `Bundle: ${report.manifest.bundle_name}`,
+    `Generated: ${report.manifest.generated_at}`,
+    `Readiness: ${report.summary.readiness_status}`,
+    "",
+    "## Plain-Language Summary",
+    "",
+    report.summary.plain_language_summary || "No plain-language summary available.",
+    "",
+    "## Recommended Next Step",
+    "",
+    report.summary.next_step || "No next step available.",
+    "",
+    "## Highest-Risk Sections",
+    "",
+  ];
+
+  if (!report.summary.highest_risk_sections?.length) {
+    lines.push("- None");
+  } else {
+    report.summary.highest_risk_sections.forEach((sectionName) => {
+      lines.push(`- ${sectionName}`);
+    });
+  }
+
+  lines.push("", "## Section Status", "");
+
+  for (const section of report.sections || []) {
+    lines.push(`- ${section.name}: ${section.status} (${section.incoming_count} incoming / ${section.current_count} current)`);
+  }
+
+  return lines.join("\n");
+}
+
 export function analyzeBackupBundleText(bundleText) {
   if (!bundleText.trim()) {
     return { status: "empty", message: "Load or paste a backup bundle to inspect it." };

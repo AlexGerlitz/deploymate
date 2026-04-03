@@ -49,6 +49,7 @@ import {
   analyzeBackupBundleText,
   buildRestoreDryRunCsv,
   buildRestoreIssuesCsv,
+  buildRestorePreparationMarkdown,
   buildRestoreReportDigest,
   buildSelectedUsersCsv,
 } from "../../lib/admin-export-utils";
@@ -152,6 +153,7 @@ function UsersPageContent() {
         (section) => restoreSectionFilter === "all" || section.status === restoreSectionFilter,
       )
     : [];
+  const restorePreparationMarkdown = buildRestorePreparationMarkdown(restoreDryRun);
   const primaryFilterDefinitions = [
     createTextFilterDefinition({
       key: "q",
@@ -971,6 +973,32 @@ function UsersPageContent() {
     setSuccess("Validation summary copied.");
   }
 
+  async function handleCopyRestorePreparation() {
+    if (!restoreDryRun) {
+      return;
+    }
+    await copyTextToClipboard(
+      [
+        restoreDryRun.summary.plain_language_summary,
+        `Next step: ${restoreDryRun.summary.next_step}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+    setSuccess("Import preparation summary copied.");
+  }
+
+  function handleDownloadRestorePreparationMarkdown() {
+    if (!restoreDryRun) {
+      return;
+    }
+    const blob = new Blob([restorePreparationMarkdown], {
+      type: "text/markdown;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-restore-import-preparation.md", blob);
+    setSuccess("Import preparation markdown downloaded.");
+  }
+
   function handleDownloadRestoreIssuesCsv() {
     if (!restoreDryRun) {
       return;
@@ -1334,9 +1362,75 @@ function UsersPageContent() {
                 <span className="status warn">review {restoreDryRun.summary.review_required_sections}</span>
                 <span className="status error">blocked {restoreDryRun.summary.blocked_sections}</span>
               </div>
+              <div className="overviewGrid" data-testid="restore-preparation-overview">
+                <div className="overviewCard" data-testid="restore-readiness-card">
+                  <span className="overviewLabel">Import readiness</span>
+                  <strong className="overviewValue">{restoreDryRun.summary.readiness_status}</strong>
+                  <div className="overviewMeta">
+                    {(restoreDryRun.summary.highest_risk_sections || []).length > 0 ? (
+                      <span>Risk focus {restoreDryRun.summary.highest_risk_sections.join(", ")}</span>
+                    ) : (
+                      <span>No high-risk sections detected</span>
+                    )}
+                  </div>
+                </div>
+                <div className="overviewCard" data-testid="restore-next-step-card">
+                  <span className="overviewLabel">What to do next</span>
+                  <strong className="overviewValue">
+                    {restoreDryRun.summary.readiness_status === "blocked"
+                      ? "Resolve blockers"
+                      : restoreDryRun.summary.readiness_status === "review"
+                        ? "Clean up review items"
+                        : "Prepare controlled import"}
+                  </strong>
+                  <div className="overviewMeta">
+                    <span>{restoreDryRun.summary.next_step}</span>
+                  </div>
+                </div>
+              </div>
               <div className="banner subtle" data-testid="restore-summary-digest">
                 {restoreReportDigest}
               </div>
+              <article className="card compactCard" data-testid="restore-preparation-card">
+                <div className="sectionHeader">
+                  <div>
+                    <h3 data-testid="restore-preparation-title">Import preparation</h3>
+                    <p className="formHint">
+                      Use this summary to explain the restore state to a non-technical reviewer before any future import work.
+                    </p>
+                  </div>
+                </div>
+                <div className="row">
+                  <span className="label">Plain-language summary</span>
+                  <div className="stackedValue">
+                    <span data-testid="restore-plain-language-summary">
+                      {restoreDryRun.summary.plain_language_summary}
+                    </span>
+                  </div>
+                </div>
+                <div className="row">
+                  <span className="label">Recommended next step</span>
+                  <span data-testid="restore-next-step-summary">{restoreDryRun.summary.next_step}</span>
+                </div>
+                <div className="actionCluster">
+                  <button
+                    type="button"
+                    className="softButton"
+                    data-testid="restore-copy-preparation-button"
+                    onClick={handleCopyRestorePreparation}
+                  >
+                    Copy preparation summary
+                  </button>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    data-testid="restore-preparation-markdown-button"
+                    onClick={handleDownloadRestorePreparationMarkdown}
+                  >
+                    Preparation markdown
+                  </button>
+                </div>
+              </article>
               <div className="overviewGrid" data-testid="restore-attention-overview">
                 <div className="overviewCard">
                   <span className="overviewLabel">Attention sections</span>
