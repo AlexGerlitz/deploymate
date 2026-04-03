@@ -209,6 +209,8 @@ make profile-changed
 make profile-frontend
 make profile-backend
 make profile-fast
+make frontend-smoke-server-status
+make frontend-smoke-server-stop
 make frontend
 make backend
 make fast
@@ -221,6 +223,8 @@ What they do:
 - `make profile-frontend` runs the fast frontend gate and then prints the same timing profile bundle
 - `make profile-backend` runs the fast backend gate and then prints the same timing profile bundle
 - `make profile-fast` runs the fast full gate and then prints the same timing profile bundle
+- `make frontend-smoke-server-status` shows reusable local frontend smoke servers kept alive between commands
+- `make frontend-smoke-server-stop` stops those reusable local frontend smoke servers explicitly
 - `make frontend` runs the fast frontend gate
 - `make backend` runs the fast backend gate
 - `make fast` runs the fast full gate
@@ -237,6 +241,7 @@ The fast gate intentionally uses fewer resources:
 - release-workflow and runbook diffs now keep `release_workflow_audit` enabled while still letting `security_audit` stay on changed-file scope during local explicit surface loops
 - preflight: skips the production frontend build in fast mode
 - fast frontend mode now reuses one shared smoke dev server instead of starting a separate `next dev` process per smoke
+- the repo now has experimental local persistent frontend smoke-server controls, but the default fast loop stays on the safer per-command lifecycle unless `FRONTEND_SMOKE_PERSIST_SERVER=1` is set explicitly
 - the heavier frontend gate also reuses shared smoke servers for the main smoke pack
 - repeated local audits are cached within one gate run, so nested security/runtime checks do not repeat unnecessarily
 - local changed-file verification now skips runtime-oriented audits automatically when the diff does not touch deploy/runtime contract files

@@ -47,4 +47,12 @@ if [ "${DEPLOYMATE_CONTEXT_DERIVED:-0}" != "1" ]; then
     echo "[dev-fast-check] frontend fast mode: $DEPLOYMATE_FRONTEND_FAST_MODE"
   fi
 fi
+
+if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
+  if [ "${FRONTEND_SMOKE_PERSIST_SERVER:-0}" = "1" ]; then
+    export FRONTEND_SMOKE_KEEP_ALIVE_ON_EXIT="${FRONTEND_SMOKE_KEEP_ALIVE_ON_EXIT:-1}"
+    echo "[dev-fast-check] persistent frontend smoke server: $FRONTEND_SMOKE_PERSIST_SERVER"
+  fi
+fi
+
 bash scripts/release_workflow.sh --surface "$SURFACE" --fast

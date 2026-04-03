@@ -1,4 +1,4 @@
-.PHONY: changed profile-changed profile-frontend profile-backend profile-fast fast frontend backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: changed profile-changed profile-frontend profile-backend profile-fast frontend-smoke-server-status frontend-smoke-server-stop fast frontend backend full timing-history timing-stats timing-hint ship-staging
 
 changed:
 	bash scripts/dev_verify_changed.sh
@@ -14,6 +14,12 @@ profile-backend:
 
 profile-fast:
 	bash scripts/profile_surface.sh full
+
+frontend-smoke-server-status:
+	bash scripts/frontend_smoke_server_control.sh status
+
+frontend-smoke-server-stop:
+	bash scripts/frontend_smoke_server_control.sh stop
 
 fast:
 	bash scripts/dev_fast_check.sh full

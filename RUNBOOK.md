@@ -36,6 +36,8 @@ make profile-changed
 make profile-frontend
 make profile-backend
 make profile-fast
+make frontend-smoke-server-status
+make frontend-smoke-server-stop
 make frontend
 make backend
 make fast
@@ -53,13 +55,14 @@ These commands:
 8. keep frontend verification on targeted fast smokes when changed files map cleanly, otherwise fall back to the default `auth + ops + runtime`
 9. auto-derive the same local diff context for explicit surface commands like `make frontend`, `make backend`, `make profile-frontend`, and `make profile-backend`
 10. keep `release_workflow_audit` enabled for release-contract diffs while still letting local `security_audit` stay on changed-file scope when a full tracked-file scan is unnecessary
-11. reuse one shared frontend smoke dev server in fast mode instead of starting a new `next dev` process for each smoke
-12. reuse shared frontend smoke servers in the heavier full gate too, so the main frontend smoke pack no longer starts a separate `next dev` process per script
-13. cache repeated local audit steps inside one gate run, so nested security/runtime audits do not re-run the same expensive checks twice
-14. skip runtime-oriented local audits automatically when the current diff does not touch runtime or deploy contract files
-15. narrow local `security_audit` to changed files and skip nested release or credentials audits unless the diff touches those contracts
-16. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
-17. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+11. keep experimental persistent frontend smoke-server controls available, but leave the default fast loop on the safer per-command lifecycle unless `FRONTEND_SMOKE_PERSIST_SERVER=1` is set explicitly
+12. reuse one shared frontend smoke dev server in fast mode instead of starting a new `next dev` process for each smoke
+13. reuse shared frontend smoke servers in the heavier full gate too, so the main frontend smoke pack no longer starts a separate `next dev` process per script
+14. cache repeated local audit steps inside one gate run, so nested security/runtime audits do not re-run the same expensive checks twice
+15. skip runtime-oriented local audits automatically when the current diff does not touch runtime or deploy contract files
+16. narrow local `security_audit` to changed files and skip nested release or credentials audits unless the diff touches those contracts
+17. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
+18. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
 
 To inspect the latest local timings quickly:
 
