@@ -39,6 +39,7 @@ scripts/detect_backend_syntax_scope.sh
 scripts/detect_security_audit_scope.sh
 scripts/bootstrap_project_automation.sh
 scripts/upgrade_project_automation.sh
+scripts/automation_core_doctor.sh
 scripts/export_automation_core.sh
 scripts/project_automation_config.sh
 scripts/project_automation_smoke_checks.sh
