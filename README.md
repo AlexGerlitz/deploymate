@@ -206,6 +206,11 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 For daily coding, the shortest useful local checks are now:
 
 ```bash
+make start-pr-branch SLUG=my-change
+make pr-ready
+make pr-open
+make pr-status
+make auto-local
 make changed
 make profile-changed
 make profile-frontend
@@ -235,6 +240,10 @@ What they do:
 - `make frontend-smoke-server-status` shows reusable local frontend smoke servers kept alive between commands
 - `make frontend-smoke-server-stop` stops those reusable local frontend smoke servers explicitly
 - `make audit-cache-clear` clears the persistent local audit fingerprint cache
+- `make start-pr-branch SLUG=...` creates a clean feature branch from local `develop`
+- `make pr-ready` runs the recommended local loop for the current feature branch and prints the PR next step
+- `make pr-open` opens a GitHub PR against `develop` with the repo template plus local automation context
+- `make pr-status` shows the current PR state through GitHub CLI
 - `make frontend` runs the fast frontend gate
 - `make frontend-hot` runs the same fast frontend gate but keeps the smoke server warm across runs
 - `make backend` runs the fast backend gate
@@ -276,7 +285,7 @@ The fast gate intentionally uses fewer resources:
 - `make recommend-local-mode` now suggests the cheapest useful loop for the current diff, so you spend less time deciding between `backend`, `frontend-hot`, `changed`, or `profile-changed`
 - `make changed` now narrows mixed diffs down to an effective `frontend` or `backend` fast surface automatically when one side already resolves to `skip`, so shared-but-one-sided changes stop paying for an unnecessary second half
 - `make auto-local` now executes the recommended loop directly, including auto-switching between fast and profile modes when the diff looks expensive enough to justify timing and cache context
-- `make auto-local` now also remembers the last successful loop for the same diff family and prints a cheaper follow-up command for the next tweak, so second-pass iterations get even shorter
+- `make auto-local` now also remembers the last successful loop for the same diff family and prints a cheaper follow-up command for the next tweak, now biased by the last measured bottleneck instead of just the previous mode name
 - project-specific layout and route assumptions now live behind [scripts/project_automation_config.sh](scripts/project_automation_config.sh), so the reusable automation core is no longer welded directly to DeployMate paths
 - project-specific path-to-target rules now live behind [scripts/project_automation_targets.sh](scripts/project_automation_targets.sh), so moving this system to another repo no longer means rewriting every `detect_*` script
 - frontend smoke assertions now live behind [scripts/project_automation_smoke_checks.sh](scripts/project_automation_smoke_checks.sh), so both the fast and heavier smoke runners are no longer welded to DeployMate-specific selectors
@@ -292,6 +301,31 @@ The fast gate intentionally uses fewer resources:
 - `make timing-history` prints the latest local timing rows without opening the CSV manually
 - `make timing-stats` prints grouped `avg/min/max/latest` phase timings from the recent local history
 - local preflight and release flows now print a short bottleneck hint from recent matching runs, so the next optimization target is obvious
+
+## PR Workflow
+
+The repository now works best with a PR-first loop into `develop`:
+
+```bash
+git switch develop
+git pull --ff-only origin develop
+make start-pr-branch SLUG=my-change
+```
+
+Then use this daily path:
+
+1. code and commit on the feature branch
+2. run `make pr-ready`
+3. push with `git push -u origin $(git branch --show-current)`
+4. open the PR with `make pr-open`
+5. merge into `develop` after CI goes green
+
+PRs are not just ceremony here:
+
+- pull requests already run the same CI release gate as `develop` pushes
+- auto-staging still happens only after the reviewed PR lands in `develop`
+- `.github/pull_request_template.md` keeps the PR body short and consistent
+- `make pr-ready` and `make pr-open` keep the branch-to-PR flow aligned with the same automation core used for local verification
 
 ## Key Screens In The App
 

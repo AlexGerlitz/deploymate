@@ -174,12 +174,37 @@ If you want the same flow from GitHub instead of a workstation shell, use the ma
 
 Recommended promotion order:
 
-1. push reviewed changes to `develop`
-2. `.github/workflows/ci.yml` runs the release gate and then auto-deploys the same commit to staging
-3. production deploy stays behind `.github/workflows/release.yml` or a manual `scripts/remote_release.sh` run
+1. open and review a PR into `develop`
+2. merge the reviewed PR into `develop`
+3. `.github/workflows/ci.yml` runs the release gate and then auto-deploys the same commit to staging
+4. production deploy stays behind `.github/workflows/release.yml` or a manual `scripts/remote_release.sh` run
 
 The CI and release workflows call the same reusable composite action in `.github/actions/remote-release/action.yml`, so staging and production deploy behavior stays aligned with `scripts/remote_release.sh`.
 Those workflows pass the exact checked-out commit SHA into the remote helper, so the release host deploys the reviewed commit rather than whichever newer commit happens to land on the branch later.
+
+Recommended PR-first daily flow:
+
+```bash
+git switch develop
+git pull --ff-only origin develop
+make start-pr-branch SLUG=my-change
+```
+
+Then:
+
+1. commit the change on the feature branch
+2. run `make pr-ready`
+3. push with `git push -u origin $(git branch --show-current)`
+4. open the PR with `make pr-open`
+5. use `make pr-status` while the PR is under review
+6. merge into `develop` after the PR CI goes green
+
+Notes:
+
+- PR CI already runs the same release gate as direct `develop` pushes
+- auto-staging still happens only after merge into `develop`
+- `.github/pull_request_template.md` keeps the PR body short and predictable
+- `make pr-ready` uses the same recommendation and `auto-local` logic as the normal local loop, so the pre-PR check is not a second parallel process
 
 For daily iteration speed on staging:
 

@@ -302,6 +302,7 @@ if [ -f "$LAST_LOOP_STATE_FILE" ]; then
   LAST_AUTO_LOCAL_SURFACE=""
   LAST_AUTO_LOCAL_EXECUTION_CLASS=""
   LAST_AUTO_LOCAL_BASE_REF=""
+  LAST_AUTO_LOCAL_BOTTLENECK_PHASE=""
   while IFS='=' read -r key value; do
     case "$key" in
       LAST_AUTO_LOCAL_MODE)
@@ -324,22 +325,47 @@ if [ -f "$LAST_LOOP_STATE_FILE" ]; then
         LAST_AUTO_LOCAL_BASE_REF="${value#\'}"
         LAST_AUTO_LOCAL_BASE_REF="${LAST_AUTO_LOCAL_BASE_REF%\'}"
         ;;
+      LAST_AUTO_LOCAL_BOTTLENECK_PHASE)
+        LAST_AUTO_LOCAL_BOTTLENECK_PHASE="${value#\'}"
+        LAST_AUTO_LOCAL_BOTTLENECK_PHASE="${LAST_AUTO_LOCAL_BOTTLENECK_PHASE%\'}"
+        ;;
     esac
   done < "$LAST_LOOP_STATE_FILE"
   if [ "${LAST_AUTO_LOCAL_BASE_REF:-}" = "$resolved_base_ref" ] && [ "${LAST_AUTO_LOCAL_SURFACE:-}" = "$surface" ]; then
     case "${LAST_AUTO_LOCAL_MODE:-}" in
       profile-frontend)
-        followup_command="make frontend-hot"
-        followup_reason="last successful loop already profiled this frontend diff; use the hot loop for the next tweak"
+        if [ "${LAST_AUTO_LOCAL_BOTTLENECK_PHASE:-}" = "frontend_phase" ] || [ "${LAST_AUTO_LOCAL_BOTTLENECK_PHASE:-}" = "preflight" ]; then
+          followup_command="make frontend-hot"
+          followup_reason="last successful loop profiled this frontend diff; the next tweak can go through the cheaper hot loop"
+        fi
         ;;
       profile-backend)
-        followup_command="make backend"
-        followup_reason="last successful loop already profiled this backend diff; use the cheaper backend rerun next"
+        if [ "${LAST_AUTO_LOCAL_BOTTLENECK_PHASE:-}" = "backend_phase" ] || [ "${LAST_AUTO_LOCAL_BOTTLENECK_PHASE:-}" = "preflight" ]; then
+          followup_command="make backend"
+          followup_reason="last successful loop profiled this backend diff; the next rerun can use the cheaper backend loop"
+        fi
         ;;
       profile-changed)
         if [ "$surface" = "full" ]; then
-          followup_command="make changed"
-          followup_reason="last successful loop already captured timing context for this mixed diff; the next rerun can use the cheaper changed loop"
+          case "${LAST_AUTO_LOCAL_BOTTLENECK_PHASE:-}" in
+            frontend_phase)
+              if [ "${frontend_fast_mode:-default}" = "targeted" ] && { [ "${frontend_fast_smokes:-}" = "auth" ] || [ "${frontend_fast_smokes:-}" = "ops" ] || [ "${frontend_fast_smokes:-}" = "runtime" ]; }; then
+                followup_command="make frontend-hot"
+                followup_reason="last mixed profile was frontend-heavy; next tweak is cheaper through the frontend hot loop"
+              else
+                followup_command="make frontend"
+                followup_reason="last mixed profile was frontend-heavy; next tweak is cheaper through the frontend loop"
+              fi
+              ;;
+            backend_phase)
+              followup_command="make backend"
+              followup_reason="last mixed profile was backend-heavy; next tweak is cheaper through the backend loop"
+              ;;
+            *)
+              followup_command="make changed"
+              followup_reason="last successful loop already captured timing context for this mixed diff; the next rerun can use the cheaper changed loop"
+              ;;
+          esac
         fi
         ;;
       frontend)

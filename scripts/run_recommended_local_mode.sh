@@ -17,6 +17,23 @@ Resolve the recommended local verification loop for the current diff and run it.
 EOF
 }
 
+resolve_timing_context() {
+  case "${1:-}" in
+    frontend|frontend-hot|profile-frontend)
+      printf 'script_name=release_workflow\nsurface=frontend\nfast_mode=1\n'
+      ;;
+    backend|profile-backend)
+      printf 'script_name=release_workflow\nsurface=backend\nfast_mode=1\n'
+      ;;
+    changed|profile-changed|"")
+      printf 'script_name=release_workflow\nsurface=%s\nfast_mode=1\n' "${surface:-full}"
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
 ARGS=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -63,6 +80,9 @@ followup_reason=""
 base_ref=""
 head_ref=""
 surface=""
+bottleneck_phase=""
+bottleneck_avg_seconds=""
+bottleneck_count=""
 
 while IFS='=' read -r key value; do
   case "$key" in
@@ -143,12 +163,50 @@ case "$recommended_mode" in
     ;;
 esac
 
+if timing_context="$(resolve_timing_context "$recommended_mode")" && [ -n "${timing_context:-}" ]; then
+  timing_script_name=""
+  timing_surface=""
+  timing_fast_mode=""
+  while IFS='=' read -r key value; do
+    case "$key" in
+      script_name)
+        timing_script_name="$value"
+        ;;
+      surface)
+        timing_surface="$value"
+        ;;
+      fast_mode)
+        timing_fast_mode="$value"
+        ;;
+    esac
+  done <<< "$timing_context"
+
+  if [ -n "${timing_script_name:-}" ] && [ -n "${timing_surface:-}" ] && [ -n "${timing_fast_mode:-}" ]; then
+    while IFS='=' read -r key value; do
+      case "$key" in
+        phase)
+          bottleneck_phase="$value"
+          ;;
+        avg_seconds)
+          bottleneck_avg_seconds="$value"
+          ;;
+        count)
+          bottleneck_count="$value"
+          ;;
+      esac
+    done < <(bash scripts/timing_history.sh print_hint_fields "$timing_script_name" "$timing_surface" "$timing_fast_mode" 160)
+  fi
+fi
+
 {
   printf 'LAST_AUTO_LOCAL_MODE=%q\n' "${recommended_mode:-}"
   printf 'LAST_AUTO_LOCAL_COMMAND=%q\n' "${recommended_command:-}"
   printf 'LAST_AUTO_LOCAL_SURFACE=%q\n' "${surface:-}"
   printf 'LAST_AUTO_LOCAL_EXECUTION_CLASS=%q\n' "${recommended_execution_class:-}"
   printf 'LAST_AUTO_LOCAL_BASE_REF=%q\n' "${base_ref:-}"
+  printf 'LAST_AUTO_LOCAL_BOTTLENECK_PHASE=%q\n' "${bottleneck_phase:-}"
+  printf 'LAST_AUTO_LOCAL_BOTTLENECK_AVG_SECONDS=%q\n' "${bottleneck_avg_seconds:-}"
+  printf 'LAST_AUTO_LOCAL_BOTTLENECK_COUNT=%q\n' "${bottleneck_count:-}"
 } >"$STATE_FILE"
 
 if [ -n "$followup_command" ]; then
