@@ -289,10 +289,12 @@ resolve_runtime_external_port() {
 run_runtime_smoke() {
   local external_port
   external_port="$(resolve_runtime_external_port)"
+  local runtime_name
+  runtime_name="smoke-runtime-${external_port}"
   echo "[smoke] runtime smoke enabled"
 
   local payload
-  payload="$(python3 - "$RUNTIME_IMAGE" "$RUNTIME_INTERNAL_PORT" "$external_port" "$RUNTIME_SERVER_ID" <<'PY'
+  payload="$(python3 - "$RUNTIME_IMAGE" "$RUNTIME_INTERNAL_PORT" "$external_port" "$RUNTIME_SERVER_ID" "$runtime_name" <<'PY'
 import json
 import sys
 
@@ -300,10 +302,11 @@ image = sys.argv[1]
 internal_port = int(sys.argv[2])
 external_port = int(sys.argv[3])
 server_id = sys.argv[4]
+name = sys.argv[5]
 
 payload = {
     "image": image,
-    "name": "smoke-runtime",
+    "name": name,
     "internal_port": internal_port,
     "external_port": external_port,
     "env": {
