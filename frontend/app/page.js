@@ -498,6 +498,9 @@ export default function LandingPage() {
               <Link href="/upgrade" className="landingButton secondaryButton">
                 Talk to sales / licensing
               </Link>
+              <Link href="/commercial-license" className="linkButton">
+                Commercial license info
+              </Link>
             </article>
           </div>
 

@@ -217,6 +217,9 @@ export default function UpgradePage() {
             >
               Read policy
             </a>
+            <Link href="/commercial-license" className="linkButton">
+              Commercial license page
+            </Link>
           </div>
 
           <div className="overviewGrid">

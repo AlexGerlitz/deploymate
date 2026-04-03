@@ -36,6 +36,11 @@ This repository is source-available, not open source.
 
 See [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for the business-use policy and [NOTICE](NOTICE) for the short-form repository notice.
 
+Commercial licensing entry points:
+
+- public explanation: `https://deploymatecloud.ru/commercial-license`
+- request flow: `https://deploymatecloud.ru/upgrade`
+
 ## Reviewer Package
 
 If you are opening this repository as a hiring reviewer, these are the fastest entry points:
