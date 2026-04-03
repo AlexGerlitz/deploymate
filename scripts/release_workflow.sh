@@ -27,6 +27,25 @@ phase_cache_fingerprint() {
   audit_cache_fingerprint_inputs "$cache_key" "$metadata" "$@"
 }
 
+frontend_target_changed_files() {
+  local smoke_target="$1"
+  local changed_path=""
+  local target_line=""
+
+  [ -n "${DEPLOYMATE_CHANGED_FILES:-}" ] || return 0
+
+  while IFS= read -r changed_path; do
+    [ -n "$changed_path" ] || continue
+    while IFS= read -r target_line; do
+      [ -n "$target_line" ] || continue
+      if [ "$target_line" = "$smoke_target" ]; then
+        printf '%s\n' "$changed_path"
+        break
+      fi
+    done < <(bash scripts/detect_frontend_smoke_targets.sh "$changed_path")
+  done <<< "${DEPLOYMATE_CHANGED_FILES}"
+}
+
 clean_frontend_build_artifacts() {
   local frontend_dir=""
   frontend_dir="$(automation_frontend_dir_rel)"
@@ -55,14 +74,50 @@ run_frontend_fast_smokes_shared() {
   export FRONTEND_SMOKE_DIST_DIR="$shared_dist"
   export FRONTEND_SMOKE_REUSE_SERVER=1
 
-  start_frontend_smoke_server
-  trap 'stop_frontend_smoke_server' RETURN
-
-  wait_for_frontend_smoke_url "$(automation_frontend_ready_path)"
+  local server_started=0
+  trap 'if [ "$server_started" = "1" ]; then stop_frontend_smoke_server; fi' RETURN
+  ensure_shared_server() {
+    if [ "$server_started" != "1" ]; then
+      start_frontend_smoke_server
+      wait_for_frontend_smoke_url "$(automation_frontend_ready_path)"
+      server_started=1
+    fi
+  }
 
   for smoke_target in "${smoke_targets[@]}"; do
+    frontend_phase_cache_key="frontend_fast_phase_${smoke_target}"
+    frontend_phase_metadata="$(printf 'surface=%s\nfast=%s\nmode=%s\ntarget=%s\n' "$SURFACE" "$FAST_MODE" "${DEPLOYMATE_FRONTEND_FAST_MODE:-default}" "$smoke_target")"
+    frontend_phase_files=(
+      "scripts/release_workflow.sh"
+      "scripts/frontend_smoke_shared.sh"
+      "scripts/frontend_${smoke_target}_smoke.sh"
+      "scripts/lib/frontend_smoke_checks.sh"
+      "scripts/project_automation_smoke_checks.sh"
+      "scripts/project_automation_config.sh"
+      "scripts/project_automation_targets.sh"
+      "frontend/package.json"
+    )
+    frontend_phase_changed_subset="$(frontend_target_changed_files "$smoke_target")"
+    if [ -n "$frontend_phase_changed_subset" ]; then
+      while IFS= read -r changed_path; do
+        [ -n "$changed_path" ] && frontend_phase_files+=("$changed_path")
+      done <<< "$frontend_phase_changed_subset"
+    fi
+    frontend_phase_metadata="$(printf '%srelevant_changed=%s\n' "$frontend_phase_metadata" "$frontend_phase_changed_subset")"
+    frontend_phase_fingerprint="$(phase_cache_fingerprint "$frontend_phase_cache_key" "$frontend_phase_metadata" "${frontend_phase_files[@]}")"
+
+    if audit_cache_persistent_has "$frontend_phase_cache_key" "$frontend_phase_fingerprint"; then
+      echo "[release] frontend ${smoke_target} phase cache hit"
+      audit_cache_record_event phase_hit "$frontend_phase_cache_key"
+      continue
+    fi
+
+    echo "[release] frontend ${smoke_target} phase cache miss"
+    audit_cache_record_event phase_miss "$frontend_phase_cache_key"
+    ensure_shared_server
     echo "[release] frontend ${smoke_target} smoke"
     automation_frontend_npm run "smoke:${smoke_target}"
+    audit_cache_persistent_mark "$frontend_phase_cache_key" "$frontend_phase_fingerprint"
   done
 }
 
@@ -192,27 +247,6 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
     if [ "$DEPLOYMATE_FRONTEND_FAST_MODE" = "skip" ]; then
       echo "[release] frontend fast smokes skipped for this diff"
     else
-      frontend_phase_cache_key="frontend_fast_phase"
-      frontend_phase_metadata="$(printf 'surface=%s\nfast=%s\nmode=%s\ntargets=%s\nchanged=%s\n' "$SURFACE" "$FAST_MODE" "${DEPLOYMATE_FRONTEND_FAST_MODE:-default}" "${frontend_fast_smokes[*]}" "${DEPLOYMATE_CHANGED_FILES:-}")"
-      frontend_phase_files=(
-        "scripts/release_workflow.sh"
-        "scripts/frontend_smoke_shared.sh"
-        "scripts/frontend_auth_smoke.sh"
-        "scripts/frontend_ops_smoke.sh"
-        "scripts/frontend_runtime_smoke.sh"
-        "scripts/lib/frontend_smoke_checks.sh"
-        "scripts/project_automation_smoke_checks.sh"
-        "scripts/project_automation_config.sh"
-        "scripts/project_automation_targets.sh"
-        "frontend/package.json"
-      )
-      if [ -n "${DEPLOYMATE_CHANGED_FILES:-}" ]; then
-        while IFS= read -r changed_path; do
-          [ -n "$changed_path" ] && frontend_phase_files+=("$changed_path")
-        done <<< "${DEPLOYMATE_CHANGED_FILES}"
-      fi
-      frontend_phase_fingerprint="$(phase_cache_fingerprint "$frontend_phase_cache_key" "$frontend_phase_metadata" "${frontend_phase_files[@]}")"
-
       for frontend_smoke in "${frontend_fast_smokes[@]}"; do
         case "$frontend_smoke" in
           auth|ops|runtime)
@@ -223,15 +257,7 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
             ;;
         esac
       done
-      if audit_cache_persistent_has "$frontend_phase_cache_key" "$frontend_phase_fingerprint"; then
-        echo "[release] frontend fast phase cache hit"
-        audit_cache_record_event phase_hit "$frontend_phase_cache_key"
-      else
-        echo "[release] frontend fast phase cache miss"
-        audit_cache_record_event phase_miss "$frontend_phase_cache_key"
-        run_frontend_fast_smokes_shared "${frontend_fast_smokes[@]}"
-        audit_cache_persistent_mark "$frontend_phase_cache_key" "$frontend_phase_fingerprint"
-      fi
+      run_frontend_fast_smokes_shared "${frontend_fast_smokes[@]}"
     fi
   else
     frontend_fast_port=3001

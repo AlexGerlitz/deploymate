@@ -71,7 +71,7 @@ These commands:
 19. reuse fingerprint-cached results for repeated local release-contract and runtime-contract audits when their inputs stay the same
 20. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
 21. print a short cache-hit summary after local preflight, release, and profile commands so saved reruns are visible immediately
-22. reuse phase-level fingerprint caches for repeated fast frontend smoke phases and backend fast suites when the diff and inputs stay the same
+22. reuse phase-level fingerprint caches for repeated fast frontend smoke targets and backend fast suites when the diff and inputs stay the same
 23. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
 24. keep project-specific path and route assumptions inside `scripts/project_automation_config.sh`, so the automation core can be ported to another repo without rewriting every script first
 25. keep project-specific path-to-target and path-to-scope rules inside `scripts/project_automation_targets.sh`, so the `detect_*` layer is portable too
