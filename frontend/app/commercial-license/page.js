@@ -15,6 +15,11 @@ const requestChecklist = [
 ];
 const contactChannels = [
   {
+    label: "Business email",
+    value: "alexgerlitz@users.noreply.github.com",
+    href: "mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license",
+  },
+  {
     label: "Request form",
     value: "Use the in-product request flow",
     href: "/upgrade",
@@ -119,7 +124,7 @@ export default function CommercialLicensePage() {
           <div className="authDecisionRow">
             <div className="authDecisionCard">
               <strong>What happens next?</strong>
-              <p>After you submit the request, the next step is a short scope review: intended use, deployment scale, support needs, and whether redistribution rights are required.</p>
+              <p>After you submit the request, the next step is a short scope review: intended use, deployment scale, support needs, and whether redistribution rights are required. The first reply usually comes within 2 business days.</p>
             </div>
             <div className="authDecisionCard">
               <strong>What to prepare</strong>
@@ -131,6 +136,12 @@ export default function CommercialLicensePage() {
             <Link href="/upgrade" className="landingButton primaryButton authPrimaryAction">
               Request commercial license
             </Link>
+            <a
+              href="mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license"
+              className="linkButton"
+            >
+              Email licensing request
+            </a>
             <a
               href="https://github.com/AlexGerlitz/deploymate/blob/main/COMMERCIAL-LICENSE.md"
               className="linkButton"

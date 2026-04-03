@@ -24,6 +24,7 @@ Examples include:
 
 Contact the repository owner through one of these channels:
 
+- [alexgerlitz@users.noreply.github.com](mailto:alexgerlitz@users.noreply.github.com)
 - [https://github.com/AlexGerlitz](https://github.com/AlexGerlitz)
 - [https://deploymatecloud.ru](https://deploymatecloud.ru)
 
@@ -39,6 +40,11 @@ Include:
 - whether use is internal, client-facing, or resale
 - expected deployment scale
 - whether you need support, customization, or redistribution rights
+
+Expected response:
+
+- initial reply usually within 2 business days
+- scope review first, then licensing terms if the use case is a fit
 
 No commercial rights are granted unless you receive explicit written permission
 or a separate signed commercial license.

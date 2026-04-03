@@ -40,7 +40,8 @@ Commercial licensing entry points:
 
 - public explanation: `https://deploymatecloud.ru/commercial-license`
 - request flow: `https://deploymatecloud.ru/upgrade`
-- owner contact: `https://github.com/AlexGerlitz`
+- owner contact: `mailto:alexgerlitz@users.noreply.github.com`
+- expected first reply: usually within 2 business days
 
 ## Reviewer Package
 

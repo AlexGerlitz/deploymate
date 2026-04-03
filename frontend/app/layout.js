@@ -48,17 +48,15 @@ export default function RootLayout({ children }) {
                 Request access
               </Link>
               <a
-                href="https://github.com/AlexGerlitz"
+                href="mailto:alexgerlitz@users.noreply.github.com?subject=DeployMate%20commercial%20license"
                 className="siteFooterLink"
-                target="_blank"
-                rel="noreferrer"
               >
-                Contact owner
+                Email licensing
               </a>
             </div>
 
             <div className="siteFooterMeta">
-              <span>Business use, SaaS, internal company rollout, and resale require explicit permission.</span>
+              <span>Business use, SaaS, internal company rollout, and resale require explicit permission. First response usually within 2 business days.</span>
               <a href="https://deploymatecloud.ru" className="inlineLink">
                 deploymatecloud.ru
               </a>
