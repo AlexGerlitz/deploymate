@@ -9,8 +9,6 @@ import {
   smokeMode,
   smokeNotifications,
   smokeOpsOverview,
-  smokeServerDiagnostics,
-  smokeServerTestResults,
   smokeServers,
   smokeTemplates,
   smokeUser,
@@ -420,9 +418,6 @@ export default function HomePage() {
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [createdDeployment, setCreatedDeployment] = useState(null);
 
-  const [serverSubmitting, setServerSubmitting] = useState(false);
-  const [serverSubmitError, setServerSubmitError] = useState("");
-  const [serverSubmitSuccess, setServerSubmitSuccess] = useState("");
   const [templateSubmitting, setTemplateSubmitting] = useState(false);
   const [templateSubmitError, setTemplateSubmitError] = useState("");
   const [templateSubmitSuccess, setTemplateSubmitSuccess] = useState("");
@@ -434,24 +429,12 @@ export default function HomePage() {
 
   const [deleteError, setDeleteError] = useState("");
   const [deletingDeploymentId, setDeletingDeploymentId] = useState("");
-  const [serverDeleteError, setServerDeleteError] = useState("");
-  const [deletingServerId, setDeletingServerId] = useState("");
   const [templateDeleteError, setTemplateDeleteError] = useState("");
   const [deletingTemplateId, setDeletingTemplateId] = useState("");
   const [deployingTemplateId, setDeployingTemplateId] = useState("");
   const [duplicatingTemplateId, setDuplicatingTemplateId] = useState("");
-  const [testingServerId, setTestingServerId] = useState("");
-  const [serverTestResults, setServerTestResults] = useState(
-    smokeMode ? smokeServerTestResults : {},
-  );
-  const [serverDiagnostics, setServerDiagnostics] = useState(
-    smokeMode ? smokeServerDiagnostics : {},
-  );
-  const [serverDiagnosticsError, setServerDiagnosticsError] = useState({});
-  const [diagnosingServerId, setDiagnosingServerId] = useState("");
   const [deploymentFilter, setDeploymentFilter] = useState("all");
   const [deploymentQuery, setDeploymentQuery] = useState("");
-  const [serverQuery, setServerQuery] = useState("");
   const [notificationFilter, setNotificationFilter] = useState("all");
   const [notificationQuery, setNotificationQuery] = useState("");
   const [templateQuery, setTemplateQuery] = useState("");
@@ -474,15 +457,6 @@ export default function HomePage() {
   });
   const [templateName, setTemplateName] = useState("");
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
-  const [serverForm, setServerForm] = useState({
-    name: "",
-    host: "",
-    port: "22",
-    username: "",
-    auth_type: "ssh_key",
-    ssh_key: "",
-  });
-
   const serverLimitReached =
     currentUser &&
     typeof currentUser.limits?.max_servers === "number" &&
@@ -519,25 +493,6 @@ export default function HomePage() {
       .toLowerCase();
 
     return haystack.includes(normalizedDeploymentQuery);
-  });
-  const normalizedServerQuery = serverQuery.trim().toLowerCase();
-  const filteredServers = servers.filter((server) => {
-    if (!normalizedServerQuery) {
-      return true;
-    }
-
-    const haystack = [
-      server.name,
-      server.host,
-      server.username,
-      server.auth_type,
-      `${server.username}@${server.host}:${server.port}`,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(normalizedServerQuery);
   });
   const normalizedNotificationQuery = notificationQuery.trim().toLowerCase();
   const filteredNotifications = notifications.filter((item) => {
@@ -742,6 +697,7 @@ export default function HomePage() {
         "Use the deployment list first, then open advanced workspace tools only when needed.",
     },
   ];
+  const serverReviewPreviewItems = servers.slice(0, 3);
   const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
     opsSnapshot.attention_items.length === 1 ? "" : "s"
   }`;
@@ -1129,14 +1085,6 @@ export default function HomePage() {
     setForm((currentForm) => ({
       ...currentForm,
       external_port: String(port),
-    }));
-  }
-
-  function updateServerFormField(event) {
-    const { name, value } = event.target;
-    setServerForm((currentForm) => ({
-      ...currentForm,
-      [name]: value,
     }));
   }
 
@@ -1584,67 +1532,6 @@ export default function HomePage() {
     }
   }
 
-  async function handleCreateServer(event) {
-    event.preventDefault();
-    setServerSubmitting(true);
-    setServerSubmitError("");
-    setServerSubmitSuccess("");
-
-    if (serverLimitReached) {
-      setServerSubmitError("Server limit reached for your current plan. Upgrade to continue.");
-      setServerSubmitting(false);
-      return;
-    }
-
-    const payload = {
-      name: serverForm.name,
-      host: serverForm.host,
-      port: Number(serverForm.port || 22),
-      username: serverForm.username,
-      auth_type: serverForm.auth_type,
-    };
-
-    if (serverForm.auth_type === "ssh_key" && serverForm.ssh_key) {
-      payload.ssh_key = serverForm.ssh_key;
-    }
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/servers`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-      await readJsonOrError(response, "Failed to create server.");
-
-      setServerForm({
-        name: "",
-        host: "",
-        port: "22",
-        username: "",
-        auth_type: "ssh_key",
-        ssh_key: "",
-      });
-      setServerSubmitSuccess("Server added successfully.");
-      await refreshPage();
-    } catch (requestError) {
-      if (requestError instanceof Error && requestError.status === 401) {
-        router.replace("/login");
-        return;
-      }
-
-      setServerSubmitError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Failed to create server.",
-      );
-    } finally {
-      setServerSubmitting(false);
-    }
-  }
-
   async function handleDelete(deploymentId) {
     const confirmed = window.confirm(
       "Delete this deployment? This will also try to remove its Docker container.",
@@ -1686,130 +1573,6 @@ export default function HomePage() {
       );
     } finally {
       setDeletingDeploymentId("");
-    }
-  }
-
-  async function handleDeleteServer(serverId) {
-    const confirmed = window.confirm(
-      "Delete this server? Deletion is blocked while deployments still use it.",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setServerDeleteError("");
-    setDeletingServerId(serverId);
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/servers/${serverId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      await readJsonOrError(response, "Failed to delete server.");
-
-      if (form.server_id === serverId) {
-        setForm((currentForm) => ({
-          ...currentForm,
-          server_id: "",
-        }));
-      }
-
-      await refreshPage();
-    } catch (requestError) {
-      if (requestError instanceof Error && requestError.status === 401) {
-        router.replace("/login");
-        return;
-      }
-
-      setServerDeleteError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Failed to delete server.",
-      );
-    } finally {
-      setDeletingServerId("");
-    }
-  }
-
-  async function handleTestServer(serverId) {
-    setServerTestResults((currentResults) => ({
-      ...currentResults,
-      [serverId]: {
-        status: "loading",
-        message: "Checking SSH and Docker on this server...",
-        tested_at: new Date().toISOString(),
-      },
-    }));
-    setTestingServerId(serverId);
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/servers/${serverId}/test`, {
-        method: "POST",
-        credentials: "include",
-      });
-      const data = await readJsonOrError(response, "Failed to test server connection.");
-      setServerTestResults((currentResults) => ({
-        ...currentResults,
-        [serverId]: {
-          ...data,
-          tested_at: new Date().toISOString(),
-        },
-      }));
-    } catch (requestError) {
-      if (requestError instanceof Error && requestError.status === 401) {
-        router.replace("/login");
-        return;
-      }
-
-      setServerTestResults((currentResults) => ({
-        ...currentResults,
-        [serverId]: {
-          status: "error",
-          message:
-            requestError instanceof Error
-              ? requestError.message
-              : "Failed to test server connection.",
-          tested_at: new Date().toISOString(),
-        },
-      }));
-    } finally {
-      setTestingServerId("");
-    }
-  }
-
-  async function handleRunServerDiagnostics(serverId) {
-    setDiagnosingServerId(serverId);
-    setServerDiagnosticsError((current) => ({
-      ...current,
-      [serverId]: "",
-    }));
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/servers/${serverId}/diagnostics`, {
-        cache: "no-store",
-        credentials: "include",
-      });
-      const data = await readJsonOrError(response, "Failed to load server diagnostics.");
-      setServerDiagnostics((current) => ({
-        ...current,
-        [serverId]: data,
-      }));
-    } catch (requestError) {
-      if (requestError instanceof Error && requestError.status === 401) {
-        router.replace("/login");
-        return;
-      }
-
-      setServerDiagnosticsError((current) => ({
-        ...current,
-        [serverId]:
-          requestError instanceof Error
-            ? requestError.message
-            : "Failed to load server diagnostics.",
-      }));
-    } finally {
-      setDiagnosingServerId("");
     }
   }
 
@@ -2061,6 +1824,11 @@ export default function HomePage() {
                 </Link>
               ) : null}
               {currentUser?.is_admin ? (
+                <Link href="/app/server-review" className="workspaceGhostAction">
+                  Server review
+                </Link>
+              ) : null}
+              {currentUser?.is_admin ? (
                 <Link href="/app/upgrade-requests" className="workspaceGhostAction">
                   Upgrade inbox
                 </Link>
@@ -2132,7 +1900,6 @@ export default function HomePage() {
           {error ? <div className="banner error">{error}</div> : null}
           {serversError ? <div className="banner error">{serversError}</div> : null}
           {deleteError ? <div className="banner error">{deleteError}</div> : null}
-          {serverDeleteError ? <div className="banner error">{serverDeleteError}</div> : null}
           {templatesError ? <div className="banner error">{templatesError}</div> : null}
           {templateDeleteError ? <div className="banner error">{templateDeleteError}</div> : null}
           {templateDeployError ? <div className="banner error">{templateDeployError}</div> : null}
@@ -2441,7 +2208,7 @@ export default function HomePage() {
         {currentUser?.is_admin ? (
         <AdminDisclosureSection
           title="Servers"
-          subtitle="Saved targets, diagnostics, and connection checks stay here when you need infrastructure detail."
+          subtitle="Workspace keeps only the overview now. Full server review, diagnostics, and follow-up live in the dedicated surface."
           badge={`${servers.length} targets`}
           testId="servers-disclosure"
         >
@@ -2450,106 +2217,13 @@ export default function HomePage() {
             <div>
               <h2 data-testid="servers-title">Servers</h2>
               <p className="formHint">
-                Search saved targets, run diagnostics, and watch for unused entries before the next rollout.
+                Keep this block short: use it to understand current server posture, then step into the dedicated review page for real work.
               </p>
             </div>
-            <label className="field toolbarField">
-              <span>Search servers</span>
-              <input
-                value={serverQuery}
-                onChange={(event) => setServerQuery(event.target.value)}
-                placeholder="demo-vps, 203.0.113.10, root"
-                disabled={serversLoading}
-                data-testid="servers-search-input"
-              />
-            </label>
+            <Link href="/app/server-review" className="landingButton secondaryButton">
+              Open server review
+            </Link>
           </div>
-          <form className="form" onSubmit={handleCreateServer} data-testid="servers-create-form">
-            <label className="field">
-              <span>Name</span>
-              <input
-                name="name"
-                value={serverForm.name}
-                onChange={updateServerFormField}
-                placeholder="demo-vps"
-                disabled={serverSubmitting}
-                required
-                data-testid="servers-create-name-input"
-              />
-            </label>
-
-            <label className="field">
-              <span>Host</span>
-              <input
-                name="host"
-                value={serverForm.host}
-                onChange={updateServerFormField}
-                placeholder="203.0.113.10"
-                disabled={serverSubmitting}
-                required
-                data-testid="servers-create-host-input"
-              />
-            </label>
-
-            <label className="field">
-              <span>Port</span>
-              <input
-                name="port"
-                type="number"
-                min="1"
-                max="65535"
-                value={serverForm.port}
-                onChange={updateServerFormField}
-                disabled={serverSubmitting}
-                required
-                data-testid="servers-create-port-input"
-              />
-            </label>
-
-            <label className="field">
-              <span>Username</span>
-              <input
-                name="username"
-                value={serverForm.username}
-                onChange={updateServerFormField}
-                placeholder="root"
-                disabled={serverSubmitting}
-                required
-                data-testid="servers-create-username-input"
-              />
-            </label>
-
-            <label className="field">
-              <span>Auth type</span>
-              <input value="ssh_key" disabled data-testid="servers-create-auth-type-input" />
-              <span className="fieldHint">
-                New server targets use SSH keys only. Password-based SSH is kept only for
-                legacy records.
-              </span>
-            </label>
-
-            <label className="field">
-              <span>SSH key</span>
-              <textarea
-                name="ssh_key"
-                value={serverForm.ssh_key}
-                onChange={updateServerFormField}
-                disabled={serverSubmitting}
-                required
-                data-testid="servers-create-ssh-key-input"
-              />
-            </label>
-
-            <div className="formActions">
-              <button type="submit" disabled={serverSubmitting || serverLimitReached} data-testid="servers-create-submit-button">
-                {serverSubmitting ? "Adding..." : "Add server"}
-              </button>
-            </div>
-          </form>
-
-          {serverSubmitError ? <div className="banner error" data-testid="servers-submit-error-banner">{serverSubmitError}</div> : null}
-          {serverSubmitSuccess ? <div className="banner success" data-testid="servers-submit-success-banner">{serverSubmitSuccess}</div> : null}
-
           <div className="list compactList" data-testid="servers-list">
             {serversLoading && servers.length === 0 ? (
               <div className="empty" data-testid="servers-loading-state">Loading servers...</div>
@@ -2563,11 +2237,7 @@ export default function HomePage() {
               </div>
             ) : null}
 
-            {!serversLoading && servers.length > 0 && filteredServers.length === 0 ? (
-              <div className="empty" data-testid="servers-filter-empty-state">No servers match this search.</div>
-            ) : null}
-
-            {filteredServers.map((server) => (
+            {serverReviewPreviewItems.map((server) => (
               <article className="card compactCard" key={server.id} data-testid={`server-card-${server.id}`}>
                 <div className="row">
                   <span className="label">Name</span>
@@ -2583,166 +2253,25 @@ export default function HomePage() {
                   <span className="label">Auth</span>
                   <span>{server.auth_type}</span>
                 </div>
-                {serverTestResults[server.id]?.tested_at ? (
-                  <div className="row">
-                    <span className="label">Last test</span>
-                    <span>{formatDate(serverTestResults[server.id].tested_at)}</span>
-                  </div>
-                ) : null}
-                {serverTestResults[server.id]?.target ? (
-                  <div className="row">
-                    <span className="label">Target</span>
-                    <span>{serverTestResults[server.id].target}</span>
-                  </div>
-                ) : null}
-                {serverTestResults[server.id]?.tested_at ? (
-                  <>
-                    <div className="row">
-                      <span className="label">SSH</span>
-                      <span
-                        className={`status ${
-                          serverTestResults[server.id].ssh_ok ? "success" : "error"
-                        }`}
-                      >
-                        {serverTestResults[server.id].ssh_ok ? "ok" : "failed"}
-                      </span>
-                    </div>
-                    <div className="row">
-                      <span className="label">Docker</span>
-                      <span
-                        className={`status ${
-                          serverTestResults[server.id].docker_ok ? "success" : "error"
-                        }`}
-                      >
-                        {serverTestResults[server.id].docker_ok ? "ok" : "failed"}
-                      </span>
-                    </div>
-                  </>
-                ) : null}
-                {serverTestResults[server.id]?.docker_version ? (
-                  <div className="row">
-                    <span className="label">Docker version</span>
-                    <span>{serverTestResults[server.id].docker_version}</span>
-                  </div>
-                ) : null}
-                {serverDiagnostics[server.id]?.checked_at ? (
-                  <div className="row">
-                    <span className="label">Diagnostics</span>
-                    <span>{formatDate(serverDiagnostics[server.id].checked_at)}</span>
-                  </div>
-                ) : null}
-                <div className="actions">
-                  {serverTestResults[server.id]?.status ? (
-                    <span
-                      className={`status ${
-                        serverTestResults[server.id].status === "loading"
-                          ? "unknown"
-                          : serverTestResults[server.id].status
-                      }`}
-                    >
-                      Last test:{" "}
-                      {serverTestResults[server.id].status === "loading"
-                        ? "checking"
-                        : serverTestResults[server.id].status}
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => handleTestServer(server.id)}
-                    disabled={testingServerId === server.id}
-                    data-testid={`server-test-button-${server.id}`}
-                  >
-                    {testingServerId === server.id ? "Testing..." : "Test connection"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRunServerDiagnostics(server.id)}
-                    disabled={diagnosingServerId === server.id}
-                    data-testid={`server-diagnostics-button-${server.id}`}
-                  >
-                    {diagnosingServerId === server.id
-                      ? "Running diagnostics..."
-                      : "Run diagnostics"}
-                  </button>
-                  <button
-                    type="button"
-                    className="dangerButton"
-                    onClick={() => handleDeleteServer(server.id)}
-                    disabled={deletingServerId === server.id}
-                    data-testid={`server-delete-button-${server.id}`}
-                  >
-                    {deletingServerId === server.id ? "Deleting..." : "Delete"}
-                  </button>
+                <div className="row">
+                  <span className="label">Usage</span>
+                  <span>
+                    {deployments.filter((deployment) => deployment.server_id === server.id).length} linked deployment
+                    {deployments.filter((deployment) => deployment.server_id === server.id).length === 1 ? "" : "s"}
+                  </span>
                 </div>
-                {serverTestResults[server.id]?.message ? (
-                  <div
-                    className={`banner ${
-                      serverTestResults[server.id].status === "success"
-                        ? "success"
-                        : serverTestResults[server.id].status === "loading"
-                          ? "subtle"
-                          : "error"
-                    } inlineBanner`}
-                  >
-                    {serverTestResults[server.id].message}
-                  </div>
-                ) : null}
-                {serverDiagnosticsError[server.id] ? (
-                  <div className="banner error inlineBanner">
-                    {serverDiagnosticsError[server.id]}
-                  </div>
-                ) : null}
-                {serverDiagnostics[server.id] ? (
-                  <div className="diagnosticsGrid" data-testid={`server-diagnostics-grid-${server.id}`}>
-                    <div className="diagnosticItem" data-testid={`server-diagnostics-summary-${server.id}`}>
-                      <div className="row">
-                        <span className="label">Overall</span>
-                        <span
-                          className={`status ${
-                            serverDiagnostics[server.id].overall_status || "unknown"
-                          }`}
-                        >
-                          {serverDiagnostics[server.id].overall_status || "unknown"}
-                        </span>
-                      </div>
-                      <p>{serverDiagnostics[server.id].target}</p>
-                      <div className="diagnosticDetails">
-                        Deployments on server: {serverDiagnostics[server.id].deployment_count}
-                      </div>
-                    </div>
-                    {(serverDiagnostics[server.id].items || []).map((item) => (
-                      <div className="diagnosticItem" key={`${server.id}-${item.key}`} data-testid={`server-diagnostic-item-${server.id}-${item.key}`}>
-                        <div className="row">
-                          <span className="label">{item.label}</span>
-                          <span className={`status ${item.status || "unknown"}`}>
-                            {item.status || "unknown"}
-                          </span>
-                        </div>
-                        <p>{item.summary || "-"}</p>
-                        {item.details ? <div className="diagnosticDetails">{item.details}</div> : null}
-                      </div>
-                    ))}
-                    <div className="diagnosticMeta" data-testid={`server-diagnostics-meta-${server.id}`}>
-                      <span>Hostname: {serverDiagnostics[server.id].hostname || "-"}</span>
-                      <span>OS: {serverDiagnostics[server.id].operating_system || "-"}</span>
-                      <span>Uptime: {serverDiagnostics[server.id].uptime || "-"}</span>
-                      <span>Disk: {serverDiagnostics[server.id].disk_usage || "-"}</span>
-                      <span>Memory: {serverDiagnostics[server.id].memory || "-"}</span>
-                      <span>
-                        Compose: {serverDiagnostics[server.id].docker_compose_version || "-"}
-                      </span>
-                      <span>
-                        Ports:{" "}
-                        {Array.isArray(serverDiagnostics[server.id].listening_ports) &&
-                        serverDiagnostics[server.id].listening_ports.length > 0
-                          ? serverDiagnostics[server.id].listening_ports.join(", ")
-                          : "-"}
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
+                <div className="actions">
+                  <Link href="/app/server-review" className="secondaryButton">
+                    Review in dedicated surface
+                  </Link>
+                </div>
               </article>
             ))}
+            {!serversLoading && servers.length > serverReviewPreviewItems.length ? (
+              <div className="banner subtle" data-testid="servers-preview-more-banner">
+                Showing {serverReviewPreviewItems.length} of {servers.length} targets here. Open Server review for the full queue, diagnostics, and follow-up actions.
+              </div>
+            ) : null}
           </div>
         </article>
         </AdminDisclosureSection>

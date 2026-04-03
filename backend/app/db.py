@@ -758,6 +758,32 @@ def delete_server_record(server_id: str) -> None:
         conn.commit()
 
 
+def update_server_record(server_id: str, server_record: dict[str, Any]) -> None:
+    update_sql = """
+    UPDATE servers
+    SET name = %(name)s,
+        host = %(host)s,
+        port = %(port)s,
+        username = %(username)s,
+        auth_type = %(auth_type)s,
+        password = %(password)s,
+        ssh_key = %(ssh_key)s
+    WHERE id = %(id)s;
+    """
+
+    prepared_record = {
+        "id": server_id,
+        **server_record,
+        "password": _encrypt_server_credential_value(server_record.get("password")),
+        "ssh_key": _encrypt_server_credential_value(server_record.get("ssh_key")),
+    }
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(update_sql, prepared_record)
+        conn.commit()
+
+
 def count_deployments_for_server(server_id: str) -> int:
     select_sql = """
     SELECT COUNT(*)

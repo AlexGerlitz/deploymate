@@ -208,6 +208,16 @@ class ServerCreateRequest(BaseModel):
     ssh_key: Optional[str] = None
 
 
+class ServerUpdateRequest(BaseModel):
+    name: str = Field(..., min_length=1)
+    host: str = Field(..., min_length=1)
+    port: int = Field(default=22, ge=1, le=65535)
+    username: str = Field(..., min_length=1)
+    auth_type: ServerAuthType
+    password: Optional[str] = None
+    ssh_key: Optional[str] = None
+
+
 class ServerResponse(BaseModel):
     id: str
     name: str

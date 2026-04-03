@@ -10,6 +10,7 @@ from app.db import (
     get_server_or_404,
     insert_server,
     list_servers,
+    update_server_record,
 )
 from app.schemas import (
     DiagnosticItem,
@@ -18,6 +19,7 @@ from app.schemas import (
     ServerDiagnosticsResponse,
     ServerResponse,
     ServerSuggestedPortsResponse,
+    ServerUpdateRequest,
 )
 from app.services.deployments import get_suggested_external_ports
 from app.services.server_diagnostics import collect_server_diagnostics, test_server_connection
@@ -35,7 +37,9 @@ def create_server(payload: ServerCreateRequest, user=Depends(require_admin)) -> 
             detail="New server targets must use ssh_key authentication.",
         )
 
-    if payload.auth_type == "ssh_key" and not payload.ssh_key:
+    next_ssh_key = payload.ssh_key or existing_server.get("ssh_key")
+
+    if payload.auth_type == "ssh_key" and not next_ssh_key:
         raise HTTPException(status_code=400, detail="ssh_key is required for auth_type=ssh_key.")
 
     enforce_plan_limit(user, "servers")
@@ -66,6 +70,37 @@ def get_servers() -> List[ServerResponse]:
 def get_server(server_id: str) -> ServerResponse:
     server = get_server_or_404(server_id)
     return ServerResponse(**server)
+
+
+@router.patch("/servers/{server_id}", response_model=ServerResponse)
+def update_server(server_id: str, payload: ServerUpdateRequest) -> ServerResponse:
+    existing_server = get_server_or_404(server_id)
+    next_ssh_key = payload.ssh_key or existing_server.get("ssh_key")
+
+    if payload.auth_type != "ssh_key":
+        raise HTTPException(
+            status_code=400,
+            detail="Server targets must use ssh_key authentication.",
+        )
+
+    if payload.auth_type == "ssh_key" and not next_ssh_key:
+        raise HTTPException(status_code=400, detail="ssh_key is required for auth_type=ssh_key.")
+
+    update_server_record(
+        server_id,
+        {
+            "name": payload.name,
+            "host": payload.host,
+            "port": payload.port,
+            "username": payload.username,
+            "auth_type": payload.auth_type,
+            "password": None,
+            "ssh_key": next_ssh_key,
+            "created_at": existing_server["created_at"],
+        },
+    )
+    saved_server = get_server_or_404(server_id)
+    return ServerResponse(**saved_server)
 
 
 @router.post("/servers/{server_id}/test", response_model=ServerConnectionTestResponse)

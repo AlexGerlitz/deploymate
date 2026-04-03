@@ -27,6 +27,7 @@ class ServerApiFlowTests(unittest.TestCase):
             patch("app.routes.servers.insert_server", side_effect=self._insert_server),
             patch("app.routes.servers.list_servers", side_effect=self._list_servers),
             patch("app.routes.servers.get_server_or_404", side_effect=self._get_server_or_404),
+            patch("app.routes.servers.update_server_record", side_effect=self._update_server_record),
             patch("app.routes.servers.delete_server_record", side_effect=self._delete_server_record),
             patch("app.routes.servers.count_deployments_for_server", side_effect=self._count_deployments_for_server),
             patch("app.routes.servers.test_server_connection", side_effect=self._test_server_connection),
@@ -58,6 +59,17 @@ class ServerApiFlowTests(unittest.TestCase):
         if not self.server or self.server["id"] != server_id:
             raise AssertionError(f"Unknown server requested: {server_id}")
         return dict(self.server)
+
+    def _update_server_record(self, server_id, record):
+        self.assertEqual(server_id, self.server["id"])
+        self.server = self._serialize_server(
+            {
+                **self.server,
+                **record,
+                "id": server_id,
+                "created_at": self.server["created_at"],
+            }
+        )
 
     def _delete_server_record(self, server_id):
         self.assertEqual(server_id, self.server["id"])
@@ -138,6 +150,24 @@ class ServerApiFlowTests(unittest.TestCase):
         get_response = self.client.get(f"/servers/{server_id}")
         self.assertEqual(get_response.status_code, 200)
         self.assertEqual(get_response.json()["host"], "203.0.113.10")
+
+        update_response = self.client.patch(
+            f"/servers/{server_id}",
+            json={
+                "name": "smoke-vps-2",
+                "host": "203.0.113.20",
+                "port": 2222,
+                "username": "root",
+                "auth_type": "ssh_key",
+                "ssh_key": "UPDATED-PRIVATE-KEY",
+            },
+        )
+        self.assertEqual(update_response.status_code, 200)
+        updated = update_response.json()
+        self.assertEqual(updated["name"], "smoke-vps-2")
+        self.assertEqual(updated["host"], "203.0.113.20")
+        self.assertEqual(updated["port"], 2222)
+        self.assertEqual(updated["username"], "root")
 
         test_response = self.client.post(f"/servers/{server_id}/test")
         self.assertEqual(test_response.status_code, 200)

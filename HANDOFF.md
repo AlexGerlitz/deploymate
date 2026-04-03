@@ -1,154 +1,183 @@
 # DeployMate Handoff
 
-Updated: 2026-04-03
+Updated: 2026-04-04
 
 ## Current State
 
-- Branch: `main`
+- Branch: `develop`
 - Working tree: dirty
-- Latest commit: `b8b59d1` `Simplify deployment detail actions`
-- `main`, `develop`, `origin/main`, and `origin/develop` are aligned
-- Remote checkout on `deploymate` is on:
-  - branch: `main`
-  - commit: `b8b59d1c0a9c30c8ecd960a6acff22b13e003191`
+- Current local edits:
+  - `HANDOFF.md`
+  - `README.md`
+  - `RUNBOOK.md`
+  - `backend/app/db.py`
+  - `backend/app/routes/servers.py`
+  - `backend/app/schemas.py`
+  - `backend/tests/test_server_api_flow.py`
+  - `frontend/app/app/admin-ui.js`
+  - `frontend/app/app/page.js`
+  - `frontend/app/app/server-review/`
+  - `frontend/app/globals.css`
+  - `scripts/scaffold_deploymate_surface.sh`
+- Latest shared branch commit: `40a75a5` `Add starter API bridge to DeployMate scaffold`
+- `main`, `develop`, `origin/main`, and `origin/develop` are aligned on `40a75a5`
 
-## What Was Completed In The Latest Session
+## Short Version
 
-### Frontend product polish
+Если совсем по-человечески:
 
-- workspace and public surfaces were calmed and simplified:
-  - [landing page](/Users/alexgerlitz/deploymate/frontend/app/page.js)
-  - [workspace page](/Users/alexgerlitz/deploymate/frontend/app/app/page.js)
-  - [global styles](/Users/alexgerlitz/deploymate/frontend/app/globals.css)
-- deployment detail flow was simplified in:
-  - [deployment detail page](/Users/alexgerlitz/deploymate/frontend/app/deployments/[deploymentId]/page.js)
-- admin surfaces were simplified in:
-  - [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js)
-  - [upgrade requests page](/Users/alexgerlitz/deploymate/frontend/app/app/upgrade-requests/page.js)
-- mobile / compact viewport polish was added for:
-  - `/`
-  - `/login`
-  - `/app`
-  - `/deployments/[deploymentId]`
-- frontend now surfaces clearer degraded / export error states in:
-  - [workspace page](/Users/alexgerlitz/deploymate/frontend/app/app/page.js)
-  - [users page](/Users/alexgerlitz/deploymate/frontend/app/app/users/page.js)
-  - [admin page utils](/Users/alexgerlitz/deploymate/frontend/app/lib/admin-page-utils.js)
+- scaffold уже не просто “улучшали”
+- его реально прогнали на живой продуктовой задаче
+- результат этой проверки: появился новый surface [server-review/page.js](/Users/alexgerlitz/deploymate/frontend/app/app/server-review/page.js)
+- это теперь полноценное место для работы с серверами
 
-Key UX direction now in place:
+Что это значит:
 
-- one obvious next step on primary screens
-- calmer premium visual layer
-- progressive disclosure for secondary tools
-- less button noise in runtime/detail flows
+- серверы больше не должны жить в двух местах сразу
+- `/app` теперь обзорный экран
+- `/app/server-review` теперь основной экран для серверной работы
 
-Latest frontend batch commits:
+## What Was Actually Done
 
-- `4e41e54` `Calm frontend surfaces and harden auth flows`
-- `b8b59d1` `Simplify deployment detail actions`
+### 1. Scaffold был проверен на реальной фиче
 
-### Backend auth and security hardening
+Через scaffold был создан и затем доведён до реального состояния новый surface:
 
-- session TTL support added
-- auth failed-attempt rate limiting added
-- cookie max-age / expiry now follow session TTL
-- stricter auth/admin credential validation added
-- lightweight security headers middleware added
-- authenticated write requests are now origin-guarded in:
-  - [backend/app/main.py](/Users/alexgerlitz/deploymate/backend/app/main.py)
+- [server-review/page.js](/Users/alexgerlitz/deploymate/frontend/app/app/server-review/page.js)
 
-Latest backend/security batch commits:
+Это уже не scaffold-demo и не mock page.
 
-- `c48eb24` `Guard authenticated writes by origin`
-- `c6d91c6` `Harden backend observability and server exports`
-- `fc7ad18` `Harden deployment observability fallbacks`
+Это живая страница поверх настоящего server API.
 
-### Backend safety follow-up now implemented locally
+### 2. Server review стал полноценным контуром
 
-- restore dry-run validation was tightened in:
-  - [backend restore routes](/Users/alexgerlitz/deploymate/backend/app/routes/root.py)
-- ops overview now degrades more safely and ops exports return clearer `503` responses in:
-  - [backend ops routes](/Users/alexgerlitz/deploymate/backend/app/routes/ops.py)
-- backend negative-path coverage was extended in:
-  - [restore dry-run tests](/Users/alexgerlitz/deploymate/backend/tests/test_restore_dry_run.py)
-  - [ops api flow tests](/Users/alexgerlitz/deploymate/backend/tests/test_ops_api_flow.py)
+Сейчас в `server-review` есть:
 
-### CI / staging automation now implemented locally
+- просмотр серверов
+- поиск и review filters
+- table view
+- saved views
+- export
+- локальный audit trail на странице
+- create server
+- edit server
+- test connection
+- diagnostics
+- suggested ports
+- delete server
 
-- `develop` push flow was changed so CI can auto-deploy the same reviewed commit to staging after the release gate passes
-- deploy surface is now auto-detected as `frontend`, `backend`, `full`, or `skip` using:
-  - [release surface detector](/Users/alexgerlitz/deploymate/scripts/detect_release_surface.sh)
-- workflow wiring and operator docs were updated in:
-  - [CI workflow](/Users/alexgerlitz/deploymate/.github/workflows/ci.yml)
-  - [staging workflow](/Users/alexgerlitz/deploymate/.github/workflows/staging.yml)
-  - [runbook](/Users/alexgerlitz/deploymate/RUNBOOK.md)
+Простой вывод:
+
+- серверный workflow теперь собран в одном месте
+- для работы с серверами не нужно прыгать обратно на `/app`
+
+### 3. Старый дублирующий server flow на `/app` был упрощён
+
+На [page.js](/Users/alexgerlitz/deploymate/frontend/app/app/page.js):
+
+- серверный блок больше не тащит на себе полный CRUD + diagnostics flow
+- там теперь короткий обзор и вход в `Server review`
+- в верхних actions тоже добавлена ссылка на `Server review`
+
+Простой вывод:
+
+- `/app` снова стал обзорной панелью
+- `server-review` стал рабочим экраном по серверам
+
+### 4. Лишний backend starter-мусор был удалён
+
+Scaffold сначала нагенерил отдельный fake backend под `server_review`, но после перевода страницы на реальные `/servers` endpoints этот слой стал лишним.
+
+Он был убран.
+
+Что осталось правильным:
+
+- реальный backend `/servers`
+- реальный frontend `server-review`
+
+Что это значит:
+
+- нет дублирующего API только ради шаблона
+- меньше лишней поддержки
+
+### 5. Реальный update flow серверов добавлен в backend
+
+На backend добавлен настоящий update путь для серверов:
+
+- db update:
+  - [db.py](/Users/alexgerlitz/deploymate/backend/app/db.py)
+- route update:
+  - [servers.py](/Users/alexgerlitz/deploymate/backend/app/routes/servers.py)
+- schema update:
+  - [schemas.py](/Users/alexgerlitz/deploymate/backend/app/schemas.py)
+- test update:
+  - [test_server_api_flow.py](/Users/alexgerlitz/deploymate/backend/tests/test_server_api_flow.py)
+
+Простой вывод:
+
+- сервер теперь можно не только создать и удалить, но и нормально редактировать
+
+## Important Practical Meaning
+
+Если коротко:
+
+- server-review теперь можно считать законченным отдельным экраном
+- это уже не “заготовка”
+- это уже не “нужно ещё чуть-чуть, чтобы стало usable”
+- это уже рабочее место для серверов
 
 ## What Was Verified
 
-Frontend:
+Проверено локально:
 
+- `bash -n scripts/scaffold_deploymate_surface.sh` -> ok
+- `cd backend && venv/bin/python -m unittest tests.test_server_api_flow` -> ok
 - `npm --prefix frontend run build` -> ok
-- `FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:auth` -> ok
-- `FRONTEND_SMOKE_PORT=3003 npm --prefix frontend run smoke:ops` -> ok
-- `FRONTEND_SMOKE_PORT=3004 npm --prefix frontend run smoke:runtime` -> ok
-- `FRONTEND_SMOKE_PORT=3005 npm --prefix frontend run smoke:admin` -> ok
+- `git diff --check` -> ok
 
-Backend:
+Простой вывод:
 
-- `venv/bin/python -m unittest tests.test_auth_api_flow tests.test_auth_security` -> ok
-- `venv/bin/python -m unittest tests.test_admin_api_flow tests.test_ops_api_flow tests.test_restore_dry_run tests.test_server_credentials_policy` -> ok
-- `bash scripts/security_audit.sh` -> ok
+- текущий локальный пакет по scaffold + server-review находится в рабочем состоянии
 
-Automation:
+## Best Next Step
 
-- `bash -n scripts/detect_release_surface.sh` -> ok
-- `bash scripts/detect_release_surface.sh HEAD~1 HEAD` -> ok
+Самый разумный следующий шаг сейчас:
 
-Production:
+1. Зафиксировать изменения в git.
+2. При желании слегка обновить `README.md` / `RUNBOOK.md`, чтобы там уже явно фигурировал `server-review` как основной server surface.
+3. После этого переключиться на следующую продуктовую область, а не продолжать бесконечно полировать server-review.
 
-- full release for `4e41e54` -> passed
-- backend-only release for `c48eb24` -> passed
-- frontend-only release for `b8b59d1` -> passed
-- post-deploy smoke -> passed
+Что сейчас уже НЕ является хорошим следующим шагом:
 
-## Production Notes
+- ещё один абстрактный раунд улучшения scaffold
+- возврат полного server CRUD обратно на `/app`
+- создание второго server screen рядом с `server-review`
 
-- current production admin demo credentials were used during smoke:
-  - username: `admin`
-  - password currently exists on the server in `/opt/deploymate/.env.production`
-- current server disk usage concern was raised manually; repo state is fine, but VPS capacity planning may be needed later if images, logs, and backups keep growing
+## Resume Prompt
 
-## Important Resume Note About Sandbox
+Если нужно быстро продолжить в новой сессии, используй такой prompt:
 
-- this chat session remained in `workspace-write` sandbox mode
-- starting a separate Codex process with `--dangerously-bypass-approvals-and-sandbox` does not retroactively change an already open session
-- if resuming in a fresh unrestricted session, start a new Codex process and continue from this handoff
+```text
+Прочитай HANDOFF.md и продолжи работу из текущего состояния.
+Считай, что server-review уже стал полноценным server workspace внутри DeployMate.
+Сначала проверь локальные изменения и подтверди, что create/edit/test/diagnostics/delete для server-review на месте.
+Потом либо помоги подготовить этот пакет к коммиту, либо обнови docs под новый server-review flow.
+```
 
-## Best Next Steps
+## Fast Resume
 
-Highest-value next slices:
-
-1. Split and commit the current work in clean batches:
-   - CI / staging automation
-   - frontend product + mobile polish
-   - backend safety follow-up
-2. Push `develop` after the automation commit and confirm the new auto-staging path works end-to-end in GitHub Actions
-3. After the first auto-staging run, document any missing staging secrets or timing issues directly in [RUNBOOK.md](/Users/alexgerlitz/deploymate/RUNBOOK.md) and this handoff
-
-## If You Need To Resume Fast
-
-1. Open [HANDOFF.md](/Users/alexgerlitz/deploymate/HANDOFF.md)
-2. Confirm head:
+1. Открой [HANDOFF.md](/Users/alexgerlitz/deploymate/HANDOFF.md).
+2. Проверь текущее состояние:
+   - `git status --short`
    - `git rev-parse --short HEAD`
-3. Confirm public branches:
-   - `git log --oneline --decorate -n 6`
-4. Confirm server checkout if deploying:
-   - `ssh deploymate "cd /opt/deploymate && git rev-parse HEAD && git rev-parse --abbrev-ref HEAD"`
-5. Re-run relevant checks for the next batch:
-   - frontend batch: `npm --prefix frontend run build`
-   - auth batch: `FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:auth`
-   - workspace batch: `FRONTEND_SMOKE_PORT=3003 npm --prefix frontend run smoke:ops`
-   - runtime batch: `FRONTEND_SMOKE_PORT=3004 npm --prefix frontend run smoke:runtime`
-   - admin batch: `FRONTEND_SMOKE_PORT=3005 npm --prefix frontend run smoke:admin`
-   - backend safety batch: `cd backend && venv/bin/python -m unittest tests.test_restore_dry_run tests.test_admin_api_flow tests.test_ops_api_flow tests.test_auth_security tests.test_server_credentials_policy`
-   - automation batch: `bash -n scripts/detect_release_surface.sh && bash scripts/detect_release_surface.sh HEAD~1 HEAD`
+3. Если продолжаешь server-review track:
+   - открой [server-review/page.js](/Users/alexgerlitz/deploymate/frontend/app/app/server-review/page.js)
+   - открой [starter-api.js](/Users/alexgerlitz/deploymate/frontend/app/app/server-review/starter-api.js)
+   - открой [servers.py](/Users/alexgerlitz/deploymate/backend/app/routes/servers.py)
+   - открой [test_server_api_flow.py](/Users/alexgerlitz/deploymate/backend/tests/test_server_api_flow.py)
+4. Быстрые проверки:
+   - `cd backend && venv/bin/python -m unittest tests.test_server_api_flow`
+   - `npm --prefix frontend run build`
+5. Если цель — завершить этот пакет:
+   - обновить docs при необходимости
+   - собрать commit
