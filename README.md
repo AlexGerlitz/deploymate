@@ -20,6 +20,16 @@ DeployMate is a self-hosted deployment control panel for small teams that need a
 
 It is built for pragmatic operator experience rather than platform complexity.
 
+## License
+
+This repository is source-available, not open source.
+
+- public code license: [PolyForm Noncommercial 1.0.0](LICENSE)
+- commercial/business use: not permitted under the public license
+- for business, internal company, client, SaaS, or resale use: request a separate commercial license first
+
+See [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for the business-use policy.
+
 ## Reviewer Package
 
 If you are opening this repository as a hiring reviewer, these are the fastest entry points:
