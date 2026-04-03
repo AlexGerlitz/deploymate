@@ -262,6 +262,7 @@ That gives you the frontend page shell, backend route/service stub, backend API 
 The generated page now also uses shared review-shell blocks from `frontend/app/app/admin-ui.js`, so new admin surfaces start from the same summary-and-queue pattern instead of ad hoc JSX.
 The backend side now also gets typed response models in `backend/app/schemas.py`, a built-in `q` filter path, and a generated API flow test for both default and filtered list responses.
 Add `--with-saved-views`, `--with-audit`, and `--with-export` when the first useful version of the surface should already include those secondary sections.
+Those richer flags now also generate real starter wiring for URL state, filter chips, saved-views manager hooks, audit filtering, and local JSON/CSV exports, so the surface starts closer to a live DeployMate workflow than a blank mock.
 
 The CI, staging, and production workflows now write a short GitHub job summary with the chosen surface, smoke mode, requested commit SHA, deployed SHA, and target URL so the result is readable without opening raw logs.
 

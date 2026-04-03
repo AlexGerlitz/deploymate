@@ -285,6 +285,14 @@ These flags let the generator start with:
 - queue + export/recovery notes
 - or the fuller review shell when the feature genuinely needs all of them
 
+The generated page is now more than a static mock:
+
+- URL/search-param sync for the primary query
+- active filter chips
+- saved-views manager wiring when `--with-saved-views` is enabled
+- audit filter/sort starter wiring when `--with-audit` is enabled
+- working local JSON/CSV starter exports when `--with-export` is enabled
+
 ## Product Starter
 
 Automation core is no longer the only reusable layer here.

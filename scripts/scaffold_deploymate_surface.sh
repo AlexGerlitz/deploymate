@@ -27,6 +27,7 @@ Behavior:
   - generates a new DeployMate admin surface page
   - generates a backend route and service stub
   - generates a backend API flow test stub
+  - adds a typed list contract into backend/app/schemas.py
   - wires the new route into backend/app/main.py
 EOF
 }
@@ -110,6 +111,11 @@ if [ ! -f "$TARGET_DIR/backend/app/main.py" ]; then
   exit 1
 fi
 
+if [ ! -f "$TARGET_DIR/backend/app/schemas.py" ]; then
+  echo "[scaffold-deploymate-surface] expected backend/app/schemas.py in target repo" >&2
+  exit 1
+fi
+
 if [ ! -d "$TARGET_DIR/frontend/app/app" ]; then
   echo "[scaffold-deploymate-surface] expected frontend/app/app in target repo" >&2
   exit 1
@@ -126,26 +132,128 @@ backend_test_path="$TARGET_DIR/backend/tests/test_${PY_SLUG}_api_flow.py"
 backend_main_path="$TARGET_DIR/backend/app/main.py"
 backend_schemas_path="$TARGET_DIR/backend/app/schemas.py"
 
-extra_imports=""
-extra_state=""
+admin_ui_imports="  AdminActiveFilters,
+  AdminDisclosureSection,
+  AdminFeedbackBanners,
+  AdminFilterFooter,
+  AdminPageHeader,
+  AdminSurfaceQueue,
+  AdminSurfaceQueueCard,
+  AdminSurfaceSummary,"
+hook_imports=""
+saved_views_lib_imports=""
+utils_imports="  buildFilterChipsFromDefinitions,
+  buildFilterState,
+  createTextFilterDefinition,"
+constants_block=""
+helpers_block=""
+saved_views_state_block=""
 saved_views_section=""
+audit_state_block=""
 audit_section=""
+export_helpers_block=""
 export_section=""
 
 if [ "$WITH_SAVED_VIEWS" = "1" ]; then
-  extra_imports="${extra_imports}
+  admin_ui_imports="${admin_ui_imports}
   AdminSavedViews,"
-  extra_state="${extra_state}
-  const [savedViewName, setSavedViewName] = useState(\"Daily review\");
-  const savedViews = [
-    {
-      id: \"${SURFACE_SLUG}-saved-view-1\",
-      name: \"Daily review\",
-      summary: \"Replace this with the first real saved view once the queue and filters are stable.\",
-      updatedAtLabel: \"just now\",
-      sourceLabel: \"local\",
-    },
-  ];"
+  hook_imports="import { useAdminSavedViewsManager } from \"../../lib/admin-page-hooks\";"
+  saved_views_lib_imports="import { formatSavedViews } from \"../../lib/admin-saved-views\";"
+  utils_imports="${utils_imports}
+  applyFilterDefinitions,
+  copyTextToClipboard,"
+  constants_block="$(cat <<EOF
+const ${PY_SLUG}SavedViewsStorageKey = "deploymate.admin.${SURFACE_SLUG}.savedViews";
+EOF
+)"
+  helpers_block="$(cat <<EOF
+function formatDate(value) {
+  if (!value) {
+    return "N/A";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+}
+
+function format${PASCAL_NAME}SavedViews(items) {
+  return formatSavedViews(items, {
+    formatDate,
+    summarizeFilters: (filters) =>
+      [filters.q ? \`search \${filters.q}\` : null].filter(Boolean).join(" · "),
+  });
+}
+EOF
+)"
+  saved_views_state_block="$(cat <<EOF
+  const {
+    savedViews,
+    savedViewName,
+    setSavedViewName,
+    savedViewsMetaText,
+    savedViewsSearch,
+    setSavedViewsSearch,
+    savedViewsSourceFilter,
+    setSavedViewsSourceFilter,
+    savedViewsSort,
+    setSavedViewsSort,
+    hasSavedViewNameMatch,
+    activeSavedViewId,
+    canSaveCurrentView,
+    visibleSavedViews,
+    savedViewsSummaryText,
+    handleSaveCurrentView,
+    handleApplySavedView,
+    handleUpdateCurrentView,
+    handleDeleteSavedView,
+    handleDownloadSavedViews,
+    handleImportSavedViews,
+    handleClearSavedViews,
+    handleClearImportedSavedViews,
+    handleResetSavedViewsTools,
+    handleUseCurrentSavedViewName,
+    handleCopySavedViewLink,
+  } = useAdminSavedViewsManager({
+    initialViews: format${PASCAL_NAME}SavedViews([
+      {
+        id: "${SURFACE_SLUG}-saved-view-1",
+        name: "Daily review",
+        filters: { q: "review" },
+        updatedAt: new Date().toISOString(),
+        source: "local",
+      },
+    ]),
+    formatViews: format${PASCAL_NAME}SavedViews,
+    storageKey: ${PY_SLUG}SavedViewsStorageKey,
+    currentFilters,
+    hasFilters: hasActiveFilters,
+    applyViewFilters: (filters) => applyFilterDefinitions(primaryFilterDefinitions, filters),
+    pathname,
+    copyText: copyTextToClipboard,
+    setFeedback: setSuccess,
+    setError,
+    initialMetaText: "Using local browser storage.",
+    exportFilename: "deploymate-${SURFACE_SLUG}-saved-views.json",
+    exportScope: "${SURFACE_SLUG}",
+    summaryNoun: "${SURFACE_SLUG}",
+    emptyImportMessage: "No valid saved views found in this file.",
+    wrongScopeMessage: "This file is not a ${SURFACE_NAME} saved views export.",
+    saveSuccessMessage: "Saved current review view.",
+    updateSuccessMessage: "Current review view updated.",
+    deleteSuccessMessage: "Saved review view removed.",
+    exportSuccessMessage: "Saved review views exported.",
+    clearSuccessMessage: "Saved review views cleared.",
+    clearImportedSuccessMessage: "Imported review views removed.",
+    resetToolsSuccessMessage: "Saved review view tools reset.",
+    importMergeMessage: ({ total, replacedCount, skippedCount }) =>
+      \`Saved review views merged. Total: \${total}. Replaced: \${replacedCount}. Skipped by limit: \${skippedCount}.\`,
+  });
+EOF
+)"
   saved_views_section="$(cat <<EOF
 
       <AdminSavedViews
@@ -153,48 +261,149 @@ if [ "$WITH_SAVED_VIEWS" = "1" ]; then
         inputLabel="View name"
         inputValue={savedViewName}
         onInputChange={(event) => setSavedViewName(event.target.value)}
-        onSave={() => {}}
-        onUpdateCurrent={() => {}}
-        saveDisabled={!savedViewName.trim()}
-        updateDisabled={!savedViewName.trim()}
+        onSave={handleSaveCurrentView}
+        onUpdateCurrent={handleUpdateCurrentView}
+        saveDisabled={!canSaveCurrentView}
+        updateDisabled={!activeSavedViewId}
         saveTestId="${SURFACE_SLUG}-save-view"
         updateTestId="${SURFACE_SLUG}-update-view"
-        statusText="Use this block only after the first queue and filters are worth repeating."
-        metaText="Starter scaffold includes one placeholder local view to show the intended shape."
-        views={savedViews}
-        onApply={() => {}}
-        onDelete={() => {}}
-        onCopy={() => {}}
-        searchValue=""
-        onSearchChange={() => {}}
+        statusText={
+          hasSavedViewNameMatch
+            ? "A saved view with this name already exists and will be replaced."
+            : "Use this block once the queue and filters are worth repeating."
+        }
+        metaText={savedViewsMetaText}
+        viewSummaryText={savedViewsSummaryText}
+        useCurrentNameLabel="Use active view name"
+        onUseCurrentName={handleUseCurrentSavedViewName}
+        useCurrentNameDisabled={!activeSavedViewId}
+        views={visibleSavedViews}
+        onApply={handleApplySavedView}
+        onDelete={handleDeleteSavedView}
+        onCopy={handleCopySavedViewLink}
+        searchValue={savedViewsSearch}
+        onSearchChange={(event) => setSavedViewsSearch(event.target.value)}
         searchTestId="${SURFACE_SLUG}-saved-views-search"
-        sourceFilter="all"
-        onSourceFilterChange={() => {}}
+        sourceFilter={savedViewsSourceFilter}
+        onSourceFilterChange={(event) => setSavedViewsSourceFilter(event.target.value)}
         sourceFilterTestId="${SURFACE_SLUG}-saved-views-source"
-        sortValue="newest"
-        onSortChange={() => {}}
+        sortValue={savedViewsSort}
+        onSortChange={(event) => setSavedViewsSort(event.target.value)}
         sortTestId="${SURFACE_SLUG}-saved-views-sort"
+        actions={[
+          {
+            label: "Export views",
+            testId: "${SURFACE_SLUG}-saved-views-export",
+            onClick: handleDownloadSavedViews,
+            disabled: savedViews.length === 0,
+          },
+          {
+            label: "Import views",
+            kind: "file",
+            testId: "${SURFACE_SLUG}-saved-views-import",
+            accept: "application/json",
+            onChange: handleImportSavedViews,
+          },
+          {
+            label: "Clear imported",
+            testId: "${SURFACE_SLUG}-saved-views-clear-imported",
+            onClick: handleClearImportedSavedViews,
+            disabled: savedViews.length === 0,
+          },
+          {
+            label: "Clear all",
+            testId: "${SURFACE_SLUG}-saved-views-clear",
+            onClick: handleClearSavedViews,
+            disabled: savedViews.length === 0,
+          },
+          {
+            label: "Reset tools",
+            testId: "${SURFACE_SLUG}-saved-views-reset-tools",
+            onClick: handleResetSavedViewsTools,
+          },
+        ]}
         emptyText="No saved views yet."
         listTestId="${SURFACE_SLUG}-saved-views-list"
+        activeViewId={activeSavedViewId}
       />
 EOF
 )"
 fi
 
 if [ "$WITH_AUDIT" = "1" ]; then
-  extra_imports="${extra_imports}
+  admin_ui_imports="${admin_ui_imports}
   AdminAuditToolbar,"
-  extra_state="${extra_state}
-  const [auditQuery, setAuditQuery] = useState(\"\");
-  const [auditScope, setAuditScope] = useState(\"all\");
-  const [auditSort, setAuditSort] = useState(\"newest\");
+  utils_imports="${utils_imports}
+  createChoiceFilterDefinition,
+  sortItemsByDateMode,"
+  audit_state_block="$(cat <<EOF
+  const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
+  const [auditScope, setAuditScope] = useState(() => searchParams.get("audit_scope") || "all");
+  const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
   const auditItems = [
     {
-      id: \"${SURFACE_SLUG}-audit-1\",
-      label: \"Scaffold created\",
-      detail: \"Replace this with the first real audit event stream once the main action exists.\",
+      id: "${SURFACE_SLUG}-audit-1",
+      label: "Scaffold created",
+      scope: "queue",
+      created_at: "2026-04-03T00:00:00+00:00",
+      detail: "Replace this with the first real audit event stream once the main action exists.",
     },
-  ];"
+    {
+      id: "${SURFACE_SLUG}-audit-2",
+      label: "Placeholder export added",
+      scope: "bulk",
+      created_at: "2026-04-02T00:00:00+00:00",
+      detail: "Use audit to explain decisions, not to dump every internal detail.",
+    },
+  ];
+  const auditFilterDefinitions = [
+    createTextFilterDefinition({
+      key: "audit_q",
+      value: auditQuery,
+      setValue: setAuditQuery,
+      chipKey: "${SURFACE_SLUG}-audit-query",
+      chipLabel: \`Audit: \${auditQuery.trim()}\`,
+      testId: "${SURFACE_SLUG}-audit-chip-query",
+    }),
+    createChoiceFilterDefinition({
+      key: "audit_scope",
+      value: auditScope,
+      setValue: setAuditScope,
+      chipKey: "${SURFACE_SLUG}-audit-scope",
+      chipLabel: \`Scope: \${auditScope}\`,
+      testId: "${SURFACE_SLUG}-audit-chip-scope",
+    }),
+    createChoiceFilterDefinition({
+      key: "audit_sort",
+      value: auditSort,
+      setValue: setAuditSort,
+      resetValue: "newest",
+      activeWhen: (value) => value !== "newest",
+      serializeWhen: (value) => value !== "newest",
+    }),
+  ];
+  const {
+    serializedParams: auditSerializedParams,
+    syncedSearchParams: syncedAuditSearchParams,
+  } = buildFilterState(auditFilterDefinitions);
+  const activeAuditFilterChips = buildFilterChipsFromDefinitions(auditFilterDefinitions);
+  const visibleAuditItems = useMemo(() => {
+    const normalizedAuditQuery = auditQuery.trim().toLowerCase();
+    const scopedItems = auditItems.filter((item) => auditScope === "all" || item.scope === auditScope);
+    const searchedItems = normalizedAuditQuery
+      ? scopedItems.filter((item) =>
+          [item.label, item.detail, item.scope].some((value) =>
+            value.toLowerCase().includes(normalizedAuditQuery),
+          ),
+        )
+      : scopedItems;
+    return sortItemsByDateMode(searchedItems, {
+      valueKey: "created_at",
+      mode: auditSort,
+    });
+  }, [auditItems, auditQuery, auditScope, auditSort]);
+EOF
+)"
   audit_section="$(cat <<EOF
 
       <AdminAuditToolbar
@@ -216,18 +425,19 @@ if [ "$WITH_AUDIT" = "1" ]; then
         sortValue={auditSort}
         onSortChange={(event) => setAuditSort(event.target.value)}
         sortTestId="${SURFACE_SLUG}-audit-sort"
-        totalCount={auditItems.length}
+        totalCount={visibleAuditItems.length}
         summary="Add the real audit feed only when the surface has a decision trail worth preserving."
+        filters={activeAuditFilterChips}
         emptyTestId="${SURFACE_SLUG}-audit-empty"
         emptyText="No audit events yet."
       >
         <div className="adminSavedViewsList" data-testid="${SURFACE_SLUG}-audit-list">
-          {auditItems.map((item) => (
+          {visibleAuditItems.map((item) => (
             <AdminSurfaceQueueCard
               key={item.id}
               title={item.label}
               body={item.detail}
-              status="info"
+              status={item.scope}
             />
           ))}
         </div>
@@ -237,6 +447,44 @@ EOF
 fi
 
 if [ "$WITH_EXPORT" = "1" ]; then
+  utils_imports="${utils_imports}
+  triggerFileDownload,"
+  export_helpers_block="$(cat <<EOF
+  function handleExportJson() {
+    const payload = {
+      surface: "${SURFACE_SLUG}",
+      generated_at: new Date().toISOString(),
+      filters: currentFilters,
+      items: filteredItems,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-${SURFACE_SLUG}-starter.json", blob);
+    setSuccess("Starter JSON export generated.");
+    setError("");
+  }
+
+  function handleExportCsv() {
+    const rows = [
+      ["id", "label", "status", "note"],
+      ...filteredItems.map((item) => [item.id, item.label, item.status, item.note]),
+    ];
+    const csv = rows
+      .map((row) =>
+        row
+          .map((value) => String(value ?? "").replaceAll("\"", "\"\""))
+          .map((value) => \`\"\${value}\"\`)
+          .join(","),
+      )
+      .join("\\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    triggerFileDownload("deploymate-${SURFACE_SLUG}-starter.csv", blob);
+    setSuccess("Starter CSV export generated.");
+    setError("");
+  }
+EOF
+)"
   export_section="$(cat <<EOF
 
       <AdminDisclosureSection
@@ -250,17 +498,17 @@ if [ "$WITH_EXPORT" = "1" ]; then
             type="button"
             className="secondaryButton"
             data-testid="${SURFACE_SLUG}-export-json"
-            onClick={() => {}}
+            onClick={handleExportJson}
           >
-            Placeholder JSON export
+            Export starter JSON
           </button>
           <button
             type="button"
             className="secondaryButton"
             data-testid="${SURFACE_SLUG}-export-csv"
-            onClick={() => {}}
+            onClick={handleExportCsv}
           >
-            Placeholder CSV export
+            Export starter CSV
           </button>
         </div>
         <p className="formHint">
@@ -274,17 +522,16 @@ fi
 safe_write "$frontend_page_path" "$(cat <<EOF
 "use client";
 
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
-  AdminDisclosureSection,
-${extra_imports}
-  AdminFeedbackBanners,
-  AdminFilterFooter,
-  AdminPageHeader,
-  AdminSurfaceQueue,
-  AdminSurfaceQueueCard,
-  AdminSurfaceSummary,
+${admin_ui_imports}
 } from "../admin-ui";
+${saved_views_lib_imports}
+${hook_imports}
+import {
+${utils_imports}
+} from "../../lib/admin-page-utils";
 
 const sampleItems = [
   {
@@ -301,11 +548,34 @@ const sampleItems = [
   },
 ];
 
-export default function ${PASCAL_NAME}Page() {
-  const [query, setQuery] = useState("");
-${extra_state}
+${constants_block}
+${helpers_block}
+function ${PASCAL_NAME}PageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(
+    "Scaffold ready. Replace the sample queue, filters, and actions with the first real workflow.",
+  );
+  const [query, setQuery] = useState(() => searchParams.get("q") || "");
+  const primaryFilterDefinitions = [
+    createTextFilterDefinition({
+      key: "q",
+      value: query,
+      setValue: setQuery,
+      chipKey: "${SURFACE_SLUG}-query",
+      chipLabel: \`Search: \${query.trim()}\`,
+      testId: "${SURFACE_SLUG}-filter-chip-query",
+    }),
+  ];
+  const { currentFilters, hasActiveFilters, syncedSearchParams } =
+    buildFilterState(primaryFilterDefinitions);
+  const activeFilterChips = buildFilterChipsFromDefinitions(primaryFilterDefinitions);
+${saved_views_state_block}
+${audit_state_block}
   const filteredItems = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = currentFilters.q.trim().toLowerCase();
     if (!normalized) {
       return sampleItems;
     }
@@ -314,7 +584,25 @@ ${extra_state}
         value.toLowerCase().includes(normalized),
       );
     });
-  }, [query]);
+  }, [currentFilters.q]);
+${export_helpers_block}
+
+  useEffect(() => {
+    const nextQuery = searchParams.get("q") || "";
+    if (nextQuery !== query) {
+      setQuery(nextQuery);
+    }
+  }, [query, searchParams]);
+
+  useEffect(() => {
+    const currentSearch = searchParams.toString();
+    if (currentSearch === syncedSearchParams) {
+      return;
+    }
+    router.replace(syncedSearchParams ? \`\${pathname}?\${syncedSearchParams}\` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams, syncedSearchParams]);
 
   return (
     <main className="workspaceShell">
@@ -323,20 +611,20 @@ ${extra_state}
         titleTestId="${SURFACE_SLUG}-page-title"
         subtitle="Scaffold a new DeployMate admin surface from one generator instead of rebuilding the same review layout by hand."
         loading={false}
-        onRefresh={() => {}}
+        onRefresh={() => setSuccess("Refresh stays local in the starter until the real loader is wired.")}
         refreshTestId="${SURFACE_SLUG}-refresh"
         actions={[
           {
             label: "Placeholder export",
             testId: "${SURFACE_SLUG}-placeholder-export",
-            onClick: () => {},
+            onClick: () => setSuccess("Use the placeholder export only after the main workflow is real."),
           },
         ]}
       />
       <AdminFeedbackBanners
         smokeMode={false}
-        error=""
-        success="Scaffold ready. Replace the sample queue, filters, and actions with the first real workflow."
+        error={error}
+        success={success}
         errorTestId="${SURFACE_SLUG}-error"
         successTestId="${SURFACE_SLUG}-success"
       />
@@ -362,7 +650,7 @@ ${extra_state}
           },
         ]}
         spotlightTitle="${SURFACE_NAME}"
-        spotlightBody="Use this scaffold to establish the first real operator workflow, then layer in richer controls only where they reduce repeated admin work."
+        spotlightBody="This starter already includes URL state, filter chips, and optional secondary sections, so you can go straight into the first real operator workflow."
       />
 
       <AdminSurfaceQueue
@@ -377,6 +665,7 @@ ${extra_state}
         emptyText="No items match the current search."
         items={filteredItems}
       >
+        <AdminActiveFilters filters={activeFilterChips} />
         {filteredItems.map((item) => (
           <AdminSurfaceQueueCard
             key={item.id}
@@ -390,7 +679,7 @@ ${extra_state}
       <article className="card formCard">
         <AdminFilterFooter
           summary="Use this scaffold as the first pass for a real admin review surface, not as a permanent mock screen."
-          hint="Next step: replace sampleItems with fetched data and wire one genuine action end to end."
+          hint="This starter already includes URL search-param sync, filter chips, and optional secondary shells so you can go straight into the first real workflow."
           onReset={() => setQuery("")}
           resetDisabled={!query}
           resetTestId="${SURFACE_SLUG}-clear-filters"
@@ -402,18 +691,26 @@ ${export_section}
 
       <AdminDisclosureSection
         title="Next integration steps"
-        subtitle="The generator created the frontend page, backend route, service stub, and API flow test."
+        subtitle="The generator created the frontend page, backend route, service stub, typed schema, and API flow test."
         badge="Scaffold"
         defaultOpen
         testId="${SURFACE_SLUG}-next-steps"
       >
         <ol className="formHint">
           <li>Replace the static queue with the first real backend payload.</li>
-          <li>Add only the filters and actions that help one concrete admin workflow.</li>
-          <li>Wire one smoke or API test around the first real interaction before adding extras.</li>
+          <li>Keep only the filters and secondary sections that support one concrete admin workflow.</li>
+          <li>Wire one real action end to end before adding more controls.</li>
         </ol>
       </AdminDisclosureSection>
     </main>
+  );
+}
+
+export default function ${PASCAL_NAME}Page() {
+  return (
+    <Suspense fallback={<main className="workspaceShell"><div className="card formCard">Loading...</div></main>}>
+      <${PASCAL_NAME}PageContent />
+    </Suspense>
   );
 }
 EOF
@@ -638,7 +935,8 @@ cat <<EOF
   - ${backend_schemas_path#$TARGET_DIR/}
 [scaffold-deploymate-surface] next useful steps:
   - replace the sample queue with a real backend payload
-  - keep the first workflow narrow before adding bulk actions or exports
+  - trim secondary sections that do not help the first real workflow
+  - wire one real action before adding more controls
   - run make backend
   - run make frontend-hot
   - open a PR once the first real slice works end to end
