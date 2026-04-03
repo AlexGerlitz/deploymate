@@ -34,4 +34,17 @@ esac
 cd "$ROOT_DIR"
 
 echo "[dev-fast-check] surface: $SURFACE"
+if [ "${DEPLOYMATE_CONTEXT_DERIVED:-0}" != "1" ]; then
+  eval "$(bash scripts/derive_local_fast_context.sh --surface "$SURFACE")"
+  echo "[dev-fast-check] derived local diff context from ${DEPLOYMATE_CONTEXT_BASE_REF:-unknown}..${DEPLOYMATE_CONTEXT_HEAD_REF:-HEAD}"
+  echo "[dev-fast-check] runtime audits: ${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}"
+  echo "[dev-fast-check] security audit scope: ${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}"
+  echo "[dev-fast-check] backend syntax mode: ${DEPLOYMATE_BACKEND_SYNTAX_MODE:-full}"
+  if [ -n "${DEPLOYMATE_BACKEND_FAST_MODE:-}" ]; then
+    echo "[dev-fast-check] backend fast mode: $DEPLOYMATE_BACKEND_FAST_MODE"
+  fi
+  if [ -n "${DEPLOYMATE_FRONTEND_FAST_MODE:-}" ]; then
+    echo "[dev-fast-check] frontend fast mode: $DEPLOYMATE_FRONTEND_FAST_MODE"
+  fi
+fi
 bash scripts/release_workflow.sh --surface "$SURFACE" --fast

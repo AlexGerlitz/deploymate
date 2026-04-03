@@ -204,6 +204,8 @@ done <<< "$security_audit_output"
 
 DEPLOYMATE_CHANGED_FILES="$(printf '%s\n' "${changed_files[@]}")"
 export DEPLOYMATE_CHANGED_FILES
+DEPLOYMATE_CONTEXT_DERIVED=1
+export DEPLOYMATE_CONTEXT_DERIVED
 echo "[dev-verify-changed] security audit: ${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full} (${security_audit_reason})"
 
 backend_syntax_output="$(bash scripts/detect_backend_syntax_scope.sh "${changed_files[@]}")"
