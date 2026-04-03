@@ -74,6 +74,7 @@ These commands:
 22. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
 23. keep project-specific path and route assumptions inside `scripts/project_automation_config.sh`, so the automation core can be ported to another repo without rewriting every script first
 24. keep project-specific path-to-target and path-to-scope rules inside `scripts/project_automation_targets.sh`, so the `detect_*` layer is portable too
+25. export the reusable automation layer with `make export-automation-core` when you want to move the core into a separate private repository
 
 To inspect the latest local timings quickly:
 

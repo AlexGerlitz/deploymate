@@ -15,6 +15,11 @@ These files are the portable part:
 - `scripts/release_workflow.sh`
 - `scripts/frontend_smoke_shared.sh`
 - `scripts/lib/project_automation.sh`
+- `scripts/lib/project_automation_targets.sh`
+
+The export manifest for the private reusable bundle lives in:
+
+- `automation-core/FILES.txt`
 
 ## Project adapter
 
@@ -61,3 +66,17 @@ The adapter split is now two-layered:
 That means a new project can usually keep the orchestration scripts and only replace these two adapter files.
 
 That turns this from one-off repo glue into an automation base you can reuse.
+
+## Private repo
+
+Yes, the core can live in a separate private repository.
+
+The easiest path is:
+
+1. run `make export-automation-core`
+2. create a new private GitHub repo
+3. copy `automation-core-dist/` into that repo
+4. evolve the automation core there
+5. sync selected changes back into product repos
+
+That gives you a private optimization base while keeping product repos independent.

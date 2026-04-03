@@ -199,6 +199,7 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 - `deploy/` production reverse-proxy config
 - `docker-compose.prod.yml` production stack definition
 - [AUTOMATION-CORE.md](AUTOMATION-CORE.md) reusable automation-core notes for porting this DX layer into another repo
+- `make export-automation-core` builds an exportable automation bundle for moving this DX layer into a separate private repository
 
 ## Fast Local Commands
 
