@@ -10,6 +10,7 @@ audit_cache_prepare
 
 if audit_cache_has security_audit; then
   echo "[security-audit] already completed in this run; skipping"
+  audit_cache_record_event run_hit security_audit
   exit 0
 fi
 
@@ -63,7 +64,9 @@ secret_seed="secret:${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_
 secret_fingerprint="$(audit_cache_fingerprint_files "$secret_seed" "${FILTERED_FILES[@]}")"
 if audit_cache_persistent_has "security_secret_scan" "$secret_fingerprint"; then
   echo "[security-audit] secret scan cache hit"
+  audit_cache_record_event persistent_hit security_secret_scan
 else
+  audit_cache_record_event persistent_miss security_secret_scan
   if "${SEARCH_CMD[@]}" \
     -e 'gh[opusr]_[A-Za-z0-9_]+' \
     -e 'github_pat_[A-Za-z0-9_]+' \
@@ -102,7 +105,9 @@ else
     runtime_fingerprint="$(audit_cache_fingerprint_files "$runtime_seed" "${RUNTIME_FILES[@]}")"
     if audit_cache_persistent_has "security_runtime_policy_scan" "$runtime_fingerprint"; then
       echo "[security-audit] runtime policy scan cache hit"
+      audit_cache_record_event persistent_hit security_runtime_policy_scan
     else
+      audit_cache_record_event persistent_miss security_runtime_policy_scan
       if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
         echo "[security-audit] warning: StrictHostKeyChecking=no found"
         cat "$TMP_FILE"

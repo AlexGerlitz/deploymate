@@ -15,6 +15,7 @@ audit_cache_prepare
 
 if audit_cache_has runtime_capability_audit; then
   echo "[runtime-capability-audit] already completed in this run; skipping"
+  audit_cache_record_event run_hit runtime_capability_audit
   exit 0
 fi
 
@@ -34,9 +35,12 @@ runtime_capability_fingerprint="$(audit_cache_fingerprint_files \
 
 if audit_cache_persistent_has "runtime_capability_audit" "$runtime_capability_fingerprint"; then
   echo "[runtime-capability-audit] cache hit"
+  audit_cache_record_event persistent_hit runtime_capability_audit
   audit_cache_mark runtime_capability_audit
   exit 0
 fi
+
+audit_cache_record_event persistent_miss runtime_capability_audit
 
 if command -v rg >/dev/null 2>&1; then
   SEARCH_CMD=(rg -n)

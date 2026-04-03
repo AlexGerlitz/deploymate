@@ -76,8 +76,11 @@ release_audit_fingerprint="$(audit_cache_fingerprint_files \
 
 if audit_cache_persistent_has "release_workflow_audit" "$release_audit_fingerprint"; then
   echo "[release-audit] cache hit"
+  audit_cache_record_event persistent_hit release_workflow_audit
   exit 0
 fi
+
+audit_cache_record_event persistent_miss release_workflow_audit
 
 echo "[release-audit] repo: $ROOT_DIR"
 

@@ -10,6 +10,7 @@ BACKEND_FAST_TEST_MODULES="${BACKEND_FAST_TEST_MODULES:-}"
 DEPLOYMATE_BACKEND_FAST_MODE="${DEPLOYMATE_BACKEND_FAST_MODE:-}"
 FRONTEND_FAST_SMOKES="${FRONTEND_FAST_SMOKES:-}"
 DEPLOYMATE_FRONTEND_FAST_MODE="${DEPLOYMATE_FRONTEND_FAST_MODE:-}"
+source "$ROOT_DIR/scripts/audit_cache.sh"
 source "$ROOT_DIR/scripts/timing_history.sh"
 SCRIPT_START_TS="$(date +%s)"
 
@@ -135,6 +136,9 @@ case "$SURFACE" in
 esac
 
 cd "$ROOT_DIR"
+
+audit_cache_prepare
+trap audit_cache_cleanup EXIT
 
 if [ -z "$BACKEND_PYTHON" ]; then
   if [ -x "backend/venv/bin/python" ]; then
@@ -294,6 +298,7 @@ echo "[release]   - frontend phase: $(format_duration "$frontend_duration")"
 echo "[release]   - backend phase: $(format_duration "$backend_duration")"
 echo "[release]   - total: $(format_duration "$total_duration")"
 echo "[release] timing history: .logs/local_gate_timing.csv"
+audit_cache_print_summary "[release]"
 timing_history_print_hint "release_workflow" "$SURFACE" "$FAST_MODE"
 echo "[release] next: git status --short"
 echo "[release] next: git push origin develop"

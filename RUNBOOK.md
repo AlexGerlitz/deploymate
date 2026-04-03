@@ -70,7 +70,8 @@ These commands:
 18. persist successful local secret-scan and runtime-policy results by fingerprint, so repeated commands on the same diff do not re-run them unnecessarily
 19. reuse fingerprint-cached results for repeated local release-contract and runtime-contract audits when their inputs stay the same
 20. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
-21. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+21. print a short cache-hit summary after local preflight, release, and profile commands so saved reruns are visible immediately
+22. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
 
 To inspect the latest local timings quickly:
 

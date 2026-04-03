@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/audit_cache.sh"
 PROFILE_MODE="${1:-changed}"
 STATS_COUNT="${TIMING_STATS_COUNT:-160}"
 RECENT_COUNT="${TIMING_RECENT_COUNT:-12}"
@@ -35,6 +36,9 @@ esac
 
 cd "$ROOT_DIR"
 
+audit_cache_prepare
+trap audit_cache_cleanup EXIT
+
 if [ "$PROFILE_MODE" = "changed" ]; then
   echo "[profile-surface] running changed-file fast gate"
   shift || true
@@ -49,6 +53,8 @@ bash scripts/timing_history.sh print_recent "$RECENT_COUNT"
 
 echo "[profile-surface] grouped timing stats"
 bash scripts/timing_history.sh print_stats "$STATS_COUNT"
+
+audit_cache_print_summary "[profile-surface]"
 
 echo "[profile-surface] release bottleneck hint"
 bash scripts/timing_history.sh print_hint release_workflow "$HINT_SURFACE" 1 "$HINT_ROWS" || true

@@ -15,6 +15,7 @@ audit_cache_prepare
 
 if audit_cache_has local_runtime_audit; then
   echo "[local-runtime-audit] already completed in this run; skipping"
+  audit_cache_record_event run_hit local_runtime_audit
   exit 0
 fi
 
@@ -26,9 +27,12 @@ local_runtime_fingerprint="$(audit_cache_fingerprint_files \
 
 if audit_cache_persistent_has "local_runtime_audit" "$local_runtime_fingerprint"; then
   echo "[local-runtime-audit] cache hit"
+  audit_cache_record_event persistent_hit local_runtime_audit
   audit_cache_mark local_runtime_audit
   exit 0
 fi
+
+audit_cache_record_event persistent_miss local_runtime_audit
 
 if command -v rg >/dev/null 2>&1; then
   SEARCH_CMD=(rg -n)
