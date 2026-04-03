@@ -7,6 +7,9 @@ SURFACE_NAME=""
 SURFACE_SLUG=""
 API_PREFIX=""
 FORCE=0
+WITH_SAVED_VIEWS=0
+WITH_AUDIT=0
+WITH_EXPORT=0
 
 usage() {
   cat <<'EOF'
@@ -15,6 +18,9 @@ Usage:
 
 Options:
   --api-prefix <prefix>  Override the generated API prefix. Default: /<slug>
+  --with-saved-views     Include a saved-views starter section in the generated page
+  --with-audit           Include an audit starter section in the generated page
+  --with-export          Include an export/recovery starter section in the generated page
   --force                Overwrite generated files if they already exist
 
 Behavior:
@@ -57,6 +63,18 @@ while [ "$#" -gt 0 ]; do
     --api-prefix)
       API_PREFIX="${2:-}"
       shift 2
+      ;;
+    --with-saved-views)
+      WITH_SAVED_VIEWS=1
+      shift
+      ;;
+    --with-audit)
+      WITH_AUDIT=1
+      shift
+      ;;
+    --with-export)
+      WITH_EXPORT=1
+      shift
       ;;
     --force)
       FORCE=1
@@ -108,12 +126,158 @@ backend_test_path="$TARGET_DIR/backend/tests/test_${PY_SLUG}_api_flow.py"
 backend_main_path="$TARGET_DIR/backend/app/main.py"
 backend_schemas_path="$TARGET_DIR/backend/app/schemas.py"
 
+extra_imports=""
+extra_state=""
+saved_views_section=""
+audit_section=""
+export_section=""
+
+if [ "$WITH_SAVED_VIEWS" = "1" ]; then
+  extra_imports="${extra_imports}
+  AdminSavedViews,"
+  extra_state="${extra_state}
+  const [savedViewName, setSavedViewName] = useState(\"Daily review\");
+  const savedViews = [
+    {
+      id: \"${SURFACE_SLUG}-saved-view-1\",
+      name: \"Daily review\",
+      summary: \"Replace this with the first real saved view once the queue and filters are stable.\",
+      updatedAtLabel: \"just now\",
+      sourceLabel: \"local\",
+    },
+  ];"
+  saved_views_section="$(cat <<EOF
+
+      <AdminSavedViews
+        title="Saved review views"
+        inputLabel="View name"
+        inputValue={savedViewName}
+        onInputChange={(event) => setSavedViewName(event.target.value)}
+        onSave={() => {}}
+        onUpdateCurrent={() => {}}
+        saveDisabled={!savedViewName.trim()}
+        updateDisabled={!savedViewName.trim()}
+        saveTestId="${SURFACE_SLUG}-save-view"
+        updateTestId="${SURFACE_SLUG}-update-view"
+        statusText="Use this block only after the first queue and filters are worth repeating."
+        metaText="Starter scaffold includes one placeholder local view to show the intended shape."
+        views={savedViews}
+        onApply={() => {}}
+        onDelete={() => {}}
+        onCopy={() => {}}
+        searchValue=""
+        onSearchChange={() => {}}
+        searchTestId="${SURFACE_SLUG}-saved-views-search"
+        sourceFilter="all"
+        onSourceFilterChange={() => {}}
+        sourceFilterTestId="${SURFACE_SLUG}-saved-views-source"
+        sortValue="newest"
+        onSortChange={() => {}}
+        sortTestId="${SURFACE_SLUG}-saved-views-sort"
+        emptyText="No saved views yet."
+        listTestId="${SURFACE_SLUG}-saved-views-list"
+      />
+EOF
+)"
+fi
+
+if [ "$WITH_AUDIT" = "1" ]; then
+  extra_imports="${extra_imports}
+  AdminAuditToolbar,"
+  extra_state="${extra_state}
+  const [auditQuery, setAuditQuery] = useState(\"\");
+  const [auditScope, setAuditScope] = useState(\"all\");
+  const [auditSort, setAuditSort] = useState(\"newest\");
+  const auditItems = [
+    {
+      id: \"${SURFACE_SLUG}-audit-1\",
+      label: \"Scaffold created\",
+      detail: \"Replace this with the first real audit event stream once the main action exists.\",
+    },
+  ];"
+  audit_section="$(cat <<EOF
+
+      <AdminAuditToolbar
+        title="Audit history"
+        description="Only keep audit here if it helps the operator explain what changed and why."
+        query={auditQuery}
+        onQueryChange={(event) => setAuditQuery(event.target.value)}
+        queryPlaceholder="Search scaffold audit history"
+        queryTestId="${SURFACE_SLUG}-audit-search"
+        filterLabel="Scope"
+        filterValue={auditScope}
+        onFilterChange={(event) => setAuditScope(event.target.value)}
+        filterOptions={[
+          { value: "all", label: "All activity" },
+          { value: "queue", label: "Queue changes" },
+          { value: "bulk", label: "Bulk changes" },
+        ]}
+        filterTestId="${SURFACE_SLUG}-audit-scope"
+        sortValue={auditSort}
+        onSortChange={(event) => setAuditSort(event.target.value)}
+        sortTestId="${SURFACE_SLUG}-audit-sort"
+        totalCount={auditItems.length}
+        summary="Add the real audit feed only when the surface has a decision trail worth preserving."
+        emptyTestId="${SURFACE_SLUG}-audit-empty"
+        emptyText="No audit events yet."
+      >
+        <div className="adminSavedViewsList" data-testid="${SURFACE_SLUG}-audit-list">
+          {auditItems.map((item) => (
+            <AdminSurfaceQueueCard
+              key={item.id}
+              title={item.label}
+              body={item.detail}
+              status="info"
+            />
+          ))}
+        </div>
+      </AdminAuditToolbar>
+EOF
+)"
+fi
+
+if [ "$WITH_EXPORT" = "1" ]; then
+  export_section="$(cat <<EOF
+
+      <AdminDisclosureSection
+        title="Export and recovery"
+        subtitle="Use this only after the main review flow is stable enough to justify exports, CSV handoff, or recovery notes."
+        badge="Optional"
+        testId="${SURFACE_SLUG}-export-starter"
+      >
+        <div className="adminFilterActions">
+          <button
+            type="button"
+            className="secondaryButton"
+            data-testid="${SURFACE_SLUG}-export-json"
+            onClick={() => {}}
+          >
+            Placeholder JSON export
+          </button>
+          <button
+            type="button"
+            className="secondaryButton"
+            data-testid="${SURFACE_SLUG}-export-csv"
+            onClick={() => {}}
+          >
+            Placeholder CSV export
+          </button>
+        </div>
+        <p className="formHint">
+          Keep export and recovery tools secondary until the first queue and action are genuinely useful.
+        </p>
+      </AdminDisclosureSection>
+EOF
+)"
+fi
+
 safe_write "$frontend_page_path" "$(cat <<EOF
 "use client";
 
 import { useMemo, useState } from "react";
 import {
   AdminDisclosureSection,
+${extra_imports}
   AdminFeedbackBanners,
   AdminFilterFooter,
   AdminPageHeader,
@@ -139,6 +303,7 @@ const sampleItems = [
 
 export default function ${PASCAL_NAME}Page() {
   const [query, setQuery] = useState("");
+${extra_state}
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {
@@ -231,6 +396,9 @@ export default function ${PASCAL_NAME}Page() {
           resetTestId="${SURFACE_SLUG}-clear-filters"
         />
       </article>
+${saved_views_section}
+${audit_section}
+${export_section}
 
       <AdminDisclosureSection
         title="Next integration steps"
@@ -456,6 +624,10 @@ cat <<EOF
 [scaffold-deploymate-surface] surface: $SURFACE_NAME
 [scaffold-deploymate-surface] slug: $SURFACE_SLUG
 [scaffold-deploymate-surface] api prefix: $API_PREFIX
+[scaffold-deploymate-surface] frontend options:
+  - saved views: $WITH_SAVED_VIEWS
+  - audit: $WITH_AUDIT
+  - export: $WITH_EXPORT
 [scaffold-deploymate-surface] created:
   - ${frontend_page_path#$TARGET_DIR/}
   - ${backend_route_path#$TARGET_DIR/}

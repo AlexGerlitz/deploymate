@@ -270,6 +270,21 @@ The backend side now also starts closer to a real DeployMate admin slice:
 
 Use it when the next feature is another admin/resource surface inside DeployMate itself, not when bootstrapping a brand-new product.
 
+For a richer first pass, the same scaffold can also add optional sections:
+
+```bash
+make scaffold-deploymate-surface \
+  SURFACE_FLAGS="--name Review Inbox --slug review-inbox --with-saved-views --with-audit --with-export"
+```
+
+These flags let the generator start with:
+
+- base queue-only surface
+- queue + saved views
+- queue + audit
+- queue + export/recovery notes
+- or the fuller review shell when the feature genuinely needs all of them
+
 ## Product Starter
 
 Automation core is no longer the only reusable layer here.
