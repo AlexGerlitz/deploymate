@@ -334,6 +334,13 @@ Those presets now also shape the first real action pattern:
 
 So the next screen starts closer to a true DeployMate workflow, not just a list with placeholder cards.
 
+The scaffold is now also entity-aware inside the generated page itself:
+
+- preset-specific workflow/segment filter
+- richer sample fields like context/meta instead of only label + status
+- dynamic summary cards driven by the current filtered starter slice
+- queue cards that already show the extra entity context you will usually need in the first real review pass
+
 ## Product Starter
 
 Automation core is no longer the only reusable layer here.

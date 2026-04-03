@@ -139,12 +139,16 @@ case "$PRESET" in
     id: "'"${SURFACE_SLUG}"'-sample-1",
     label: "Primary review queue",
     status: "needs-review",
+    segment: "triage",
+    meta: "Unassigned · starter queue",
     note: "Replace this with the first real review slice for '"${SURFACE_NAME}"'.",
   },
   {
     id: "'"${SURFACE_SLUG}"'-sample-2",
     label: "Follow-up backlog",
     status: "ready",
+    segment: "follow-up",
+    meta: "Owner assigned · waiting next step",
     note: "Keep only the actions and fields that support an actual admin decision.",
   },
 ]'
@@ -153,12 +157,16 @@ case "$PRESET" in
             "id": "'"${SURFACE_SLUG}"'-sample-1",
             "label": "Primary review queue",
             "status": "needs-review",
+            "segment": "triage",
+            "meta": "Unassigned · starter queue",
             "note": "Replace this with the first real review slice for '"${SURFACE_NAME}"'.",
         },
         {
             "id": "'"${SURFACE_SLUG}"'-sample-2",
             "label": "Follow-up backlog",
             "status": "ready",
+            "segment": "follow-up",
+            "meta": "Owner assigned · waiting next step",
             "note": "Keep only the actions and fields that support an actual admin decision.",
         },
     ]'
@@ -181,8 +189,17 @@ case "$PRESET" in
         ]'
     SAVED_VIEW_SUMMARY='[filters.q ? `search ${filters.q}` : null]'
     AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Queue changes" }, { value: "bulk", label: "Bulk changes" }]'
-    CSV_HEADERS='["id", "label", "status", "note"]'
-    CSV_ROW='[item.id, item.label, item.status, item.note]'
+    CSV_HEADERS='["id", "label", "status", "segment", "meta", "note"]'
+    CSV_ROW='[item.id, item.label, item.status, item.segment, item.meta, item.note]'
+    SEGMENT_FILTER_LABEL="Queue slice"
+    SEGMENT_FILTER_DEFAULT="all"
+    SEGMENT_FILTER_OPTIONS='[{ value: "all", label: "All slices" }, { value: "triage", label: "Triage" }, { value: "follow-up", label: "Follow-up" }]'
+    SEGMENT_FILTER_CHIP='`Slice: ${segmentFilter}`'
+    SEGMENT_FILTER_SUMMARY='[
+      filters.q ? `search ${filters.q}` : null,
+      filters.segment && filters.segment !== "all" ? `slice ${filters.segment}` : null
+    ]'
+    CARD_META_LABEL="Queue slice"
     ACTION_SECTION_TITLE="First real action"
     ACTION_SECTION_DESCRIPTION="Use the scaffold to prove one operator decision flow end to end before adding more controls."
     ACTION_FOCUS_HINT="Pick one queue item and make the first meaningful review decision local-first."
@@ -208,12 +225,16 @@ case "$PRESET" in
     id: "'"${SURFACE_SLUG}"'-sample-1",
     label: "alex-admin",
     status: "admin",
+    segment: "password",
+    meta: "Team plan · password change required",
     note: "Password change required. Replace this with the first real user review queue.",
   },
   {
     id: "'"${SURFACE_SLUG}"'-sample-2",
     label: "maria-member",
     status: "team",
+    segment: "access",
+    meta: "Starter plan · access review clear",
     note: "Active teammate. Keep actions narrow: role, plan, or password reset before anything else.",
   },
 ]'
@@ -222,12 +243,16 @@ case "$PRESET" in
             "id": "'"${SURFACE_SLUG}"'-sample-1",
             "label": "alex-admin",
             "status": "admin",
+            "segment": "password",
+            "meta": "Team plan · password change required",
             "note": "Password change required. Replace this with the first real user review queue.",
         },
         {
             "id": "'"${SURFACE_SLUG}"'-sample-2",
             "label": "maria-member",
             "status": "team",
+            "segment": "access",
+            "meta": "Starter plan · access review clear",
             "note": "Active teammate. Keep actions narrow: role, plan, or password reset before anything else.",
         },
     ]'
@@ -253,8 +278,17 @@ case "$PRESET" in
       filters.q && filters.q.includes("admin") ? "admin slice" : null
     ]'
     AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "User changes" }, { value: "bulk", label: "Bulk role/plan" }]'
-    CSV_HEADERS='["id", "username", "role_or_plan", "note"]'
-    CSV_ROW='[item.id, item.label, item.status, item.note]'
+    CSV_HEADERS='["id", "username", "role_or_plan", "segment", "meta", "note"]'
+    CSV_ROW='[item.id, item.label, item.status, item.segment, item.meta, item.note]'
+    SEGMENT_FILTER_LABEL="User workflow"
+    SEGMENT_FILTER_DEFAULT="all"
+    SEGMENT_FILTER_OPTIONS='[{ value: "all", label: "All workflows" }, { value: "password", label: "Password" }, { value: "access", label: "Access" }]'
+    SEGMENT_FILTER_CHIP='`Workflow: ${segmentFilter}`'
+    SEGMENT_FILTER_SUMMARY='[
+      filters.q ? `search ${filters.q}` : null,
+      filters.segment && filters.segment !== "all" ? `workflow ${filters.segment}` : null
+    ]'
+    CARD_META_LABEL="User context"
     ACTION_SECTION_TITLE="Access decision starter"
     ACTION_SECTION_DESCRIPTION="Start with one user action that actually changes access posture: password follow-up or role triage."
     ACTION_FOCUS_HINT="Keep the first user workflow narrow: password, role, or plan. Do not mix all three on day one."
@@ -280,12 +314,16 @@ case "$PRESET" in
     id: "'"${SURFACE_SLUG}"'-sample-1",
     label: "Team rollout request",
     status: "in_review",
+    segment: "linked",
+    meta: "Team plan · linked account found",
     note: "Linked plan upgrade request. Replace this with the first real upgrade inbox queue.",
   },
   {
     id: "'"${SURFACE_SLUG}"'-sample-2",
     label: "Pricing question",
     status: "new",
+    segment: "unlinked",
+    meta: "Starter plan · no linked account",
     note: "Keep the first pass focused on triage and disposition before adding broader workflow steps.",
   },
 ]'
@@ -294,12 +332,16 @@ case "$PRESET" in
             "id": "'"${SURFACE_SLUG}"'-sample-1",
             "label": "Team rollout request",
             "status": "in_review",
+            "segment": "linked",
+            "meta": "Team plan · linked account found",
             "note": "Linked plan upgrade request. Replace this with the first real upgrade inbox queue.",
         },
         {
             "id": "'"${SURFACE_SLUG}"'-sample-2",
             "label": "Pricing question",
             "status": "new",
+            "segment": "unlinked",
+            "meta": "Starter plan · no linked account",
             "note": "Keep the first pass focused on triage and disposition before adding broader workflow steps.",
         },
     ]'
@@ -325,8 +367,17 @@ case "$PRESET" in
       filters.q && filters.q.includes("request") ? "request focus" : null
     ]'
     AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Inbox changes" }, { value: "bulk", label: "Bulk triage" }]'
-    CSV_HEADERS='["id", "request", "status", "note"]'
-    CSV_ROW='[item.id, item.label, item.status, item.note]'
+    CSV_HEADERS='["id", "request", "status", "segment", "meta", "note"]'
+    CSV_ROW='[item.id, item.label, item.status, item.segment, item.meta, item.note]'
+    SEGMENT_FILTER_LABEL="Request type"
+    SEGMENT_FILTER_DEFAULT="all"
+    SEGMENT_FILTER_OPTIONS='[{ value: "all", label: "All requests" }, { value: "linked", label: "Linked" }, { value: "unlinked", label: "Unlinked" }]'
+    SEGMENT_FILTER_CHIP='`Request type: ${segmentFilter}`'
+    SEGMENT_FILTER_SUMMARY='[
+      filters.q ? `search ${filters.q}` : null,
+      filters.segment && filters.segment !== "all" ? `type ${filters.segment}` : null
+    ]'
+    CARD_META_LABEL="Request context"
     ACTION_SECTION_TITLE="Inbox disposition starter"
     ACTION_SECTION_DESCRIPTION="Start with one disposition flow that moves requests forward: approve, close, or hold for follow-up."
     ACTION_FOCUS_HINT="The first inbox workflow should change request state and leave a clear note for the next operator."
@@ -352,12 +403,16 @@ case "$PRESET" in
     id: "'"${SURFACE_SLUG}"'-sample-1",
     label: "smoke-vps",
     status: "ssh_key",
+    segment: "diagnostics",
+    meta: "SSH key auth · health check pending",
     note: "Diagnostics pending. Replace this with the first real server review queue.",
   },
   {
     id: "'"${SURFACE_SLUG}"'-sample-2",
     label: "edge-runner",
     status: "password",
+    segment: "auth",
+    meta: "Password auth · connectivity uncertain",
     note: "Use the first workflow to review auth type, connectivity, or diagnostics before adding more panels.",
   },
 ]'
@@ -366,12 +421,16 @@ case "$PRESET" in
             "id": "'"${SURFACE_SLUG}"'-sample-1",
             "label": "smoke-vps",
             "status": "ssh_key",
+            "segment": "diagnostics",
+            "meta": "SSH key auth · health check pending",
             "note": "Diagnostics pending. Replace this with the first real server review queue.",
         },
         {
             "id": "'"${SURFACE_SLUG}"'-sample-2",
             "label": "edge-runner",
             "status": "password",
+            "segment": "auth",
+            "meta": "Password auth · connectivity uncertain",
             "note": "Use the first workflow to review auth type, connectivity, or diagnostics before adding more panels.",
         },
     ]'
@@ -397,8 +456,17 @@ case "$PRESET" in
       filters.q && filters.q.includes("ssh") ? "ssh focus" : null
     ]'
     AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Server changes" }, { value: "bulk", label: "Ops follow-up" }]'
-    CSV_HEADERS='["id", "server", "auth_or_state", "note"]'
-    CSV_ROW='[item.id, item.label, item.status, item.note]'
+    CSV_HEADERS='["id", "server", "auth_or_state", "segment", "meta", "note"]'
+    CSV_ROW='[item.id, item.label, item.status, item.segment, item.meta, item.note]'
+    SEGMENT_FILTER_LABEL="Ops focus"
+    SEGMENT_FILTER_DEFAULT="all"
+    SEGMENT_FILTER_OPTIONS='[{ value: "all", label: "All ops focus" }, { value: "diagnostics", label: "Diagnostics" }, { value: "auth", label: "Auth" }]'
+    SEGMENT_FILTER_CHIP='`Ops focus: ${segmentFilter}`'
+    SEGMENT_FILTER_SUMMARY='[
+      filters.q ? `search ${filters.q}` : null,
+      filters.segment && filters.segment !== "all" ? `focus ${filters.segment}` : null
+    ]'
+    CARD_META_LABEL="Server context"
     ACTION_SECTION_TITLE="Operations action starter"
     ACTION_SECTION_DESCRIPTION="Use the first server flow to resolve one concrete ops decision: diagnostics, auth readiness, or connection follow-up."
     ACTION_FOCUS_HINT="The first server action should reduce uncertainty about connectivity or auth state."
@@ -430,6 +498,7 @@ hook_imports=""
 saved_views_lib_imports=""
 utils_imports="  buildFilterChipsFromDefinitions,
   buildFilterState,
+  createChoiceFilterDefinition,
   createTextFilterDefinition,"
 constants_block=""
 helpers_block=""
@@ -470,7 +539,7 @@ function format${PASCAL_NAME}SavedViews(items) {
   return formatSavedViews(items, {
     formatDate,
     summarizeFilters: (filters) =>
-      ${SAVED_VIEW_SUMMARY}.filter(Boolean).join(" · "),
+      ${SEGMENT_FILTER_SUMMARY}.filter(Boolean).join(" · "),
   });
 }
 EOF
@@ -620,7 +689,6 @@ if [ "$WITH_AUDIT" = "1" ]; then
   admin_ui_imports="${admin_ui_imports}
   AdminAuditToolbar,"
   utils_imports="${utils_imports}
-  createChoiceFilterDefinition,
   sortItemsByDateMode,"
   audit_state_block="$(cat <<EOF
   const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
@@ -813,6 +881,8 @@ ${utils_imports}
 } from "../../lib/admin-page-utils";
 
 const sampleItems = ${SAMPLE_ITEMS_FRONTEND};
+const starterMetrics = ${METRICS_JS};
+const segmentFilterOptions = ${SEGMENT_FILTER_OPTIONS};
 
 ${constants_block}
 ${helpers_block}
@@ -829,6 +899,9 @@ function ${PASCAL_NAME}PageContent() {
   const [actionNote, setActionNote] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
+  const [segmentFilter, setSegmentFilter] = useState(
+    () => searchParams.get("segment") || "${SEGMENT_FILTER_DEFAULT}",
+  );
   const primaryFilterDefinitions = [
     createTextFilterDefinition({
       key: "q",
@@ -838,6 +911,14 @@ function ${PASCAL_NAME}PageContent() {
       chipLabel: \`Search: \${query.trim()}\`,
       testId: "${SURFACE_SLUG}-filter-chip-query",
     }),
+    createChoiceFilterDefinition({
+      key: "segment",
+      value: segmentFilter,
+      setValue: setSegmentFilter,
+      chipKey: "${SURFACE_SLUG}-segment",
+      chipLabel: ${SEGMENT_FILTER_CHIP},
+      testId: "${SURFACE_SLUG}-filter-chip-segment",
+    }),
   ];
   const { currentFilters, hasActiveFilters, syncedSearchParams } =
     buildFilterState(primaryFilterDefinitions);
@@ -846,15 +927,37 @@ ${saved_views_state_block}
 ${audit_state_block}
   const filteredItems = useMemo(() => {
     const normalized = currentFilters.q.trim().toLowerCase();
-    if (!normalized) {
-      return items;
-    }
     return items.filter((item) => {
-      return [item.label, item.status, item.note].some((value) =>
+      const matchesQuery = !normalized || [item.label, item.status, item.note, item.meta, item.segment].some((value) =>
         value.toLowerCase().includes(normalized),
       );
+      const matchesSegment =
+        currentFilters.segment === "all" || item.segment === currentFilters.segment;
+      return matchesQuery && matchesSegment;
     });
-  }, [currentFilters.q, items]);
+  }, [currentFilters.q, currentFilters.segment, items]);
+  const summaryMetrics = useMemo(() => {
+    const segmentCounts = filteredItems.reduce((acc, item) => {
+      acc[item.segment] = (acc[item.segment] || 0) + 1;
+      return acc;
+    }, {});
+    const segmentSummary = Object.entries(segmentCounts)
+      .map(([segment, count]) => \`\${segment} · \${count}\`)
+      .join(" / ");
+
+    if (!segmentSummary) {
+      return starterMetrics;
+    }
+
+    return [
+      {
+        label: "${SEGMENT_FILTER_LABEL}",
+        value: segmentSummary,
+        description: "Starter data already groups queue items by the preset-specific workflow slice.",
+      },
+      ...starterMetrics.slice(1),
+    ];
+  }, [filteredItems]);
   const selectedItem = filteredItems.find((item) => item.id === selectedItemId)
     || items.find((item) => item.id === selectedItemId)
     || filteredItems[0]
@@ -915,7 +1018,11 @@ ${export_helpers_block}
     if (nextQuery !== query) {
       setQuery(nextQuery);
     }
-  }, [query, searchParams]);
+    const nextSegment = searchParams.get("segment") || "${SEGMENT_FILTER_DEFAULT}";
+    if (nextSegment !== segmentFilter) {
+      setSegmentFilter(nextSegment);
+    }
+  }, [query, searchParams, segmentFilter]);
 
   useEffect(() => {
     const currentSearch = searchParams.toString();
@@ -955,7 +1062,7 @@ ${export_helpers_block}
       <AdminSurfaceSummary
         title="${SUMMARY_TITLE}"
         description="${SUMMARY_DESCRIPTION}"
-        metrics={${METRICS_JS}}
+        metrics={summaryMetrics}
         spotlightTitle="${SURFACE_NAME}"
         spotlightBody="${SPOTLIGHT_BODY}"
       />
@@ -973,6 +1080,20 @@ ${export_helpers_block}
         items={filteredItems}
       >
         <AdminActiveFilters filters={activeFilterChips} />
+        <label className="field">
+          <span>${SEGMENT_FILTER_LABEL}</span>
+          <select
+            data-testid="${SURFACE_SLUG}-segment-filter"
+            value={segmentFilter}
+            onChange={(event) => setSegmentFilter(event.target.value)}
+          >
+            {segmentFilterOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {filteredItems.map((item) => (
           <AdminSurfaceQueueCard
             key={item.id}
@@ -980,6 +1101,12 @@ ${export_helpers_block}
             body={item.note}
             status={item.id === selectedItemId ? \`\${item.status} · focused\` : item.status}
           >
+            <p className="formHint">
+              <strong>${CARD_META_LABEL}:</strong> {item.meta}
+            </p>
+            <p className="formHint">
+              <strong>${SEGMENT_FILTER_LABEL}:</strong> {item.segment}
+            </p>
             <div className="adminFilterActions">
               <button
                 type="button"
@@ -1072,9 +1199,12 @@ ${export_helpers_block}
       <article className="card formCard">
         <AdminFilterFooter
           summary="Use this scaffold as the first pass for a real admin review surface, not as a permanent mock screen."
-          hint="This starter already includes URL search-param sync, filter chips, and optional secondary shells so you can go straight into the first real workflow."
-          onReset={() => setQuery("")}
-          resetDisabled={!query}
+          hint="This starter already includes URL search-param sync, preset-aware filters, and optional secondary shells so you can go straight into the first real workflow."
+          onReset={() => {
+            setQuery("");
+            setSegmentFilter("${SEGMENT_FILTER_DEFAULT}");
+          }}
+          resetDisabled={!query && segmentFilter === "${SEGMENT_FILTER_DEFAULT}"}
           resetTestId="${SURFACE_SLUG}-clear-filters"
         />
       </article>
@@ -1128,6 +1258,7 @@ def list_${PY_SLUG}_items(query: str = "") -> dict:
             "surface": "${SURFACE_SLUG}",
             "total": len(items),
             "query": query,
+            "segment_filter_label": "${SEGMENT_FILTER_LABEL}",
             "primary_action_label": "${PRIMARY_ACTION_LABEL}",
             "secondary_action_label": "${SECONDARY_ACTION_LABEL}",
             "next_step": "Replace stub data with the first real repository-backed workflow.",
@@ -1200,6 +1331,8 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
                     "id": "${SURFACE_SLUG}-sample-1",
                     "label": "Primary review queue",
                     "status": "needs-review",
+                    "segment": "triage",
+                    "meta": "Unassigned · starter queue",
                     "note": "Replace this with the first real review slice for ${SURFACE_NAME}.",
                 }
             ]
@@ -1209,6 +1342,8 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
                     "id": "${SURFACE_SLUG}-sample-2",
                     "label": "Follow-up backlog",
                     "status": "ready",
+                    "segment": "follow-up",
+                    "meta": "Owner assigned · waiting next step",
                     "note": "Keep only the actions and fields that support an actual admin decision.",
                 }
             ],
@@ -1216,6 +1351,7 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
                 "surface": "${SURFACE_SLUG}",
                 "total": 1,
                 "query": query,
+                "segment_filter_label": "${SEGMENT_FILTER_LABEL}",
                 "primary_action_label": "${PRIMARY_ACTION_LABEL}",
                 "secondary_action_label": "${SECONDARY_ACTION_LABEL}",
                 "next_step": "Replace stub data with the first real repository-backed workflow.",
@@ -1257,6 +1393,8 @@ class ${PASCAL_NAME}Item(BaseModel):
     id: str
     label: str
     status: str
+    segment: Optional[str] = None
+    meta: Optional[str] = None
     note: Optional[str] = None
 
 
@@ -1264,6 +1402,7 @@ class ${PASCAL_NAME}Summary(BaseModel):
     surface: str
     total: int = 0
     query: str = ""
+    segment_filter_label: str
     primary_action_label: str
     secondary_action_label: str
     next_step: str
