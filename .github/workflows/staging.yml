@@ -17,6 +17,18 @@ on:
         required: true
         type: boolean
         default: true
+      skip_smoke:
+        description: "Skip post-deploy smoke"
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: staging-manual-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   staging-release:
@@ -38,6 +50,7 @@ jobs:
           deploy_ssh_private_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           deploy_ssh_known_hosts: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
           runtime_smoke_enabled: ${{ inputs.runtime_smoke && '1' || '0' }}
+          skip_smoke: ${{ inputs.skip_smoke && '1' || '0' }}
           deploy_repo_dir: ${{ secrets.DEPLOY_REPO_DIR }}
           deploy_branch: ${{ secrets.DEPLOY_BRANCH }}
           deploy_ref: ${{ github.sha }}
@@ -53,3 +66,17 @@ jobs:
           runtime_smoke_external_port: ${{ secrets.RUNTIME_SMOKE_EXTERNAL_PORT }}
           runtime_smoke_start_port: ${{ secrets.RUNTIME_SMOKE_START_PORT }}
           runtime_smoke_health_timeout: ${{ secrets.RUNTIME_SMOKE_HEALTH_TIMEOUT }}
+
+      - name: Write staging summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Manual Staging Deploy"
+            echo
+            echo "- Surface: \`${{ inputs.surface }}\`"
+            echo "- Runtime smoke: \`${{ inputs.runtime_smoke && 'enabled' || 'disabled' }}\`"
+            echo "- Post-deploy smoke: \`${{ inputs.skip_smoke && 'skipped' || 'enabled' }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"

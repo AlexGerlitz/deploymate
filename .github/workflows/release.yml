@@ -23,6 +23,13 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -59,3 +66,17 @@ jobs:
           runtime_smoke_external_port: ${{ secrets.RUNTIME_SMOKE_EXTERNAL_PORT }}
           runtime_smoke_start_port: ${{ secrets.RUNTIME_SMOKE_START_PORT }}
           runtime_smoke_health_timeout: ${{ secrets.RUNTIME_SMOKE_HEALTH_TIMEOUT }}
+
+      - name: Write release summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Production Release"
+            echo
+            echo "- Surface: \`${{ inputs.surface }}\`"
+            echo "- Runtime smoke: \`${{ inputs.runtime_smoke && 'enabled' || 'disabled' }}\`"
+            echo "- Post-deploy smoke: \`${{ inputs.skip_smoke && 'skipped' || 'enabled' }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"

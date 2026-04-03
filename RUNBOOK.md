@@ -107,8 +107,12 @@ After the push:
 3. if the commit changes only `backend/`, staging deploy rebuilds `backend`
 4. mixed or shared changes fall back to a full staging deploy
 5. docs-only or workflow-only changes skip staging deploy entirely
+6. older in-progress CI runs on the same branch are cancelled automatically so only the newest iteration keeps running
 
 Use `.github/workflows/staging.yml` only as a manual fallback when you need to redeploy staging on demand.
+That manual fallback now also supports `skip_smoke` when you need a faster redeploy for operator-only checks.
+
+The CI, staging, and production workflows now write a short GitHub job summary with the chosen surface, smoke mode, and commit SHA so the result is readable without opening raw logs.
 
 To verify that the release workflows and the documented GitHub secret contract still match:
 

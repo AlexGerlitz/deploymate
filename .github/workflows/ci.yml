@@ -6,6 +6,14 @@ on:
       - develop
   pull_request:
 
+concurrency:
+  group: >-
+    ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   release-gate:
     runs-on: ubuntu-latest
@@ -36,6 +44,19 @@ jobs:
         run: bash scripts/release_workflow.sh --surface full
         env:
           BACKEND_PYTHON: python
+
+      - name: Write release gate summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Release Gate"
+            echo
+            echo "- Event: \`${{ github.event_name }}\`"
+            echo "- Ref: \`${{ github.ref_name }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Surface: \`full\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   staging-release:
     needs: release-gate
@@ -92,3 +113,18 @@ jobs:
           runtime_smoke_external_port: ${{ secrets.RUNTIME_SMOKE_EXTERNAL_PORT }}
           runtime_smoke_start_port: ${{ secrets.RUNTIME_SMOKE_START_PORT }}
           runtime_smoke_health_timeout: ${{ secrets.RUNTIME_SMOKE_HEALTH_TIMEOUT }}
+
+      - name: Write staging summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Staging Deploy"
+            echo
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Surface: \`${{ steps.detect-surface.outputs.surface }}\`"
+            echo "- Reason: ${{ steps.detect-surface.outputs.reason }}"
+            echo "- Should deploy: \`${{ steps.detect-surface.outputs.should_deploy }}\`"
+            echo "- Runtime smoke: \`enabled\`"
+            echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
