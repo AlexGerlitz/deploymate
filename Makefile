@@ -1,4 +1,7 @@
-.PHONY: start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: dev-doctor start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core bootstrap-core-init upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+
+dev-doctor:
+	bash scripts/dev_doctor.sh
 
 start-pr-branch:
 	bash scripts/start_pr_branch.sh $(SLUG)
@@ -62,6 +65,9 @@ export-automation-core:
 
 bootstrap-core:
 	bash scripts/bootstrap_project_automation.sh $(TARGET_DIR)
+
+bootstrap-core-init:
+	bash scripts/bootstrap_project_automation.sh $(TARGET_DIR) --init-adapters $(BOOTSTRAP_CORE_FLAGS)
 
 upgrade-core:
 	bash scripts/upgrade_project_automation.sh $(TARGET_DIR) $(UPGRADE_FLAGS)

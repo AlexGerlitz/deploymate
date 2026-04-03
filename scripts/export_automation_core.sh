@@ -42,6 +42,7 @@ Recommended first edits in a new project:
 
 1. `scripts/project_automation_config.sh`
 2. `scripts/project_automation_targets.sh`
+3. `scripts/project_automation_smoke_checks.sh`
 
 After that, adjust smoke commands or test suites only if the new repo uses different entrypoints.
 
@@ -53,10 +54,22 @@ After that, adjust smoke commands or test suites only if the new repo uses diffe
 bash scripts/bootstrap_project_automation.sh /absolute/path/to/project
 ```
 
+Or bootstrap and prefill the first adapter config immediately:
+
+```bash
+bash scripts/bootstrap_project_automation.sh /absolute/path/to/project --init-adapters --project-name MyApp --frontend-dir web --backend-dir api
+```
+
 Or through `make`:
 
 ```bash
 make bootstrap-core TARGET_DIR=/absolute/path/to/project
+```
+
+Or through `make` with adapter prefill:
+
+```bash
+make bootstrap-core-init TARGET_DIR=/absolute/path/to/project BOOTSTRAP_CORE_FLAGS="--project-name MyApp --frontend-dir web --backend-dir api"
 ```
 
 Use `--force` only when you intentionally want to overwrite already copied core files.
@@ -80,6 +93,7 @@ Use `--force` only when you intentionally want to overwrite already copied core 
 ```bash
 make changed
 make profile-changed
+make dev-doctor
 ```
 
 7. Once that is stable, run the heavier loops you actually want to keep:
@@ -148,6 +162,12 @@ make doctor-core TARGET_DIR=/absolute/path/to/project
 ```
 
 Add `--strict` when you want the command to fail on reusable-core drift or missing files.
+
+For shell-friendly automation:
+
+```bash
+bash scripts/automation_core_doctor.sh /absolute/path/to/project --format shell
+```
 EOF
 
 perl -0pi -e 's/VERSION_PLACEHOLDER/'"$(automation_core_version "$ROOT_DIR" | sed 's/[\/&]/\\&/g')"'/g' "$OUTPUT_DIR/README.md"

@@ -37,8 +37,8 @@ It controls:
 
 ## Porting order
 
-1. Copy the reusable core files into the new repo.
-2. Copy `scripts/project_automation_config.sh`.
+1. Bootstrap the core into the new repo.
+2. Prefill adapter config immediately if you already know the project layout.
 3. Edit only the adapter file first.
 4. Adjust project-specific target maps next:
    - `scripts/project_automation_targets.sh`
@@ -52,8 +52,9 @@ After the three adapter files are updated, use this order:
 
 1. `make changed`
 2. `make profile-changed`
-3. `make frontend` or `make backend`
-4. `make full`
+3. `make dev-doctor`
+4. `make frontend` or `make backend`
+5. `make full`
 
 That keeps the first migration pass cheap and makes the slowest mismatch obvious quickly.
 
@@ -100,10 +101,20 @@ That gives you a private optimization base while keeping product repos independe
 This repo now includes:
 
 - `scripts/bootstrap_project_automation.sh`
+- `scripts/init_project_automation_adapters.sh`
 - `scripts/upgrade_project_automation.sh`
 - `scripts/automation_core_doctor.sh`
+- `scripts/dev_doctor.sh`
 
 It installs the manifest files into another project root, skips existing files by default, and only overwrites them when `--force` is passed explicitly.
+
+For the fastest adoption path in a new repo:
+
+```bash
+make bootstrap-core-init TARGET_DIR=/absolute/path/to/project BOOTSTRAP_CORE_FLAGS="--project-name MyApp --frontend-dir web --backend-dir api"
+```
+
+That still leaves the target maps and smoke checks for you to adapt, but it removes the most boring first-pass edits.
 
 The upgrade helper is stricter by default:
 
@@ -117,6 +128,11 @@ The doctor helper reports:
 - target installed version
 - reusable-core drift or missing files
 - adapter drift separately from core drift
+- a readiness status:
+  - `ready`
+  - `adapters-unedited`
+  - `adapters-missing`
+  - `core-needs-sync`
 
 ## What Is Already Portable
 

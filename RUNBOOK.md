@@ -211,6 +211,7 @@ Notes:
 - `make pr-doctor` now also compares the current local commit, the last locally verified commit, and the PR head SHA on GitHub so stale local green runs or unpushed commits are obvious before review
 - `make pr-watch` waits on GitHub checks and then refreshes doctor output
 - `make pr-land` refuses to merge unless doctor is clean, local `HEAD` matches the PR head SHA, and PR checks are green
+- `make dev-doctor` gives one compact local summary of recommended loop, timing bottleneck, and PR doctor state
 
 For daily iteration speed on staging:
 

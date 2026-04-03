@@ -32,10 +32,22 @@ To install the core into another project directly:
 bash scripts/bootstrap_project_automation.sh /absolute/path/to/project
 ```
 
+To install it and prefill the first adapter config in one shot:
+
+```bash
+bash scripts/bootstrap_project_automation.sh /absolute/path/to/project --init-adapters --project-name MyApp --frontend-dir web --backend-dir api
+```
+
 Or through `make`:
 
 ```bash
 make bootstrap-core TARGET_DIR=/absolute/path/to/project
+```
+
+Or through `make` with adapter prefill:
+
+```bash
+make bootstrap-core-init TARGET_DIR=/absolute/path/to/project BOOTSTRAP_CORE_FLAGS="--project-name MyApp --frontend-dir web --backend-dir api"
 ```
 
 To upgrade an existing project safely:
@@ -62,9 +74,15 @@ Or through `make`:
 make doctor-core TARGET_DIR=/absolute/path/to/project
 ```
 
+For shell-friendly automation:
+
+```bash
+bash scripts/automation_core_doctor.sh /absolute/path/to/project --format shell
+```
+
 ## What stays project-specific
 
-Two adapter files are expected to change first in another project:
+Three adapter files are expected to change first in another project:
 
 - `scripts/project_automation_config.sh`
 - `scripts/project_automation_targets.sh`
@@ -73,3 +91,15 @@ Two adapter files are expected to change first in another project:
 Everything else is intended to be the reusable core.
 
 Both the fast auth/ops/runtime smoke layer and the heavier admin/restore/servers/templates smoke layers now read checks from this adapter instead of hardcoding DeployMate page assertions inside the core scripts.
+
+## Fastest First Day In A New Repo
+
+After bootstrap, the shortest useful path is:
+
+```bash
+make changed
+make profile-changed
+make dev-doctor
+```
+
+That gives you a cheap first validation, the timing picture, and one summary of what to run next.

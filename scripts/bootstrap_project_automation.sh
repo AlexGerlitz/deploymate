@@ -8,15 +8,20 @@ source "${SCRIPT_DIR}/lib/automation_core_bundle.sh"
 MANIFEST="$(automation_core_manifest_file "$REPO_ROOT")"
 FORCE=0
 TARGET_DIR=""
+INIT_ADAPTERS=0
+PROJECT_NAME=""
+FRONTEND_DIR=""
+BACKEND_DIR=""
 
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/bootstrap_project_automation.sh /absolute/path/to/project [--force]
+  bash scripts/bootstrap_project_automation.sh /absolute/path/to/project [--force] [--init-adapters] [--project-name <name>] [--frontend-dir <dir>] [--backend-dir <dir>]
 
 Behavior:
   - copies the automation-core manifest files into the target project
   - refuses to overwrite existing files unless --force is set
+  - can prefill the adapter config for a new project with --init-adapters
   - prints the adapter files to edit first after bootstrap
 EOF
 }
@@ -30,6 +35,21 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --force)
       FORCE=1
+      ;;
+    --init-adapters)
+      INIT_ADAPTERS=1
+      ;;
+    --project-name)
+      PROJECT_NAME="${2:-}"
+      shift
+      ;;
+    --frontend-dir)
+      FRONTEND_DIR="${2:-}"
+      shift
+      ;;
+    --backend-dir)
+      BACKEND_DIR="${2:-}"
+      shift
       ;;
     -h|--help)
       usage
@@ -88,6 +108,20 @@ while IFS= read -r rel_path; do
   copy_count=$((copy_count + 1))
 done <"$MANIFEST"
 
+if [ "$INIT_ADAPTERS" = "1" ]; then
+  init_args=("$TARGET_DIR")
+  if [ -n "$PROJECT_NAME" ]; then
+    init_args+=(--project-name "$PROJECT_NAME")
+  fi
+  if [ -n "$FRONTEND_DIR" ]; then
+    init_args+=(--frontend-dir "$FRONTEND_DIR")
+  fi
+  if [ -n "$BACKEND_DIR" ]; then
+    init_args+=(--backend-dir "$BACKEND_DIR")
+  fi
+  bash "${SCRIPT_DIR}/init_project_automation_adapters.sh" "${init_args[@]}"
+fi
+
 cat <<EOF
 [bootstrap-automation-core] copied files: $copy_count
 [bootstrap-automation-core] skipped existing files: $skip_count
@@ -100,4 +134,5 @@ cat <<EOF
 [bootstrap-automation-core] recommended first validation:
   - make changed
   - make profile-changed
+  - make dev-doctor
 EOF

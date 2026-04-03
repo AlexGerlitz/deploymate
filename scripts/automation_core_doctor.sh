@@ -8,11 +8,12 @@ source "${SCRIPT_DIR}/lib/automation_core_bundle.sh"
 
 TARGET_DIR=""
 STRICT=0
+OUTPUT_FORMAT="human"
 
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/automation_core_doctor.sh /absolute/path/to/project [--strict]
+  bash scripts/automation_core_doctor.sh /absolute/path/to/project [--strict] [--format human|shell]
 
 Behavior:
   - validates the source automation-core manifest
@@ -31,6 +32,10 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --strict)
       STRICT=1
+      ;;
+    --format)
+      OUTPUT_FORMAT="${2:-human}"
+      shift
       ;;
     -h|--help)
       usage
@@ -103,12 +108,37 @@ if [ "$missing_core" -gt 0 ] || [ "$diverged_core" -gt 0 ]; then
   status="needs-attention"
 fi
 
+readiness_status="ready"
+if [ "$missing_core" -gt 0 ] || [ "$diverged_core" -gt 0 ]; then
+  readiness_status="core-needs-sync"
+elif [ "$adapter_missing" -gt 0 ]; then
+  readiness_status="adapters-missing"
+elif [ "$adapter_matching" -gt 0 ] && [ "$adapter_drift" -eq 0 ] && [ "$adapter_missing" -eq 0 ]; then
+  readiness_status="adapters-unedited"
+fi
+
+if [ "$OUTPUT_FORMAT" = "shell" ]; then
+  cat <<EOF
+source_core_version=$source_version
+target_core_version=$target_version
+matching_core=$matching_core
+diverged_core=$diverged_core
+missing_core=$missing_core
+adapter_matching=$adapter_matching
+adapter_drift=$adapter_drift
+adapter_missing=$adapter_missing
+status=$status
+readiness_status=$readiness_status
+EOF
+else
+
 cat <<EOF
 [automation-core-doctor] source core version: $source_version
 [automation-core-doctor] target core version: $target_version
 [automation-core-doctor] reusable core: matching=$matching_core diverged=$diverged_core missing=$missing_core
 [automation-core-doctor] adapters: matching=$adapter_matching drifted=$adapter_drift missing=$adapter_missing
 [automation-core-doctor] status: $status
+[automation-core-doctor] readiness: $readiness_status
 EOF
 
 if [ "$adapter_drift" -gt 0 ] || [ "$adapter_missing" -gt 0 ]; then
@@ -118,6 +148,15 @@ if [ "$adapter_drift" -gt 0 ] || [ "$adapter_missing" -gt 0 ]; then
   - scripts/project_automation_targets.sh
   - scripts/project_automation_smoke_checks.sh
 EOF
+fi
+
+if [ "$readiness_status" = "adapters-unedited" ]; then
+  cat <<'EOF'
+[automation-core-doctor] next step:
+  - adapter files are still identical to the exported defaults
+  - edit config, targets, and smoke checks before trusting the local loops
+EOF
+fi
 fi
 
 if [ "$STRICT" = "1" ] && { [ "$missing_core" -gt 0 ] || [ "$diverged_core" -gt 0 ]; }; then

@@ -200,6 +200,7 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 - `docker-compose.prod.yml` production stack definition
 - [AUTOMATION-CORE.md](AUTOMATION-CORE.md) reusable automation-core notes for porting this DX layer into another repo
 - `make export-automation-core` builds an exportable automation bundle for moving this DX layer into a separate private repository
+- `make bootstrap-core-init TARGET_DIR=... BOOTSTRAP_CORE_FLAGS="--project-name MyApp --frontend-dir web --backend-dir api"` installs the reusable core into another repo and prefills the first adapter config in one shot
 
 ## Fast Local Commands
 
@@ -214,6 +215,7 @@ make pr-doctor
 make pr-watch
 make pr-land
 make auto-local
+make dev-doctor
 make changed
 make profile-changed
 make profile-frontend
@@ -250,6 +252,7 @@ What they do:
 - `make pr-doctor` prints PR health, current size class, upstream status, PR status, and whether the last local green loop still matches the branch base
 - `make pr-watch` waits on PR checks and then prints the latest doctor summary
 - `make pr-land` merges the current PR only when doctor is clean, the PR head SHA matches local `HEAD`, and GitHub checks are green
+- `make dev-doctor` prints the cheapest useful local loop, the latest timing bottleneck, and the current PR doctor summary in one command
 - `make pr-doctor` also reads PR CI status from GitHub and gives a split hint from the actual diff mix when the branch gets too large
 - `make pr-doctor` now also compares the current local `HEAD`, the last locally verified `HEAD`, and the PR head SHA on GitHub, so stale local green runs stop being mistaken for current verification
 - `make frontend` runs the fast frontend gate
@@ -339,6 +342,7 @@ PRs are not just ceremony here:
 - `make pr-doctor` now also surfaces PR check health and a practical split direction, so the next action is clearer than a generic “too big” warning
 - `make pr-doctor` now also catches “you already changed the branch after the last green local run” and “the PR head on GitHub is not the same commit you last verified locally”
 - `make pr-land` closes the loop safely by refusing to merge a PR whose doctor state, head SHA, or GitHub checks no longer match
+- `make dev-doctor` gives one compact answer to “what should I run next and what is blocking me?”, which is exactly the kind of friction this automation core is supposed to remove
 
 ## Key Screens In The App
 
