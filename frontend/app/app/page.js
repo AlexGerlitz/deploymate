@@ -687,6 +687,43 @@ export default function HomePage() {
       actionLabel: currentUser?.is_admin ? "Open admin surface" : "View upgrade options",
     },
   ];
+  const reviewerPathItems = [
+    {
+      label: "Start here",
+      title:
+        opsSnapshot.deployments.total > 0
+          ? "Read the live runtime surface"
+          : "Read the live workspace surface",
+      detail:
+        opsSnapshot.deployments.total > 0
+          ? "Open the deployment list first, then step into one live deployment detail to see health, logs, diagnostics, and activity together."
+          : "The workspace hero and status strip explain what this environment can do before any deployment exists.",
+      href:
+        deployments[0]?.id
+          ? `/deployments/${deployments[0].id}`
+          : "#runtime-deployments",
+      actionLabel:
+        deployments[0]?.id ? "Open deployment detail" : "Open deployment list",
+    },
+    {
+      label: "Then show depth",
+      title: currentUser?.is_admin ? "Open team access review" : "Open upgrade path",
+      detail: currentUser?.is_admin
+        ? "The users surface shows saved views, exports, restore validation, and audit-oriented access review."
+        : "The upgrade path keeps commercial next steps separate from the runtime workspace.",
+      href: currentUser?.is_admin ? "/app/users" : "/upgrade",
+      actionLabel: currentUser?.is_admin ? "Open users" : "Open upgrade",
+    },
+    {
+      label: "Finish with governance",
+      title: currentUser?.is_admin ? "Open the upgrade inbox" : "Return to runtime state",
+      detail: currentUser?.is_admin
+        ? "The upgrade inbox makes queue review, bulk status changes, and audit history easy to discover."
+        : "Stay on the main workspace when you only need runtime proof and rollout clarity.",
+      href: currentUser?.is_admin ? "/app/upgrade-requests" : "#runtime-deployments",
+      actionLabel: currentUser?.is_admin ? "Open upgrade inbox" : "Back to deployments",
+    },
+  ];
   const workspaceGlanceItems = [
     ...workspaceStatusItems,
     {
@@ -2181,6 +2218,28 @@ export default function HomePage() {
                   )}
                 </div>
               </aside>
+            </div>
+
+            <div className="workspaceReviewerPanel" data-testid="workspace-reviewer-panel">
+              <div className="workspaceReviewerHeader">
+                <div>
+                  <span className="eyebrow">Reviewer path</span>
+                  <strong>Show the strongest surfaces in one short pass</strong>
+                </div>
+                <span className="workspaceReviewerBadge">60-second route</span>
+              </div>
+              <div className="workspaceReviewerGrid">
+                {reviewerPathItems.map((item) => (
+                  <article key={item.label} className="workspaceReviewerCard">
+                    <span>{item.label}</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    <Link href={item.href} className="landingButton secondaryButton">
+                      {item.actionLabel}
+                    </Link>
+                  </article>
+                ))}
+              </div>
             </div>
           </article>
         </div>

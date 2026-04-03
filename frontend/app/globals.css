@@ -1976,6 +1976,39 @@ button.landingButton.primaryButton:disabled {
   margin-top: 14px;
 }
 
+.authDemoGuide {
+  display: grid;
+  gap: 10px;
+  padding: 14px 15px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.96);
+}
+
+.authDemoGuide strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.authDemoGuideList {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.authDemoGuideList span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(19, 34, 56, 0.08);
+  color: #22324a;
+  padding: 7px 11px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .authDemoAction {
   border-radius: 14px;
   background: rgba(19, 34, 56, 0.06);
@@ -2160,6 +2193,79 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceGlanceItem {
   background: rgba(255, 255, 255, 0.94);
+}
+
+.workspaceReviewerPanel {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.96) 0%, rgba(247, 250, 252, 0.96) 100%);
+}
+
+.workspaceReviewerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.workspaceReviewerHeader strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.workspaceReviewerBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(240, 181, 90, 0.16);
+  color: #8f5e0d;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspaceReviewerGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.workspaceReviewerCard {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.workspaceReviewerCard span {
+  color: #8f5e0d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workspaceReviewerCard strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+
+.workspaceReviewerCard p {
+  margin: 0;
+  color: #455164;
 }
 
 .workspaceStatusStrip {
@@ -2411,7 +2517,8 @@ button.landingButton.primaryButton:disabled {
   .showcaseCommandHeader,
   .sectionHeader,
   .authCardHeader,
-  .authCardFooter {
+  .authCardFooter,
+  .workspaceReviewerHeader {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -2512,6 +2619,10 @@ button.landingButton.primaryButton:disabled {
   .workspaceGuideGrid {
     grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
     align-items: start;
+  }
+
+  .workspaceReviewerGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .workspaceStatusStrip {

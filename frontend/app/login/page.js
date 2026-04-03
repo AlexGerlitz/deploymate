@@ -2,6 +2,26 @@ import Link from "next/link";
 
 const publicSignupEnabled =
   process.env.NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED === "1";
+const reviewerChecklist = [
+  {
+    label: "01",
+    title: "Open the live workspace first",
+    detail:
+      "Use demo access to land inside the product immediately, without needing account setup or verbal guidance.",
+  },
+  {
+    label: "02",
+    title: "Read runtime state before clicking around",
+    detail:
+      "Start with deployments, health, and the current priority signal so the product story is visible in one pass.",
+  },
+  {
+    label: "03",
+    title: "Then open admin review surfaces",
+    detail:
+      "Users and upgrade review show that the product goes beyond runtime CRUD into operational governance.",
+  },
+];
 
 export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
@@ -32,6 +52,16 @@ export default async function LoginPage({ searchParams }) {
               <span className="cardKicker">Release</span>
               <strong>Smoke-tested rollout discipline around the product instead of manual guesswork.</strong>
             </article>
+          </div>
+
+          <div className="authChecklist" data-testid="auth-reviewer-checklist">
+            {reviewerChecklist.map((item) => (
+              <article key={item.label} className="authChecklistItem">
+                <span className="cardKicker">Reviewer path {item.label}</span>
+                <strong>{item.title}</strong>
+                <p>{item.detail}</p>
+              </article>
+            ))}
           </div>
 
           <div className="authAsideNote">
@@ -99,6 +129,15 @@ export default async function LoginPage({ searchParams }) {
               Opens the current demo workspace immediately, so a reviewer can see the product
               before creating an account.
             </p>
+            <div className="authDemoGuide" data-testid="auth-demo-guide">
+              <strong>What to open after demo login</strong>
+              <div className="authDemoGuideList">
+                <span>Workspace overview</span>
+                <span>Deployment detail</span>
+                <span>Users</span>
+                <span>Upgrade inbox</span>
+              </div>
+            </div>
           </form>
 
           {error ? <div className="banner error" data-testid="auth-login-error-banner">{error}</div> : null}
