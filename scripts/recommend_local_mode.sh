@@ -5,11 +5,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE_REF="${BASE_REF:-}"
 HEAD_REF="${HEAD_REF:-HEAD}"
+SIMULATED_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
   bash scripts/recommend_local_mode.sh [--base-ref <ref>] [--head-ref <ref>]
+  bash scripts/recommend_local_mode.sh --paths <path> [<path> ...]
 
 Print the locally recommended verification command for the current diff.
 EOF
@@ -90,6 +92,13 @@ while [ "$#" -gt 0 ]; do
       HEAD_REF="${2:-}"
       shift 2
       ;;
+    --paths)
+      shift
+      while [ "$#" -gt 0 ]; do
+        SIMULATED_PATHS+=("$1")
+        shift
+      done
+      ;;
     -h|--help)
       usage
       exit 0
@@ -106,15 +115,19 @@ cd "$ROOT_DIR"
 
 resolved_base_ref="$(resolve_base_ref)"
 changed_files=()
-while IFS= read -r path; do
-  [ -n "$path" ] && changed_files+=("$path")
-done < <(
-  {
-    git diff --name-only "$resolved_base_ref" "$HEAD_REF"
-    git diff --name-only HEAD
-    git diff --name-only --cached HEAD
-  } | awk '!seen[$0]++'
-)
+if [ "${#SIMULATED_PATHS[@]}" -gt 0 ]; then
+  changed_files=("${SIMULATED_PATHS[@]}")
+else
+  while IFS= read -r path; do
+    [ -n "$path" ] && changed_files+=("$path")
+  done < <(
+    {
+      git diff --name-only "$resolved_base_ref" "$HEAD_REF"
+      git diff --name-only HEAD
+      git diff --name-only --cached HEAD
+    } | awk '!seen[$0]++'
+  )
+fi
 
 surface="skip"
 reason="no changed files"
@@ -135,13 +148,14 @@ fi
 recommended_command="make changed"
 recommended_mode="changed"
 recommendation_reason="$reason"
+backend_fast_mode=""
+frontend_fast_mode=""
+frontend_fast_smokes=""
 
 if [ "$surface" = "skip" ]; then
   recommended_command="make timing-history"
   recommended_mode="skip"
 elif [ "$surface" = "frontend" ]; then
-  frontend_fast_mode=""
-  frontend_fast_smokes=""
   while IFS='=' read -r key value; do
     case "$key" in
       frontend_fast_mode)
@@ -171,7 +185,6 @@ elif [ "$surface" = "frontend" ]; then
     recommended_mode="frontend"
   fi
 elif [ "$surface" = "backend" ]; then
-  backend_fast_mode=""
   while IFS='=' read -r key value; do
     case "$key" in
       backend_fast_mode)
@@ -194,8 +207,43 @@ elif [ "$surface" = "backend" ]; then
       ;;
   esac
 else
-  recommended_command="make profile-changed"
-  recommended_mode="profile-changed"
+  while IFS='=' read -r key value; do
+    case "$key" in
+      backend_fast_mode)
+        backend_fast_mode="$value"
+        ;;
+    esac
+  done < <(bash scripts/detect_backend_fast_scope.sh "${changed_files[@]}")
+
+  while IFS='=' read -r key value; do
+    case "$key" in
+      frontend_fast_mode)
+        frontend_fast_mode="$value"
+        ;;
+      frontend_fast_smokes)
+        frontend_fast_smokes="$value"
+        ;;
+    esac
+  done < <(bash scripts/detect_frontend_fast_scope.sh "${changed_files[@]}")
+
+  if [ "$frontend_fast_mode" = "skip" ] && [ "${backend_fast_mode:-safety}" != "skip" ]; then
+    recommended_command="make backend"
+    recommended_mode="backend"
+    recommendation_reason="mixed diff resolves to backend-only fast loop"
+  elif [ "$backend_fast_mode" = "skip" ] && [ "${frontend_fast_mode:-default}" != "skip" ]; then
+    if [ "$frontend_fast_mode" = "targeted" ] && { [ "$frontend_fast_smokes" = "auth" ] || [ "$frontend_fast_smokes" = "ops" ] || [ "$frontend_fast_smokes" = "runtime" ]; }; then
+      recommended_command="make frontend-hot"
+      recommended_mode="frontend-hot"
+      recommendation_reason="mixed diff resolves to single frontend fast target (${frontend_fast_smokes})"
+    else
+      recommended_command="make frontend"
+      recommended_mode="frontend"
+      recommendation_reason="mixed diff resolves to frontend-only fast loop"
+    fi
+  else
+    recommended_command="make profile-changed"
+    recommended_mode="profile-changed"
+  fi
 fi
 
 printf 'base_ref=%s\n' "$resolved_base_ref"

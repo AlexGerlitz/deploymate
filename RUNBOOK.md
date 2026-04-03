@@ -81,11 +81,12 @@ These commands:
 29. keep local diff-context derivation stable even when there are no changed files and print a family bottleneck hint, so explicit surface commands stay predictable and still show which verification family is dominating misses
 30. prefer per-file fingerprint reuse for `security_audit` secret and runtime-policy scans even in wider scopes when the file set is still manageable, so repeat full-scope checks stop rescanning the entire repo
 31. recommend the cheapest useful local loop for the current diff via `make recommend-local-mode`, so you spend less time choosing between `make changed`, `make backend`, `make frontend-hot`, or `make profile-changed`
-32. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
-33. keep project-specific path and route assumptions inside `scripts/project_automation_config.sh`, so the automation core can be ported to another repo without rewriting every script first
-34. keep project-specific path-to-target and path-to-scope rules inside `scripts/project_automation_targets.sh`, so the `detect_*` layer is portable too
-35. export the reusable automation layer with `make export-automation-core` when you want to move the core into a separate private repository
-36. keep frontend smoke assertions inside `scripts/project_automation_smoke_checks.sh`, so both the fast and heavier smoke runners stay reusable across projects
+32. narrow `make changed` mixed diffs down to an effective `frontend` or `backend` fast surface when the other side already resolves to `skip`, so shared-but-one-sided changes stop paying for both halves
+33. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+34. keep project-specific path and route assumptions inside `scripts/project_automation_config.sh`, so the automation core can be ported to another repo without rewriting every script first
+35. keep project-specific path-to-target and path-to-scope rules inside `scripts/project_automation_targets.sh`, so the `detect_*` layer is portable too
+36. export the reusable automation layer with `make export-automation-core` when you want to move the core into a separate private repository
+37. keep frontend smoke assertions inside `scripts/project_automation_smoke_checks.sh`, so both the fast and heavier smoke runners stay reusable across projects
 
 To inspect the latest local timings quickly:
 

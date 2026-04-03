@@ -130,6 +130,8 @@ printf '%s\n' "$detect_output"
 
 surface=""
 reason=""
+run_surface=""
+run_surface_reason=""
 backend_changed_files=()
 frontend_changed_files=()
 runtime_audit_reason=""
@@ -291,6 +293,21 @@ if [ "$surface" = "frontend" ] || [ "$surface" = "full" ]; then
   fi
 fi
 
+run_surface="$surface"
+if [ "$surface" = "full" ]; then
+  if [ "${DEPLOYMATE_FRONTEND_FAST_MODE:-default}" = "skip" ] && [ "${DEPLOYMATE_BACKEND_FAST_MODE:-safety}" != "skip" ]; then
+    run_surface="backend"
+    run_surface_reason="frontend loop resolved to skip for this mixed diff"
+  elif [ "${DEPLOYMATE_BACKEND_FAST_MODE:-safety}" = "skip" ] && [ "${DEPLOYMATE_FRONTEND_FAST_MODE:-default}" != "skip" ]; then
+    run_surface="frontend"
+    run_surface_reason="backend loop resolved to skip for this mixed diff"
+  fi
+fi
+
+if [ "$run_surface" != "$surface" ]; then
+  echo "[dev-verify-changed] effective fast surface: $run_surface (${run_surface_reason})"
+fi
+
 recommendation_output="$(bash scripts/recommend_local_mode.sh --base-ref "$BASE_REF" --head-ref "$HEAD_REF")"
 while IFS='=' read -r key value; do
   case "$key" in
@@ -306,4 +323,4 @@ if [ -n "${recommended_command:-}" ]; then
   echo "[dev-verify-changed] recommended next loop: ${recommended_command} (${recommendation_reason:-current diff})"
 fi
 
-bash scripts/dev_fast_check.sh "$surface"
+bash scripts/dev_fast_check.sh "$run_surface"
