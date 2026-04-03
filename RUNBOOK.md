@@ -40,6 +40,7 @@ make profile-frontend-hot
 make profile-fast-hot
 make frontend-smoke-server-status
 make frontend-smoke-server-stop
+make audit-cache-clear
 make frontend
 make frontend-hot
 make backend
@@ -66,8 +67,9 @@ These commands:
 15. skip runtime-oriented local audits automatically when the current diff does not touch runtime or deploy contract files
 16. narrow local `security_audit` to changed files and skip nested release or credentials audits unless the diff touches those contracts
 17. split local `security_audit` into secret scan and runtime-policy scan, so docs or release-contract diffs still keep the right checks without scanning risky runtime defaults unnecessarily
-18. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
-19. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+18. persist successful local secret-scan and runtime-policy results by fingerprint, so repeated commands on the same diff do not re-run them unnecessarily
+19. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
+20. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
 
 To inspect the latest local timings quickly:
 

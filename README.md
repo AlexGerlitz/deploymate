@@ -213,6 +213,7 @@ make profile-frontend-hot
 make profile-fast-hot
 make frontend-smoke-server-status
 make frontend-smoke-server-stop
+make audit-cache-clear
 make frontend
 make frontend-hot
 make backend
@@ -231,6 +232,7 @@ What they do:
 - `make profile-fast-hot` runs the full profile bundle with the persistent frontend smoke server enabled
 - `make frontend-smoke-server-status` shows reusable local frontend smoke servers kept alive between commands
 - `make frontend-smoke-server-stop` stops those reusable local frontend smoke servers explicitly
+- `make audit-cache-clear` clears the persistent local audit fingerprint cache
 - `make frontend` runs the fast frontend gate
 - `make frontend-hot` runs the same fast frontend gate but keeps the smoke server warm across runs
 - `make backend` runs the fast backend gate
@@ -257,6 +259,7 @@ The fast gate intentionally uses fewer resources:
 - explicit surface commands like `make frontend`, `make backend`, `make profile-frontend`, and `make profile-backend` now auto-derive the same local diff context, so scoped audits and syntax checks still stay cheap outside `make changed`
 - release-workflow and runbook diffs now keep `release_workflow_audit` enabled while still letting `security_audit` stay on changed-file scope during local explicit surface loops
 - local `security_audit` now splits cheap secret scanning from runtime-policy scanning, so release/docs/script-heavy diffs keep the relevant checks without paying for unnecessary risky-default scans
+- successful local secret-scan and runtime-policy results now persist by file fingerprint, so repeating the same loop does not re-run those scans unnecessarily
 - preflight: skips the production frontend build in fast mode
 - fast frontend mode now reuses one shared smoke dev server instead of starting a separate `next dev` process per smoke
 - the repo now has experimental local persistent frontend smoke-server controls, but the default fast loop stays on the safer per-command lifecycle unless `FRONTEND_SMOKE_PERSIST_SERVER=1` is set explicitly

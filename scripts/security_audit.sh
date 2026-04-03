@@ -59,18 +59,24 @@ done
 
 echo "[security-audit] scanning tracked files for high-signal secret patterns"
 echo "[security-audit] secret scan scope: ${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
-
-if "${SEARCH_CMD[@]}" \
-  -e 'gh[opusr]_[A-Za-z0-9_]+' \
-  -e 'github_pat_[A-Za-z0-9_]+' \
-  -e 'AKIA[0-9A-Z]{16}' \
-  -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
-  -e 'xox[baprs]-[A-Za-z0-9-]+' \
-  -e 'sk_live_[A-Za-z0-9]+' \
-  -- "${FILTERED_FILES[@]}" >"$TMP_FILE"; then
-  echo "[security-audit] potential secret material found:"
-  cat "$TMP_FILE"
-  exit 1
+secret_seed="secret:${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
+secret_fingerprint="$(audit_cache_fingerprint_files "$secret_seed" "${FILTERED_FILES[@]}")"
+if audit_cache_persistent_has "security_secret_scan" "$secret_fingerprint"; then
+  echo "[security-audit] secret scan cache hit"
+else
+  if "${SEARCH_CMD[@]}" \
+    -e 'gh[opusr]_[A-Za-z0-9_]+' \
+    -e 'github_pat_[A-Za-z0-9_]+' \
+    -e 'AKIA[0-9A-Z]{16}' \
+    -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+    -e 'xox[baprs]-[A-Za-z0-9-]+' \
+    -e 'sk_live_[A-Za-z0-9]+' \
+    -- "${FILTERED_FILES[@]}" >"$TMP_FILE"; then
+    echo "[security-audit] potential secret material found:"
+    cat "$TMP_FILE"
+    exit 1
+  fi
+  audit_cache_persistent_mark "security_secret_scan" "$secret_fingerprint"
 fi
 
 echo "[security-audit] scanning for risky runtime defaults"
@@ -92,16 +98,26 @@ else
   if [ "${#RUNTIME_FILES[@]}" -eq 0 ]; then
     echo "[security-audit] no runtime policy files in current scope"
   else
-    if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
-      echo "[security-audit] warning: StrictHostKeyChecking=no found"
-      cat "$TMP_FILE"
-      WARNINGS=1
-    fi
+    runtime_seed="runtime-policy:${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}"
+    runtime_fingerprint="$(audit_cache_fingerprint_files "$runtime_seed" "${RUNTIME_FILES[@]}")"
+    if audit_cache_persistent_has "security_runtime_policy_scan" "$runtime_fingerprint"; then
+      echo "[security-audit] runtime policy scan cache hit"
+    else
+      if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
+        echo "[security-audit] warning: StrictHostKeyChecking=no found"
+        cat "$TMP_FILE"
+        WARNINGS=1
+      fi
 
-    if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
-      echo "[security-audit] warning: docker.sock reference found"
-      cat "$TMP_FILE"
-      WARNINGS=1
+      if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
+        echo "[security-audit] warning: docker.sock reference found"
+        cat "$TMP_FILE"
+        WARNINGS=1
+      fi
+
+      if [ "$WARNINGS" -eq 0 ]; then
+        audit_cache_persistent_mark "security_runtime_policy_scan" "$runtime_fingerprint"
+      fi
     fi
   fi
 fi
