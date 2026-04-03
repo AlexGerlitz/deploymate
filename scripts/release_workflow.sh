@@ -74,28 +74,28 @@ bash scripts/preflight.sh --surface "$SURFACE"
 
 if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   echo "[release] frontend auth smoke"
-  npm --prefix frontend run smoke:auth
+  FRONTEND_SMOKE_PORT=3001 npm --prefix frontend run smoke:auth
 
   echo "[release] frontend admin smoke"
-  npm --prefix frontend run smoke:admin
+  FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:admin
 
   echo "[release] frontend admin interactions smoke"
-  npm --prefix frontend run smoke:admin-interactions
+  FRONTEND_SMOKE_PORT=3003 npm --prefix frontend run smoke:admin-interactions
 
   echo "[release] frontend ops smoke"
-  npm --prefix frontend run smoke:ops
+  FRONTEND_SMOKE_PORT=3004 npm --prefix frontend run smoke:ops
 
   echo "[release] frontend restore smoke"
-  npm --prefix frontend run smoke:restore
+  FRONTEND_SMOKE_PORT=3005 npm --prefix frontend run smoke:restore
 
   echo "[release] frontend runtime smoke"
-  npm --prefix frontend run smoke:runtime
+  FRONTEND_SMOKE_PORT=3006 npm --prefix frontend run smoke:runtime
 
   echo "[release] frontend servers smoke"
-  npm --prefix frontend run smoke:servers
+  FRONTEND_SMOKE_PORT=3007 npm --prefix frontend run smoke:servers
 
   echo "[release] frontend templates smoke"
-  npm --prefix frontend run smoke:templates
+  FRONTEND_SMOKE_PORT=3008 npm --prefix frontend run smoke:templates
 
   clean_frontend_build_artifacts
   echo "[release] frontend build"
