@@ -105,7 +105,11 @@ done < <(
 print_export DEPLOYMATE_CONTEXT_DERIVED 1
 print_export DEPLOYMATE_CONTEXT_BASE_REF "$resolved_base_ref"
 print_export DEPLOYMATE_CONTEXT_HEAD_REF "$HEAD_REF"
-print_export DEPLOYMATE_CHANGED_FILES "$(join_lines "${changed_files[@]}")"
+changed_files_joined=""
+if [ "${#changed_files[@]}" -gt 0 ]; then
+  changed_files_joined="$(join_lines "${changed_files[@]}")"
+fi
+print_export DEPLOYMATE_CHANGED_FILES "$changed_files_joined"
 
 if [ "${#changed_files[@]}" -eq 0 ]; then
   print_export DEPLOYMATE_RUN_RUNTIME_AUDITS 1

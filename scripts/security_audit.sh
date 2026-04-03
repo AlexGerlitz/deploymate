@@ -26,8 +26,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-SECRET_CACHE_MAX_FILES="${DEPLOYMATE_SECRET_SCAN_CACHE_MAX_FILES:-24}"
-RUNTIME_POLICY_CACHE_MAX_FILES="${DEPLOYMATE_RUNTIME_POLICY_CACHE_MAX_FILES:-16}"
+SECRET_CACHE_MAX_FILES="${DEPLOYMATE_SECRET_SCAN_CACHE_MAX_FILES:-600}"
+RUNTIME_POLICY_CACHE_MAX_FILES="${DEPLOYMATE_RUNTIME_POLICY_CACHE_MAX_FILES:-128}"
 
 scan_single_file_or_fail() {
   local label="$1"
@@ -110,8 +110,7 @@ audit_cache_record_event phase_miss "$security_phase_cache_key"
 echo "[security-audit] scanning tracked files for high-signal secret patterns"
 echo "[security-audit] secret scan scope: ${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
 secret_seed="secret:${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}"
-if [ "${DEPLOYMATE_SECRET_SCAN_SCOPE:-${DEPLOYMATE_SECURITY_AUDIT_SCOPE:-full}}" = "changed" ] \
-  && [ "${#FILTERED_FILES[@]}" -gt 0 ] \
+if [ "${#FILTERED_FILES[@]}" -gt 0 ] \
   && [ "${#FILTERED_FILES[@]}" -le "$SECRET_CACHE_MAX_FILES" ]; then
   secret_cache_hits=0
   secret_cache_misses=0
@@ -180,8 +179,7 @@ else
     echo "[security-audit] no runtime policy files in current scope"
   else
     runtime_seed="runtime-policy:${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}"
-    if [ "${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}" = "changed" ] \
-      && [ "${#RUNTIME_FILES[@]}" -le "$RUNTIME_POLICY_CACHE_MAX_FILES" ]; then
+    if [ "${#RUNTIME_FILES[@]}" -le "$RUNTIME_POLICY_CACHE_MAX_FILES" ]; then
       runtime_policy_cache_hits=0
       runtime_policy_cache_misses=0
       echo "[security-audit] runtime policy cache mode: per-file"
