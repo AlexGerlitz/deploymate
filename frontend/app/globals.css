@@ -1287,6 +1287,24 @@ code {
   line-height: 1.75;
 }
 
+.landingHeroNote {
+  display: grid;
+  gap: 6px;
+  max-width: 680px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(34, 49, 73, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #4b5565;
+}
+
+.landingHeroNote strong {
+  color: #132238;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
 .eyebrow {
   margin-bottom: 12px;
   color: #8f5e0d;
@@ -1427,6 +1445,28 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.showcaseQuickTake {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(34, 49, 73, 0.08);
+}
+
+.showcaseQuickTake strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.showcaseQuickTake p {
+  margin: 0;
+  color: #4f5868;
+  line-height: 1.65;
 }
 
 .showcaseChip,
@@ -1740,6 +1780,11 @@ code {
   box-shadow: 0 14px 28px rgba(19, 34, 56, 0.18);
 }
 
+.landingHeroCopy .primaryButton {
+  min-width: 220px;
+  padding-inline: 24px;
+}
+
 button.landingButton.primaryButton {
   background: #132238;
   color: #fff;
@@ -1760,6 +1805,10 @@ button.landingButton.primaryButton:disabled {
   border: 1px solid #d0d5dd;
   background: #fff;
   color: #111;
+}
+
+.landingSecondaryCta {
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .ghostButton {
@@ -1976,6 +2025,34 @@ button.landingButton.primaryButton:disabled {
   margin-top: 14px;
 }
 
+.authDecisionRow {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.authDecisionCard {
+  display: grid;
+  gap: 6px;
+  padding: 14px 15px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.94);
+}
+
+.authDecisionCard strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.authDecisionCard p {
+  margin: 0;
+  color: #596171;
+  line-height: 1.6;
+}
+
 .authDemoGuide {
   display: grid;
   gap: 10px;
@@ -2125,6 +2202,10 @@ button.landingButton.primaryButton:disabled {
   display: grid;
   gap: 12px;
   margin-bottom: 18px;
+}
+
+.workspaceBannerStack .banner.subtle strong {
+  color: #132238;
 }
 
 .workspaceGuidePanel {
@@ -2606,6 +2687,10 @@ button.landingButton.primaryButton:disabled {
 
   .authShell {
     grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+  }
+
+  .authDecisionRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .landingPathGrid {

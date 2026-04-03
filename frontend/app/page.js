@@ -123,14 +123,18 @@ export default function LandingPage() {
                   Open live product
                 </Link>
                 {publicSignupEnabled ? (
-                  <Link href="/register" className="landingButton secondaryButton">
+                  <Link href="/register" className="landingButton secondaryButton landingSecondaryCta">
                     Create trial account
                   </Link>
                 ) : (
-                  <Link href="/upgrade" className="landingButton secondaryButton">
+                  <Link href="/upgrade" className="landingButton secondaryButton landingSecondaryCta">
                     Start trial / Request access
                   </Link>
                 )}
+              </div>
+
+              <div className="landingHeroNote" data-testid="landing-hero-note">
+                <strong>Best first pass:</strong> open the live product, read the workspace, then inspect one deployment detail and one admin screen.
               </div>
 
               <div className="landingMetaRow">
@@ -156,6 +160,10 @@ export default function LandingPage() {
                 <div className="showcaseTopline">
                   <span className="showcaseChip">Product preview</span>
                   <span className="showcaseLive">Live</span>
+                </div>
+                <div className="showcaseQuickTake">
+                  <strong>What you should notice first</strong>
+                  <p>The app leads with current state, not setup complexity. You can understand the product before you understand its internals.</p>
                 </div>
 
                 <div className="showcaseScoreboard">
@@ -496,6 +504,9 @@ export default function LandingPage() {
             <div>
               <div className="eyebrow">Ready to explore</div>
               <h2>Open the product and decide quickly whether the workflow feels clearer.</h2>
+              <p className="sectionLead">
+                The fastest route is login, workspace, one deployment detail, then one admin review surface.
+              </p>
             </div>
             <div className="buttonRow">
               <Link href="/login" className="landingButton primaryButton">

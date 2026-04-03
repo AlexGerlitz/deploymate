@@ -118,6 +118,17 @@ export default async function LoginPage({ searchParams }) {
             </div>
           </form>
 
+          <div className="authDecisionRow" data-testid="auth-decision-row">
+            <div className="authDecisionCard">
+              <strong>Just evaluating?</strong>
+              <p>Use the demo route below for the fastest product walkthrough.</p>
+            </div>
+            <div className="authDecisionCard">
+              <strong>Ready to try it yourself?</strong>
+              <p>Sign in or create a trial account to work inside your own workspace.</p>
+            </div>
+          </div>
+
           <form method="post" action="/login/demo" className="authDemoForm">
             <button
               type="submit"
