@@ -19,6 +19,7 @@ import {
   smokeMode,
   smokeRestoreBundle,
   smokeRestoreDryRun,
+  smokeRestoreImportPlan,
   smokeRestoreReportMode,
   smokeUserAuditViews,
   smokeUsers,
@@ -49,6 +50,7 @@ import {
   analyzeBackupBundleText,
   buildRestoreFilteredSectionsCsv,
   buildRestoreDryRunCsv,
+  buildRestoreImportPlanMarkdown,
   buildRestoreIssuesCsv,
   buildRestorePreparationMarkdown,
   buildRestoreReportDigest,
@@ -93,6 +95,13 @@ function formatUserSavedViews(items) {
   });
 }
 
+function formatPreparationMode(mode) {
+  return String(mode || "")
+    .split("_")
+    .filter(Boolean)
+    .join(" ");
+}
+
 function UsersPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -107,6 +116,9 @@ function UsersPageContent() {
   );
   const [restoreDryRun, setRestoreDryRun] = useState(
     smokeRestoreReportMode ? smokeRestoreDryRun : null,
+  );
+  const [restoreImportPlan, setRestoreImportPlan] = useState(
+    smokeRestoreReportMode ? smokeRestoreImportPlan : null,
   );
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [restoreSectionFilter, setRestoreSectionFilter] = useState("all");
@@ -172,6 +184,8 @@ function UsersPageContent() {
         const haystack = [
           section.name,
           section.status,
+          section.preparation_mode,
+          section.recommended_action,
           ...(section.notes || []),
           ...(section.blockers || []).map((issue) => issue.message),
           ...(section.warnings || []).map((issue) => issue.message),
@@ -184,6 +198,7 @@ function UsersPageContent() {
       })
     : [];
   const restorePreparationMarkdown = buildRestorePreparationMarkdown(restoreDryRun);
+  const restoreImportPlanMarkdown = buildRestoreImportPlanMarkdown(restoreImportPlan);
   const primaryFilterDefinitions = [
     createTextFilterDefinition({
       key: "q",
@@ -887,6 +902,7 @@ function UsersPageContent() {
     reader.onload = () => {
       setBackupBundleText(typeof reader.result === "string" ? reader.result : "");
       setRestoreDryRun(null);
+      setRestoreImportPlan(null);
       setRestoreSectionFilter("all");
       setSuccess(`Loaded backup file ${file.name}.`);
       setError("");
@@ -918,6 +934,7 @@ function UsersPageContent() {
       });
       const data = await readJsonOrError(response, "Failed to run restore dry-run.");
       setRestoreDryRun(data);
+      setRestoreImportPlan(null);
       setRestoreSectionFilter("all");
       setSuccess("Restore dry-run completed.");
     } catch (requestError) {
@@ -961,6 +978,7 @@ function UsersPageContent() {
       ),
     );
     setRestoreDryRun(null);
+    setRestoreImportPlan(null);
     setSuccess("Sample bundle loaded.");
     setError("");
   }
@@ -968,9 +986,16 @@ function UsersPageContent() {
   function handleClearBundle() {
     setBackupBundleText("");
     setRestoreDryRun(null);
+    setRestoreImportPlan(null);
     setRestoreSectionFilter("all");
     setSuccess("Backup bundle editor cleared.");
     setError("");
+  }
+
+  function handleBackupBundleTextChange(event) {
+    setBackupBundleText(event.target.value);
+    setRestoreDryRun(null);
+    setRestoreImportPlan(null);
   }
 
   function handleDownloadRestoreReportJson() {
@@ -1011,6 +1036,7 @@ function UsersPageContent() {
       [
         restoreDryRun.summary.plain_language_summary,
         `Next step: ${restoreDryRun.summary.next_step}`,
+        restoreDryRun.summary.preparation_summary,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -1049,6 +1075,60 @@ function UsersPageContent() {
     });
     triggerFileDownload("deploymate-restore-dry-run-issues.csv", blob);
     setSuccess("Validation issues CSV downloaded.");
+  }
+
+  async function handleBuildRestoreImportPlan() {
+    setRestoreLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      if (!backupBundleText.trim()) {
+        throw new Error("Load or paste a backup bundle first.");
+      }
+
+      const parsedBundle = JSON.parse(backupBundleText);
+      const response = await fetch(`${apiBaseUrl}/admin/restore/import-plan`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ bundle: parsedBundle }),
+      });
+      const data = await readJsonOrError(response, "Failed to build restore import plan.");
+      setRestoreImportPlan(data);
+      setSuccess("Controlled import plan built.");
+    } catch (requestError) {
+      setRestoreImportPlan(null);
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to build restore import plan.",
+      );
+    } finally {
+      setRestoreLoading(false);
+    }
+  }
+
+  function handleDownloadRestoreImportPlanJson() {
+    if (!restoreImportPlan) {
+      return;
+    }
+    const blob = new Blob([JSON.stringify(restoreImportPlan, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-restore-import-plan.json", blob);
+    setSuccess("Controlled import plan JSON downloaded.");
+  }
+
+  function handleDownloadRestoreImportPlanMarkdown() {
+    if (!restoreImportPlan) {
+      return;
+    }
+    const blob = new Blob([restoreImportPlanMarkdown], {
+      type: "text/markdown;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-restore-import-plan.md", blob);
+    setSuccess("Controlled import plan markdown downloaded.");
   }
 
   function resetUserFilters() {
@@ -1340,12 +1420,21 @@ function UsersPageContent() {
             <button type="button" className="secondaryButton" data-testid="restore-report-issues-csv-button" onClick={handleDownloadRestoreIssuesCsv} disabled={!restoreDryRun}>
               Issues CSV
             </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="restore-import-plan-button"
+              onClick={handleBuildRestoreImportPlan}
+              disabled={restoreLoading || bundleAnalysis.status !== "ready"}
+            >
+              {restoreLoading ? "Building plan..." : "Build controlled import plan"}
+            </button>
           </div>
           <label className="field">
             <span>Bundle JSON</span>
             <textarea
               value={backupBundleText}
-              onChange={(event) => setBackupBundleText(event.target.value)}
+              onChange={handleBackupBundleTextChange}
               placeholder='{"manifest": {...}, "data": {...}}'
             />
           </label>
@@ -1428,6 +1517,16 @@ function UsersPageContent() {
                     <span>{restoreDryRun.summary.next_step}</span>
                   </div>
                 </div>
+                <div className="overviewCard" data-testid="restore-preparation-mix-card">
+                  <span className="overviewLabel">Preparation mix</span>
+                  <strong className="overviewValue">{restoreDryRun.summary.prepare_import_sections}</strong>
+                  <div className="overviewMeta">
+                    <span>Prepare {restoreDryRun.summary.prepare_import_sections}</span>
+                    <span>Merge review {restoreDryRun.summary.merge_review_sections}</span>
+                    <span>Validate only {restoreDryRun.summary.validate_only_sections}</span>
+                    <span>Dry-run only {restoreDryRun.summary.dry_run_only_sections}</span>
+                  </div>
+                </div>
               </div>
               <div className="banner subtle" data-testid="restore-summary-digest">
                 {restoreReportDigest}
@@ -1452,6 +1551,10 @@ function UsersPageContent() {
                 <div className="row">
                   <span className="label">Recommended next step</span>
                   <span data-testid="restore-next-step-summary">{restoreDryRun.summary.next_step}</span>
+                </div>
+                <div className="row">
+                  <span className="label">Preparation mix</span>
+                  <span data-testid="restore-preparation-mix-summary">{restoreDryRun.summary.preparation_summary}</span>
                 </div>
                 <div className="actionCluster">
                   <button
@@ -1480,6 +1583,92 @@ function UsersPageContent() {
                   </button>
                 </div>
               </article>
+              {restoreImportPlan ? (
+                <article className="card compactCard" data-testid="restore-import-plan-card">
+                  <div className="sectionHeader">
+                    <div>
+                      <h3 data-testid="restore-import-plan-title">Controlled import plan</h3>
+                      <p className="formHint">
+                        This plan narrows future import scope for review, but it still does not authorize any live apply.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="overviewGrid" data-testid="restore-import-plan-overview">
+                    <div className="overviewCard">
+                      <span className="overviewLabel">Plan status</span>
+                      <strong className="overviewValue">{restoreImportPlan.summary.plan_status}</strong>
+                      <div className="overviewMeta">
+                        <span>Apply allowed {restoreImportPlan.summary.apply_allowed ? "yes" : "no"}</span>
+                        <span>Plan ID {restoreImportPlan.summary.plan_id}</span>
+                      </div>
+                    </div>
+                    <div className="overviewCard">
+                      <span className="overviewLabel">Scope</span>
+                      <strong className="overviewValue">{restoreImportPlan.summary.included_sections.length}</strong>
+                      <div className="overviewMeta">
+                        <span>Included {restoreImportPlan.summary.included_sections.join(", ") || "none"}</span>
+                        <span>Blocked {restoreImportPlan.summary.blocked_sections.join(", ") || "none"}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <span className="label">Scope summary</span>
+                    <span data-testid="restore-import-plan-scope-summary">{restoreImportPlan.summary.plan_scope_summary}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Reviewer guidance</span>
+                    <span data-testid="restore-import-plan-reviewer-guidance">{restoreImportPlan.summary.reviewer_guidance}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Typed confirmation</span>
+                    <span data-testid="restore-import-plan-confirmation">{restoreImportPlan.summary.typed_confirmation_phrase}</span>
+                  </div>
+                  <div className="actionCluster">
+                    <button
+                      type="button"
+                      className="softButton"
+                      data-testid="restore-import-plan-json-button"
+                      onClick={handleDownloadRestoreImportPlanJson}
+                    >
+                      Plan JSON
+                    </button>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      data-testid="restore-import-plan-markdown-button"
+                      onClick={handleDownloadRestoreImportPlanMarkdown}
+                    >
+                      Plan markdown
+                    </button>
+                  </div>
+                  <div className="overviewAttentionList" data-testid="restore-import-plan-sections">
+                    {restoreImportPlan.sections.map((section) => (
+                      <div className="overviewAttentionItem" key={section.name} data-testid={`restore-import-plan-section-${section.name}`}>
+                        <div className="row">
+                          <span className="label">Section</span>
+                          <span>{section.name}</span>
+                        </div>
+                        <div className="row">
+                          <span className="label">Plan state</span>
+                          <span>{section.plan_state}</span>
+                        </div>
+                        <div className="row">
+                          <span className="label">Preparation mode</span>
+                          <span>{formatPreparationMode(section.preparation_mode)}</span>
+                        </div>
+                        <div className="row">
+                          <span className="label">Include in plan</span>
+                          <span>{section.include_in_plan ? "yes" : "no"}</span>
+                        </div>
+                        <div className="row">
+                          <span className="label">Rationale</span>
+                          <span>{section.rationale}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ) : null}
               <div className="overviewGrid" data-testid="restore-attention-overview">
                 <div className="overviewCard">
                   <span className="overviewLabel">Attention sections</span>
@@ -1581,6 +1770,18 @@ function UsersPageContent() {
                       <span>
                         {(section.blockers || []).length} blocker{(section.blockers || []).length === 1 ? "" : "s"} ·{" "}
                         {(section.warnings || []).length} warning{(section.warnings || []).length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Preparation mode</span>
+                      <span data-testid={`restore-section-mode-${section.name}`}>
+                        {formatPreparationMode(section.preparation_mode)}
+                      </span>
+                    </div>
+                    <div className="row">
+                      <span className="label">Recommended action</span>
+                      <span data-testid={`restore-section-action-${section.name}`}>
+                        {section.recommended_action}
                       </span>
                     </div>
                     {section.blockers.length > 0 ? (

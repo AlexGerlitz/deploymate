@@ -15,6 +15,7 @@ from app.routes.notifications import router as notifications_router
 from app.routes.ops import router as ops_router
 from app.routes.root import router as root_router
 from app.routes.servers import router as servers_router
+from app.routes.import_review import router as import_review_router
 
 
 app = FastAPI(
@@ -95,3 +96,4 @@ app.include_router(deployment_observability_router)
 app.include_router(notifications_router)
 app.include_router(ops_router)
 app.include_router(servers_router)
+app.include_router(import_review_router)

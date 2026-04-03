@@ -425,6 +425,8 @@ class RestoreDryRunSection(BaseModel):
     incoming_count: int = 0
     current_count: int = 0
     status: Literal["ok", "warn", "error"] = "ok"
+    preparation_mode: Literal["validate_only", "merge_review", "prepare_import", "dry_run_only"] = "prepare_import"
+    recommended_action: str = ""
     blockers: list[RestoreDryRunIssue] = Field(default_factory=list)
     warnings: list[RestoreDryRunIssue] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
@@ -442,6 +444,11 @@ class RestoreDryRunSummary(BaseModel):
     next_step: str = ""
     plain_language_summary: str = ""
     highest_risk_sections: list[str] = Field(default_factory=list)
+    preparation_summary: str = ""
+    validate_only_sections: int = 0
+    merge_review_sections: int = 0
+    prepare_import_sections: int = 0
+    dry_run_only_sections: int = 0
 
 
 class RestoreDryRunResponse(BaseModel):
@@ -449,3 +456,52 @@ class RestoreDryRunResponse(BaseModel):
     manifest: BackupBundleManifest
     summary: RestoreDryRunSummary
     sections: list[RestoreDryRunSection] = Field(default_factory=list)
+
+
+class RestoreImportPlanSection(BaseModel):
+    name: str
+    source_status: Literal["ok", "warn", "error"] = "ok"
+    preparation_mode: Literal["validate_only", "merge_review", "prepare_import", "dry_run_only"] = "prepare_import"
+    plan_state: Literal["include", "review", "blocked", "exclude"] = "review"
+    include_in_plan: bool = False
+    rationale: str = ""
+    recommended_action: str = ""
+
+
+class RestoreImportPlanSummary(BaseModel):
+    plan_id: str
+    plan_status: Literal["ready_for_review", "review_required", "blocked"] = "review_required"
+    apply_allowed: bool = False
+    apply_block_reason: str = ""
+    boundary_message: str = ""
+    apply_readiness_status: Literal["not_ready", "review_required"] = "review_required"
+    apply_readiness_summary: str = ""
+    acknowledgement_items: list[str] = Field(default_factory=list)
+    typed_review_phrase: str = ""
+    plan_scope_summary: str = ""
+    reviewer_guidance: str = ""
+    typed_confirmation_phrase: str = ""
+    included_sections: list[str] = Field(default_factory=list)
+    review_sections: list[str] = Field(default_factory=list)
+    blocked_sections: list[str] = Field(default_factory=list)
+    excluded_sections: list[str] = Field(default_factory=list)
+    approval_status: Literal["approval_required", "approval_blocked"] = "approval_required"
+    approval_summary: str = ""
+    approval_decision_question: str = ""
+    approval_checklist: list[str] = Field(default_factory=list)
+    approval_handoff_note: str = ""
+
+
+class RestoreImportPlanResponse(BaseModel):
+    generated_at: str
+    dry_run_generated_at: str
+    manifest: BackupBundleManifest
+    summary: RestoreImportPlanSummary
+    sections: list[RestoreImportPlanSection] = Field(default_factory=list)
+
+
+class ImportReviewWorkspaceResponse(BaseModel):
+    generated_at: str
+    bundle_manifest: BackupBundleManifest
+    dry_run: RestoreDryRunResponse
+    import_plan: RestoreImportPlanResponse

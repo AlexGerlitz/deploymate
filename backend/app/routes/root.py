@@ -46,6 +46,9 @@ from app.schemas import (
     RestoreDryRunResponse,
     RestoreDryRunSection,
     RestoreDryRunSummary,
+    RestoreImportPlanResponse,
+    RestoreImportPlanSection,
+    RestoreImportPlanSummary,
     UpgradeRequestCreate,
     UpgradeRequestItem,
     UpgradeRequestResponse,
@@ -169,6 +172,211 @@ def _finalize_section(section: RestoreDryRunSection) -> RestoreDryRunSection:
     return section
 
 
+def _apply_restore_preparation_guidance(section: RestoreDryRunSection) -> RestoreDryRunSection:
+    if section.name == "deployments":
+        section.preparation_mode = "dry_run_only"
+        section.recommended_action = (
+            "Keep deployments in dry-run only. Use this section for runtime review and manual rebuild planning instead of any future direct import."
+        )
+        return section
+
+    if section.name == "servers":
+        if section.status == "error":
+            section.preparation_mode = "dry_run_only"
+            section.recommended_action = (
+                "Do not prepare server import yet. Resolve identity, trust, and target conflicts first, then rerun dry-run."
+            )
+        else:
+            section.preparation_mode = "merge_review"
+            section.recommended_action = (
+                "Keep servers behind merge review. Validate host identity and SSH trust before treating them as import candidates."
+            )
+        return section
+
+    if section.name == "users":
+        section.preparation_mode = "merge_review"
+        section.recommended_action = (
+            "Review users as merge candidates only. Preserve credential and password-reset state rather than planning blind overwrite."
+        )
+        return section
+
+    if section.name == "audit_events":
+        section.preparation_mode = "validate_only"
+        section.recommended_action = (
+            "Validate audit event shape and deduplication needs, but keep this section low priority for any future import preparation."
+        )
+        return section
+
+    if section.status == "error":
+        section.preparation_mode = "merge_review"
+        section.recommended_action = (
+            "Resolve blockers in this section first, then rerun dry-run before any import preparation work."
+        )
+    elif section.status == "warn":
+        section.preparation_mode = "merge_review"
+        section.recommended_action = (
+            "Clean up warnings and linking drift in this section, then rerun dry-run before moving into import preparation."
+        )
+    else:
+        section.preparation_mode = "prepare_import"
+        section.recommended_action = (
+            "This section looks clean enough to document as an import-preparation candidate, while final apply stays manual."
+        )
+
+    return section
+
+
+def _build_restore_preparation_summary(sections: list[RestoreDryRunSection]) -> tuple[str, int, int, int, int]:
+    validate_only_sections = sum(1 for section in sections if section.preparation_mode == "validate_only")
+    merge_review_sections = sum(1 for section in sections if section.preparation_mode == "merge_review")
+    prepare_import_sections = sum(1 for section in sections if section.preparation_mode == "prepare_import")
+    dry_run_only_sections = sum(1 for section in sections if section.preparation_mode == "dry_run_only")
+
+    parts: list[str] = []
+    if prepare_import_sections:
+        parts.append(f"{prepare_import_sections} ready to document for import preparation")
+    if merge_review_sections:
+        parts.append(f"{merge_review_sections} still need merge review")
+    if validate_only_sections:
+        parts.append(f"{validate_only_sections} are validation-only")
+    if dry_run_only_sections:
+        parts.append(f"{dry_run_only_sections} should stay dry-run only")
+
+    summary = "Preparation mix: " + ", ".join(parts) if parts else "Preparation mix is not available."
+    return (
+        summary,
+        validate_only_sections,
+        merge_review_sections,
+        prepare_import_sections,
+        dry_run_only_sections,
+    )
+
+
+def _build_restore_import_plan(report: RestoreDryRunResponse) -> RestoreImportPlanResponse:
+    sections: list[RestoreImportPlanSection] = []
+
+    for section in report.sections:
+        if section.preparation_mode == "prepare_import" and section.status == "ok":
+            plan_state = "include"
+            include_in_plan = True
+            rationale = "This section can be carried into a controlled import plan, but final apply still stays manual."
+        elif section.preparation_mode == "dry_run_only" or section.status == "error":
+            plan_state = "blocked" if section.status == "error" else "exclude"
+            include_in_plan = False
+            rationale = "This section must stay outside any future apply scope until the underlying runtime or safety risk is resolved."
+        elif section.preparation_mode == "validate_only":
+            plan_state = "exclude"
+            include_in_plan = False
+            rationale = "This section is useful for validation and context, but it should not be part of an import scope."
+        else:
+            plan_state = "review"
+            include_in_plan = False
+            rationale = "This section still needs operator review and cleanup before it can be considered for any import scope."
+
+        sections.append(
+            RestoreImportPlanSection(
+                name=section.name,
+                source_status=section.status,
+                preparation_mode=section.preparation_mode,
+                plan_state=plan_state,
+                include_in_plan=include_in_plan,
+                rationale=rationale,
+                recommended_action=section.recommended_action,
+            )
+        )
+
+    included_sections = [section.name for section in sections if section.plan_state == "include"]
+    review_sections = [section.name for section in sections if section.plan_state == "review"]
+    blocked_sections = [section.name for section in sections if section.plan_state == "blocked"]
+    excluded_sections = [section.name for section in sections if section.plan_state == "exclude"]
+
+    if blocked_sections:
+        plan_status = "blocked"
+    elif review_sections:
+        plan_status = "review_required"
+    else:
+        plan_status = "ready_for_review"
+
+    scope_parts: list[str] = []
+    if included_sections:
+        scope_parts.append(f"include {', '.join(included_sections)}")
+    if review_sections:
+        scope_parts.append(f"hold {', '.join(review_sections)} for review")
+    if blocked_sections:
+        scope_parts.append(f"block {', '.join(blocked_sections)}")
+    if excluded_sections:
+        scope_parts.append(f"exclude {', '.join(excluded_sections)}")
+
+    plan_scope_summary = "Controlled import scope: " + "; ".join(scope_parts) if scope_parts else "Controlled import scope is empty."
+    apply_block_reason = (
+        "Live restore apply is intentionally blocked in DeployMate right now. This workspace is only for review, scoping, and operator handoff."
+    )
+    boundary_message = (
+        "This is not an apply screen. Use it to narrow scope, confirm risks, and prepare handoff before any future controlled restore flow exists."
+    )
+    apply_readiness_status = "not_ready" if blocked_sections else "review_required"
+    apply_readiness_summary = (
+        "The operator can review and acknowledge scope, but the system is not ready for live restore apply."
+        if blocked_sections
+        else "The operator can review and acknowledge scope, but final apply still requires a future controlled restore flow."
+    )
+    acknowledgement_items = [
+        "I reviewed the blocked and review-required sections, not just the included scope.",
+        "I understand this screen does not authorize any live restore apply.",
+        "I am using this plan only for review, handoff, or future controlled preparation.",
+    ]
+    typed_review_phrase = f"acknowledge import review {report.manifest.bundle_name}"
+    approval_status = "approval_blocked" if blocked_sections else "approval_required"
+    approval_summary = (
+        "Approval can only cover review scope and preparation handoff. Live apply remains blocked until a future controlled restore flow exists."
+    )
+    approval_decision_question = (
+        "Do we approve this bundle for continued review and preparation work, without approving any live restore apply?"
+    )
+    approval_checklist = [
+        "Blocked sections were explicitly reviewed, not ignored.",
+        "Included sections were checked against current operator intent and environment drift.",
+        "Everyone involved understands that approval here does not mean permission to run live restore apply.",
+    ]
+    approval_handoff_note = (
+        "Use this packet to hand off a review decision, not an execution decision. If approval is granted, the next step is still controlled preparation only."
+    )
+    reviewer_guidance = (
+        "This plan is for operator review only. It narrows future import scope without authorizing any live restore apply."
+    )
+    typed_confirmation_phrase = f"review import plan {report.manifest.bundle_name}"
+
+    return RestoreImportPlanResponse(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        dry_run_generated_at=report.generated_at,
+        manifest=report.manifest,
+        summary=RestoreImportPlanSummary(
+            plan_id=f"import-plan-{uuid.uuid4().hex[:12]}",
+            plan_status=plan_status,
+            apply_allowed=False,
+            apply_block_reason=apply_block_reason,
+            boundary_message=boundary_message,
+            apply_readiness_status=apply_readiness_status,
+            apply_readiness_summary=apply_readiness_summary,
+            acknowledgement_items=acknowledgement_items,
+            typed_review_phrase=typed_review_phrase,
+            plan_scope_summary=plan_scope_summary,
+            reviewer_guidance=reviewer_guidance,
+            typed_confirmation_phrase=typed_confirmation_phrase,
+            included_sections=included_sections,
+            review_sections=review_sections,
+            blocked_sections=blocked_sections,
+            excluded_sections=excluded_sections,
+            approval_status=approval_status,
+            approval_summary=approval_summary,
+            approval_decision_question=approval_decision_question,
+            approval_checklist=approval_checklist,
+            approval_handoff_note=approval_handoff_note,
+        ),
+        sections=sections,
+    )
+
+
 def _get_bundle_section_items(data_raw: dict, section_name: str) -> list[dict]:
     raw_items = data_raw.get(section_name)
     if raw_items is None:
@@ -275,7 +483,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
         elif existing:
             section.warnings.append(_issue("warn", "user_id_exists", f'User "{username}" already exists and would require merge handling.'))
     section.notes.append("Users can be validated safely, but restore apply should stay controlled because of credential state.")
-    sections.append(_finalize_section(section))
+    sections.append(_apply_restore_preparation_guidance(_finalize_section(section)))
 
     incoming_requests = _get_bundle_section_items(data_raw, "upgrade_requests")
     section = RestoreDryRunSection(
@@ -319,7 +527,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
                 )
             )
     section.notes.append("Upgrade requests can usually be restored after ID and linking review.")
-    sections.append(_finalize_section(section))
+    sections.append(_apply_restore_preparation_guidance(_finalize_section(section)))
 
     incoming_audit = _get_bundle_section_items(data_raw, "audit_events")
     section = RestoreDryRunSection(
@@ -345,7 +553,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
         if audit_id in current_audit_ids:
             section.warnings.append(_issue("warn", "audit_id_exists", f'Audit event "{audit_id}" already exists in current system.'))
     section.notes.append("Audit history is append-only and low-risk, but duplicate IDs should be deduplicated on restore.")
-    sections.append(_finalize_section(section))
+    sections.append(_apply_restore_preparation_guidance(_finalize_section(section)))
 
     incoming_servers = _get_bundle_section_items(data_raw, "servers")
     incoming_server_ids = _collect_item_ids(incoming_servers)
@@ -380,7 +588,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
         if target in current_server_targets and current_server_targets[target].get("id") != item.get("id"):
             section.warnings.append(_issue("warn", "server_target_conflict", f'Server target "{target}" already exists in current system.'))
     section.notes.append("Server restore is sensitive because credentials and remote targets may have changed.")
-    sections.append(_finalize_section(section))
+    sections.append(_apply_restore_preparation_guidance(_finalize_section(section)))
 
     incoming_templates = _get_bundle_section_items(data_raw, "templates")
     incoming_template_ids = _collect_item_ids(incoming_templates)
@@ -419,7 +627,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
                 )
             )
     section.notes.append("Templates are good restore candidates after conflict cleanup.")
-    sections.append(_finalize_section(section))
+    sections.append(_apply_restore_preparation_guidance(_finalize_section(section)))
 
     incoming_deployments = _get_bundle_section_items(data_raw, "deployments")
     section = RestoreDryRunSection(
@@ -477,7 +685,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
             if port_key in current_ports and current_ports[port_key].get("id") != item.get("id"):
                 section.blockers.append(_issue("error", "deployment_port_conflict", f'External port "{external_port}" is already used on the target environment.'))
     section.notes.append("Deployment restore is runtime-sensitive and should stay dry-run only for now.")
-    sections.append(_finalize_section(section))
+    sections.append(_apply_restore_preparation_guidance(_finalize_section(section)))
 
     total_records = sum(section.incoming_count for section in sections)
 
@@ -505,7 +713,7 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
                 f'Bundle version "{manifest.version}" is not the current expected backup format.',
             )
         )
-    sections[0] = _finalize_section(sections[0])
+    sections[0] = _apply_restore_preparation_guidance(_finalize_section(sections[0]))
 
     blocker_count = sum(len(section.blockers) for section in sections)
     warning_count = sum(len(section.warnings) for section in sections)
@@ -515,6 +723,13 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
     readiness_status, next_step, plain_language_summary, highest_risk_sections = _build_restore_readiness_summary(
         sections
     )
+    (
+        preparation_summary,
+        validate_only_sections,
+        merge_review_sections,
+        prepare_import_sections,
+        dry_run_only_sections,
+    ) = _build_restore_preparation_summary(sections)
 
     return RestoreDryRunResponse(
         generated_at=datetime.now(timezone.utc).isoformat(),
@@ -531,6 +746,11 @@ def _analyze_restore_bundle(bundle: dict) -> RestoreDryRunResponse:
             next_step=next_step,
             plain_language_summary=plain_language_summary,
             highest_risk_sections=highest_risk_sections,
+            preparation_summary=preparation_summary,
+            validate_only_sections=validate_only_sections,
+            merge_review_sections=merge_review_sections,
+            prepare_import_sections=prepare_import_sections,
+            dry_run_only_sections=dry_run_only_sections,
         ),
         sections=sections,
     )
@@ -903,6 +1123,15 @@ def export_admin_backup_bundle():
 )
 def run_restore_dry_run(payload: RestoreDryRunRequest) -> RestoreDryRunResponse:
     return _analyze_restore_bundle(payload.bundle)
+
+
+@router.post(
+    "/admin/restore/import-plan",
+    response_model=RestoreImportPlanResponse,
+    dependencies=[Depends(require_admin)],
+)
+def build_restore_import_plan(payload: RestoreDryRunRequest) -> RestoreImportPlanResponse:
+    return _build_restore_import_plan(_analyze_restore_bundle(payload.bundle))
 
 
 @router.post(

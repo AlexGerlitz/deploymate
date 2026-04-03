@@ -122,11 +122,20 @@ export const smokeRestoreDryRun = {
     plain_language_summary:
       "This backup is not ready for any real import work yet because 2 sections are blocked: servers, deployments.",
     highest_risk_sections: ["servers", "deployments", "users"],
+    preparation_summary:
+      "Preparation mix: 1 ready to document for import preparation, 2 still need merge review, 1 are validation-only, 2 should stay dry-run only",
+    validate_only_sections: 1,
+    merge_review_sections: 2,
+    prepare_import_sections: 1,
+    dry_run_only_sections: 2,
   },
   sections: [
     {
       name: "users",
       status: "warn",
+      preparation_mode: "merge_review",
+      recommended_action:
+        "Review users as merge candidates only. Preserve credential and password-reset state rather than planning blind overwrite.",
       incoming_count: 2,
       current_count: 2,
       blockers: [],
@@ -142,6 +151,9 @@ export const smokeRestoreDryRun = {
     {
       name: "upgrade_requests",
       status: "ok",
+      preparation_mode: "prepare_import",
+      recommended_action:
+        "This section looks clean enough to document as an import-preparation candidate, while final apply stays manual.",
       incoming_count: 1,
       current_count: 1,
       blockers: [],
@@ -151,6 +163,9 @@ export const smokeRestoreDryRun = {
     {
       name: "audit_events",
       status: "ok",
+      preparation_mode: "validate_only",
+      recommended_action:
+        "Validate audit event shape and deduplication needs, but keep this section low priority for any future import preparation.",
       incoming_count: 3,
       current_count: 4,
       blockers: [],
@@ -160,6 +175,9 @@ export const smokeRestoreDryRun = {
     {
       name: "servers",
       status: "error",
+      preparation_mode: "dry_run_only",
+      recommended_action:
+        "Do not prepare server import yet. Resolve identity, trust, and target conflicts first, then rerun dry-run.",
       incoming_count: 1,
       current_count: 1,
       blockers: [
@@ -175,6 +193,9 @@ export const smokeRestoreDryRun = {
     {
       name: "deployment_templates",
       status: "warn",
+      preparation_mode: "merge_review",
+      recommended_action:
+        "Clean up warnings and linking drift in this section, then rerun dry-run before moving into import preparation.",
       incoming_count: 1,
       current_count: 2,
       blockers: [],
@@ -195,6 +216,9 @@ export const smokeRestoreDryRun = {
     {
       name: "deployments",
       status: "error",
+      preparation_mode: "dry_run_only",
+      recommended_action:
+        "Keep deployments in dry-run only. Use this section for runtime review and manual rebuild planning instead of any future direct import.",
       incoming_count: 1,
       current_count: 1,
       blockers: [
@@ -206,6 +230,88 @@ export const smokeRestoreDryRun = {
       ],
       warnings: [],
       notes: ["Deployment restore remains the riskiest section in the bundle."],
+    },
+  ],
+};
+
+export const smokeRestoreImportPlan = {
+  generated_at: "2026-04-02T00:40:00Z",
+  dry_run_generated_at: "2026-04-02T00:35:00Z",
+  manifest: smokeRestoreBundle.manifest,
+  summary: {
+    plan_id: "import-plan-smoke",
+    plan_status: "blocked",
+    apply_allowed: false,
+    plan_scope_summary:
+      "Controlled import scope: include upgrade_requests; hold users, deployment_templates for review; block servers; exclude audit_events, deployments",
+    reviewer_guidance:
+      "This plan is for operator review only. It narrows future import scope without authorizing any live restore apply.",
+    typed_confirmation_phrase: "review import plan deploymate-backup-smoke",
+    included_sections: ["upgrade_requests"],
+    review_sections: ["users", "deployment_templates"],
+    blocked_sections: ["servers"],
+    excluded_sections: ["audit_events", "deployments"],
+  },
+  sections: [
+    {
+      name: "users",
+      source_status: "warn",
+      preparation_mode: "merge_review",
+      plan_state: "review",
+      include_in_plan: false,
+      rationale: "This section still needs operator review and cleanup before it can be considered for any import scope.",
+      recommended_action:
+        "Review users as merge candidates only. Preserve credential and password-reset state rather than planning blind overwrite.",
+    },
+    {
+      name: "upgrade_requests",
+      source_status: "ok",
+      preparation_mode: "prepare_import",
+      plan_state: "include",
+      include_in_plan: true,
+      rationale: "This section can be carried into a controlled import plan, but final apply still stays manual.",
+      recommended_action:
+        "This section looks clean enough to document as an import-preparation candidate, while final apply stays manual.",
+    },
+    {
+      name: "audit_events",
+      source_status: "ok",
+      preparation_mode: "validate_only",
+      plan_state: "exclude",
+      include_in_plan: false,
+      rationale: "This section is useful for validation and context, but it should not be part of an import scope.",
+      recommended_action:
+        "Validate audit event shape and deduplication needs, but keep this section low priority for any future import preparation.",
+    },
+    {
+      name: "servers",
+      source_status: "error",
+      preparation_mode: "dry_run_only",
+      plan_state: "blocked",
+      include_in_plan: false,
+      rationale: "This section must stay outside any future apply scope until the underlying runtime or safety risk is resolved.",
+      recommended_action:
+        "Do not prepare server import yet. Resolve identity, trust, and target conflicts first, then rerun dry-run.",
+    },
+    {
+      name: "deployment_templates",
+      source_status: "warn",
+      preparation_mode: "merge_review",
+      plan_state: "review",
+      include_in_plan: false,
+      rationale: "This section still needs operator review and cleanup before it can be considered for any import scope.",
+      recommended_action:
+        "Clean up warnings and linking drift in this section, then rerun dry-run before moving into import preparation.",
+    },
+    {
+      name: "deployments",
+      source_status: "error",
+      preparation_mode: "dry_run_only",
+      plan_state: "exclude",
+      include_in_plan: false,
+      rationale: "This section must stay outside any future apply scope until the underlying runtime or safety risk is resolved.",
+      recommended_action:
+        "Keep deployments in dry-run only. Use this section for runtime review and manual rebuild planning instead of any future direct import.",
     },
   ],
 };
