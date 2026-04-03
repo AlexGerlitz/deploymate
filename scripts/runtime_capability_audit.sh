@@ -18,6 +18,26 @@ if audit_cache_has runtime_capability_audit; then
   exit 0
 fi
 
+runtime_capability_files=(
+  "frontend/Dockerfile"
+  "docker-compose.prod.yml"
+  ".env.production.example"
+)
+
+if [ -f ".env.production" ]; then
+  runtime_capability_files+=(".env.production")
+fi
+
+runtime_capability_fingerprint="$(audit_cache_fingerprint_files \
+  "runtime-capability-audit" \
+  "${runtime_capability_files[@]}")"
+
+if audit_cache_persistent_has "runtime_capability_audit" "$runtime_capability_fingerprint"; then
+  echo "[runtime-capability-audit] cache hit"
+  audit_cache_mark runtime_capability_audit
+  exit 0
+fi
+
 if command -v rg >/dev/null 2>&1; then
   SEARCH_CMD=(rg -n)
 else
@@ -69,6 +89,7 @@ echo "[runtime-capability-audit] checking production env alignment"
 if [ ! -f ".env.production" ]; then
   echo "[runtime-capability-audit] no .env.production file found; static contract checks only"
   echo "[runtime-capability-audit] ok"
+  audit_cache_persistent_mark "runtime_capability_audit" "$runtime_capability_fingerprint"
   audit_cache_mark runtime_capability_audit
   exit 0
 fi
@@ -97,4 +118,5 @@ case "$backend_value" in
 esac
 
 echo "[runtime-capability-audit] ok"
+audit_cache_persistent_mark "runtime_capability_audit" "$runtime_capability_fingerprint"
 audit_cache_mark runtime_capability_audit

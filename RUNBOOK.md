@@ -68,8 +68,9 @@ These commands:
 16. narrow local `security_audit` to changed files and skip nested release or credentials audits unless the diff touches those contracts
 17. split local `security_audit` into secret scan and runtime-policy scan, so docs or release-contract diffs still keep the right checks without scanning risky runtime defaults unnecessarily
 18. persist successful local secret-scan and runtime-policy results by fingerprint, so repeated commands on the same diff do not re-run them unnecessarily
-19. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
-20. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+19. reuse fingerprint-cached results for repeated local release-contract and runtime-contract audits when their inputs stay the same
+20. print a timing summary for local preflight and release phases so the slowest step is visible immediately after each run
+21. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
 
 To inspect the latest local timings quickly:
 

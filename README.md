@@ -260,6 +260,7 @@ The fast gate intentionally uses fewer resources:
 - release-workflow and runbook diffs now keep `release_workflow_audit` enabled while still letting `security_audit` stay on changed-file scope during local explicit surface loops
 - local `security_audit` now splits cheap secret scanning from runtime-policy scanning, so release/docs/script-heavy diffs keep the relevant checks without paying for unnecessary risky-default scans
 - successful local secret-scan and runtime-policy results now persist by file fingerprint, so repeating the same loop does not re-run those scans unnecessarily
+- repeated local release-contract and runtime-contract audits now also reuse fingerprint-cached results when their inputs did not change
 - preflight: skips the production frontend build in fast mode
 - fast frontend mode now reuses one shared smoke dev server instead of starting a separate `next dev` process per smoke
 - the repo now has experimental local persistent frontend smoke-server controls, but the default fast loop stays on the safer per-command lifecycle unless `FRONTEND_SMOKE_PERSIST_SERVER=1` is set explicitly

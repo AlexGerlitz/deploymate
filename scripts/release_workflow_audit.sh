@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/audit_cache.sh"
 cd "$ROOT_DIR"
 
 RELEASE_WORKFLOW=".github/workflows/release.yml"
@@ -65,6 +66,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
+audit_cache_prepare
+
+release_audit_fingerprint="$(audit_cache_fingerprint_files \
+  "release-workflow-audit" \
+  "$RELEASE_WORKFLOW" \
+  "$STAGING_WORKFLOW" \
+  "$RUNBOOK_FILE")"
+
+if audit_cache_persistent_has "release_workflow_audit" "$release_audit_fingerprint"; then
+  echo "[release-audit] cache hit"
+  exit 0
+fi
+
 echo "[release-audit] repo: $ROOT_DIR"
 
 release_secrets_file="$TMP_DIR/release-secrets.txt"
@@ -80,3 +94,4 @@ compare_lists "workflow secrets vs RUNBOOK.md" "$release_secrets_file" "$runbook
 
 echo "[release-audit] release and staging workflows use the same secret contract"
 echo "[release-audit] RUNBOOK.md matches the workflow secret contract"
+audit_cache_persistent_mark "release_workflow_audit" "$release_audit_fingerprint"
