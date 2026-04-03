@@ -6,6 +6,7 @@
 
 - [ ] `make auto-local`
 - [ ] `make pr-doctor -- --strict`
+- [ ] PR checks are green before `make pr-land`
 - [ ] any extra targeted check worth calling out
 
 ## Release Notes

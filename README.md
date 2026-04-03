@@ -211,6 +211,8 @@ make pr-ready
 make pr-open
 make pr-status
 make pr-doctor
+make pr-watch
+make pr-land
 make auto-local
 make changed
 make profile-changed
@@ -246,6 +248,8 @@ What they do:
 - `make pr-open` opens a GitHub PR against `develop` with the repo template plus local automation context
 - `make pr-status` shows the current PR state through GitHub CLI
 - `make pr-doctor` prints PR health, current size class, upstream status, PR status, and whether the last local green loop still matches the branch base
+- `make pr-watch` waits on PR checks and then prints the latest doctor summary
+- `make pr-land` merges the current PR only when doctor is clean, the PR head SHA matches local `HEAD`, and GitHub checks are green
 - `make pr-doctor` also reads PR CI status from GitHub and gives a split hint from the actual diff mix when the branch gets too large
 - `make pr-doctor` now also compares the current local `HEAD`, the last locally verified `HEAD`, and the PR head SHA on GitHub, so stale local green runs stop being mistaken for current verification
 - `make frontend` runs the fast frontend gate
@@ -322,7 +326,8 @@ Then use this daily path:
 2. run `make pr-ready`
 3. push with `git push -u origin $(git branch --show-current)`
 4. open the PR with `make pr-open`
-5. merge into `develop` after CI goes green
+5. wait with `make pr-watch`
+6. merge with `make pr-land`
 
 PRs are not just ceremony here:
 
@@ -333,6 +338,7 @@ PRs are not just ceremony here:
 - `make pr-doctor` warns when the branch has grown into a probably-too-large PR, so review cost stays under control
 - `make pr-doctor` now also surfaces PR check health and a practical split direction, so the next action is clearer than a generic “too big” warning
 - `make pr-doctor` now also catches “you already changed the branch after the last green local run” and “the PR head on GitHub is not the same commit you last verified locally”
+- `make pr-land` closes the loop safely by refusing to merge a PR whose doctor state, head SHA, or GitHub checks no longer match
 
 ## Key Screens In The App
 

@@ -1,4 +1,4 @@
-.PHONY: start-pr-branch pr-ready pr-open pr-status pr-doctor recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
+.PHONY: start-pr-branch pr-ready pr-open pr-status pr-doctor pr-watch pr-land recommend-local-mode auto-local changed profile-changed profile-frontend profile-backend profile-fast profile-frontend-hot profile-fast-hot frontend-smoke-server-status frontend-smoke-server-stop audit-cache-clear export-automation-core bootstrap-core upgrade-core doctor-core fast fast-hot frontend frontend-hot backend full timing-history timing-stats timing-hint ship-staging
 
 start-pr-branch:
 	bash scripts/start_pr_branch.sh $(SLUG)
@@ -14,6 +14,12 @@ pr-status:
 
 pr-doctor:
 	bash scripts/pr_doctor.sh $(PR_DOCTOR_FLAGS)
+
+pr-watch:
+	bash scripts/pr_watch.sh $(PR_WATCH_FLAGS)
+
+pr-land:
+	bash scripts/pr_land.sh $(PR_LAND_FLAGS)
 
 recommend-local-mode:
 	bash scripts/recommend_local_mode.sh

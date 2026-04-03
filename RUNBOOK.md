@@ -197,7 +197,8 @@ Then:
 3. push with `git push -u origin $(git branch --show-current)`
 4. open the PR with `make pr-open`
 5. use `make pr-status` while the PR is under review
-6. merge into `develop` after the PR CI goes green
+6. wait with `make pr-watch`
+7. merge with `make pr-land`
 
 Notes:
 
@@ -208,6 +209,8 @@ Notes:
 - `make pr-doctor` prints branch cleanliness, upstream state, PR state, local-loop freshness, and a PR size class so oversized branches get caught before review
 - `make pr-doctor` also reads the current PR check state from GitHub and suggests a likely split direction from the diff mix when a branch has grown too large
 - `make pr-doctor` now also compares the current local commit, the last locally verified commit, and the PR head SHA on GitHub so stale local green runs or unpushed commits are obvious before review
+- `make pr-watch` waits on GitHub checks and then refreshes doctor output
+- `make pr-land` refuses to merge unless doctor is clean, local `HEAD` matches the PR head SHA, and PR checks are green
 
 For daily iteration speed on staging:
 
