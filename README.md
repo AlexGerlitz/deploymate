@@ -271,6 +271,7 @@ The fast gate intentionally uses fewer resources:
 - repeated local runtime audits now also reuse per-file fingerprints for static runtime-contract files, so one changed deploy/runtime file no longer invalidates every unchanged runtime contract check
 - repeated release workflow contract checks now reuse per-file extracted secret lists for `release.yml`, `staging.yml`, and `RUNBOOK.md`, so changing one contract file does not re-parse the other two
 - local preflight, release, and profile commands now print family-level cache savings for `security`, `release_contract`, and `runtime`, so it is obvious which layer still costs the most
+- local diff-context derivation now handles empty changed-file sets cleanly and prints a family bottleneck hint, so explicit surface commands stay stable and immediately show which verification family still dominates misses
 - project-specific layout and route assumptions now live behind [scripts/project_automation_config.sh](scripts/project_automation_config.sh), so the reusable automation core is no longer welded directly to DeployMate paths
 - project-specific path-to-target rules now live behind [scripts/project_automation_targets.sh](scripts/project_automation_targets.sh), so moving this system to another repo no longer means rewriting every `detect_*` script
 - frontend smoke assertions now live behind [scripts/project_automation_smoke_checks.sh](scripts/project_automation_smoke_checks.sh), so both the fast and heavier smoke runners are no longer welded to DeployMate-specific selectors

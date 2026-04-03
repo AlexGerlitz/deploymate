@@ -44,6 +44,14 @@ print_export() {
   printf 'export %s=%q\n' "$key" "$value"
 }
 
+join_lines() {
+  if [ "$#" -eq 0 ]; then
+    return 0
+  fi
+
+  printf '%s\n' "$@"
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --surface)
@@ -97,7 +105,7 @@ done < <(
 print_export DEPLOYMATE_CONTEXT_DERIVED 1
 print_export DEPLOYMATE_CONTEXT_BASE_REF "$resolved_base_ref"
 print_export DEPLOYMATE_CONTEXT_HEAD_REF "$HEAD_REF"
-print_export DEPLOYMATE_CHANGED_FILES "$(printf '%s\n' "${changed_files[@]}")"
+print_export DEPLOYMATE_CHANGED_FILES "$(join_lines "${changed_files[@]}")"
 
 if [ "${#changed_files[@]}" -eq 0 ]; then
   print_export DEPLOYMATE_RUN_RUNTIME_AUDITS 1

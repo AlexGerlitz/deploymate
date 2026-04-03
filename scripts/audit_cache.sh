@@ -256,6 +256,64 @@ audit_cache_print_family_summary() {
   done <<< "$summary_body"
 }
 
+audit_cache_print_family_hint() {
+  local prefix="${1:-[audit-cache]}"
+  local stats_file="${DEPLOYMATE_AUDIT_CACHE_STATS_FILE:-}"
+  local hint_line=""
+
+  [ -n "$stats_file" ] && [ -f "$stats_file" ] || return 0
+
+  hint_line="$(awk -F',' '
+    function family_for_key(key) {
+      if (key ~ /^security_/ || key == "security_audit") {
+        return "security"
+      }
+      if (key ~ /^release_workflow_audit$/ || key ~ /^release_workflow_contract_/) {
+        return "release_contract"
+      }
+      if (key ~ /^runtime_capability_audit/ || key ~ /^local_runtime_audit/) {
+        return "runtime"
+      }
+      return ""
+    }
+    {
+      family = family_for_key($2)
+      if (family == "") {
+        next
+      }
+      if ($1 == "persistent_hit" || $1 == "phase_hit" || $1 == "run_hit") {
+        hits[family]++
+      } else if ($1 == "persistent_miss" || $1 == "phase_miss") {
+        misses[family]++
+      }
+    }
+    END {
+      families[1] = "security"
+      families[2] = "release_contract"
+      families[3] = "runtime"
+      best_family = ""
+      best_miss = -1
+      for (i = 1; i <= 3; i++) {
+        family = families[i]
+        miss = misses[family] + 0
+        if (miss > best_miss) {
+          best_miss = miss
+          best_family = family
+        }
+      }
+      if (best_family != "" && best_miss > 0) {
+        printf "%s|%d|%d\n", best_family, hits[best_family] + 0, misses[best_family] + 0
+      }
+    }
+  ' "$stats_file")"
+
+  [ -n "$hint_line" ] || return 0
+
+  IFS='|' read -r hint_family hint_hits hint_misses <<< "$hint_line"
+  printf '%s family bottleneck: %s (hit=%s miss=%s)\n' \
+    "$prefix" "$hint_family" "$hint_hits" "$hint_misses"
+}
+
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   set -euo pipefail
   command="${1:-clear_persistent}"
