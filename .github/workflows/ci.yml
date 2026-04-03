@@ -62,7 +62,8 @@ jobs:
 
       - name: Skip staging deploy
         if: steps.detect-surface.outputs.should_deploy != '1'
-        run: echo "[ci] skipping staging deploy: ${{ steps.detect-surface.outputs.reason }}"
+        run: |
+          echo "[ci] skipping staging deploy: ${{ steps.detect-surface.outputs.reason }}"
 
       - name: Run staging release
         if: steps.detect-surface.outputs.should_deploy == '1'
