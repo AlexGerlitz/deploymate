@@ -6,6 +6,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SURFACE="full"
 FAST_MODE=0
 source "$ROOT_DIR/scripts/audit_cache.sh"
+SCRIPT_START_TS="$(date +%s)"
+
+format_duration() {
+  local seconds="$1"
+  printf '%ss' "$seconds"
+}
 
 clean_frontend_build_artifacts() {
   if [ -d "frontend/.next" ]; then
@@ -64,17 +70,22 @@ echo "[preflight] fast mode: $FAST_MODE"
 echo "[preflight] git status"
 git status --short
 
+frontend_build_duration=0
 if [ -f "frontend/package.json" ] && { [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; }; then
   if [ "$FAST_MODE" = "1" ]; then
     echo "[preflight] frontend build skipped in fast mode"
   else
+    frontend_build_start_ts="$(date +%s)"
     clean_frontend_build_artifacts
     echo "[preflight] frontend build"
     npm --prefix frontend run build
+    frontend_build_duration=$(( $(date +%s) - frontend_build_start_ts ))
   fi
 fi
 
+backend_syntax_duration=0
 if [ -d "backend/app" ] && { [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; }; then
+  backend_syntax_start_ts="$(date +%s)"
   echo "[preflight] backend syntax check"
   python_files=()
   while IFS= read -r file; do
@@ -83,20 +94,34 @@ if [ -d "backend/app" ] && { [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full"
   if [ "${#python_files[@]}" -gt 0 ]; then
     python3 -m py_compile "${python_files[@]}"
   fi
+  backend_syntax_duration=$(( $(date +%s) - backend_syntax_start_ts ))
 fi
 
+security_audit_duration=0
 if [ -f "scripts/security_audit.sh" ]; then
+  security_audit_start_ts="$(date +%s)"
   echo "[preflight] security audit"
   bash scripts/security_audit.sh
+  security_audit_duration=$(( $(date +%s) - security_audit_start_ts ))
 fi
 
+runtime_capability_duration=0
 if [ -f "scripts/runtime_capability_audit.sh" ]; then
   if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" = "1" ]; then
+    runtime_capability_start_ts="$(date +%s)"
     echo "[preflight] runtime capability audit"
     bash scripts/runtime_capability_audit.sh
+    runtime_capability_duration=$(( $(date +%s) - runtime_capability_start_ts ))
   else
     echo "[preflight] runtime capability audit skipped for this local diff"
   fi
 fi
 
+total_duration=$(( $(date +%s) - SCRIPT_START_TS ))
+echo "[preflight] timing summary:"
+echo "[preflight]   - frontend build: $(format_duration "$frontend_build_duration")"
+echo "[preflight]   - backend syntax: $(format_duration "$backend_syntax_duration")"
+echo "[preflight]   - security audit: $(format_duration "$security_audit_duration")"
+echo "[preflight]   - runtime capability audit: $(format_duration "$runtime_capability_duration")"
+echo "[preflight]   - total: $(format_duration "$total_duration")"
 echo "[preflight] done"

@@ -8,6 +8,12 @@ BACKEND_PYTHON="${BACKEND_PYTHON:-}"
 FAST_MODE=0
 BACKEND_FAST_TEST_MODULES="${BACKEND_FAST_TEST_MODULES:-}"
 FRONTEND_FAST_SMOKES="${FRONTEND_FAST_SMOKES:-}"
+SCRIPT_START_TS="$(date +%s)"
+
+format_duration() {
+  local seconds="$1"
+  printf '%ss' "$seconds"
+}
 
 clean_frontend_build_artifacts() {
   if [ -d "frontend/.next" ]; then
@@ -147,13 +153,17 @@ if [ -n "$FRONTEND_FAST_SMOKES" ]; then
 fi
 
 echo "[release] preflight"
+preflight_start_ts="$(date +%s)"
 if [ "$FAST_MODE" = "1" ]; then
   bash scripts/preflight.sh --surface "$SURFACE" --fast
 else
   bash scripts/preflight.sh --surface "$SURFACE"
 fi
+preflight_duration=$(( $(date +%s) - preflight_start_ts ))
 
+frontend_duration=0
 if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
+  frontend_start_ts="$(date +%s)"
   frontend_fast_smokes=(auth ops runtime)
   if [ -n "$FRONTEND_FAST_SMOKES" ]; then
     IFS=' ' read -r -a frontend_fast_smokes <<< "$FRONTEND_FAST_SMOKES"
@@ -203,9 +213,12 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
     echo "[release] frontend build"
     npm --prefix frontend run build
   fi
+  frontend_duration=$(( $(date +%s) - frontend_start_ts ))
 fi
 
+backend_duration=0
 if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
+  backend_start_ts="$(date +%s)"
   if [ "$FAST_MODE" = "1" ]; then
     if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
       echo "[release] backend targeted fast suite"
@@ -223,6 +236,7 @@ if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
     echo "[release] backend test suite"
     PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest discover -s backend/tests -p 'test_*.py'
   fi
+  backend_duration=$(( $(date +%s) - backend_start_ts ))
 fi
 
 echo "[release] executed phases:"
@@ -250,6 +264,12 @@ if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
 fi
 
 echo "[release] checks passed"
+total_duration=$(( $(date +%s) - SCRIPT_START_TS ))
+echo "[release] timing summary:"
+echo "[release]   - preflight: $(format_duration "$preflight_duration")"
+echo "[release]   - frontend phase: $(format_duration "$frontend_duration")"
+echo "[release]   - backend phase: $(format_duration "$backend_duration")"
+echo "[release]   - total: $(format_duration "$total_duration")"
 echo "[release] next: git status --short"
 echo "[release] next: git push origin develop"
 echo "[release] next: follow RUNBOOK.md for deploy and post-deploy smoke"
