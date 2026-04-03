@@ -132,6 +132,22 @@ bash scripts/upgrade_project_automation.sh /absolute/path/to/project --dry-run
 bash scripts/upgrade_project_automation.sh /absolute/path/to/project --force
 bash scripts/upgrade_project_automation.sh /absolute/path/to/project --force --include-adapters
 ```
+
+## Inspect Core Health
+
+Before or after an upgrade, inspect the target project with:
+
+```bash
+bash scripts/automation_core_doctor.sh /absolute/path/to/project
+```
+
+Or through `make`:
+
+```bash
+make doctor-core TARGET_DIR=/absolute/path/to/project
+```
+
+Add `--strict` when you want the command to fail on reusable-core drift or missing files.
 EOF
 
 perl -0pi -e 's/VERSION_PLACEHOLDER/'"$(automation_core_version "$ROOT_DIR" | sed 's/[\/&]/\\&/g')"'/g' "$OUTPUT_DIR/README.md"
