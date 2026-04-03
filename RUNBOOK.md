@@ -42,7 +42,7 @@ These commands:
 1. detect the changed release surface locally when needed
 2. run the smaller `--fast` local gate instead of the full release gate
 3. skip the production frontend build in preflight fast mode
-4. keep backend verification on a focused safety suite unless you explicitly ask for the full gate
+4. keep backend verification on a targeted test set when changed files map cleanly, otherwise fall back to the focused safety suite
 
 Or run the broader local release gate:
 

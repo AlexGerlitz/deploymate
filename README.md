@@ -221,7 +221,7 @@ What they do:
 The fast gate intentionally uses fewer resources:
 
 - frontend: auth, ops, and runtime smoke only
-- backend: focused safety suite instead of full test discovery
+- backend: targeted tests from changed files when possible, otherwise the focused safety suite
 - preflight: skips the production frontend build in fast mode
 
 ## Key Screens In The App

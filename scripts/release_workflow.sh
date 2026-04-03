@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SURFACE="full"
 BACKEND_PYTHON="${BACKEND_PYTHON:-}"
 FAST_MODE=0
+BACKEND_FAST_TEST_MODULES="${BACKEND_FAST_TEST_MODULES:-}"
 
 clean_frontend_build_artifacts() {
   if [ -d "frontend/.next" ]; then
@@ -76,6 +77,9 @@ echo "[release] repo: $ROOT_DIR"
 echo "[release] surface: $SURFACE"
 echo "[release] fast mode: $FAST_MODE"
 echo "[release] backend python: $BACKEND_PYTHON"
+if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
+  echo "[release] backend fast targets: $BACKEND_FAST_TEST_MODULES"
+fi
 
 echo "[release] preflight"
 if [ "$FAST_MODE" = "1" ]; then
@@ -118,12 +122,18 @@ fi
 
 if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
   if [ "$FAST_MODE" = "1" ]; then
-    echo "[release] backend fast safety suite"
-    PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest \
-      backend.tests.test_auth_security \
-      backend.tests.test_ops_api_flow \
-      backend.tests.test_restore_dry_run \
-      backend.tests.test_server_credentials_policy
+    if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
+      echo "[release] backend targeted fast suite"
+      IFS=' ' read -r -a backend_fast_modules <<< "$BACKEND_FAST_TEST_MODULES"
+      PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest "${backend_fast_modules[@]}"
+    else
+      echo "[release] backend fast safety suite"
+      PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest \
+        backend.tests.test_auth_security \
+        backend.tests.test_ops_api_flow \
+        backend.tests.test_restore_dry_run \
+        backend.tests.test_server_credentials_policy
+    fi
   else
     echo "[release] backend test suite"
     PYTHONPATH=backend "$BACKEND_PYTHON" -m unittest discover -s backend/tests -p 'test_*.py'
@@ -140,7 +150,11 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
 fi
 if [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; then
   if [ "$FAST_MODE" = "1" ]; then
-    echo "[release]   - backend preflight plus fast safety suite"
+    if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
+      echo "[release]   - backend preflight plus targeted fast suite"
+    else
+      echo "[release]   - backend preflight plus fast safety suite"
+    fi
   else
     echo "[release]   - backend preflight and test suite"
   fi
