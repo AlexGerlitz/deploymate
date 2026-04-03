@@ -9,41 +9,22 @@ DIST_DIR="${FRONTEND_SMOKE_DIST_DIR:-.next-smoke-${PORT}}"
 USERS_HTML="$(mktemp)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
 cleanup() {
-  if [ -n "${SERVER_PID:-}" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
-    kill "$SERVER_PID" >/dev/null 2>&1 || true
-    wait "$SERVER_PID" 2>/dev/null || true
-  fi
-  if [ -n "${DIST_DIR:-}" ] && [ -d "$REPO_ROOT/frontend/$DIST_DIR" ]; then
-    rm -rf "$REPO_ROOT/frontend/$DIST_DIR"
+  if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
+    stop_frontend_smoke_server
   fi
   rm -f "$USERS_HTML"
 }
 
 trap cleanup EXIT
 
-NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_PUBLIC_SMOKE_RESTORE_REPORT=1 NEXT_DIST_DIR="$DIST_DIR" \
-  npm --prefix "$REPO_ROOT/frontend" run dev -- --hostname 127.0.0.1 --port "$PORT" >"$SERVER_LOG" 2>&1 &
-SERVER_PID=$!
-
-for _ in $(seq 1 60); do
-  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-    echo "[frontend-restore-smoke] dev server exited early" >&2
-    cat "$SERVER_LOG" >&2
-    exit 1
-  fi
-  if curl -sS -o /dev/null "$BASE_URL/app/users"; then
-    break
-  fi
-  sleep 1
-done
-
-if ! curl -sS -o /dev/null "$BASE_URL/app/users"; then
-  echo "[frontend-restore-smoke] dev server did not become ready" >&2
-  cat "$SERVER_LOG" >&2
-  exit 1
+if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
+  NEXT_PUBLIC_SMOKE_RESTORE_REPORT=1 start_frontend_smoke_server
 fi
+
+wait_for_frontend_smoke_url "/app/users"
 
 curl -sS "$BASE_URL/app/users" >"$USERS_HTML"
 

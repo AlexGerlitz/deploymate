@@ -46,6 +46,37 @@ run_frontend_fast_smokes_shared() {
   done
 }
 
+run_frontend_smokes_shared() {
+  local shared_port="${1}"
+  local shared_log="${2}"
+  local shared_dist="${3}"
+  shift 3
+  local smoke_targets=("$@")
+  local smoke_target=""
+
+  source scripts/frontend_smoke_shared.sh
+
+  PORT="$shared_port"
+  BASE_URL="http://127.0.0.1:${PORT}"
+  SERVER_LOG="$shared_log"
+  DIST_DIR="$shared_dist"
+
+  export FRONTEND_SMOKE_PORT="$shared_port"
+  export FRONTEND_SMOKE_LOG="$shared_log"
+  export FRONTEND_SMOKE_DIST_DIR="$shared_dist"
+  export FRONTEND_SMOKE_REUSE_SERVER=1
+
+  start_frontend_smoke_server
+  trap 'stop_frontend_smoke_server' RETURN
+
+  wait_for_frontend_smoke_url "/app"
+
+  for smoke_target in "${smoke_targets[@]}"; do
+    echo "[release] frontend ${smoke_target} smoke"
+    npm --prefix frontend run "smoke:${smoke_target}"
+  done
+}
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -159,20 +190,14 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   fi
 
   if [ "$FAST_MODE" != "1" ]; then
-    echo "[release] frontend admin smoke"
-    FRONTEND_SMOKE_PORT=3004 npm --prefix frontend run smoke:admin
+    run_frontend_smokes_shared 3001 "/tmp/deploymate-frontend-full-smoke.log" ".next-smoke-full-3001" \
+      auth ops runtime admin admin-interactions servers templates
 
-    echo "[release] frontend admin interactions smoke"
-    FRONTEND_SMOKE_PORT=3005 npm --prefix frontend run smoke:admin-interactions
-
-    echo "[release] frontend restore smoke"
-    FRONTEND_SMOKE_PORT=3006 npm --prefix frontend run smoke:restore
-
-    echo "[release] frontend servers smoke"
-    FRONTEND_SMOKE_PORT=3007 npm --prefix frontend run smoke:servers
-
-    echo "[release] frontend templates smoke"
-    FRONTEND_SMOKE_PORT=3008 npm --prefix frontend run smoke:templates
+    FRONTEND_SMOKE_PORT=3002 \
+    FRONTEND_SMOKE_LOG="/tmp/deploymate-frontend-restore-shared.log" \
+    FRONTEND_SMOKE_DIST_DIR=".next-smoke-restore-3002" \
+    NEXT_PUBLIC_SMOKE_RESTORE_REPORT=1 \
+      bash scripts/frontend_restore_smoke.sh
 
     clean_frontend_build_artifacts
     echo "[release] frontend build"
