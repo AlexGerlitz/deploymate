@@ -83,6 +83,7 @@ surface=""
 bottleneck_phase=""
 bottleneck_avg_seconds=""
 bottleneck_count=""
+verified_head_sha=""
 
 while IFS='=' read -r key value; do
   case "$key" in
@@ -115,6 +116,8 @@ while IFS='=' read -r key value; do
       ;;
   esac
 done <<< "$recommendation_output"
+
+verified_head_sha="$(git rev-parse HEAD)"
 
 echo "[run-recommended-local-mode] base ref: ${base_ref:-unknown}"
 echo "[run-recommended-local-mode] head ref: ${head_ref:-HEAD}"
@@ -204,6 +207,8 @@ fi
   printf 'LAST_AUTO_LOCAL_SURFACE=%q\n' "${surface:-}"
   printf 'LAST_AUTO_LOCAL_EXECUTION_CLASS=%q\n' "${recommended_execution_class:-}"
   printf 'LAST_AUTO_LOCAL_BASE_REF=%q\n' "${base_ref:-}"
+  printf 'LAST_AUTO_LOCAL_HEAD_REF=%q\n' "${head_ref:-}"
+  printf 'LAST_AUTO_LOCAL_VERIFIED_HEAD_SHA=%q\n' "${verified_head_sha:-}"
   printf 'LAST_AUTO_LOCAL_BOTTLENECK_PHASE=%q\n' "${bottleneck_phase:-}"
   printf 'LAST_AUTO_LOCAL_BOTTLENECK_AVG_SECONDS=%q\n' "${bottleneck_avg_seconds:-}"
   printf 'LAST_AUTO_LOCAL_BOTTLENECK_COUNT=%q\n' "${bottleneck_count:-}"

@@ -207,6 +207,7 @@ Notes:
 - `make pr-ready` uses the same recommendation and `auto-local` logic as the normal local loop, so the pre-PR check is not a second parallel process
 - `make pr-doctor` prints branch cleanliness, upstream state, PR state, local-loop freshness, and a PR size class so oversized branches get caught before review
 - `make pr-doctor` also reads the current PR check state from GitHub and suggests a likely split direction from the diff mix when a branch has grown too large
+- `make pr-doctor` now also compares the current local commit, the last locally verified commit, and the PR head SHA on GitHub so stale local green runs or unpushed commits are obvious before review
 
 For daily iteration speed on staging:
 

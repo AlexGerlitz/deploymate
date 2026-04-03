@@ -136,10 +136,16 @@ pr_number=""
 pr_state="missing"
 pr_checks_state="missing"
 pr_checks_summary=""
-if pr_view_output="$(gh pr view --json number,state,isDraft,url 2>/dev/null)"; then
+pr_head_sha=""
+pr_base_ref_name=""
+pr_head_ref_name=""
+if pr_view_output="$(gh pr view --json number,state,isDraft,url,headRefOid,baseRefName,headRefName 2>/dev/null)"; then
   pr_number="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); puts data["number"] || ""')"
   pr_state="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); draft=data["isDraft"] ? "draft" : "ready"; puts "#{data["state"]}:#{draft}"')"
   pr_url="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); puts data["url"] || ""')"
+  pr_head_sha="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); puts data["headRefOid"] || ""')"
+  pr_base_ref_name="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); puts data["baseRefName"] || ""')"
+  pr_head_ref_name="$(printf '%s\n' "$pr_view_output" | ruby -rjson -e 'data=JSON.parse(STDIN.read); puts data["headRefName"] || ""')"
   if pr_checks_output="$(gh pr checks "$pr_number" --json bucket,name,workflow,state 2>/dev/null)"; then
     pr_checks_state="$(printf '%s\n' "$pr_checks_output" | ruby -rjson -e '
       data=JSON.parse(STDIN.read)
@@ -194,6 +200,8 @@ while IFS='=' read -r key value; do
 done < <(collect_split_hint "$base_ref")
 
 last_base_ref=""
+last_head_ref=""
+last_verified_head_sha=""
 last_mode=""
 last_bottleneck_phase=""
 if [ -f "$STATE_FILE" ]; then
@@ -204,6 +212,12 @@ if [ -f "$STATE_FILE" ]; then
       LAST_AUTO_LOCAL_BASE_REF)
         last_base_ref="$normalized"
         ;;
+      LAST_AUTO_LOCAL_HEAD_REF)
+        last_head_ref="$normalized"
+        ;;
+      LAST_AUTO_LOCAL_VERIFIED_HEAD_SHA)
+        last_verified_head_sha="$normalized"
+        ;;
       LAST_AUTO_LOCAL_MODE)
         last_mode="$normalized"
         ;;
@@ -211,12 +225,15 @@ if [ -f "$STATE_FILE" ]; then
         last_bottleneck_phase="$normalized"
         ;;
     esac
-  done < "$STATE_FILE"
+done < "$STATE_FILE"
 fi
 
 local_loop_state="missing"
-if [ -n "$last_base_ref" ] && [ "$last_base_ref" = "$base_ref" ] && [ -n "$last_mode" ]; then
+current_head_sha="$(git rev-parse HEAD)"
+if [ -n "$last_base_ref" ] && [ "$last_base_ref" = "$base_ref" ] && [ -n "$last_mode" ] && [ -n "$last_verified_head_sha" ] && [ "$last_verified_head_sha" = "$current_head_sha" ]; then
   local_loop_state="ready"
+elif [ -n "$last_verified_head_sha" ] && [ "$last_verified_head_sha" != "$current_head_sha" ]; then
+  local_loop_state="stale-head"
 fi
 
 echo "[pr-doctor] branch: $current_branch"
@@ -238,6 +255,12 @@ fi
 if [ -n "$pr_number" ]; then
   echo "[pr-doctor] pull request: #$pr_number ($pr_state)"
   echo "[pr-doctor] pull request url: $pr_url"
+  if [ -n "$pr_head_ref_name" ] || [ -n "$pr_base_ref_name" ]; then
+    echo "[pr-doctor] PR branch pair: ${pr_head_ref_name:-unknown} -> ${pr_base_ref_name:-unknown}"
+  fi
+  if [ -n "$pr_head_sha" ]; then
+    echo "[pr-doctor] PR head SHA: ${pr_head_sha:0:7}"
+  fi
   echo "[pr-doctor] PR checks: $pr_checks_state"
   if [ -n "$pr_checks_summary" ]; then
     echo "[pr-doctor] PR checks summary: $pr_checks_summary"
@@ -247,9 +270,13 @@ else
 fi
 if [ "$local_loop_state" = "ready" ]; then
   echo "[pr-doctor] local verification: ready via $last_mode"
+  echo "[pr-doctor] verified head SHA: ${last_verified_head_sha:0:7}"
   if [ -n "$last_bottleneck_phase" ]; then
     echo "[pr-doctor] last bottleneck: $last_bottleneck_phase"
   fi
+elif [ "$local_loop_state" = "stale-head" ]; then
+  echo "[pr-doctor] local verification: stale after new commits"
+  echo "[pr-doctor] last verified head SHA: ${last_verified_head_sha:0:7}"
 else
   echo "[pr-doctor] local verification: missing or stale for this base ref"
 fi
@@ -274,6 +301,14 @@ if [ -n "$split_hint" ] && { [ "$size_class" = "split" ] || [ "$size_class" = "l
 fi
 if [ "$local_loop_state" != "ready" ]; then
   echo "[pr-doctor] warning: run make pr-ready before opening or updating the PR" >&2
+  issues=1
+fi
+if [ -n "$pr_head_sha" ] && [ "$pr_state" != "MERGED:ready" ] && [ "$pr_head_sha" != "$current_head_sha" ]; then
+  echo "[pr-doctor] warning: current local HEAD is not the same as the PR head on GitHub; push the branch or refresh the local branch" >&2
+  issues=1
+fi
+if [ -n "$pr_head_sha" ] && [ "$pr_state" != "MERGED:ready" ] && [ -n "$last_verified_head_sha" ] && [ "$pr_head_sha" != "$last_verified_head_sha" ]; then
+  echo "[pr-doctor] warning: the last local green loop does not match the PR head SHA" >&2
   issues=1
 fi
 if [ -n "$pr_number" ] && [ "$pr_checks_state" = "fail" ]; then
