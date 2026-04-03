@@ -1,4 +1,4 @@
-.PHONY: changed fast frontend backend full timing-history ship-staging
+.PHONY: changed fast frontend backend full timing-history timing-stats ship-staging
 
 changed:
 	bash scripts/dev_verify_changed.sh
@@ -17,6 +17,9 @@ full:
 
 timing-history:
 	bash scripts/timing_history.sh print_recent 20
+
+timing-stats:
+	bash scripts/timing_history.sh print_stats 160
 
 ship-staging:
 	git push origin develop
