@@ -77,11 +77,12 @@ These commands:
 25. reuse per-file fingerprints for changed-file `security_audit` secret and runtime-policy scans, so one extra file in the diff does not invalidate every unchanged security target
 26. reuse per-file fingerprints for repeated local runtime static-contract checks, so one changed runtime/deploy file does not force rechecking every unchanged runtime contract file
 27. reuse per-file extracted contract lists for `release_workflow_audit`, so changing one of `release.yml`, `staging.yml`, or `RUNBOOK.md` does not force reparsing the other two
-28. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
-29. keep project-specific path and route assumptions inside `scripts/project_automation_config.sh`, so the automation core can be ported to another repo without rewriting every script first
-30. keep project-specific path-to-target and path-to-scope rules inside `scripts/project_automation_targets.sh`, so the `detect_*` layer is portable too
-31. export the reusable automation layer with `make export-automation-core` when you want to move the core into a separate private repository
-32. keep frontend smoke assertions inside `scripts/project_automation_smoke_checks.sh`, so both the fast and heavier smoke runners stay reusable across projects
+28. print family-level cache savings for `security`, `release_contract`, and `runtime`, so repeated local runs show which verification layer still dominates cost
+29. append each local timing phase into `.logs/local_gate_timing.csv` so repeated runs can be compared over time
+30. keep project-specific path and route assumptions inside `scripts/project_automation_config.sh`, so the automation core can be ported to another repo without rewriting every script first
+31. keep project-specific path-to-target and path-to-scope rules inside `scripts/project_automation_targets.sh`, so the `detect_*` layer is portable too
+32. export the reusable automation layer with `make export-automation-core` when you want to move the core into a separate private repository
+33. keep frontend smoke assertions inside `scripts/project_automation_smoke_checks.sh`, so both the fast and heavier smoke runners stay reusable across projects
 
 To inspect the latest local timings quickly:
 

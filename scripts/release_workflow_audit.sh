@@ -59,7 +59,7 @@ cache_contract_output() {
   audit_cache_record_event persistent_miss release_workflow_audit
   "$extractor" "$@" >"$output_file"
   audit_cache_persistent_mark "$cache_key" "$fingerprint"
-  audit_cache_persistent_store_value "$cache_key" "$(cat "$output_file")"
+  audit_cache_persistent_store_file "$cache_key" "$output_file"
   return 1
 }
 

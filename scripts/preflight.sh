@@ -179,5 +179,6 @@ echo "[preflight]   - runtime capability audit: $(format_duration "$runtime_capa
 echo "[preflight]   - total: $(format_duration "$total_duration")"
 echo "[preflight] timing history: .logs/local_gate_timing.csv"
 audit_cache_print_summary "[preflight]"
+audit_cache_print_family_summary "[preflight]"
 timing_history_print_hint "preflight" "$SURFACE" "$FAST_MODE"
 echo "[preflight] done"

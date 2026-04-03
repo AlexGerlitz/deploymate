@@ -159,6 +159,14 @@ audit_cache_persistent_store_value() {
   printf '%s' "$value" >"$path"
 }
 
+audit_cache_persistent_store_file() {
+  local key="$1"
+  local source_file="$2"
+  local path=""
+  path="$(audit_cache_persistent_value_path "$key")"
+  cat "$source_file" >"$path"
+}
+
 audit_cache_persistent_read_value() {
   local key="$1"
   local path=""
@@ -196,6 +204,56 @@ audit_cache_print_summary() {
   esac
 
   printf '%s cache summary: %s\n' "$prefix" "$summary"
+}
+
+audit_cache_print_family_summary() {
+  local prefix="${1:-[audit-cache]}"
+  local stats_file="${DEPLOYMATE_AUDIT_CACHE_STATS_FILE:-}"
+  local summary_body=""
+
+  [ -n "$stats_file" ] && [ -f "$stats_file" ] || return 0
+
+  summary_body="$(awk -F',' '
+    function family_for_key(key) {
+      if (key ~ /^security_/ || key == "security_audit") {
+        return "security"
+      }
+      if (key ~ /^release_workflow_audit$/ || key ~ /^release_workflow_contract_/) {
+        return "release_contract"
+      }
+      if (key ~ /^runtime_capability_audit/ || key ~ /^local_runtime_audit/) {
+        return "runtime"
+      }
+      return ""
+    }
+    {
+      family = family_for_key($2)
+      if (family == "") {
+        next
+      }
+      counts[family "," $1]++
+    }
+    END {
+      families[1] = "security"
+      families[2] = "release_contract"
+      families[3] = "runtime"
+      for (i = 1; i <= 3; i++) {
+        family = families[i]
+        hit = counts[family ",persistent_hit"] + counts[family ",phase_hit"] + counts[family ",run_hit"]
+        miss = counts[family ",persistent_miss"] + counts[family ",phase_miss"]
+        if (hit + miss > 0) {
+          printf "%s hit=%d miss=%d\n", family, hit, miss
+        }
+      }
+    }
+  ' "$stats_file")"
+
+  [ -n "$summary_body" ] || return 0
+
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    printf '%s family cache: %s\n' "$prefix" "$line"
+  done <<< "$summary_body"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

@@ -55,6 +55,7 @@ echo "[profile-surface] grouped timing stats"
 bash scripts/timing_history.sh print_stats "$STATS_COUNT"
 
 audit_cache_print_summary "[profile-surface]"
+audit_cache_print_family_summary "[profile-surface]"
 
 echo "[profile-surface] release bottleneck hint"
 bash scripts/timing_history.sh print_hint release_workflow "$HINT_SURFACE" 1 "$HINT_ROWS" || true
