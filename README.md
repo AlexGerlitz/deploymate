@@ -351,6 +351,7 @@ The generated surface now also ships in a more maintainable shape:
 - `starter-smoke.js` for route/check placeholders
 - backend `*_starter.py` module for sample items and summary contract
 - typed backend starter-action request/response + POST endpoint test
+- `starter-api.js` for the generated frontend read/write bridge
 
 ## Product Starter
 

@@ -122,6 +122,7 @@ API_PREFIX="${API_PREFIX:-/$SURFACE_SLUG}"
 frontend_page_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/page.js"
 frontend_data_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-data.js"
 frontend_actions_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-actions.js"
+frontend_api_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-api.js"
 frontend_smoke_path="$TARGET_DIR/frontend/app/app/$SURFACE_SLUG/starter-smoke.js"
 backend_route_path="$TARGET_DIR/backend/app/routes/$PY_SLUG.py"
 backend_starter_path="$TARGET_DIR/backend/app/services/${PY_SLUG}_starter.py"
@@ -960,6 +961,7 @@ export const starterStrings = {
   bulkApplyLabel: "${BULK_APPLY_LABEL}",
   mutationRouteLabel: "${MUTATION_ROUTE_LABEL}",
 };
+export const starterRuntimeMode = "local";
 EOF
 )"
 
@@ -981,6 +983,41 @@ export function buildStarterSummaryMetrics(filteredItems) {
   return Object.entries(segmentCounts)
     .map(([segment, count]) => \`\${segment} · \${count}\`)
     .join(" / ");
+}
+EOF
+)"
+
+safe_write "$frontend_api_path" "$(cat <<EOF
+import { readJsonOrError } from "../../lib/admin-page-utils";
+
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+export async function fetch${PASCAL_NAME}StarterList(params = {}) {
+  const search = new URLSearchParams();
+  if (params.q) {
+    search.set("q", params.q);
+  }
+  const response = await fetch(
+    \`\${apiBaseUrl}${API_PREFIX}\${search.toString() ? \`?\${search.toString()}\` : ""}\`,
+    {
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  return readJsonOrError(response, "Failed to load starter surface data.");
+}
+
+export async function run${PASCAL_NAME}StarterAction(itemId, payload) {
+  const response = await fetch(\`\${apiBaseUrl}${API_PREFIX}/\${itemId}/starter-action\`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  return readJsonOrError(response, "Failed to run starter action.");
 }
 EOF
 )"
@@ -1089,12 +1126,17 @@ import {
   sampleItems,
   segmentFilterOptions,
   starterMetrics,
+  starterRuntimeMode,
   starterStrings,
 } from "./starter-data";
 import {
   buildStarterMutationPreview,
   buildStarterSummaryMetrics,
 } from "./starter-actions";
+import {
+  fetch${PASCAL_NAME}StarterList,
+  run${PASCAL_NAME}StarterAction,
+} from "./starter-api";
 
 ${constants_block}
 ${helpers_block}
@@ -1229,6 +1271,31 @@ ${export_helpers_block}
         };
 
     setActionLoadingId(itemId);
+    if (starterRuntimeMode === "api") {
+      run${PASCAL_NAME}StarterAction(itemId, {
+        action: actionKind,
+        note: actionNote.trim(),
+      })
+        .then((payload) => {
+          if (payload?.item) {
+            setItems((currentItems) =>
+              currentItems.map((item) => (item.id === itemId ? payload.item : item)),
+            );
+          }
+          setSelectedItemId(itemId);
+          setActionNote("");
+          setSuccess(\`\${actionConfig.success} API starter path is now wired.\`);
+          setError("");
+        })
+        .catch((actionError) => {
+          setError(actionError.message || "Failed to run starter action.");
+          setSuccess("");
+        })
+        .finally(() => {
+          setActionLoadingId("");
+        });
+      return;
+    }
     setItems((currentItems) =>
       currentItems.map((item) =>
         item.id === itemId
@@ -1299,7 +1366,22 @@ ${export_helpers_block}
         titleTestId="${SURFACE_SLUG}-page-title"
         subtitle="Scaffold a new DeployMate admin surface from one generator instead of rebuilding the same review layout by hand."
         loading={false}
-        onRefresh={() => setSuccess("Refresh stays local in the starter until the real loader is wired.")}
+        onRefresh={async () => {
+          if (starterRuntimeMode !== "api") {
+            setSuccess("Refresh stays local in the starter until the real loader is wired.");
+            setError("");
+            return;
+          }
+          try {
+            const data = await fetch${PASCAL_NAME}StarterList({ q: query });
+            setItems(data.items || []);
+            setSuccess("Starter data refreshed from the generated API client.");
+            setError("");
+          } catch (refreshError) {
+            setError(refreshError.message || "Failed to refresh starter data.");
+            setSuccess("");
+          }
+        }}
         refreshTestId="${SURFACE_SLUG}-refresh"
         actions={[
           {
@@ -1443,7 +1525,7 @@ ${export_helpers_block}
       <AdminSurfaceMutationPreview
         description="Use this payload preview to wire the first real write path instead of inventing request shape from scratch."
         testId="${SURFACE_SLUG}-mutation-starter"
-        routeLabel={starterStrings.mutationRouteLabel}
+        routeLabel={\`\${starterStrings.mutationRouteLabel} · mode: \${starterRuntimeMode}\`}
         selectedSummary={selectedItems.map((item) => item.label).join(", ") || "Nothing selected"}
         payload={starterMutationPreview}
       />
