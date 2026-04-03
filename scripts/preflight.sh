@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SURFACE="full"
 FAST_MODE=0
+source "$ROOT_DIR/scripts/audit_cache.sh"
 
 clean_frontend_build_artifacts() {
   if [ -d "frontend/.next" ]; then
@@ -53,6 +54,9 @@ case "$SURFACE" in
 esac
 
 cd "$ROOT_DIR"
+
+audit_cache_prepare
+trap audit_cache_cleanup EXIT
 
 echo "[preflight] repo: $ROOT_DIR"
 echo "[preflight] surface: $SURFACE"

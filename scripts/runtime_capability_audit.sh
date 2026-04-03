@@ -3,7 +3,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/audit_cache.sh"
 cd "$ROOT_DIR"
+
+audit_cache_prepare
+
+if audit_cache_has runtime_capability_audit; then
+  echo "[runtime-capability-audit] already completed in this run; skipping"
+  exit 0
+fi
 
 if command -v rg >/dev/null 2>&1; then
   SEARCH_CMD=(rg -n)
@@ -56,6 +64,7 @@ echo "[runtime-capability-audit] checking production env alignment"
 if [ ! -f ".env.production" ]; then
   echo "[runtime-capability-audit] no .env.production file found; static contract checks only"
   echo "[runtime-capability-audit] ok"
+  audit_cache_mark runtime_capability_audit
   exit 0
 fi
 
@@ -83,3 +92,4 @@ case "$backend_value" in
 esac
 
 echo "[runtime-capability-audit] ok"
+audit_cache_mark runtime_capability_audit

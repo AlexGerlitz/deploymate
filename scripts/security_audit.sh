@@ -3,7 +3,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/audit_cache.sh"
 cd "$ROOT_DIR"
+
+audit_cache_prepare
+
+if audit_cache_has security_audit; then
+  echo "[security-audit] already completed in this run; skipping"
+  exit 0
+fi
 
 if command -v rg >/dev/null 2>&1; then
   SEARCH_CMD=(rg -n -S)
@@ -111,3 +119,5 @@ if [ "$WARNINGS" -eq 0 ]; then
 else
   echo "[security-audit] warnings found; review recommended"
 fi
+
+audit_cache_mark security_audit

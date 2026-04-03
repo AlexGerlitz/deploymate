@@ -225,6 +225,7 @@ The fast gate intentionally uses fewer resources:
 - preflight: skips the production frontend build in fast mode
 - fast frontend mode now reuses one shared smoke dev server instead of starting a separate `next dev` process per smoke
 - the heavier frontend gate also reuses shared smoke servers for the main smoke pack
+- repeated local audits are cached within one gate run, so nested security/runtime checks do not repeat unnecessarily
 
 ## Key Screens In The App
 
