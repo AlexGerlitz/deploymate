@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/lib/project_automation_targets.sh"
 
 if [ "$#" -eq 0 ]; then
   printf 'backend_fast_mode=safety\n'
@@ -16,18 +17,18 @@ has_backend_scope=0
 reason="shared diff without backend app impact"
 
 for path in "$@"; do
-  case "$path" in
-    backend/*)
+  case "$(automation_backend_fast_scope_for_path "$path")" in
+    backend)
       backend_paths+=("$path")
       has_backend_scope=1
       reason="backend files changed"
       ;;
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh|scripts/post_deploy_smoke.sh)
+    backend_release_contract)
       requires_safety=1
       has_backend_scope=1
       reason="shared release or runtime contract changed"
       ;;
-    .github/*|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|NOTICE|COMMERCIAL-LICENSE.md|docs/*|frontend/*)
+    ignore)
       ;;
     *)
       requires_safety=1

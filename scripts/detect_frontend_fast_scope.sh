@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/lib/project_automation_targets.sh"
 
 if [ "$#" -eq 0 ]; then
   printf 'frontend_fast_mode=default\n'
@@ -17,18 +18,18 @@ has_frontend_scope=0
 reason="shared diff without frontend app impact"
 
 for path in "$@"; do
-  case "$path" in
-    frontend/*)
+  case "$(automation_frontend_fast_scope_for_path "$path")" in
+    frontend)
       frontend_paths+=("$path")
       has_frontend_scope=1
       reason="frontend files changed"
       ;;
-    frontend/Dockerfile|docker-compose.yml|docker-compose.prod.yml|deploy/*|infra/*|scripts/release_workflow.sh|scripts/preflight.sh|scripts/remote_release.sh|scripts/post_deploy_smoke.sh)
+    frontend_delivery_contract)
       requires_default=1
       has_frontend_scope=1
       reason="shared frontend delivery contract changed"
       ;;
-    .github/*|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|NOTICE|COMMERCIAL-LICENSE.md|docs/*|backend/*)
+    ignore)
       ;;
     *)
       requires_default=1
@@ -46,7 +47,7 @@ fi
 
 if [ "$requires_default" = "1" ]; then
   printf 'frontend_fast_mode=default\n'
-  printf 'frontend_fast_smokes=auth ops runtime\n'
+  printf 'frontend_fast_smokes=%s\n' "$(automation_frontend_fast_smokes_default_lines | tr '\n' ' ' | xargs)"
   printf 'reason=%s\n' "$reason"
   exit 0
 fi

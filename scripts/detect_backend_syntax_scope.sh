@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/lib/project_automation_targets.sh"
+
 if [ "$#" -eq 0 ]; then
   printf 'backend_syntax_mode=full\n'
   printf 'reason=no changed files provided\n'
@@ -13,18 +16,18 @@ requires_full=0
 reason="no changed backend python files"
 
 for path in "$@"; do
-  case "$path" in
-    backend/app/*.py|backend/app/**/*.py)
+  case "$(automation_backend_syntax_scope_for_path "$path")" in
+    backend_python)
       python_files+=("$path")
       reason="changed backend python files"
       ;;
-    backend/tests/*.py|backend/tests/**/*.py)
+    backend_tests)
       ;;
-    backend/*)
+    backend_non_python)
       requires_full=1
       reason="non-python backend files changed"
       ;;
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|deploy/*|infra/*|scripts/preflight.sh|scripts/release_workflow.sh|scripts/dev_verify_changed.sh)
+    backend_release_contract)
       requires_full=1
       reason="shared release or backend contract changed"
       ;;

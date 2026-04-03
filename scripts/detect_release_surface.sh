@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/lib/project_automation_targets.sh"
 BASE_REF="${1:-}"
 HEAD_REF="${2:-HEAD}"
 EMPTY_TREE_SHA="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
@@ -36,16 +37,16 @@ full_changed=0
 relevant_changed=0
 
 for path in "${changed_files[@]}"; do
-  case "$path" in
-    frontend/*)
+  case "$(automation_classify_release_path "$path")" in
+    frontend)
       frontend_changed=1
       relevant_changed=1
       ;;
-    backend/*)
+    backend)
       backend_changed=1
       relevant_changed=1
       ;;
-    README.md|RUNBOOK.md|HANDOFF.md|LICENSE|.gitignore|.github/*)
+    docs)
       ;;
     *)
       full_changed=1

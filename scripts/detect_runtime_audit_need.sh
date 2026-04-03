@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/lib/project_automation_targets.sh"
+
 if [ "$#" -eq 0 ]; then
   printf 'run_runtime_audits=1\n'
   printf 'reason=no changed files provided\n'
@@ -9,8 +12,8 @@ if [ "$#" -eq 0 ]; then
 fi
 
 for path in "$@"; do
-  case "$path" in
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|backend/app/services/runtime_executors.py|scripts/runtime_capability_audit.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh)
+  case "$(automation_runtime_audit_scope_for_path "$path")" in
+    runtime_contract)
       printf 'run_runtime_audits=1\n'
       printf 'reason=runtime or deploy contract changed\n'
       exit 0

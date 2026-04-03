@@ -36,9 +36,7 @@ It controls:
 2. Copy `scripts/project_automation_config.sh`.
 3. Edit only the adapter file first.
 4. Adjust project-specific target maps next:
-   - `scripts/detect_frontend_smoke_targets.sh`
-   - `scripts/detect_backend_test_targets.sh`
-   - `scripts/detect_*_scope.sh`
+   - `scripts/project_automation_targets.sh`
 5. Rename smoke scripts or backend suites only if the new repo uses different commands.
 
 ## Why this matters
@@ -52,5 +50,14 @@ With the adapter split:
 - the profile commands carry over
 - the hot-loop frontend server lifecycle carries over
 - only project layout and target maps need real customization
+
+## Target maps
+
+The adapter split is now two-layered:
+
+- `scripts/project_automation_config.sh`: directory and route assumptions
+- `scripts/project_automation_targets.sh`: path-to-surface, path-to-smoke, path-to-test, and path-to-audit rules
+
+That means a new project can usually keep the orchestration scripts and only replace these two adapter files.
 
 That turns this from one-off repo glue into an automation base you can reuse.
