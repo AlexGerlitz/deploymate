@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE_REF="${BASE_REF:-}"
 HEAD_REF="${HEAD_REF:-HEAD}"
 SIMULATED_PATHS=()
+LAST_LOOP_STATE_FILE="$ROOT_DIR/.logs/auto_local_last.env"
 
 usage() {
   cat <<'EOF'
@@ -151,6 +152,8 @@ recommendation_reason="$reason"
 recommended_run_command="make changed"
 recommended_profile_command="make profile-changed"
 recommended_execution_class="fast"
+followup_command=""
+followup_reason=""
 backend_fast_mode=""
 frontend_fast_mode=""
 frontend_fast_smokes=""
@@ -293,6 +296,62 @@ else
   fi
 fi
 
+if [ -f "$LAST_LOOP_STATE_FILE" ]; then
+  LAST_AUTO_LOCAL_MODE=""
+  LAST_AUTO_LOCAL_COMMAND=""
+  LAST_AUTO_LOCAL_SURFACE=""
+  LAST_AUTO_LOCAL_EXECUTION_CLASS=""
+  LAST_AUTO_LOCAL_BASE_REF=""
+  while IFS='=' read -r key value; do
+    case "$key" in
+      LAST_AUTO_LOCAL_MODE)
+        LAST_AUTO_LOCAL_MODE="${value#\'}"
+        LAST_AUTO_LOCAL_MODE="${LAST_AUTO_LOCAL_MODE%\'}"
+        ;;
+      LAST_AUTO_LOCAL_COMMAND)
+        LAST_AUTO_LOCAL_COMMAND="${value#\'}"
+        LAST_AUTO_LOCAL_COMMAND="${LAST_AUTO_LOCAL_COMMAND%\'}"
+        ;;
+      LAST_AUTO_LOCAL_SURFACE)
+        LAST_AUTO_LOCAL_SURFACE="${value#\'}"
+        LAST_AUTO_LOCAL_SURFACE="${LAST_AUTO_LOCAL_SURFACE%\'}"
+        ;;
+      LAST_AUTO_LOCAL_EXECUTION_CLASS)
+        LAST_AUTO_LOCAL_EXECUTION_CLASS="${value#\'}"
+        LAST_AUTO_LOCAL_EXECUTION_CLASS="${LAST_AUTO_LOCAL_EXECUTION_CLASS%\'}"
+        ;;
+      LAST_AUTO_LOCAL_BASE_REF)
+        LAST_AUTO_LOCAL_BASE_REF="${value#\'}"
+        LAST_AUTO_LOCAL_BASE_REF="${LAST_AUTO_LOCAL_BASE_REF%\'}"
+        ;;
+    esac
+  done < "$LAST_LOOP_STATE_FILE"
+  if [ "${LAST_AUTO_LOCAL_BASE_REF:-}" = "$resolved_base_ref" ] && [ "${LAST_AUTO_LOCAL_SURFACE:-}" = "$surface" ]; then
+    case "${LAST_AUTO_LOCAL_MODE:-}" in
+      profile-frontend)
+        followup_command="make frontend-hot"
+        followup_reason="last successful loop already profiled this frontend diff; use the hot loop for the next tweak"
+        ;;
+      profile-backend)
+        followup_command="make backend"
+        followup_reason="last successful loop already profiled this backend diff; use the cheaper backend rerun next"
+        ;;
+      profile-changed)
+        if [ "$surface" = "full" ]; then
+          followup_command="make changed"
+          followup_reason="last successful loop already captured timing context for this mixed diff; the next rerun can use the cheaper changed loop"
+        fi
+        ;;
+      frontend)
+        if [ "${frontend_fast_mode:-default}" = "targeted" ]; then
+          followup_command="make frontend-hot"
+          followup_reason="frontend reruns on the same diff are cheaper through the hot loop"
+        fi
+        ;;
+    esac
+  fi
+fi
+
 printf 'base_ref=%s\n' "$resolved_base_ref"
 printf 'head_ref=%s\n' "$HEAD_REF"
 printf 'surface=%s\n' "$surface"
@@ -303,3 +362,5 @@ printf 'recommended_run_command=%s\n' "$recommended_run_command"
 printf 'recommended_profile_command=%s\n' "$recommended_profile_command"
 printf 'recommended_execution_class=%s\n' "$recommended_execution_class"
 printf 'recommendation_reason=%s\n' "$recommendation_reason"
+printf 'followup_command=%s\n' "$followup_command"
+printf 'followup_reason=%s\n' "$followup_reason"
