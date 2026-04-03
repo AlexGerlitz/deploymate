@@ -43,6 +43,7 @@ These commands:
 2. run the smaller `--fast` local gate instead of the full release gate
 3. skip the production frontend build in preflight fast mode
 4. keep backend verification on a targeted test set when changed files map cleanly, otherwise fall back to the focused safety suite
+5. keep frontend verification on targeted fast smokes when changed files map cleanly, otherwise fall back to the default `auth + ops + runtime`
 
 Or run the broader local release gate:
 

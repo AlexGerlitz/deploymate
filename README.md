@@ -220,7 +220,7 @@ What they do:
 
 The fast gate intentionally uses fewer resources:
 
-- frontend: auth, ops, and runtime smoke only
+- frontend: targeted auth/ops/runtime smokes from changed files when possible, otherwise all three
 - backend: targeted tests from changed files when possible, otherwise the focused safety suite
 - preflight: skips the production frontend build in fast mode
 

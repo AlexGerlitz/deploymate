@@ -7,6 +7,7 @@ SURFACE="full"
 BACKEND_PYTHON="${BACKEND_PYTHON:-}"
 FAST_MODE=0
 BACKEND_FAST_TEST_MODULES="${BACKEND_FAST_TEST_MODULES:-}"
+FRONTEND_FAST_SMOKES="${FRONTEND_FAST_SMOKES:-}"
 
 clean_frontend_build_artifacts() {
   if [ -d "frontend/.next" ]; then
@@ -80,6 +81,9 @@ echo "[release] backend python: $BACKEND_PYTHON"
 if [ -n "$BACKEND_FAST_TEST_MODULES" ]; then
   echo "[release] backend fast targets: $BACKEND_FAST_TEST_MODULES"
 fi
+if [ -n "$FRONTEND_FAST_SMOKES" ]; then
+  echo "[release] frontend fast smokes: $FRONTEND_FAST_SMOKES"
+fi
 
 echo "[release] preflight"
 if [ "$FAST_MODE" = "1" ]; then
@@ -89,14 +93,25 @@ else
 fi
 
 if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
-  echo "[release] frontend auth smoke"
-  FRONTEND_SMOKE_PORT=3001 npm --prefix frontend run smoke:auth
+  frontend_fast_smokes=(auth ops runtime)
+  if [ -n "$FRONTEND_FAST_SMOKES" ]; then
+    IFS=' ' read -r -a frontend_fast_smokes <<< "$FRONTEND_FAST_SMOKES"
+  fi
 
-  echo "[release] frontend ops smoke"
-  FRONTEND_SMOKE_PORT=3002 npm --prefix frontend run smoke:ops
-
-  echo "[release] frontend runtime smoke"
-  FRONTEND_SMOKE_PORT=3003 npm --prefix frontend run smoke:runtime
+  frontend_fast_port=3001
+  for frontend_smoke in "${frontend_fast_smokes[@]}"; do
+    case "$frontend_smoke" in
+      auth|ops|runtime)
+        echo "[release] frontend ${frontend_smoke} smoke"
+        FRONTEND_SMOKE_PORT="$frontend_fast_port" npm --prefix frontend run "smoke:${frontend_smoke}"
+        frontend_fast_port=$((frontend_fast_port + 1))
+        ;;
+      *)
+        echo "[release] unknown frontend fast smoke target: $frontend_smoke" >&2
+        exit 1
+        ;;
+    esac
+  done
 
   if [ "$FAST_MODE" != "1" ]; then
     echo "[release] frontend admin smoke"
@@ -143,7 +158,11 @@ fi
 echo "[release] executed phases:"
 if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   if [ "$FAST_MODE" = "1" ]; then
-    echo "[release]   - frontend preflight plus auth, ops, and runtime smokes"
+    if [ -n "$FRONTEND_FAST_SMOKES" ]; then
+      echo "[release]   - frontend preflight plus targeted fast smokes"
+    else
+      echo "[release]   - frontend preflight plus auth, ops, and runtime smokes"
+    fi
   else
     echo "[release]   - frontend preflight, smokes, and build"
   fi

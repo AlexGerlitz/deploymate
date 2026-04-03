@@ -131,6 +131,7 @@ printf '%s\n' "$detect_output"
 surface=""
 reason=""
 backend_changed_files=()
+frontend_changed_files=()
 while IFS='=' read -r key value; do
   case "$key" in
     surface)
@@ -147,6 +148,9 @@ for path in "${changed_files[@]}"; do
     backend/*)
       backend_changed_files+=("$path")
       ;;
+    frontend/*)
+      frontend_changed_files+=("$path")
+      ;;
   esac
 done
 
@@ -161,6 +165,14 @@ if [ "$surface" = "backend" ] || [ "$surface" = "full" ]; then
     BACKEND_FAST_TEST_MODULES="$(bash scripts/detect_backend_test_targets.sh "${backend_changed_files[@]}" | tr '\n' ' ' | xargs)"
     export BACKEND_FAST_TEST_MODULES
     echo "[dev-verify-changed] backend fast targets: $BACKEND_FAST_TEST_MODULES"
+  fi
+fi
+
+if [ "$surface" = "frontend" ] || [ "$surface" = "full" ]; then
+  if [ "${#frontend_changed_files[@]}" -gt 0 ]; then
+    FRONTEND_FAST_SMOKES="$(bash scripts/detect_frontend_smoke_targets.sh "${frontend_changed_files[@]}" | tr '\n' ' ' | xargs)"
+    export FRONTEND_FAST_SMOKES
+    echo "[dev-verify-changed] frontend fast smokes: $FRONTEND_FAST_SMOKES"
   fi
 fi
 
