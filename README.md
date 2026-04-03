@@ -315,6 +315,15 @@ The generated page is now more than a static mock:
 - audit filter/sort starter wiring when `--with-audit` is enabled
 - working local JSON/CSV starter exports when `--with-export` is enabled
 
+The scaffold is also entity-aware now:
+
+- `--preset generic`
+- `--preset users`
+- `--preset upgrade-requests`
+- `--preset servers`
+
+So the generated sample queue, summary copy, search placeholder, and starter export shape can already look closer to the kind of DeployMate surface you are actually adding.
+
 ## Product Starter
 
 Automation core is no longer the only reusable layer here.

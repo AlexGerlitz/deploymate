@@ -10,6 +10,7 @@ FORCE=0
 WITH_SAVED_VIEWS=0
 WITH_AUDIT=0
 WITH_EXPORT=0
+PRESET="generic"
 
 usage() {
   cat <<'EOF'
@@ -18,17 +19,11 @@ Usage:
 
 Options:
   --api-prefix <prefix>  Override the generated API prefix. Default: /<slug>
+  --preset <name>        One of: generic, users, upgrade-requests, servers
   --with-saved-views     Include a saved-views starter section in the generated page
   --with-audit           Include an audit starter section in the generated page
   --with-export          Include an export/recovery starter section in the generated page
   --force                Overwrite generated files if they already exist
-
-Behavior:
-  - generates a new DeployMate admin surface page
-  - generates a backend route and service stub
-  - generates a backend API flow test stub
-  - adds a typed list contract into backend/app/schemas.py
-  - wires the new route into backend/app/main.py
 EOF
 }
 
@@ -63,6 +58,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --api-prefix)
       API_PREFIX="${2:-}"
+      shift 2
+      ;;
+    --preset)
+      PRESET="${2:-}"
       shift 2
       ;;
     --with-saved-views)
@@ -106,13 +105,8 @@ if [ -z "$SURFACE_NAME" ] || [ -z "$SURFACE_SLUG" ]; then
   exit 1
 fi
 
-if [ ! -f "$TARGET_DIR/backend/app/main.py" ]; then
-  echo "[scaffold-deploymate-surface] expected backend/app/main.py in target repo" >&2
-  exit 1
-fi
-
-if [ ! -f "$TARGET_DIR/backend/app/schemas.py" ]; then
-  echo "[scaffold-deploymate-surface] expected backend/app/schemas.py in target repo" >&2
+if [ ! -f "$TARGET_DIR/backend/app/main.py" ] || [ ! -f "$TARGET_DIR/backend/app/schemas.py" ]; then
+  echo "[scaffold-deploymate-surface] expected backend/app/main.py and backend/app/schemas.py in target repo" >&2
   exit 1
 fi
 
@@ -131,6 +125,250 @@ backend_service_path="$TARGET_DIR/backend/app/services/$PY_SLUG.py"
 backend_test_path="$TARGET_DIR/backend/tests/test_${PY_SLUG}_api_flow.py"
 backend_main_path="$TARGET_DIR/backend/app/main.py"
 backend_schemas_path="$TARGET_DIR/backend/app/schemas.py"
+
+case "$PRESET" in
+  generic)
+    SEARCH_PLACEHOLDER="Search the first real review queue"
+    QUEUE_TITLE="Current queue slice"
+    QUEUE_DESCRIPTION="Start with one useful list, one clear filter, and one action that helps the operator decide what to do next."
+    SUMMARY_TITLE="Review shape"
+    SUMMARY_DESCRIPTION="Every new admin surface should start with a narrow review slice, not with every possible panel turned on at once."
+    SPOTLIGHT_BODY="This starter already includes URL state, filter chips, and optional secondary sections, so you can go straight into the first real operator workflow."
+    SAMPLE_ITEMS_FRONTEND='[
+  {
+    id: "'"${SURFACE_SLUG}"'-sample-1",
+    label: "Primary review queue",
+    status: "needs-review",
+    note: "Replace this with the first real review slice for '"${SURFACE_NAME}"'.",
+  },
+  {
+    id: "'"${SURFACE_SLUG}"'-sample-2",
+    label: "Follow-up backlog",
+    status: "ready",
+    note: "Keep only the actions and fields that support an actual admin decision.",
+  },
+]'
+    SAMPLE_ITEMS_PY='[
+        {
+            "id": "'"${SURFACE_SLUG}"'-sample-1",
+            "label": "Primary review queue",
+            "status": "needs-review",
+            "note": "Replace this with the first real review slice for '"${SURFACE_NAME}"'.",
+        },
+        {
+            "id": "'"${SURFACE_SLUG}"'-sample-2",
+            "label": "Follow-up backlog",
+            "status": "ready",
+            "note": "Keep only the actions and fields that support an actual admin decision.",
+        },
+    ]'
+    METRICS_JS='[
+          {
+            label: "First pass",
+            value: "Queue",
+            description: "Ship one useful list with one real decision before adding richer tooling.",
+          },
+          {
+            label: "Second pass",
+            value: "Action",
+            description: "Add the first action that actually resolves the queue or moves work forward.",
+          },
+          {
+            label: "Later",
+            value: "Audit/export",
+            description: "Bring in audit, saved views, and exports only after the main review flow earns them.",
+          },
+        ]'
+    SAVED_VIEW_SUMMARY='[filters.q ? `search ${filters.q}` : null]'
+    AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Queue changes" }, { value: "bulk", label: "Bulk changes" }]'
+    CSV_HEADERS='["id", "label", "status", "note"]'
+    CSV_ROW='[item.id, item.label, item.status, item.note]'
+    ;;
+  users)
+    SEARCH_PLACEHOLDER="Search username, role, plan, or password state"
+    QUEUE_TITLE="Current user slice"
+    QUEUE_DESCRIPTION="Start with a user list that supports one concrete admin decision: role, plan, or password follow-up."
+    SUMMARY_TITLE="User review shape"
+    SUMMARY_DESCRIPTION="User surfaces should start with access and password decisions, not with every secondary tool turned on."
+    SPOTLIGHT_BODY="Use this starter to ship one genuine user-admin workflow first, then layer in saved views, exports, and audit where they reduce repeated triage."
+    SAMPLE_ITEMS_FRONTEND='[
+  {
+    id: "'"${SURFACE_SLUG}"'-sample-1",
+    label: "alex-admin",
+    status: "admin",
+    note: "Password change required. Replace this with the first real user review queue.",
+  },
+  {
+    id: "'"${SURFACE_SLUG}"'-sample-2",
+    label: "maria-member",
+    status: "team",
+    note: "Active teammate. Keep actions narrow: role, plan, or password reset before anything else.",
+  },
+]'
+    SAMPLE_ITEMS_PY='[
+        {
+            "id": "'"${SURFACE_SLUG}"'-sample-1",
+            "label": "alex-admin",
+            "status": "admin",
+            "note": "Password change required. Replace this with the first real user review queue.",
+        },
+        {
+            "id": "'"${SURFACE_SLUG}"'-sample-2",
+            "label": "maria-member",
+            "status": "team",
+            "note": "Active teammate. Keep actions narrow: role, plan, or password reset before anything else.",
+        },
+    ]'
+    METRICS_JS='[
+          {
+            label: "Primary review",
+            value: "Access",
+            description: "Start with role, plan, and password-state decisions before adding more tools.",
+          },
+          {
+            label: "Secondary",
+            value: "Saved views",
+            description: "Saved views matter only after role and plan triage happens repeatedly.",
+          },
+          {
+            label: "Later",
+            value: "Audit/export",
+            description: "Bring in exports and audit once the user review loop is stable enough to hand off.",
+          },
+        ]'
+    SAVED_VIEW_SUMMARY='[
+      filters.q ? `search ${filters.q}` : null,
+      filters.q && filters.q.includes("admin") ? "admin slice" : null
+    ]'
+    AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "User changes" }, { value: "bulk", label: "Bulk role/plan" }]'
+    CSV_HEADERS='["id", "username", "role_or_plan", "note"]'
+    CSV_ROW='[item.id, item.label, item.status, item.note]'
+    ;;
+  upgrade-requests)
+    SEARCH_PLACEHOLDER="Search request name, email, plan, or review note"
+    QUEUE_TITLE="Current inbox slice"
+    QUEUE_DESCRIPTION="Start with one useful inbox queue, one clear filter, and one disposition action that moves requests forward."
+    SUMMARY_TITLE="Inbox review shape"
+    SUMMARY_DESCRIPTION="Upgrade-request surfaces should begin with triage and disposition, not with every operator tool enabled on day one."
+    SPOTLIGHT_BODY="Use this starter to establish the first real inbox review flow, then layer in linkage, exports, and audit where they cut repeated admin work."
+    SAMPLE_ITEMS_FRONTEND='[
+  {
+    id: "'"${SURFACE_SLUG}"'-sample-1",
+    label: "Team rollout request",
+    status: "in_review",
+    note: "Linked plan upgrade request. Replace this with the first real upgrade inbox queue.",
+  },
+  {
+    id: "'"${SURFACE_SLUG}"'-sample-2",
+    label: "Pricing question",
+    status: "new",
+    note: "Keep the first pass focused on triage and disposition before adding broader workflow steps.",
+  },
+]'
+    SAMPLE_ITEMS_PY='[
+        {
+            "id": "'"${SURFACE_SLUG}"'-sample-1",
+            "label": "Team rollout request",
+            "status": "in_review",
+            "note": "Linked plan upgrade request. Replace this with the first real upgrade inbox queue.",
+        },
+        {
+            "id": "'"${SURFACE_SLUG}"'-sample-2",
+            "label": "Pricing question",
+            "status": "new",
+            "note": "Keep the first pass focused on triage and disposition before adding broader workflow steps.",
+        },
+    ]'
+    METRICS_JS='[
+          {
+            label: "Primary review",
+            value: "Inbox",
+            description: "Start with a triage queue and one status-changing action before richer workflow tooling.",
+          },
+          {
+            label: "Secondary",
+            value: "Linking",
+            description: "Only add linked-user and plan handoff once the inbox flow is genuinely used.",
+          },
+          {
+            label: "Later",
+            value: "Audit/export",
+            description: "Exports and audit should explain decisions, not compete with the first inbox action.",
+          },
+        ]'
+    SAVED_VIEW_SUMMARY='[
+      filters.q ? `search ${filters.q}` : null,
+      filters.q && filters.q.includes("request") ? "request focus" : null
+    ]'
+    AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Inbox changes" }, { value: "bulk", label: "Bulk triage" }]'
+    CSV_HEADERS='["id", "request", "status", "note"]'
+    CSV_ROW='[item.id, item.label, item.status, item.note]'
+    ;;
+  servers)
+    SEARCH_PLACEHOLDER="Search server name, auth type, or diagnostics state"
+    QUEUE_TITLE="Current server slice"
+    QUEUE_DESCRIPTION="Start with a server list and one real operational decision, such as diagnostics review or connection follow-up."
+    SUMMARY_TITLE="Server review shape"
+    SUMMARY_DESCRIPTION="Server surfaces should start with connectivity and diagnostics, then grow into broader operator tooling only when needed."
+    SPOTLIGHT_BODY="Use this starter to ship the first real server review loop, then bring in secondary diagnostics, exports, and audit after it earns them."
+    SAMPLE_ITEMS_FRONTEND='[
+  {
+    id: "'"${SURFACE_SLUG}"'-sample-1",
+    label: "smoke-vps",
+    status: "ssh_key",
+    note: "Diagnostics pending. Replace this with the first real server review queue.",
+  },
+  {
+    id: "'"${SURFACE_SLUG}"'-sample-2",
+    label: "edge-runner",
+    status: "password",
+    note: "Use the first workflow to review auth type, connectivity, or diagnostics before adding more panels.",
+  },
+]'
+    SAMPLE_ITEMS_PY='[
+        {
+            "id": "'"${SURFACE_SLUG}"'-sample-1",
+            "label": "smoke-vps",
+            "status": "ssh_key",
+            "note": "Diagnostics pending. Replace this with the first real server review queue.",
+        },
+        {
+            "id": "'"${SURFACE_SLUG}"'-sample-2",
+            "label": "edge-runner",
+            "status": "password",
+            "note": "Use the first workflow to review auth type, connectivity, or diagnostics before adding more panels.",
+        },
+    ]'
+    METRICS_JS='[
+          {
+            label: "Primary review",
+            value: "Connectivity",
+            description: "Start with one useful list plus diagnostics or connection-status action.",
+          },
+          {
+            label: "Secondary",
+            value: "Ports",
+            description: "Suggested ports and deeper diagnostics come after the first server review action works.",
+          },
+          {
+            label: "Later",
+            value: "Audit/export",
+            description: "Audit and exports should support operations handoff, not distract from first-pass connectivity work.",
+          },
+        ]'
+    SAVED_VIEW_SUMMARY='[
+      filters.q ? `search ${filters.q}` : null,
+      filters.q && filters.q.includes("ssh") ? "ssh focus" : null
+    ]'
+    AUDIT_OPTIONS='[{ value: "all", label: "All activity" }, { value: "queue", label: "Server changes" }, { value: "bulk", label: "Ops follow-up" }]'
+    CSV_HEADERS='["id", "server", "auth_or_state", "note"]'
+    CSV_ROW='[item.id, item.label, item.status, item.note]'
+    ;;
+  *)
+    echo "[scaffold-deploymate-surface] unsupported preset: $PRESET" >&2
+    exit 1
+    ;;
+esac
 
 admin_ui_imports="  AdminActiveFilters,
   AdminDisclosureSection,
@@ -184,7 +422,7 @@ function format${PASCAL_NAME}SavedViews(items) {
   return formatSavedViews(items, {
     formatDate,
     summarizeFilters: (filters) =>
-      [filters.q ? \`search \${filters.q}\` : null].filter(Boolean).join(" · "),
+      ${SAVED_VIEW_SUMMARY}.filter(Boolean).join(" · "),
   });
 }
 EOF
@@ -382,10 +620,6 @@ if [ "$WITH_AUDIT" = "1" ]; then
       serializeWhen: (value) => value !== "newest",
     }),
   ];
-  const {
-    serializedParams: auditSerializedParams,
-    syncedSearchParams: syncedAuditSearchParams,
-  } = buildFilterState(auditFilterDefinitions);
   const activeAuditFilterChips = buildFilterChipsFromDefinitions(auditFilterDefinitions);
   const visibleAuditItems = useMemo(() => {
     const normalizedAuditQuery = auditQuery.trim().toLowerCase();
@@ -416,11 +650,7 @@ EOF
         filterLabel="Scope"
         filterValue={auditScope}
         onFilterChange={(event) => setAuditScope(event.target.value)}
-        filterOptions={[
-          { value: "all", label: "All activity" },
-          { value: "queue", label: "Queue changes" },
-          { value: "bulk", label: "Bulk changes" },
-        ]}
+        filterOptions=${AUDIT_OPTIONS}
         filterTestId="${SURFACE_SLUG}-audit-scope"
         sortValue={auditSort}
         onSortChange={(event) => setAuditSort(event.target.value)}
@@ -453,6 +683,7 @@ if [ "$WITH_EXPORT" = "1" ]; then
   function handleExportJson() {
     const payload = {
       surface: "${SURFACE_SLUG}",
+      preset: "${PRESET}",
       generated_at: new Date().toISOString(),
       filters: currentFilters,
       items: filteredItems,
@@ -467,8 +698,8 @@ if [ "$WITH_EXPORT" = "1" ]; then
 
   function handleExportCsv() {
     const rows = [
-      ["id", "label", "status", "note"],
-      ...filteredItems.map((item) => [item.id, item.label, item.status, item.note]),
+      ${CSV_HEADERS},
+      ...filteredItems.map((item) => ${CSV_ROW}),
     ];
     const csv = rows
       .map((row) =>
@@ -533,20 +764,7 @@ import {
 ${utils_imports}
 } from "../../lib/admin-page-utils";
 
-const sampleItems = [
-  {
-    id: "${SURFACE_SLUG}-sample-1",
-    label: "Primary review queue",
-    status: "needs-review",
-    note: "Replace this with the first real review slice for ${SURFACE_NAME}.",
-  },
-  {
-    id: "${SURFACE_SLUG}-sample-2",
-    label: "Follow-up backlog",
-    status: "ready",
-    note: "Keep only the actions and fields that support an actual admin decision.",
-  },
-];
+const sampleItems = ${SAMPLE_ITEMS_FRONTEND};
 
 ${constants_block}
 ${helpers_block}
@@ -630,36 +848,20 @@ ${export_helpers_block}
       />
 
       <AdminSurfaceSummary
-        title="Review shape"
-        description="Every new admin surface should start with a narrow review slice, not with every possible panel turned on at once."
-        metrics={[
-          {
-            label: "First pass",
-            value: "Queue",
-            description: "Ship one useful list with one real decision before adding richer tooling.",
-          },
-          {
-            label: "Second pass",
-            value: "Action",
-            description: "Add the first action that actually resolves the queue or moves work forward.",
-          },
-          {
-            label: "Later",
-            value: "Audit/export",
-            description: "Bring in audit, saved views, and exports only after the main review flow earns them.",
-          },
-        ]}
+        title="${SUMMARY_TITLE}"
+        description="${SUMMARY_DESCRIPTION}"
+        metrics={${METRICS_JS}}
         spotlightTitle="${SURFACE_NAME}"
-        spotlightBody="This starter already includes URL state, filter chips, and optional secondary sections, so you can go straight into the first real operator workflow."
+        spotlightBody="${SPOTLIGHT_BODY}"
       />
 
       <AdminSurfaceQueue
-        title="Current queue slice"
-        description="Start with one useful list, one clear filter, and one action that helps the operator decide what to do next."
+        title="${QUEUE_TITLE}"
+        description="${QUEUE_DESCRIPTION}"
         searchLabel="Search ${SURFACE_NAME}"
         searchValue={query}
         onSearchChange={(event) => setQuery(event.target.value)}
-        searchPlaceholder="Search the first real review queue"
+        searchPlaceholder="${SEARCH_PLACEHOLDER}"
         searchTestId="${SURFACE_SLUG}-search"
         emptyTestId="${SURFACE_SLUG}-empty"
         emptyText="No items match the current search."
@@ -719,20 +921,7 @@ EOF
 safe_write "$backend_service_path" "$(cat <<EOF
 def list_${PY_SLUG}_items(query: str = "") -> dict:
     normalized_query = query.strip().lower()
-    items = [
-        {
-            "id": "${SURFACE_SLUG}-sample-1",
-            "label": "Primary review queue",
-            "status": "needs-review",
-            "note": "Replace this with the first real review slice for ${SURFACE_NAME}.",
-        },
-        {
-            "id": "${SURFACE_SLUG}-sample-2",
-            "label": "Follow-up backlog",
-            "status": "ready",
-            "note": "Keep only the actions and fields that support an actual admin decision.",
-        },
-    ]
+    items = ${SAMPLE_ITEMS_PY}
     if normalized_query:
         items = [
             item
@@ -844,7 +1033,6 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["summary"]["surface"], "${SURFACE_SLUG}")
         self.assertEqual(len(payload["items"]), 1)
-        self.assertEqual(payload["items"][0]["status"], "needs-review")
         self.assertEqual(payload["summary"]["query"], "")
 
     def test_${PY_SLUG}_query_filter_flow(self):
@@ -857,7 +1045,7 @@ class ${PASCAL_NAME}ApiFlowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["summary"]["query"], "follow")
-        self.assertEqual(payload["items"][0]["label"], "Follow-up backlog")
+        self.assertEqual(len(payload["items"]), 1)
 
 
 if __name__ == "__main__":
@@ -895,25 +1083,15 @@ ruby -e '
   import_line = "from app.routes.#{py_slug} import router as #{py_slug}_router\n"
   unless content.include?(import_line)
     route_imports = content.scan(/^from app\.routes\..+$/)
-    if route_imports.empty?
-      content << "\n#{import_line}"
-    else
-      last_import = route_imports.last
-      content = content.sub("#{last_import}\n", "#{last_import}\n#{import_line}")
-    end
+    last_import = route_imports.last
+    content = content.sub("#{last_import}\n", "#{last_import}\n#{import_line}")
   end
-
   include_line = "app.include_router(#{py_slug}_router)\n"
   unless content.include?(include_line)
     include_routes = content.scan(/^app\.include_router\(.+\)$/)
-    if include_routes.empty?
-      content << "\n#{include_line}"
-    else
-      last_include = include_routes.last
-      content = content.sub("#{last_include}\n", "#{last_include}\n#{include_line}")
-    end
+    last_include = include_routes.last
+    content = content.sub("#{last_include}\n", "#{last_include}\n#{include_line}")
   end
-
   File.write(file, content)
 ' "$backend_main_path" "$PY_SLUG"
 
@@ -921,6 +1099,7 @@ cat <<EOF
 [scaffold-deploymate-surface] surface: $SURFACE_NAME
 [scaffold-deploymate-surface] slug: $SURFACE_SLUG
 [scaffold-deploymate-surface] api prefix: $API_PREFIX
+[scaffold-deploymate-surface] preset: $PRESET
 [scaffold-deploymate-surface] frontend options:
   - saved views: $WITH_SAVED_VIEWS
   - audit: $WITH_AUDIT
@@ -934,10 +1113,9 @@ cat <<EOF
   - ${backend_main_path#$TARGET_DIR/}
   - ${backend_schemas_path#$TARGET_DIR/}
 [scaffold-deploymate-surface] next useful steps:
-  - replace the sample queue with a real backend payload
+  - replace the preset samples with the first real backend payload
   - trim secondary sections that do not help the first real workflow
   - wire one real action before adding more controls
   - run make backend
   - run make frontend-hot
-  - open a PR once the first real slice works end to end
 EOF
