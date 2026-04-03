@@ -351,6 +351,8 @@ export default function DeploymentDetailsPage({ params }) {
   const [envExpanded, setEnvExpanded] = useState(false);
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
+  const [deleteReviewOpen, setDeleteReviewOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [activityQuery, setActivityQuery] = useState("");
   const [activityLevelFilter, setActivityLevelFilter] = useState("all");
   const [activitySort, setActivitySort] = useState("newest");
@@ -425,6 +427,16 @@ export default function DeploymentDetailsPage({ params }) {
 
       return rightTime - leftTime;
     });
+  const deleteConfirmationTarget = deployment?.container_name || deployment?.id || "";
+  const deleteImpactSummary = deployment
+    ? [
+        `Deployment record: ${deployment.id}`,
+        `Container: ${deployment.container_name || "N/A"}`,
+        `Target: ${diagnostics?.server_target || (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")}`,
+        deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
+        "This action tries to remove the running container and then deletes the saved deployment record.",
+      ].join("\n")
+    : "";
   const detailPriority =
     attentionItems[0]?.message ||
     (deployment?.status === "failed"
@@ -903,11 +915,7 @@ export default function DeploymentDetailsPage({ params }) {
   }
 
   async function handleDelete() {
-    const confirmed = window.confirm(
-      "Delete this deployment? This will also try to remove its Docker container.",
-    );
-
-    if (!confirmed) {
+    if (!deleteConfirmationTarget || deleteConfirmationText.trim() !== deleteConfirmationTarget) {
       return;
     }
 
@@ -920,6 +928,8 @@ export default function DeploymentDetailsPage({ params }) {
         credentials: "include",
       });
       await readJsonOrError(response, "Failed to delete deployment.");
+      setDeleteReviewOpen(false);
+      setDeleteConfirmationText("");
       router.push("/app");
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -1419,12 +1429,55 @@ export default function DeploymentDetailsPage({ params }) {
                 <button
                   type="button"
                   className="dangerButton"
-                  onClick={handleDelete}
+                  onClick={() => setDeleteReviewOpen((current) => !current)}
                   disabled={deleting}
+                  data-testid="runtime-detail-delete-review-button"
                 >
-                  {deleting ? "Deleting..." : "Delete deployment"}
+                  {deleteReviewOpen ? "Hide delete review" : "Review delete"}
                 </button>
               </div>
+              {deleteReviewOpen ? (
+                <div className="stackedValue" data-testid="runtime-detail-delete-review-panel">
+                  <div className="banner error">
+                    This is destructive. Type <strong>{deleteConfirmationTarget}</strong> to confirm deletion.
+                  </div>
+                  <pre className="logs expandedBlock" data-testid="runtime-detail-delete-impact-summary">
+                    {deleteImpactSummary}
+                  </pre>
+                  <label className="field">
+                    <span>Type the deployment name to confirm</span>
+                    <input
+                      value={deleteConfirmationText}
+                      onChange={(event) => setDeleteConfirmationText(event.target.value)}
+                      placeholder={deleteConfirmationTarget}
+                      data-testid="runtime-detail-delete-confirmation-input"
+                    />
+                  </label>
+                  <div className="actionCluster">
+                    <button
+                      type="button"
+                      className="dangerButton"
+                      onClick={handleDelete}
+                      disabled={deleting || deleteConfirmationText.trim() !== deleteConfirmationTarget}
+                      data-testid="runtime-detail-delete-confirm-button"
+                    >
+                      {deleting ? "Deleting..." : "Delete deployment now"}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => {
+                        setDeleteReviewOpen(false);
+                        setDeleteConfirmationText("");
+                      }}
+                      disabled={deleting}
+                      data-testid="runtime-detail-delete-cancel-button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="row">
                 <span className="label">Status</span>
                 <span className={`status ${deployment.status || "unknown"}`}>
