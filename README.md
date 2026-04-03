@@ -199,6 +199,31 @@ For the public release framing, see [docs/releases/v0.1.0.md](docs/releases/v0.1
 - `deploy/` production reverse-proxy config
 - `docker-compose.prod.yml` production stack definition
 
+## Fast Local Commands
+
+For daily coding, the shortest useful local checks are now:
+
+```bash
+make changed
+make frontend
+make backend
+make fast
+```
+
+What they do:
+
+- `make changed` detects the changed release surface from the local diff and runs only the lightweight matching gate
+- `make frontend` runs the fast frontend gate
+- `make backend` runs the fast backend gate
+- `make fast` runs the fast full gate
+- `make full` still runs the heavier full local release workflow
+
+The fast gate intentionally uses fewer resources:
+
+- frontend: auth, ops, and runtime smoke only
+- backend: focused safety suite instead of full test discovery
+- preflight: skips the production frontend build in fast mode
+
 ## Key Screens In The App
 
 - `/app` operations dashboard

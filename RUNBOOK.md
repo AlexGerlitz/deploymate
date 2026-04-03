@@ -28,10 +28,34 @@ Before any release from the workstation:
 ./scripts/preflight.sh
 ```
 
+For the fastest local loop, use the new lightweight commands:
+
+```bash
+make changed
+make frontend
+make backend
+make fast
+```
+
+These commands:
+
+1. detect the changed release surface locally when needed
+2. run the smaller `--fast` local gate instead of the full release gate
+3. skip the production frontend build in preflight fast mode
+4. keep backend verification on a focused safety suite unless you explicitly ask for the full gate
+
 Or run the broader local release gate:
 
 ```bash
 bash scripts/release_workflow.sh --surface full
+```
+
+Fast mode is also available directly:
+
+```bash
+bash scripts/release_workflow.sh --surface frontend --fast
+bash scripts/release_workflow.sh --surface backend --fast
+bash scripts/release_workflow.sh --surface full --fast
 ```
 
 For template-heavy frontend changes, also run:

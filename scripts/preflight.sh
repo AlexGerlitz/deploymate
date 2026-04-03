@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SURFACE="full"
+FAST_MODE=0
 
 clean_frontend_build_artifacts() {
   if [ -d "frontend/.next" ]; then
@@ -15,7 +16,7 @@ clean_frontend_build_artifacts() {
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/preflight.sh [--surface frontend|backend|full]
+  bash scripts/preflight.sh [--surface frontend|backend|full] [--fast]
 EOF
 }
 
@@ -24,6 +25,10 @@ while [ "$#" -gt 0 ]; do
     --surface)
       SURFACE="${2:-}"
       shift 2
+      ;;
+    --fast)
+      FAST_MODE=1
+      shift
       ;;
     -h|--help)
       usage
@@ -51,13 +56,18 @@ cd "$ROOT_DIR"
 
 echo "[preflight] repo: $ROOT_DIR"
 echo "[preflight] surface: $SURFACE"
+echo "[preflight] fast mode: $FAST_MODE"
 echo "[preflight] git status"
 git status --short
 
 if [ -f "frontend/package.json" ] && { [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; }; then
-  clean_frontend_build_artifacts
-  echo "[preflight] frontend build"
-  npm --prefix frontend run build
+  if [ "$FAST_MODE" = "1" ]; then
+    echo "[preflight] frontend build skipped in fast mode"
+  else
+    clean_frontend_build_artifacts
+    echo "[preflight] frontend build"
+    npm --prefix frontend run build
+  fi
 fi
 
 if [ -d "backend/app" ] && { [ "$SURFACE" = "backend" ] || [ "$SURFACE" = "full" ]; }; then
