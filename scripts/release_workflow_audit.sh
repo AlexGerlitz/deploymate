@@ -11,7 +11,7 @@ RUNBOOK_FILE="RUNBOOK.md"
 
 extract_workflow_secrets() {
   local file="$1"
-  rg -o 'secrets\.[A-Z0-9_]+' "$file" \
+  grep -oE 'secrets\.[A-Z0-9_]+' "$file" \
     | sed 's/^secrets\.//' \
     | sort -u
 }

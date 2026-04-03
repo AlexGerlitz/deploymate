@@ -5,6 +5,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if command -v rg >/dev/null 2>&1; then
+  SEARCH_CMD=(rg -n)
+else
+  SEARCH_CMD=(grep -nE)
+fi
+
 fail() {
   echo "[runtime-capability-audit] fail: $1" >&2
   exit 1
@@ -25,23 +31,23 @@ read_env_value() {
 
 echo "[runtime-capability-audit] checking production defaults"
 
-if ! rg -n 'ARG NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0' frontend/Dockerfile >/dev/null; then
+if ! "${SEARCH_CMD[@]}" 'ARG NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0' frontend/Dockerfile >/dev/null; then
   fail "frontend/Dockerfile does not default NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED to 0"
 fi
 
-if ! rg -n 'DEPLOYMATE_LOCAL_DOCKER_ENABLED: \$\{DEPLOYMATE_LOCAL_DOCKER_ENABLED:-false\}' docker-compose.prod.yml >/dev/null; then
+if ! "${SEARCH_CMD[@]}" 'DEPLOYMATE_LOCAL_DOCKER_ENABLED: \$\{DEPLOYMATE_LOCAL_DOCKER_ENABLED:-false\}' docker-compose.prod.yml >/dev/null; then
   fail "docker-compose.prod.yml does not default DEPLOYMATE_LOCAL_DOCKER_ENABLED to false"
 fi
 
-if ! rg -n 'NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED: \$\{NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED:-0\}' docker-compose.prod.yml >/dev/null; then
+if ! "${SEARCH_CMD[@]}" 'NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED: \$\{NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED:-0\}' docker-compose.prod.yml >/dev/null; then
   fail "docker-compose.prod.yml does not default NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED to 0"
 fi
 
-if ! rg -n '^DEPLOYMATE_LOCAL_DOCKER_ENABLED=false$' .env.production.example >/dev/null; then
+if ! "${SEARCH_CMD[@]}" '^DEPLOYMATE_LOCAL_DOCKER_ENABLED=false$' .env.production.example >/dev/null; then
   fail ".env.production.example does not keep DEPLOYMATE_LOCAL_DOCKER_ENABLED=false"
 fi
 
-if ! rg -n '^NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0$' .env.production.example >/dev/null; then
+if ! "${SEARCH_CMD[@]}" '^NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0$' .env.production.example >/dev/null; then
   fail ".env.production.example does not keep NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0"
 fi
 

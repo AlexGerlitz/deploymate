@@ -5,6 +5,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if command -v rg >/dev/null 2>&1; then
+  SEARCH_CMD=(rg -n -S)
+else
+  SEARCH_CMD=(grep -nE)
+fi
+
 TMP_FILE="$(mktemp)"
 cleanup() {
   rm -f "$TMP_FILE"
@@ -37,7 +43,7 @@ done
 
 echo "[security-audit] scanning tracked files for high-signal secret patterns"
 
-if rg -n -S \
+if "${SEARCH_CMD[@]}" \
   -e 'gh[opusr]_[A-Za-z0-9_]+' \
   -e 'github_pat_[A-Za-z0-9_]+' \
   -e 'AKIA[0-9A-Z]{16}' \
@@ -68,13 +74,13 @@ for file in "${FILTERED_FILES[@]}"; do
   esac
 done
 
-if rg -n -S 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
+if "${SEARCH_CMD[@]}" 'StrictHostKeyChecking=no' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
   echo "[security-audit] warning: StrictHostKeyChecking=no found"
   cat "$TMP_FILE"
   WARNINGS=1
 fi
 
-if rg -n -S '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
+if "${SEARCH_CMD[@]}" '/var/run/docker.sock' -- "${RUNTIME_FILES[@]}" >"$TMP_FILE"; then
   echo "[security-audit] warning: docker.sock reference found"
   cat "$TMP_FILE"
   WARNINGS=1
