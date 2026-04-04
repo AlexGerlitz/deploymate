@@ -352,6 +352,31 @@ def _build_restore_import_plan(report: RestoreDryRunResponse) -> RestoreImportPl
     approval_next_step = (
         "Send the approval packet to the reviewer or approver, then keep work at the review/preparation boundary until a separate controlled restore flow exists."
     )
+    if blocked_sections:
+        preparation_status = "preparation_blocked"
+    elif review_sections:
+        preparation_status = "preparation_review_required"
+    else:
+        preparation_status = "preparation_ready"
+    preparation_packet_title = f"Controlled preparation handoff for {report.manifest.bundle_name}"
+    preparation_share_summary = (
+        f"Preparation scope for {report.manifest.bundle_name}: "
+        f"prepare {len(included_sections)}, review {len(review_sections)}, blocked {len(blocked_sections)}, exclude {len(excluded_sections)}."
+    )
+    preparation_summary = (
+        "Controlled preparation can document included sections, keep review sections under manual review, and leave blocked sections outside any preparation scope."
+    )
+    preparation_checklist = [
+        "Preparation work only covers documented scope and does not authorize execution.",
+        "Review-required sections stay under manual review until their warnings are resolved.",
+        "Blocked sections stay outside preparation and must be revalidated in a future dry-run.",
+    ]
+    preparation_handoff_note = (
+        "Use this handoff when the next person needs to prepare documentation, sequence review work, or line up prerequisites without moving into live restore apply."
+    )
+    preparation_next_step = (
+        "Document the included scope, assign review work for review-required sections, and keep blocked sections out of the preparation path until the next dry-run clears them."
+    )
     reviewer_guidance = (
         "This plan is for operator review only. It narrows future import scope without authorizing any live restore apply."
     )
@@ -387,6 +412,13 @@ def _build_restore_import_plan(report: RestoreDryRunResponse) -> RestoreImportPl
             approval_checklist=approval_checklist,
             approval_handoff_note=approval_handoff_note,
             approval_next_step=approval_next_step,
+            preparation_status=preparation_status,
+            preparation_packet_title=preparation_packet_title,
+            preparation_share_summary=preparation_share_summary,
+            preparation_summary=preparation_summary,
+            preparation_checklist=preparation_checklist,
+            preparation_handoff_note=preparation_handoff_note,
+            preparation_next_step=preparation_next_step,
         ),
         sections=sections,
     )

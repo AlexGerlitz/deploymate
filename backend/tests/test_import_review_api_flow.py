@@ -149,6 +149,16 @@ class ImportReviewApiFlowTests(unittest.TestCase):
                     ],
                     "approval_handoff_note": "Use this packet to hand off a review decision, not an execution decision.",
                     "approval_next_step": "Send the approval packet to the reviewer or approver, then keep work at the review/preparation boundary until a separate controlled restore flow exists.",
+                    "preparation_status": "preparation_blocked",
+                    "preparation_packet_title": "Controlled preparation handoff for deploymate-backup-live",
+                    "preparation_share_summary": "Preparation scope for deploymate-backup-live: prepare 0, review 1, blocked 1, exclude 1.",
+                    "preparation_summary": "Controlled preparation can document included sections, keep review sections under manual review, and leave blocked sections outside any preparation scope.",
+                    "preparation_checklist": [
+                        "Preparation work only covers documented scope and does not authorize execution.",
+                        "Review-required sections stay under manual review until their warnings are resolved.",
+                    ],
+                    "preparation_handoff_note": "Use this handoff when the next person needs to prepare documentation, sequence review work, or line up prerequisites without moving into live restore apply.",
+                    "preparation_next_step": "Document the included scope, assign review work for review-required sections, and keep blocked sections out of the preparation path until the next dry-run clears them.",
                     "plan_scope_summary": "Controlled import scope: hold users for review; block deployments",
                     "reviewer_guidance": "Review only. No live apply is authorized.",
                     "typed_confirmation_phrase": "review import plan deploymate-backup-live",
@@ -193,6 +203,8 @@ class ImportReviewApiFlowTests(unittest.TestCase):
         self.assertEqual(payload["import_plan"]["summary"]["approval_status"], "approval_blocked")
         self.assertIn("approval", payload["import_plan"]["summary"]["approval_packet_title"].lower())
         self.assertIn("deploymate-backup-live", payload["import_plan"]["summary"]["approval_subject_line"])
+        self.assertEqual(payload["import_plan"]["summary"]["preparation_status"], "preparation_blocked")
+        self.assertIn("preparation", payload["import_plan"]["summary"]["preparation_packet_title"].lower())
         self.assertEqual(payload["import_plan"]["sections"][0]["plan_state"], "review")
 
 

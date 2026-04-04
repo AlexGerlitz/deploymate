@@ -183,3 +183,72 @@ export function buildImportReviewApprovalTrail(workspace) {
     excluded_sections: workspace.import_plan.summary.excluded_sections || [],
   };
 }
+
+export function buildImportReviewPreparationPacket(workspace) {
+  if (!workspace) {
+    return "";
+  }
+
+  const lines = [
+    "# Controlled Preparation Handoff",
+    "",
+    workspace.import_plan.summary.preparation_packet_title || `Controlled preparation handoff for ${workspace.bundle_manifest.bundle_name}`,
+    "",
+    `Bundle: ${workspace.bundle_manifest.bundle_name}`,
+    `Plan ID: ${workspace.import_plan.summary.plan_id}`,
+    `Preparation status: ${workspace.import_plan.summary.preparation_status}`,
+    "",
+    "## Share Summary",
+    "",
+    workspace.import_plan.summary.preparation_share_summary || "No preparation share summary available.",
+    "",
+    "## Summary",
+    "",
+    workspace.import_plan.summary.preparation_summary || "No preparation summary available.",
+    "",
+    "## Handoff Note",
+    "",
+    workspace.import_plan.summary.preparation_handoff_note || "No preparation handoff note available.",
+    "",
+    "## Checklist",
+    "",
+  ];
+
+  if (!(workspace.import_plan.summary.preparation_checklist || []).length) {
+    lines.push("- No preparation checklist items available.");
+  } else {
+    for (const item of workspace.import_plan.summary.preparation_checklist) {
+      lines.push(`- ${item}`);
+    }
+  }
+
+  lines.push("", "## Scope", "", workspace.import_plan.summary.plan_scope_summary || "No scope summary available.");
+  lines.push("", "## Next Step", "", workspace.import_plan.summary.preparation_next_step || "No preparation next step available.");
+
+  return lines.join("\n");
+}
+
+export function buildImportReviewPreparationTrail(workspace) {
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    generated_at: workspace.generated_at,
+    bundle_name: workspace.bundle_manifest.bundle_name,
+    plan_id: workspace.import_plan.summary.plan_id,
+    preparation_status: workspace.import_plan.summary.preparation_status,
+    preparation_packet_title: workspace.import_plan.summary.preparation_packet_title,
+    preparation_share_summary: workspace.import_plan.summary.preparation_share_summary,
+    preparation_summary: workspace.import_plan.summary.preparation_summary,
+    preparation_handoff_note: workspace.import_plan.summary.preparation_handoff_note,
+    preparation_next_step: workspace.import_plan.summary.preparation_next_step,
+    preparation_checklist: workspace.import_plan.summary.preparation_checklist || [],
+    plan_scope_summary: workspace.import_plan.summary.plan_scope_summary,
+    reviewer_guidance: workspace.import_plan.summary.reviewer_guidance,
+    included_sections: workspace.import_plan.summary.included_sections || [],
+    review_sections: workspace.import_plan.summary.review_sections || [],
+    blocked_sections: workspace.import_plan.summary.blocked_sections || [],
+    excluded_sections: workspace.import_plan.summary.excluded_sections || [],
+  };
+}

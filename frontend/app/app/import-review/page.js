@@ -15,6 +15,8 @@ import {
   buildImportReviewApprovalTrail,
   buildImportReviewCsv,
   buildImportReviewMarkdown,
+  buildImportReviewPreparationPacket,
+  buildImportReviewPreparationTrail,
   importReviewHandoffStorageKey,
 } from "../../lib/import-review-feature-pack";
 
@@ -198,6 +200,29 @@ function ImportReviewPageContent() {
     setSuccess("Approval trail JSON downloaded.");
   }
 
+  function handleDownloadPreparationPacket() {
+    if (!workspace) {
+      return;
+    }
+    const blob = new Blob([buildImportReviewPreparationPacket(workspace)], {
+      type: "text/markdown;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-import-review-preparation-packet.md", blob);
+    setSuccess("Preparation packet markdown downloaded.");
+  }
+
+  function handleDownloadPreparationTrailJson() {
+    if (!workspace) {
+      return;
+    }
+    const trail = buildImportReviewPreparationTrail(workspace);
+    const blob = new Blob([JSON.stringify(trail, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-import-review-preparation-trail.json", blob);
+    setSuccess("Preparation trail JSON downloaded.");
+  }
+
   async function handleCopyApprovalQuestion() {
     if (!workspace) {
       return;
@@ -222,6 +247,23 @@ function ImportReviewPageContent() {
         .join("\n"),
     );
     setSuccess("Approval handoff summary copied.");
+  }
+
+  async function handleCopyPreparationSummary() {
+    if (!workspace) {
+      return;
+    }
+    await copyTextToClipboard(
+      [
+        workspace.import_plan.summary.preparation_packet_title,
+        workspace.import_plan.summary.preparation_share_summary,
+        workspace.import_plan.summary.preparation_summary,
+        `Next step: ${workspace.import_plan.summary.preparation_next_step}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+    setSuccess("Preparation handoff summary copied.");
   }
 
   async function handleCopyConfirmation() {
@@ -283,6 +325,12 @@ function ImportReviewPageContent() {
             label: "Approval trail JSON",
             testId: "import-review-approval-trail-button",
             onClick: handleDownloadApprovalTrailJson,
+            disabled: !workspace,
+          },
+          {
+            label: "Preparation packet",
+            testId: "import-review-preparation-packet-button",
+            onClick: handleDownloadPreparationPacket,
             disabled: !workspace,
           },
         ]}
@@ -550,6 +598,75 @@ function ImportReviewPageContent() {
                 onClick={handleCopyApprovalSummary}
               >
                 Copy handoff summary
+              </button>
+            </div>
+          </article>
+
+          <article className="card compactCard" data-testid="import-review-preparation-card">
+            <div className="sectionHeader">
+              <div>
+                <h3 data-testid="import-review-preparation-title">Controlled preparation handoff</h3>
+                <p className="formHint">
+                  Use this packet for the next safe stage: documenting scope, sequencing review work, and lining up prerequisites without crossing into live apply.
+                </p>
+              </div>
+            </div>
+            <div className="row">
+              <span className="label">Preparation status</span>
+              <span data-testid="import-review-preparation-status">{workspace.import_plan.summary.preparation_status}</span>
+            </div>
+            <div className="row">
+              <span className="label">Packet title</span>
+              <span data-testid="import-review-preparation-packet-title">{workspace.import_plan.summary.preparation_packet_title}</span>
+            </div>
+            <div className="row">
+              <span className="label">Share summary</span>
+              <span data-testid="import-review-preparation-share-summary">{workspace.import_plan.summary.preparation_share_summary}</span>
+            </div>
+            <div className="row">
+              <span className="label">Preparation summary</span>
+              <span data-testid="import-review-preparation-summary">{workspace.import_plan.summary.preparation_summary}</span>
+            </div>
+            <div className="backupIssueList" data-testid="import-review-preparation-checklist">
+              {(workspace.import_plan.summary.preparation_checklist || []).map((item, index) => (
+                <div className="row" key={`preparation-item-${index}`}>
+                  <span className="label">Check</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+            <div className="row">
+              <span className="label">Handoff note</span>
+              <span data-testid="import-review-preparation-handoff-note">{workspace.import_plan.summary.preparation_handoff_note}</span>
+            </div>
+            <div className="row">
+              <span className="label">Next step</span>
+              <span data-testid="import-review-preparation-next-step">{workspace.import_plan.summary.preparation_next_step}</span>
+            </div>
+            <div className="actionCluster">
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="import-review-preparation-download-button"
+                onClick={handleDownloadPreparationPacket}
+              >
+                Download preparation packet
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="import-review-preparation-trail-download-button"
+                onClick={handleDownloadPreparationTrailJson}
+              >
+                Download preparation trail JSON
+              </button>
+              <button
+                type="button"
+                className="softButton"
+                data-testid="import-review-preparation-copy-summary-button"
+                onClick={handleCopyPreparationSummary}
+              >
+                Copy preparation summary
               </button>
             </div>
           </article>

@@ -494,6 +494,13 @@ class RestoreImportPlanSummary(BaseModel):
     approval_checklist: list[str] = Field(default_factory=list)
     approval_handoff_note: str = ""
     approval_next_step: str = ""
+    preparation_status: Literal["preparation_ready", "preparation_review_required", "preparation_blocked"] = "preparation_review_required"
+    preparation_packet_title: str = ""
+    preparation_share_summary: str = ""
+    preparation_summary: str = ""
+    preparation_checklist: list[str] = Field(default_factory=list)
+    preparation_handoff_note: str = ""
+    preparation_next_step: str = ""
 
 
 class RestoreImportPlanResponse(BaseModel):
