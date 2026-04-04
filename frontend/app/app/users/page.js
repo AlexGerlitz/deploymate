@@ -216,6 +216,38 @@ function UsersPageContent() {
     : [];
   const restorePreparationMarkdown = buildRestorePreparationMarkdown(restoreDryRun);
   const restoreImportPlanMarkdown = buildRestoreImportPlanMarkdown(restoreImportPlan);
+  const visibleAdminsCount = filteredUsers.filter((user) => user.role === "admin").length;
+  const visibleSecurityFollowUpCount = filteredUsers.filter((user) => user.must_change_password).length;
+  const accessFocusLabel =
+    visibleSecurityFollowUpCount > 0
+      ? "Security follow-up users need attention"
+      : visibleAdminsCount > 0
+        ? "Admin access is the active review slice"
+        : filteredUsers.length > 0
+          ? "Member access is the active review slice"
+          : "No clear team-access focus yet";
+  const accessNextStep =
+    visibleSecurityFollowUpCount > 0
+      ? "Start with users who still need a password change, then review admin access and only after that create new accounts."
+      : visibleAdminsCount > 0
+        ? "Review the visible admin accounts first, then move through the remaining team-access changes on screen."
+        : filteredUsers.length > 0
+          ? "Review the visible teammate access slice first, then create or bulk-update accounts only after the list looks right."
+          : "Adjust the filters until this page shows the access slice you actually want to review next.";
+  const recoveryFocusLabel = restoreImportPlan
+    ? "Controlled import plan is ready for dedicated review"
+    : restoreDryRun
+      ? "Dry-run already shows the current recovery state"
+      : bundleAnalysis.status === "ready"
+        ? "Bundle is loaded and ready for validation"
+        : "Recovery path is waiting for a bundle";
+  const recoveryNextStep = restoreImportPlan
+    ? "Open import review workspace for this exact bundle and continue the controlled recovery path there."
+    : restoreDryRun
+      ? restoreDryRun.summary.next_step
+      : bundleAnalysis.status === "ready"
+        ? "Validate the loaded bundle first, then build the controlled import plan if the dry-run is usable."
+        : "Export or load a bundle first, then run restore validation before using any recovery handoff tools.";
   const primaryFilterDefinitions = [
     createTextFilterDefinition({
       key: "q",
@@ -1251,12 +1283,13 @@ function UsersPageContent() {
           onRefresh={refreshPageData}
           refreshTestId="users-refresh-button"
           primaryAction={{
-            label: "Create user",
+            label: "Review team access",
             testId: "users-primary-action-button",
-            onClick: () => scrollToElement("users-create-user-card"),
+            onClick: () => scrollToElement("users-current-review-slice"),
             disabled: false,
           }}
           actions={[
+            { label: "Recovery path", testId: "users-recovery-path-button", onClick: () => scrollToElement("users-recovery-path-card") },
             { label: "Copy link", testId: "users-copy-link-button", onClick: handleCopyCurrentView },
             { label: "Export CSV", testId: "users-export-button", onClick: handleDownloadUsersExport },
             { label: "Audit CSV", testId: "users-audit-export-button", onClick: handleDownloadAuditExport },
@@ -1324,10 +1357,101 @@ function UsersPageContent() {
           </article>
         ) : null}
 
+        <article className="card formCard" data-testid="users-main-next-step-card">
+          <div className="sectionHeader">
+            <div>
+              <h2 data-testid="users-main-next-step-title">Main next step</h2>
+              <p className="formHint">
+                Work the visible team-access slice first. Creation, bulk tools, audit, and recovery stay secondary until the current access review is clear.
+              </p>
+            </div>
+          </div>
+          <div className="row">
+            <span className="label">Current focus</span>
+            <span data-testid="users-main-next-step-focus">{accessFocusLabel}</span>
+          </div>
+          <div className="row">
+            <span className="label">What to do</span>
+            <span data-testid="users-main-next-step-copy">{accessNextStep}</span>
+          </div>
+          <div className="backupSummaryBadges">
+            <span className="status info">visible {filteredUsers.length}</span>
+            <span className="status unknown">admins {visibleAdminsCount}</span>
+            <span className="status warn">security follow-up {visibleSecurityFollowUpCount}</span>
+          </div>
+          <div className="actionCluster">
+            <button
+              type="button"
+              className="landingButton primaryButton"
+              data-testid="users-main-next-step-button"
+              onClick={() => scrollToElement("users-current-review-slice")}
+            >
+              Open current review slice
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="users-main-next-step-copy-button"
+              onClick={() => copyTextToClipboard(accessNextStep).then(() => setSuccess("Team-access next-step summary copied."))}
+            >
+              Copy next step
+            </button>
+          </div>
+        </article>
+
+        <article id="users-recovery-path-card" className="card formCard" data-testid="users-recovery-path-card">
+          <div className="sectionHeader">
+            <div>
+              <h2 data-testid="users-recovery-path-title">Recovery path</h2>
+              <p className="formHint">
+                Keep backup validation and restore review visible as a separate path. Use it only when you are doing recovery work, not while reviewing normal team access.
+              </p>
+            </div>
+          </div>
+          <div className="row">
+            <span className="label">Current focus</span>
+            <span data-testid="users-recovery-path-focus">{recoveryFocusLabel}</span>
+          </div>
+          <div className="row">
+            <span className="label">What to do</span>
+            <span data-testid="users-recovery-path-copy">{recoveryNextStep}</span>
+          </div>
+          <div className="actionCluster">
+            {restoreImportPlan ? (
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="users-recovery-open-import-review-button"
+                onClick={handleOpenImportReviewWorkspace}
+              >
+                Open import review workspace
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="users-recovery-open-advanced-button"
+                onClick={() => scrollToElement("users-advanced-tools-section")}
+              >
+                Open recovery tools
+              </button>
+            )}
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="users-recovery-copy-button"
+              onClick={() => copyTextToClipboard(recoveryNextStep).then(() => setSuccess("Recovery next-step summary copied."))}
+            >
+              Copy recovery next step
+            </button>
+          </div>
+        </article>
+
         <AdminDisclosureSection
           title="Advanced audit and recovery"
           subtitle="Open this when review needs an audit trail, export artifact, or restore validation."
           badge={`${visibleAuditEvents.length} activity`}
+          sectionId="users-advanced-tools-section"
           testId="users-advanced-tools"
         >
           <AdminAuditToolbar
@@ -1988,7 +2112,7 @@ function UsersPageContent() {
           />
         </article>
 
-        <article className="card formCard">
+        <article id="users-current-review-slice" className="card formCard">
           <div className="sectionHeader">
             <div>
               <h2>Current review slice</h2>
