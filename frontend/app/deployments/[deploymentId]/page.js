@@ -6,6 +6,18 @@ import { use, useEffect, useState } from "react";
 import { AdminDisclosureSection } from "../../app/admin-ui";
 import { escapeCsvCell, triggerFileDownload } from "../../lib/admin-page-utils";
 import {
+  buildDeploymentUrl,
+  buildEnvIssues,
+  buildReviewConfirmationPhrase,
+  buildReviewIntroText,
+  buildRolloutDraftSummary,
+  formatDate,
+  formatSuggestedPorts,
+  normalizeDeploymentActionError,
+  readJsonOrError,
+  rolloutReviewerCopy,
+} from "../../lib/runtime-workspace-utils";
+import {
   smokeActivity,
   smokeDeployment,
   smokeDiagnostics,
@@ -16,26 +28,6 @@ import {
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
-
-function formatDate(value) {
-  if (!value) {
-    return "N/A";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
-
-function buildDeploymentUrl(deployment) {
-  if (!deployment?.server_host || !deployment?.external_port) {
-    return "";
-  }
-  return `http://${deployment.server_host}:${deployment.external_port}`;
-}
 
 function buildAttentionItems(deployment, health, diagnostics) {
   const items = [];
@@ -277,50 +269,164 @@ function buildActivityExportCsv(items) {
     .join("\n");
 }
 
-function formatSuggestedPorts(ports) {
-  if (!Array.isArray(ports) || ports.length === 0) {
-    return "";
-  }
-  return ports.join(", ");
-}
-
 function normalizeRedeployError(message) {
   return normalizeDeploymentActionError(message, "Failed to redeploy deployment.");
 }
 
-function normalizeDeploymentActionError(message, fallbackMessage) {
-  if (!message) {
-    return fallbackMessage;
+function buildRedeployValidation(form, envRows) {
+  const errors = [];
+  const warnings = [];
+  const internalPort = form.internal_port.trim();
+  const externalPort = form.external_port.trim();
+  const envIssues = buildEnvIssues(envRows);
+
+  if (!form.image.trim()) {
+    errors.push("Image is required.");
   }
 
-  if (message.includes("Port ") && message.includes("is already in use on server")) {
-    return `${message} Use one of the suggested free ports for this server.`;
+  if ((internalPort && !externalPort) || (!internalPort && externalPort)) {
+    errors.push("Internal port and external port must be provided together.");
   }
 
-  if (message.includes("Container name ") && message.includes("is already in use on server")) {
-    return `${message} Choose another deployment name or keep the current one.`;
+  errors.push(...envIssues);
+
+  if (!externalPort && internalPort) {
+    warnings.push("This rollout draft still has no public port mapping.");
   }
 
-  return message;
+  return { errors, warnings };
 }
 
-async function readJsonOrError(response, fallbackMessage) {
-  const contentType = response.headers.get("content-type") || "";
-  const payload = contentType.includes("application/json")
-    ? await response.json()
-    : null;
-
-  if (!response.ok) {
-    const detail =
-      payload && typeof payload.detail === "string"
-        ? payload.detail
-        : fallbackMessage;
-    const error = new Error(detail);
-    error.status = response.status;
-    throw error;
+function buildRedeployChangeRows(deployment, form, envRows) {
+  if (!deployment) {
+    return [];
   }
 
-  return payload;
+  const nextEnv = JSON.stringify(
+    envRows.reduce((env, row) => {
+      const key = row.key.trim();
+      if (key) {
+        env[key] = row.value;
+      }
+      return env;
+    }, {}),
+    null,
+    2,
+  );
+  const currentEnv = JSON.stringify(deployment.env || {}, null, 2);
+  const rows = [
+    {
+      label: "Image",
+      currentValue: deployment.image || "N/A",
+      nextValue: form.image.trim() || "N/A",
+    },
+    {
+      label: "Container name",
+      currentValue: deployment.container_name || "Auto-generated",
+      nextValue: form.name.trim() || "Keep current / auto-generated",
+    },
+    {
+      label: "Ports",
+      currentValue: `${deployment.external_port || "-"}:${deployment.internal_port || "-"}`,
+      nextValue: `${form.external_port.trim() || "-"}:${form.internal_port.trim() || "-"}`,
+    },
+    {
+      label: "Env",
+      currentValue: currentEnv === "{}" ? "No env vars" : currentEnv,
+      nextValue: nextEnv === "{}" ? "No env vars" : nextEnv,
+    },
+  ];
+
+  return rows.filter((row) => row.currentValue !== row.nextValue);
+}
+
+function buildRedeployImpactSummary({
+  deployment,
+  diagnostics,
+  deploymentUrl,
+  changeRows,
+}) {
+  if (!deployment) {
+    return "";
+  }
+
+  const lines = [
+    `Deployment record: ${deployment.id}`,
+    `Current container: ${deployment.container_name || "N/A"}`,
+    `Current status: ${deployment.status || "unknown"}`,
+    `Target: ${
+      diagnostics?.server_target ||
+      (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
+    }`,
+    deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
+    "",
+    "This action will ask DeployMate to redeploy this runtime with the draft shown above.",
+  ];
+
+  if (changeRows.length === 0) {
+    lines.push("No config changes were detected. This will re-run the current rollout with the same visible settings.");
+  } else {
+    lines.push("", "Detected rollout changes:");
+    changeRows.forEach((row) => {
+      lines.push(`- ${row.label}`);
+      lines.push(`  current: ${row.currentValue}`);
+      lines.push(`  next: ${row.nextValue}`);
+    });
+  }
+
+  return lines.join("\n");
+}
+
+function buildDetailIntent(deployment, health, diagnostics, attentionItems) {
+  if (deployment?.status === "failed") {
+    return {
+      key: "stabilize",
+      title: "Stabilize this rollout first",
+      detail:
+        "The current deployment is already failed, so the first job is understanding the failure and deciding whether a redeploy is actually safe.",
+      primaryHref: "#runtime-detail-main-next-step",
+      primaryAction: "Review main next step",
+      secondaryHref: "#runtime-detail-activity-tools",
+      secondaryAction: "Open activity and diagnostics",
+    };
+  }
+
+  if (health?.status && health.status !== "healthy") {
+    return {
+      key: "health-review",
+      title: "Review runtime health before changing anything",
+      detail:
+        "Health is degraded, so this page should act as a runtime review surface first and only become a rollout-change surface after the issue is understood.",
+      primaryHref: "#runtime-detail-main-next-step",
+      primaryAction: "Review main next step",
+      secondaryHref: "#runtime-detail-activity-tools",
+      secondaryAction: "Open deeper runtime tools",
+    };
+  }
+
+  if (diagnostics?.activity?.recent_failure_count > 0 || attentionItems.length > 0) {
+    return {
+      key: "attention-review",
+      title: "Clear the runtime warnings first",
+      detail:
+        "This rollout is not fully clean yet, so review the highlighted warnings and only prepare the next change after the current state is believable.",
+      primaryHref: "#runtime-detail-main-next-step",
+      primaryAction: "Review main next step",
+      secondaryHref: "#runtime-detail-redeploy",
+      secondaryAction: "Open redeploy draft",
+    };
+  }
+
+  return {
+    key: "steady-state",
+    title: "This rollout looks stable",
+    detail:
+      "Use this screen to preserve the current state, save a reusable template, or prepare a deliberate redeploy without mixing those actions into incident work.",
+    primaryHref: "#runtime-detail-redeploy",
+    primaryAction: "Prepare rollout change",
+    secondaryHref: "#runtime-detail-handoff-tools",
+    secondaryAction: "Open handoff and template tools",
+  };
 }
 
 export default function DeploymentDetailsPage({ params }) {
@@ -339,13 +445,17 @@ export default function DeploymentDetailsPage({ params }) {
   const [redeploying, setRedeploying] = useState(false);
   const [redeployError, setRedeployError] = useState("");
   const [redeploySuccess, setRedeploySuccess] = useState("");
+  const [redeployReviewOpen, setRedeployReviewOpen] = useState(false);
+  const [redeployConfirmationText, setRedeployConfirmationText] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateError, setTemplateError] = useState("");
   const [templateSuccess, setTemplateSuccess] = useState("");
+  const [savedTemplate, setSavedTemplate] = useState(null);
   const [copyMessage, setCopyMessage] = useState("");
   const [diagnosticsError, setDiagnosticsError] = useState("");
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState("overview");
   const [logsExpanded, setLogsExpanded] = useState(false);
   const [diagnosticsLogsExpanded, setDiagnosticsLogsExpanded] = useState(false);
   const [envExpanded, setEnvExpanded] = useState(false);
@@ -428,13 +538,18 @@ export default function DeploymentDetailsPage({ params }) {
       return rightTime - leftTime;
     });
   const deleteConfirmationTarget = deployment?.container_name || deployment?.id || "";
+  const deleteConfirmationPhrase = buildReviewConfirmationPhrase(
+    "delete",
+    deleteConfirmationTarget,
+  );
   const deleteImpactSummary = deployment
     ? [
         `Deployment record: ${deployment.id}`,
         `Container: ${deployment.container_name || "N/A"}`,
         `Target: ${diagnostics?.server_target || (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")}`,
         deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
-        "This action tries to remove the running container and then deletes the saved deployment record.",
+        "",
+        "This action will try to remove the running container and then delete the saved deployment record.",
       ].join("\n")
     : "";
   const detailPriority =
@@ -444,36 +559,18 @@ export default function DeploymentDetailsPage({ params }) {
       : health?.status && health.status !== "healthy"
         ? `Health is currently ${health.status}.`
         : "Runtime surface is stable enough for review.");
-  const detailGuideCards = [
-    {
-      step: "01",
-      title: "Review live state",
-      detail:
-        attentionItems.length > 0
-          ? `${attentionItems.length} runtime item${attentionItems.length === 1 ? "" : "s"} need review before the next change.`
-          : "Status, endpoint, and health are stable enough for a quick review.",
-      href: "#runtime-detail-overview",
-      actionLabel: "Check runtime state",
-    },
-    {
-      step: "02",
-      title: "Apply the next rollout change",
-      detail:
-        deployment?.status === "failed"
-          ? "Adjust image, ports, or env vars, then run a deliberate redeploy."
-          : "Use redeploy only when you are ready to change the current runtime.",
-      href: "#runtime-detail-redeploy",
-      actionLabel: "Open redeploy",
-    },
-    {
-      step: "03",
-      title: "Keep a reusable handoff",
-      detail:
-        "Save this setup as a template or open deeper runtime tools only when you need diagnostics, logs, or activity.",
-      href: "#runtime-detail-secondary-tools",
-      actionLabel: "Open tools",
-    },
-  ];
+  const recommendedNextStep = buildRecommendedNextStep(
+    deployment,
+    health,
+    diagnostics,
+    attentionItems,
+  );
+  const detailIntent = buildDetailIntent(
+    deployment,
+    health,
+    diagnostics,
+    attentionItems,
+  );
   const detailGlanceItems = [
     {
       label: "Endpoint",
@@ -502,6 +599,50 @@ export default function DeploymentDetailsPage({ params }) {
             ? "Redeploy deliberately"
             : "Keep current rollout stable",
       detail: detailPriority,
+    },
+  ];
+  const redeployPreflight = buildRedeployValidation(form, envRows);
+  const redeployChangeRows = buildRedeployChangeRows(deployment, form, envRows);
+  const redeployConfirmationTarget = deployment?.container_name || deployment?.id || "";
+  const redeployConfirmationPhrase = buildReviewConfirmationPhrase(
+    "redeploy",
+    redeployConfirmationTarget,
+  );
+  const redeployImpactSummary = buildRedeployImpactSummary({
+    deployment,
+    diagnostics,
+    deploymentUrl,
+    changeRows: redeployChangeRows,
+  });
+  const mainNextStepCards = [
+    {
+      key: "focus",
+      label: "Focus now",
+      title: detailIntent.title,
+      detail: detailIntent.detail,
+      href: detailIntent.primaryHref,
+      actionLabel: detailIntent.primaryAction,
+      primary: true,
+    },
+    {
+      key: "handoff",
+      label: "Explain it clearly",
+      title: "Create a teammate-ready runtime handoff",
+      detail:
+        "The plain-language summary and downloadable handoff packet stay ready when you need to explain the current state without making someone reconstruct it from raw logs.",
+      href: "#runtime-detail-handoff-tools",
+      actionLabel: "Open handoff tools",
+      primary: false,
+    },
+    {
+      key: "guardrails",
+      label: "Be careful",
+      title: "Keep destructive actions behind review",
+      detail:
+        "Delete is available here, but only after an explicit review step and typed confirmation so it cannot compete with the main runtime path.",
+      href: "#runtime-detail-delete-controls",
+      actionLabel: "Open delete review",
+      primary: false,
     },
   ];
 
@@ -862,9 +1003,29 @@ export default function DeploymentDetailsPage({ params }) {
 
   async function handleRedeploy(event) {
     event.preventDefault();
+    setRedeployError("");
+    setRedeploySuccess("");
+
+    if (redeployPreflight.errors.length > 0) {
+      setRedeployError(redeployPreflight.errors[0]);
+      return;
+    }
+
+    setRedeployReviewOpen(true);
+  }
+
+  async function handleRedeployConfirm() {
     setRedeploying(true);
     setRedeployError("");
     setRedeploySuccess("");
+
+    if (
+      !redeployConfirmationPhrase ||
+      redeployConfirmationText.trim() !== redeployConfirmationPhrase
+    ) {
+      setRedeploying(false);
+      return;
+    }
 
     const payload = {
       image: form.image,
@@ -897,6 +1058,8 @@ export default function DeploymentDetailsPage({ params }) {
       );
       await readJsonOrError(response, "Failed to redeploy deployment.");
       setRedeploySuccess("Deployment redeployed successfully.");
+      setRedeployReviewOpen(false);
+      setRedeployConfirmationText("");
       await loadDeploymentDetails();
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -915,7 +1078,7 @@ export default function DeploymentDetailsPage({ params }) {
   }
 
   async function handleDelete() {
-    if (!deleteConfirmationTarget || deleteConfirmationText.trim() !== deleteConfirmationTarget) {
+    if (!deleteConfirmationPhrase || deleteConfirmationText.trim() !== deleteConfirmationPhrase) {
       return;
     }
 
@@ -930,7 +1093,7 @@ export default function DeploymentDetailsPage({ params }) {
       await readJsonOrError(response, "Failed to delete deployment.");
       setDeleteReviewOpen(false);
       setDeleteConfirmationText("");
-      router.push("/app");
+      router.push("/app/deployment-workflow");
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
         router.replace("/login");
@@ -954,6 +1117,7 @@ export default function DeploymentDetailsPage({ params }) {
     setTemplateSaving(true);
     setTemplateError("");
     setTemplateSuccess("");
+    setSavedTemplate(null);
 
     try {
       const response = await fetch(`${apiBaseUrl}/deployment-templates`, {
@@ -964,7 +1128,11 @@ export default function DeploymentDetailsPage({ params }) {
         credentials: "include",
         body: JSON.stringify(buildTemplatePayload()),
       });
-      await readJsonOrError(response, "Failed to save deployment template.");
+      const savedTemplateResponse = await readJsonOrError(
+        response,
+        "Failed to save deployment template.",
+      );
+      setSavedTemplate(savedTemplateResponse);
       setTemplateName("");
       setTemplateSuccess("Deployment template saved.");
     } catch (requestError) {
@@ -1016,19 +1184,19 @@ export default function DeploymentDetailsPage({ params }) {
               <p>
                 {currentUser
                   ? `${deploymentId} · ${currentUser.username}. ${detailPriority}`
-                  : deploymentId}
+                  : rolloutReviewerCopy.detail.heroBody}
               </p>
             </div>
             <div className="buttonRow workspaceHeroActions" data-testid="runtime-detail-header-actions">
-              <Link href="/app" className="linkButton workspaceSecondaryAction">
-                Back
+              <Link href="/app/deployment-workflow" className="linkButton workspaceSecondaryAction">
+                Back to deployment workflow
               </Link>
               <Link
-                href="#runtime-detail-redeploy"
+                href={detailIntent.primaryHref}
                 className="landingButton primaryButton workspacePrimaryAction"
                 data-testid="runtime-detail-open-redeploy-button"
               >
-                Prepare rollout change
+                {detailIntent.primaryAction}
               </Link>
               {deploymentUrl ? (
                 <a
@@ -1076,7 +1244,7 @@ export default function DeploymentDetailsPage({ params }) {
             <div className="workspaceHeroBadge workspaceHeroSpotlight">
               <span>What matters now</span>
               <strong>{detailPriority}</strong>
-              <p>Use this page for redeploy, diagnostics, health review, logs, and incident handoff.</p>
+              <p>{rolloutReviewerCopy.detail.spotlightBody}</p>
             </div>
           </div>
         </section>
@@ -1097,35 +1265,61 @@ export default function DeploymentDetailsPage({ params }) {
           ) : null}
           {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
 
-          <article className="card formCard workspaceGuidePanel" data-testid="runtime-detail-guide-card">
+          <article
+            className="card formCard workspaceGuidePanel"
+            data-testid="runtime-detail-main-next-step-card"
+            id="runtime-detail-main-next-step"
+          >
             <div className="sectionHeader workspaceGuideHeader">
               <div>
-                <h2 data-testid="runtime-detail-guide-title">Use this runtime page in three moves</h2>
+                <h2 data-testid="runtime-detail-main-next-step-title">{rolloutReviewerCopy.detail.mainNextStepTitle}</h2>
                 <p className="formHint">
-                  Review the live state first, change the rollout deliberately, then open deeper tools only when incident or handoff work needs them.
+                  {rolloutReviewerCopy.detail.mainNextStepBody} Use the main action below, then open just one secondary layer if you still need more.
                 </p>
               </div>
             </div>
 
             <div className="workspaceGuideGrid">
-              <div className="stepsGrid workspaceGuideSteps">
-                {detailGuideCards.map((card) => (
-                  <article key={card.step} className="stepCard workspaceStepCard">
-                    <span className="stepNumber">{card.step}</span>
-                    <h3>{card.title}</h3>
-                    <p>{card.detail}</p>
-                    <Link
-                      href={card.href}
-                      className={
-                        card.actionLabel === "Open redeploy"
-                          ? "landingButton primaryButton"
-                          : "landingButton secondaryButton"
-                      }
+              <div className="workspaceReviewerGrid">
+                <article
+                  className="workspaceReviewerCard"
+                  data-testid={`runtime-detail-main-next-step-item-${mainNextStepCards[0].key}`}
+                >
+                  <span>{mainNextStepCards[0].label}</span>
+                  <strong>{mainNextStepCards[0].title}</strong>
+                  <p>{mainNextStepCards[0].detail}</p>
+                  <Link
+                    href={mainNextStepCards[0].href}
+                    className="landingButton primaryButton"
+                    data-testid={`runtime-detail-main-next-step-action-${mainNextStepCards[0].key}`}
+                  >
+                    {mainNextStepCards[0].actionLabel}
+                  </Link>
+                </article>
+                <div className="list compactList">
+                  {mainNextStepCards.slice(1).map((card) => (
+                    <article
+                      key={card.key}
+                      className="card compactCard"
+                      data-testid={`runtime-detail-main-next-step-item-${card.key}`}
                     >
-                      {card.actionLabel}
-                    </Link>
-                  </article>
-                ))}
+                      <div className="row">
+                        <span className="label">{card.label}</span>
+                        <span>{card.title}</span>
+                      </div>
+                      <p>{card.detail}</p>
+                      <div className="actions">
+                        <Link
+                          href={card.href}
+                          className="linkButton"
+                          data-testid={`runtime-detail-main-next-step-action-${card.key}`}
+                        >
+                          {card.actionLabel}
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               </div>
 
               <aside className="workspaceGlancePanel">
@@ -1144,6 +1338,19 @@ export default function DeploymentDetailsPage({ params }) {
                     </div>
                   ))}
                 </div>
+                <div className="overviewAttentionItem" data-testid="runtime-detail-main-next-step-focus">
+                  <div className="overviewAttentionHeader">
+                    <span className={`status ${attentionItems.length > 0 ? "warn" : "healthy"}`}>
+                      {attentionItems.length > 0 ? "review first" : "stable"}
+                    </span>
+                    <strong>{recommendedNextStep}</strong>
+                  </div>
+                  <p>
+                    {attentionItems.length > 0
+                      ? "Treat this as a runtime review surface first. Only move into redeploy after the current issues are understood."
+                      : "The runtime looks stable enough that the next deliberate change can start from the redeploy and template tools below."}
+                  </p>
+                </div>
                 <div className="workspaceMetaLine">
                   <span>
                     Backend: <code>{apiBaseUrl}</code>
@@ -1158,6 +1365,45 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               </aside>
             </div>
+            <div
+              className="filterTabs"
+              role="tablist"
+              aria-label="Deployment detail tabs"
+              data-testid="runtime-detail-tabs-card"
+            >
+              <button
+                type="button"
+                className={detailTab === "overview" ? "active" : ""}
+                onClick={() => setDetailTab("overview")}
+                data-testid="runtime-detail-tab-overview"
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                className={detailTab === "change" ? "active" : ""}
+                onClick={() => setDetailTab("change")}
+                data-testid="runtime-detail-tab-change"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                className={detailTab === "share" ? "active" : ""}
+                onClick={() => setDetailTab("share")}
+                data-testid="runtime-detail-tab-share"
+              >
+                Share
+              </button>
+              <button
+                type="button"
+                className={detailTab === "tools" ? "active" : ""}
+                onClick={() => setDetailTab("tools")}
+                data-testid="runtime-detail-tab-tools"
+              >
+                Tools
+              </button>
+            </div>
           </article>
         </div>
 
@@ -1165,6 +1411,7 @@ export default function DeploymentDetailsPage({ params }) {
 
         {deployment ? (
           <>
+            <section hidden={detailTab !== "overview"}>
             <div
               className="overviewGrid"
               data-testid="runtime-detail-overview-grid"
@@ -1207,13 +1454,15 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               </div>
             </div>
+            </section>
 
+        <section hidden={detailTab !== "change"}>
         <article className="card formCard adminToolCard" id="runtime-detail-redeploy">
           <div className="adminToolHeader">
             <span className="adminToolEyebrow">Next step</span>
             <h2>Prepare the next rollout change</h2>
             <p>
-              Adjust image, ports, or env vars here, then redeploy deliberately once this runtime is ready for an update.
+              Adjust image, ports, or env vars here, then redeploy deliberately once this runtime is ready for an update. This follows the same guided rollout logic as the main deployment workflow.
             </p>
           </div>
           <form className="form" onSubmit={handleRedeploy}>
@@ -1327,23 +1576,110 @@ export default function DeploymentDetailsPage({ params }) {
             </div>
 
             <div className="formActions runtimePrimaryActions">
-              <button type="submit" className="landingButton primaryButton" disabled={redeploying}>
-                {redeploying ? "Redeploying..." : "Redeploy"}
+              <button
+                type="submit"
+                className="landingButton primaryButton"
+                disabled={redeploying || redeployPreflight.errors.length > 0}
+                data-testid="runtime-detail-redeploy-review-button"
+              >
+                {redeploying ? "Redeploying..." : "Review redeploy"}
               </button>
               {redeploying ? <span className="formHint">Redeploying container...</span> : null}
+              {!redeploying ? (
+                <span className="formHint">
+                  Open review first, then confirm the rollout change explicitly.
+                </span>
+              ) : null}
             </div>
           </form>
 
+          {redeployPreflight.errors.length > 0 ? (
+            <div className="banner error" data-testid="runtime-detail-redeploy-preflight-error">
+              {redeployPreflight.errors[0]}
+            </div>
+          ) : null}
+          {redeployPreflight.warnings.length > 0 ? (
+            <div className="banner subtle" data-testid="runtime-detail-redeploy-preflight-warning">
+              {redeployPreflight.warnings.join(" ")}
+            </div>
+          ) : null}
+          <div className="banner subtle" data-testid="runtime-detail-redeploy-draft-summary">
+            {buildRolloutDraftSummary({
+              envRows,
+              serverSelected: Boolean(deployment?.server_id),
+              localDeploymentsEnabled: true,
+              internalPort: form.internal_port,
+              externalPort: form.external_port,
+            })}
+          </div>
+          {redeployReviewOpen ? (
+            <div className="stackedValue" data-testid="runtime-detail-redeploy-review-panel">
+              <div className="banner subtle">
+                {buildReviewIntroText("redeploy", redeployConfirmationPhrase).split(redeployConfirmationPhrase)[0]}
+                <strong>{redeployConfirmationPhrase}</strong>
+                {buildReviewIntroText("redeploy", redeployConfirmationPhrase).split(redeployConfirmationPhrase)[1]}
+              </div>
+              {redeployPreflight.warnings.length > 0 ? (
+                <div className="banner subtle" data-testid="runtime-detail-redeploy-review-warning">
+                  {redeployPreflight.warnings.join(" ")}
+                </div>
+              ) : null}
+              <pre className="logs expandedBlock" data-testid="runtime-detail-redeploy-impact-summary">
+                {redeployImpactSummary}
+              </pre>
+              <label className="field">
+                <span>Type the confirmation phrase to continue</span>
+                <input
+                  value={redeployConfirmationText}
+                  onChange={(event) => setRedeployConfirmationText(event.target.value)}
+                  placeholder={redeployConfirmationPhrase}
+                  data-testid="runtime-detail-redeploy-confirmation-input"
+                />
+              </label>
+              <div className="actionCluster">
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  onClick={handleRedeployConfirm}
+                  disabled={
+                    redeploying ||
+                    redeployConfirmationText.trim() !== redeployConfirmationPhrase
+                  }
+                  data-testid="runtime-detail-redeploy-confirm-button"
+                >
+                  {redeploying ? "Redeploying..." : "Confirm redeploy"}
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => {
+                    setRedeployReviewOpen(false);
+                    setRedeployConfirmationText("");
+                  }}
+                  disabled={redeploying}
+                  data-testid="runtime-detail-redeploy-cancel-button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <div className="banner subtle">
+            Current next-step guidance: {recommendedNextStep}
+          </div>
           {redeployError ? <div className="banner error">{redeployError}</div> : null}
           {redeploySuccess ? <div className="banner success">{redeploySuccess}</div> : null}
         </article>
+        </section>
 
+            <section hidden={detailTab !== "share"}>
             <AdminDisclosureSection
               title="Templates and runtime tools"
               subtitle="Save this configuration for later, then open diagnostics, logs, and activity only when you need deeper runtime context."
               badge={`${attentionItems.length} attention`}
               testId="runtime-detail-secondary-tools"
             >
+            <div id="runtime-detail-handoff-tools" />
             <AdminDisclosureSection
               title="Share and safety controls"
               subtitle="Handoff actions, refresh, session exit, and deletion stay here so the main runtime path stays focused on review and rollout."
@@ -1432,6 +1768,7 @@ export default function DeploymentDetailsPage({ params }) {
                   onClick={() => setDeleteReviewOpen((current) => !current)}
                   disabled={deleting}
                   data-testid="runtime-detail-delete-review-button"
+                  id="runtime-detail-delete-controls"
                 >
                   {deleteReviewOpen ? "Hide delete review" : "Review delete"}
                 </button>
@@ -1439,17 +1776,19 @@ export default function DeploymentDetailsPage({ params }) {
               {deleteReviewOpen ? (
                 <div className="stackedValue" data-testid="runtime-detail-delete-review-panel">
                   <div className="banner error">
-                    This is destructive. Type <strong>{deleteConfirmationTarget}</strong> to confirm deletion.
+                    {buildReviewIntroText("delete", deleteConfirmationPhrase).split(deleteConfirmationPhrase)[0]}
+                    <strong>{deleteConfirmationPhrase}</strong>
+                    {buildReviewIntroText("delete", deleteConfirmationPhrase).split(deleteConfirmationPhrase)[1]}
                   </div>
                   <pre className="logs expandedBlock" data-testid="runtime-detail-delete-impact-summary">
                     {deleteImpactSummary}
                   </pre>
                   <label className="field">
-                    <span>Type the deployment name to confirm</span>
+                    <span>Type the confirmation phrase to continue</span>
                     <input
                       value={deleteConfirmationText}
                       onChange={(event) => setDeleteConfirmationText(event.target.value)}
-                      placeholder={deleteConfirmationTarget}
+                      placeholder={deleteConfirmationPhrase}
                       data-testid="runtime-detail-delete-confirmation-input"
                     />
                   </label>
@@ -1458,7 +1797,7 @@ export default function DeploymentDetailsPage({ params }) {
                       type="button"
                       className="dangerButton"
                       onClick={handleDelete}
-                      disabled={deleting || deleteConfirmationText.trim() !== deleteConfirmationTarget}
+                      disabled={deleting || deleteConfirmationText.trim() !== deleteConfirmationPhrase}
                       data-testid="runtime-detail-delete-confirm-button"
                     >
                       {deleting ? "Deleting..." : "Delete deployment now"}
@@ -1602,7 +1941,7 @@ export default function DeploymentDetailsPage({ params }) {
                 <div>
                   <h2>Save as template</h2>
                   <p className="formHint">
-                    Turn the current deployment settings into a reusable preset for the next rollout.
+                    Turn the current deployment settings into a reusable preset, then continue template review and reuse inside the deployment workflow.
                   </p>
                 </div>
               </div>
@@ -1627,16 +1966,33 @@ export default function DeploymentDetailsPage({ params }) {
                   >
                     {templateSaving ? "Saving template..." : "Save as template"}
                   </button>
+                  {savedTemplate?.id ? (
+                    <Link
+                      href={`/app/deployment-workflow?template=${savedTemplate.id}&template_action=preview&template_source=deployment-detail#templates`}
+                      className="linkButton"
+                    >
+                      Open in workflow
+                    </Link>
+                  ) : null}
                 </div>
               </div>
-            </article>
+	              {savedTemplate?.id ? (
+	                <div className="banner subtle" data-testid="runtime-detail-template-bridge-banner">
+	                  Template "{savedTemplate.template_name}" is now part of the deployment workflow. Open it there to preview, reuse, or edit it in the main rollout screen.
+	                </div>
+	              ) : null}
+	            </article>
+	            </AdminDisclosureSection>
+	            </section>
 
+            <section hidden={detailTab !== "tools"}>
             <AdminDisclosureSection
               title="Runtime tools and history"
               subtitle="Quick reference, diagnostics, logs, and activity remain available here without crowding the first runtime screen."
               badge={`${attentionItems.length} attention`}
               testId="runtime-detail-tools-disclosure"
             >
+            <div id="runtime-detail-activity-tools" />
             <article className="card compactCard" data-testid="runtime-detail-quick-reference-card">
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-quick-reference-title">Quick reference</h2>
@@ -1994,9 +2350,9 @@ export default function DeploymentDetailsPage({ params }) {
                   ))}
                 </div>
               )}
-            </article>
-            </AdminDisclosureSection>
-            </AdminDisclosureSection>
+	            </article>
+	            </AdminDisclosureSection>
+	            </section>
           </>
         ) : null}
       </div>
