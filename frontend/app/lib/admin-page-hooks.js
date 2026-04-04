@@ -10,6 +10,7 @@ import {
   upsertSavedView,
 } from "./admin-saved-views";
 import { buildPageUrl, persistFormattedViews, triggerFileDownload } from "./admin-page-utils";
+import { formatDate } from "./runtime-workspace-utils";
 
 export function useDebouncedValue(value, options = {}) {
   const { delay = 250, disabled = false, initialValue = value } = options;
@@ -265,10 +266,7 @@ export function useAdminSavedViewsManager(options) {
           scope: exportScope,
           currentViews: savedViews,
           formatViews,
-          formatDate: (value) => {
-            const date = new Date(value);
-            return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-          },
+          formatDate,
           emptyStateMessage: emptyImportMessage,
           wrongScopeMessage,
         });

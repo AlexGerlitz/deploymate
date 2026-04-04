@@ -47,21 +47,9 @@ import {
   runServerReviewStarterAction,
   updateServerReviewServer,
 } from "./starter-api";
+import { formatDate } from "../../lib/runtime-workspace-utils";
 
 const savedViewsStorageKey = "deploymate.admin.server-review.savedViews";
-
-function formatDate(value) {
-  if (!value) {
-    return "N/A";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
 
 function formatSavedServerViews(items) {
   return formatSavedViews(items, {
@@ -363,6 +351,11 @@ function ServerReviewPageContent() {
 
   const selectedItems = items.filter((item) => selectedItemIds.includes(item.id));
   const starterMutationPreview = buildStarterMutationPreview(selectedItem, actionNote);
+  const hasServers = servers.length > 0;
+  const topPriorityTitle = hasServers ? "Review one saved server first" : "Add your first server target";
+  const topPriorityBody = hasServers
+    ? "Pick one saved server, test the connection or run diagnostics, and only then open editing, exports, or deeper review tools."
+    : "Fill in one SSH target first so this workspace can tell you whether the server is reachable and ready for rollout work.";
 
   const visibleAuditItems = useMemo(() => {
     const normalizedAuditQuery = auditQuery.trim().toLowerCase();
@@ -422,7 +415,7 @@ function ServerReviewPageContent() {
         id: "server-review-saved-view-1",
         name: "Diagnostics queue",
         filters: { segment: "diagnostics" },
-        updatedAt: new Date().toISOString(),
+        updatedAt: "2026-04-04T00:00:00.000Z",
         source: "local",
       },
     ]),
@@ -917,10 +910,53 @@ function ServerReviewPageContent() {
         spotlightBody={starterStrings.spotlightBody}
       />
 
+      <article className="card formCard" data-testid="server-review-first-step">
+        <div className="sectionHeader">
+          <div>
+            <h2>{topPriorityTitle}</h2>
+            <p>{topPriorityBody}</p>
+          </div>
+        </div>
+        <div className="overviewGrid" data-testid="server-review-first-step-grid">
+          <article className="overviewCard">
+            <span>Do this now</span>
+            <strong>{hasServers ? "Focus one server and remove uncertainty" : "Create one SSH server target"}</strong>
+            <div className="overviewMeta">
+              <span>
+                {hasServers
+                  ? "Use the live queue below, run one connection test or diagnostics pass, and avoid jumping into exports or bulk review first."
+                  : "Name, host, port, username, and SSH key are enough to begin. Everything else can wait until the first target is saved."}
+              </span>
+            </div>
+            <div className="adminFilterActions">
+              <button
+                type="button"
+                className="primaryButton"
+                data-testid="server-review-first-step-action"
+                onClick={() =>
+                  scrollToElement(hasServers ? "server-review-live-queue" : "server-review-create-server-section")
+                }
+              >
+                {hasServers ? "Open live server queue" : "Jump to add server form"}
+              </button>
+            </div>
+          </article>
+          <article className="overviewCard">
+            <span>Later</span>
+            <strong>Use deeper review tools only after one server is clear</strong>
+            <div className="overviewMeta">
+              <span>
+                Edit, table comparison, saved views, exports, and activity are still here, but they should not compete with the first server action.
+              </span>
+            </div>
+          </article>
+        </div>
+      </article>
+
       <AdminDisclosureSection
         title="Add server target"
-        subtitle="Create new SSH-key server targets here so the whole server workflow stays inside this surface."
-        badge="Create"
+        subtitle="Add one SSH target here so DeployMate can test it and show whether it is ready for rollout work."
+        badge={hasServers ? "Create another" : "Start here"}
         defaultOpen={servers.length === 0}
         sectionId="server-review-create-server-section"
         testId="server-review-create-server"
@@ -983,7 +1019,7 @@ function ServerReviewPageContent() {
               rows={6}
               value={serverForm.ssh_key}
               onChange={updateServerFormField}
-              placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+	              placeholder="Paste your SSH private key content here"
               disabled={serverSubmitting}
               required
               data-testid="server-review-create-ssh-key"
@@ -1003,9 +1039,9 @@ function ServerReviewPageContent() {
 
       <AdminDisclosureSection
         title="Edit selected server"
-        subtitle="Keep host, port, username, and SSH key current without leaving the review page."
+        subtitle="Use this only after one server is already understood and you know exactly what needs to change."
         badge={selectedItem ? "Edit" : "Pick one"}
-        defaultOpen={Boolean(selectedItem)}
+        defaultOpen={false}
         testId="server-review-edit-server"
       >
         {selectedItem ? (
@@ -1084,18 +1120,19 @@ function ServerReviewPageContent() {
         )}
       </AdminDisclosureSection>
 
-      <AdminSurfaceQueue
-        title={starterStrings.queueTitle}
-        description={starterStrings.queueDescription}
-        searchLabel="Search server targets"
-        searchValue={query}
-        onSearchChange={(event) => setQuery(event.target.value)}
-        searchPlaceholder={starterStrings.searchPlaceholder}
-        searchTestId="server-review-search"
-        emptyTestId="server-review-empty"
-        emptyText="No server targets match the current review filters."
-        items={filteredItems}
-      >
+      <div id="server-review-live-queue">
+        <AdminSurfaceQueue
+          title={starterStrings.queueTitle}
+          description={starterStrings.queueDescription}
+          searchLabel="Search server targets"
+          searchValue={query}
+          onSearchChange={(event) => setQuery(event.target.value)}
+          searchPlaceholder={starterStrings.searchPlaceholder}
+          searchTestId="server-review-search"
+          emptyTestId="server-review-empty"
+          emptyText="No server targets match the current review filters."
+          items={filteredItems}
+        >
         <AdminActiveFilters filters={activeFilterChips} />
         <label className="field">
           <span>{starterStrings.segmentFilterLabel}</span>
@@ -1171,59 +1208,8 @@ function ServerReviewPageContent() {
             </div>
           </AdminSurfaceQueueCard>
         ))}
-      </AdminSurfaceQueue>
-
-      <AdminSurfaceTable
-        title="Server review table"
-        description="Use the denser table when you need to compare readiness, auth posture, and suggested next ports across multiple targets."
-        columns={starterTableColumns}
-        rows={visibleTableRows}
-        rowKey={(row) => row.id}
-        selectedRowId={selectedItemId}
-        emptyText="No rows match the current search."
-        emptyTestId="server-review-table-empty"
-        tableTestId="server-review-table"
-        renderCell={(row, column) => {
-          if (column.key === "label") {
-            return (
-              <div className="adminSurfaceTablePrimary">
-                <strong>{row.label}</strong>
-                <p className="formHint">{row.note}</p>
-              </div>
-            );
-          }
-          return row[column.key];
-        }}
-        renderActions={(row) => (
-          <>
-            <button
-              type="button"
-              className="secondaryButton"
-              data-testid={`${row.id}-table-select`}
-              onClick={() => handleToggleSelection(row.id)}
-            >
-              {selectedItemIds.includes(row.id) ? "Selected" : "Select"}
-            </button>
-            <button
-              type="button"
-              className="secondaryButton"
-              data-testid={`${row.id}-table-focus`}
-              onClick={() => handleSelectItem(row.id)}
-            >
-              {row.id === selectedItemId ? "Focused" : "Focus"}
-            </button>
-            <button
-              type="button"
-              className="dangerButton"
-              data-testid={`${row.id}-table-delete`}
-              onClick={() => handleDeleteServer(row.id)}
-              disabled={deletingServerId === row.id}
-            >
-              {deletingServerId === row.id ? "Deleting..." : "Delete"}
-            </button>
-          </>
-        )}
-      />
+        </AdminSurfaceQueue>
+      </div>
 
       <AdminSurfaceActionStarter
         title={starterStrings.actionSectionTitle}
@@ -1256,194 +1242,254 @@ function ServerReviewPageContent() {
         </div>
       ) : null}
 
-      <AdminSurfaceBulkStarter
-        title={starterStrings.bulkSectionTitle}
-        description={starterStrings.bulkSectionDescription}
-        testId="server-review-bulk-starter"
-        presetOneLabel={starterStrings.bulkPresetOneLabel}
-        onPresetOne={() => handleApplyBulkPreset(starterStrings.bulkPresetOneSegment)}
-        presetTwoLabel={starterStrings.bulkPresetTwoLabel}
-        onPresetTwo={() => handleApplyBulkPreset(starterStrings.bulkPresetTwoSegment)}
-        selectedCount={selectedItemIds.length}
-        visibleCount={filteredItems.length}
-        statusValue={bulkStatusValue}
-        onStatusChange={(event) => setBulkStatusValue(event.target.value)}
-        statusOptions={bulkStatusOptions}
-        applyLabel={starterStrings.bulkApplyLabel}
-        onApply={handleApplyBulkAction}
-        applyDisabled={!selectedItemIds.length || !bulkStatusValue}
-      />
-
-      <AdminSurfaceMutationPreview
-        description="This preview now reflects the live server review actions instead of a fake starter mutation."
-        testId="server-review-mutation-starter"
-        routeLabel={starterStrings.mutationRouteLabel}
-        selectedSummary={selectedItems.map((item) => item.label).join(", ") || "Nothing selected"}
-        payload={starterMutationPreview}
-      />
-
-      <article className="card formCard">
-        <AdminFilterFooter
-          summary="This surface now uses the live /servers API for review data, diagnostics, and connection checks."
-          hint="Keep only the views and follow-up labels that support real operator review. Everything else should earn its place."
-          onReset={() => {
-            setQuery("");
-            setSegmentFilter("all");
+      <AdminDisclosureSection
+        title="Advanced review tools"
+        subtitle="Open this only after the first server decision is already clear."
+        badge="Later"
+        defaultOpen={false}
+        testId="server-review-advanced-tools"
+      >
+        <AdminSurfaceTable
+          title="Server review table"
+          description="Use the denser table when you need to compare readiness, auth posture, and suggested next ports across multiple targets."
+          columns={starterTableColumns}
+          rows={visibleTableRows}
+          rowKey={(row) => row.id}
+          selectedRowId={selectedItemId}
+          emptyText="No rows match the current search."
+          emptyTestId="server-review-table-empty"
+          tableTestId="server-review-table"
+          renderCell={(row, column) => {
+            if (column.key === "label") {
+              return (
+                <div className="adminSurfaceTablePrimary">
+                  <strong>{row.label}</strong>
+                  <p className="formHint">{row.note}</p>
+                </div>
+              );
+            }
+            return row[column.key];
           }}
-          resetDisabled={!query && segmentFilter === "all"}
-          resetTestId="server-review-clear-filters"
+          renderActions={(row) => (
+            <>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid={`${row.id}-table-select`}
+                onClick={() => handleToggleSelection(row.id)}
+              >
+                {selectedItemIds.includes(row.id) ? "Selected" : "Select"}
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid={`${row.id}-table-focus`}
+                onClick={() => handleSelectItem(row.id)}
+              >
+                {row.id === selectedItemId ? "Focused" : "Focus"}
+              </button>
+              <button
+                type="button"
+                className="dangerButton"
+                data-testid={`${row.id}-table-delete`}
+                onClick={() => handleDeleteServer(row.id)}
+                disabled={deletingServerId === row.id}
+              >
+                {deletingServerId === row.id ? "Deleting..." : "Delete"}
+              </button>
+            </>
+          )}
         />
-      </article>
 
-      <AdminSavedViews
-        title="Saved review views"
-        inputLabel="View name"
-        inputValue={savedViewName}
-        onInputChange={(event) => setSavedViewName(event.target.value)}
-        onSave={handleSaveCurrentView}
-        onUpdateCurrent={handleUpdateCurrentView}
-        saveDisabled={!canSaveCurrentView}
-        updateDisabled={!activeSavedViewId}
-        saveTestId="server-review-save-view"
-        updateTestId="server-review-update-view"
-        statusText={
-          hasSavedViewNameMatch
-            ? "A saved view with this name already exists and will be replaced."
-            : "Save filters you want to revisit during daily infra review."
-        }
-        metaText={savedViewsMetaText}
-        viewSummaryText={savedViewsSummaryText}
-        useCurrentNameLabel="Use active view name"
-        onUseCurrentName={handleUseCurrentSavedViewName}
-        useCurrentNameDisabled={!activeSavedViewId}
-        views={visibleSavedViews}
-        onApply={handleApplySavedView}
-        onDelete={handleDeleteSavedView}
-        onCopy={handleCopySavedViewLink}
-        searchValue={savedViewsSearch}
-        onSearchChange={(event) => setSavedViewsSearch(event.target.value)}
-        searchTestId="server-review-saved-views-search"
-        sourceFilter={savedViewsSourceFilter}
-        onSourceFilterChange={(event) => setSavedViewsSourceFilter(event.target.value)}
-        sourceFilterTestId="server-review-saved-views-source"
-        sortValue={savedViewsSort}
-        onSortChange={(event) => setSavedViewsSort(event.target.value)}
-        sortTestId="server-review-saved-views-sort"
-        actions={[
-          {
-            label: "Export views",
-            testId: "server-review-saved-views-export",
-            onClick: handleDownloadSavedViews,
-            disabled: savedViews.length === 0,
-          },
-          {
-            label: "Import views",
-            kind: "file",
-            testId: "server-review-saved-views-import",
-            accept: "application/json",
-            onChange: handleImportSavedViews,
-          },
-          {
-            label: "Clear imported",
-            testId: "server-review-saved-views-clear-imported",
-            onClick: handleClearImportedSavedViews,
-            disabled: savedViews.length === 0,
-          },
-          {
-            label: "Clear all",
-            testId: "server-review-saved-views-clear",
-            onClick: handleClearSavedViews,
-            disabled: savedViews.length === 0,
-          },
-          {
-            label: "Reset tools",
-            testId: "server-review-saved-views-reset-tools",
-            onClick: handleResetSavedViewsTools,
-          },
-        ]}
-        emptyText="No saved server review views yet."
-        listTestId="server-review-saved-views-list"
-        activeViewId={activeSavedViewId}
-      />
+        <AdminSurfaceBulkStarter
+          title={starterStrings.bulkSectionTitle}
+          description={starterStrings.bulkSectionDescription}
+          testId="server-review-bulk-starter"
+          presetOneLabel={starterStrings.bulkPresetOneLabel}
+          onPresetOne={() => handleApplyBulkPreset(starterStrings.bulkPresetOneSegment)}
+          presetTwoLabel={starterStrings.bulkPresetTwoLabel}
+          onPresetTwo={() => handleApplyBulkPreset(starterStrings.bulkPresetTwoSegment)}
+          selectedCount={selectedItemIds.length}
+          visibleCount={filteredItems.length}
+          statusValue={bulkStatusValue}
+          onStatusChange={(event) => setBulkStatusValue(event.target.value)}
+          statusOptions={bulkStatusOptions}
+          applyLabel={starterStrings.bulkApplyLabel}
+          onApply={handleApplyBulkAction}
+          applyDisabled={!selectedItemIds.length || !bulkStatusValue}
+        />
 
-      <AdminAuditToolbar
-        title="Review activity"
-        description="This local activity log records what the operator actually did on this page: refreshes, diagnostics, tests, and bulk follow-up labels."
-        query={auditQuery}
-        onQueryChange={(event) => setAuditQuery(event.target.value)}
-        queryPlaceholder="Search server review activity"
-        queryTestId="server-review-audit-search"
-        filterLabel="Scope"
-        filterValue={auditScope}
-        onFilterChange={(event) => setAuditScope(event.target.value)}
-        filterOptions={[
-          { value: "all", label: "All activity" },
-          { value: "queue", label: "Queue review" },
-          { value: "bulk", label: "Bulk follow-up" },
-        ]}
-        filterTestId="server-review-audit-scope"
-        sortValue={auditSort}
-        onSortChange={(event) => setAuditSort(event.target.value)}
-        sortTestId="server-review-audit-sort"
-        totalCount={visibleAuditItems.length}
-        summary="Use this log to explain what was reviewed and what changed during the current server review pass."
-        filters={activeAuditFilterChips}
-        emptyTestId="server-review-audit-empty"
-        emptyText="No review activity recorded yet."
-      >
-        <div className="adminSavedViewsList" data-testid="server-review-audit-list">
-          {visibleAuditItems.map((item) => (
-            <AdminSurfaceQueueCard
-              key={item.id}
-              title={item.label}
-              body={item.detail}
-              status={item.scope}
-            />
-          ))}
-        </div>
-      </AdminAuditToolbar>
+        <AdminSurfaceMutationPreview
+          description="This preview now reflects the live server review actions instead of a fake starter mutation."
+          testId="server-review-mutation-starter"
+          routeLabel={starterStrings.mutationRouteLabel}
+          selectedSummary={selectedItems.map((item) => item.label).join(", ") || "Nothing selected"}
+          payload={starterMutationPreview}
+        />
 
-      <AdminDisclosureSection
-        title="Export and recovery"
-        subtitle="JSON and CSV export stay close at hand for handoff, audit, or operator review."
-        badge="Optional"
-        testId="server-review-export-starter"
-      >
-        <div className="adminFilterActions">
-          <button
-            type="button"
-            className="secondaryButton"
-            data-testid="server-review-export-json"
-            onClick={handleExportJson}
-          >
-            Export JSON
-          </button>
-          <button
-            type="button"
-            className="secondaryButton"
-            data-testid="server-review-export-csv"
-            onClick={handleExportCsv}
-          >
-            Export CSV
-          </button>
-        </div>
-        <p className="formHint">
-          The export reflects the live filtered queue and the current page activity log.
-        </p>
-      </AdminDisclosureSection>
+        <article className="card formCard">
+          <AdminFilterFooter
+            summary="This surface now uses the live /servers API for review data, diagnostics, and connection checks."
+            hint="Keep only the views and follow-up labels that support real operator review. Everything else should earn its place."
+            onReset={() => {
+              setQuery("");
+              setSegmentFilter("all");
+            }}
+            resetDisabled={!query && segmentFilter === "all"}
+            resetTestId="server-review-clear-filters"
+          />
+        </article>
 
-      <AdminDisclosureSection
-        title="What this proved"
-        subtitle="This page started from the scaffold, then got wired into the real server API."
-        badge="Real surface"
-        defaultOpen
-        testId="server-review-next-steps"
-      >
-        <ol className="formHint">
-          <li>The scaffold can now start a real server review page instead of only a local demo queue.</li>
-          <li>Queue, table, saved views, export, and audit shell were reusable enough to survive contact with a real feature.</li>
-          <li>The next useful follow-up is deciding whether this page should replace the server block on the main workspace.</li>
-        </ol>
+        <AdminSavedViews
+          title="Saved review views"
+          inputLabel="View name"
+          inputValue={savedViewName}
+          onInputChange={(event) => setSavedViewName(event.target.value)}
+          onSave={handleSaveCurrentView}
+          onUpdateCurrent={handleUpdateCurrentView}
+          saveDisabled={!canSaveCurrentView}
+          updateDisabled={!activeSavedViewId}
+          saveTestId="server-review-save-view"
+          updateTestId="server-review-update-view"
+          statusText={
+            hasSavedViewNameMatch
+              ? "A saved view with this name already exists and will be replaced."
+              : "Save filters you want to revisit during daily infra review."
+          }
+          metaText={savedViewsMetaText}
+          viewSummaryText={savedViewsSummaryText}
+          useCurrentNameLabel="Use active view name"
+          onUseCurrentName={handleUseCurrentSavedViewName}
+          useCurrentNameDisabled={!activeSavedViewId}
+          views={visibleSavedViews}
+          onApply={handleApplySavedView}
+          onDelete={handleDeleteSavedView}
+          onCopy={handleCopySavedViewLink}
+          searchValue={savedViewsSearch}
+          onSearchChange={(event) => setSavedViewsSearch(event.target.value)}
+          searchTestId="server-review-saved-views-search"
+          sourceFilter={savedViewsSourceFilter}
+          onSourceFilterChange={(event) => setSavedViewsSourceFilter(event.target.value)}
+          sourceFilterTestId="server-review-saved-views-source"
+          sortValue={savedViewsSort}
+          onSortChange={(event) => setSavedViewsSort(event.target.value)}
+          sortTestId="server-review-saved-views-sort"
+          actions={[
+            {
+              label: "Export views",
+              testId: "server-review-saved-views-export",
+              onClick: handleDownloadSavedViews,
+              disabled: savedViews.length === 0,
+            },
+            {
+              label: "Import views",
+              kind: "file",
+              testId: "server-review-saved-views-import",
+              accept: "application/json",
+              onChange: handleImportSavedViews,
+            },
+            {
+              label: "Clear imported",
+              testId: "server-review-saved-views-clear-imported",
+              onClick: handleClearImportedSavedViews,
+              disabled: savedViews.length === 0,
+            },
+            {
+              label: "Clear all",
+              testId: "server-review-saved-views-clear",
+              onClick: handleClearSavedViews,
+              disabled: savedViews.length === 0,
+            },
+            {
+              label: "Reset tools",
+              testId: "server-review-saved-views-reset-tools",
+              onClick: handleResetSavedViewsTools,
+            },
+          ]}
+          emptyText="No saved server review views yet."
+          listTestId="server-review-saved-views-list"
+          activeViewId={activeSavedViewId}
+        />
+
+        <AdminAuditToolbar
+          title="Review activity"
+          description="This local activity log records what the operator actually did on this page: refreshes, diagnostics, tests, and bulk follow-up labels."
+          query={auditQuery}
+          onQueryChange={(event) => setAuditQuery(event.target.value)}
+          queryPlaceholder="Search server review activity"
+          queryTestId="server-review-audit-search"
+          filterLabel="Scope"
+          filterValue={auditScope}
+          onFilterChange={(event) => setAuditScope(event.target.value)}
+          filterOptions={[
+            { value: "all", label: "All activity" },
+            { value: "queue", label: "Queue review" },
+            { value: "bulk", label: "Bulk follow-up" },
+          ]}
+          filterTestId="server-review-audit-scope"
+          sortValue={auditSort}
+          onSortChange={(event) => setAuditSort(event.target.value)}
+          sortTestId="server-review-audit-sort"
+          totalCount={visibleAuditItems.length}
+          summary="Use this log to explain what was reviewed and what changed during the current server review pass."
+          filters={activeAuditFilterChips}
+          emptyTestId="server-review-audit-empty"
+          emptyText="No review activity recorded yet."
+        >
+          <div className="adminSavedViewsList" data-testid="server-review-audit-list">
+            {visibleAuditItems.map((item) => (
+              <AdminSurfaceQueueCard
+                key={item.id}
+                title={item.label}
+                body={item.detail}
+                status={item.scope}
+              />
+            ))}
+          </div>
+        </AdminAuditToolbar>
+
+        <AdminDisclosureSection
+          title="Export and recovery"
+          subtitle="JSON and CSV export stay close at hand for handoff, audit, or operator review."
+          badge="Optional"
+          testId="server-review-export-starter"
+        >
+          <div className="adminFilterActions">
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="server-review-export-json"
+              onClick={handleExportJson}
+            >
+              Export JSON
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="server-review-export-csv"
+              onClick={handleExportCsv}
+            >
+              Export CSV
+            </button>
+          </div>
+          <p className="formHint">
+            The export reflects the live filtered queue and the current page activity log.
+          </p>
+        </AdminDisclosureSection>
+
+        <AdminDisclosureSection
+          title="What this proved"
+          subtitle="This page started from the scaffold, then got wired into the real server API."
+          badge="Real surface"
+          defaultOpen={false}
+          testId="server-review-next-steps"
+        >
+          <ol className="formHint">
+            <li>The scaffold can now start a real server review page instead of only a local demo queue.</li>
+            <li>Queue, table, saved views, export, and audit shell were reusable enough to survive contact with a real feature.</li>
+            <li>The next useful follow-up is deciding whether this page should replace the server block on the main workspace.</li>
+          </ol>
+        </AdminDisclosureSection>
       </AdminDisclosureSection>
     </main>
   );

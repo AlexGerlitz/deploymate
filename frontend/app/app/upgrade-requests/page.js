@@ -44,24 +44,12 @@ import {
   triggerFileDownload,
 } from "../../lib/admin-page-utils";
 import { buildSelectedRequestsCsv } from "../../lib/admin-export-utils";
+import { formatDate } from "../../lib/runtime-workspace-utils";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const upgradeSavedViewsStorageKey = "deploymate.admin.upgradeRequests.savedViews";
 const upgradeAuditViewsStorageKey = "deploymate.admin.upgradeRequests.auditViews";
-
-function formatDate(value) {
-  if (!value) {
-    return "N/A";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
 
 function formatUpgradeSavedViews(items) {
   return formatSavedViews(items, {
