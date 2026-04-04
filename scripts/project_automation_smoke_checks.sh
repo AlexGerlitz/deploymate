@@ -177,8 +177,15 @@ automation_smoke_admin_checks() {
 /app/users|restore report json disabled|data-testid="restore-report-json-button"[^>]*disabled
 /app/users|restore report csv disabled|data-testid="restore-report-csv-button"[^>]*disabled
 /app/upgrade-requests|upgrade requests page title|data-testid="upgrade-requests-page-title"
+/app/upgrade-requests|upgrade primary action button|data-testid="upgrade-primary-action-button"
 /app/upgrade-requests|upgrade smoke banner|data-testid="admin-smoke-banner"
 /app/upgrade-requests|upgrade refresh button|data-testid="upgrade-refresh-button"
+/app/upgrade-requests|upgrade main next step card|data-testid="upgrade-main-next-step-card"
+/app/upgrade-requests|upgrade main next step title|data-testid="upgrade-main-next-step-title"
+/app/upgrade-requests|upgrade main next step focus|data-testid="upgrade-main-next-step-focus"
+/app/upgrade-requests|upgrade main next step copy|data-testid="upgrade-main-next-step-copy"
+/app/upgrade-requests|upgrade main next step button|data-testid="upgrade-main-next-step-button"
+/app/upgrade-requests|upgrade main next step copy button|data-testid="upgrade-main-next-step-copy-button"
 /app/upgrade-requests|upgrade copy link button|data-testid="upgrade-copy-link-button"
 /app/upgrade-requests|upgrade export button|data-testid="upgrade-export-button"
 /app/upgrade-requests|upgrade audit search|data-testid="upgrade-audit-search"

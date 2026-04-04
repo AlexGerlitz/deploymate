@@ -79,6 +79,17 @@ function formatUpgradeSavedViews(items) {
   });
 }
 
+function scrollToElement(sectionId) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const element = document.getElementById(sectionId);
+  if (element) {
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 function UpgradeRequestsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -113,6 +124,25 @@ function UpgradeRequestsPageContent() {
   const [saveFeedback, setSaveFeedback] = useState("");
   const [drafts, setDrafts] = useState({});
   const filteredRequests = requests;
+  const visibleNewCount = filteredRequests.filter((item) => item.status === "new").length;
+  const visibleReviewCount = filteredRequests.filter((item) => item.status === "in_review").length;
+  const visibleApprovedCount = filteredRequests.filter((item) => item.status === "approved").length;
+  const inboxNextStep =
+    visibleNewCount > 0
+      ? "Start with new requests, link them to the right user when possible, then move them into in-review."
+      : visibleReviewCount > 0
+        ? "Finish the in-review requests on screen, then approve, reject, or close them deliberately."
+        : visibleApprovedCount > 0
+          ? "Clean up the already approved requests and close the ones that no longer need active follow-up."
+          : "Adjust the filters until this inbox slice shows the requests you actually want to work through next.";
+  const inboxFocusLabel =
+    visibleNewCount > 0
+      ? "New requests need triage"
+      : visibleReviewCount > 0
+        ? "In-review requests are the active queue"
+        : visibleApprovedCount > 0
+          ? "Approved requests need follow-through"
+          : "No obvious queue focus yet";
   const primaryFilterDefinitions = [
     createTextFilterDefinition({
       key: "q",
@@ -768,6 +798,12 @@ function UpgradeRequestsPageContent() {
           loading={loading}
           onRefresh={refreshPageData}
           refreshTestId="upgrade-refresh-button"
+          primaryAction={{
+            label: "Review inbox",
+            testId: "upgrade-primary-action-button",
+            onClick: () => scrollToElement("upgrade-inbox-review-card"),
+            disabled: false,
+          }}
           actions={[
             { label: "Copy link", testId: "upgrade-copy-link-button", onClick: handleCopyCurrentView },
             { label: "Export CSV", testId: "upgrade-export-button", onClick: handleDownloadUpgradeExport },
@@ -834,6 +870,48 @@ function UpgradeRequestsPageContent() {
             ) : null}
           </article>
         ) : null}
+
+        <article id="upgrade-inbox-review-card" className="card formCard" data-testid="upgrade-main-next-step-card">
+          <div className="sectionHeader">
+            <div>
+              <h2 data-testid="upgrade-main-next-step-title">Main next step</h2>
+              <p className="formHint">
+                Work the visible inbox slice first. Saved views, bulk actions, and audit stay below as supporting tools after the queue is clear.
+              </p>
+            </div>
+          </div>
+          <div className="row">
+            <span className="label">Current focus</span>
+            <span data-testid="upgrade-main-next-step-focus">{inboxFocusLabel}</span>
+          </div>
+          <div className="row">
+            <span className="label">What to do</span>
+            <span data-testid="upgrade-main-next-step-copy">{inboxNextStep}</span>
+          </div>
+          <div className="backupSummaryBadges">
+            <span className="status info">new {visibleNewCount}</span>
+            <span className="status warn">in review {visibleReviewCount}</span>
+            <span className="status healthy">approved {visibleApprovedCount}</span>
+          </div>
+          <div className="actionCluster">
+            <button
+              type="button"
+              className="landingButton primaryButton"
+              data-testid="upgrade-main-next-step-button"
+              onClick={() => scrollToElement("upgrade-current-queue-slice")}
+            >
+              Open current queue slice
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="upgrade-main-next-step-copy-button"
+              onClick={() => copyTextToClipboard(inboxNextStep).then(() => setSaveFeedback("Inbox next-step summary copied."))}
+            >
+              Copy next step
+            </button>
+          </div>
+        </article>
 
         <AdminDisclosureSection
           title="Audit history"
@@ -1025,7 +1103,7 @@ function UpgradeRequestsPageContent() {
           />
         </article>
 
-        <article className="card formCard">
+        <article id="upgrade-current-queue-slice" className="card formCard">
           <div className="sectionHeader">
             <div>
               <h2>Current queue slice</h2>
