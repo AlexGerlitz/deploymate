@@ -60,6 +60,11 @@ automation_smoke_runtime_checks() {
   cat <<'EOF'
 /app|runtime page title|data-testid="runtime-page-title"
 /app|runtime smoke banner|data-testid="runtime-smoke-banner"
+/app|workspace scenario card|data-testid="workspace-scenario-card"
+/app|workspace scenario title|data-testid="workspace-scenario-title"
+/app|workspace scenario grid|data-testid="workspace-scenario-grid"
+/app|workspace scenario deploy action|data-testid="workspace-scenario-action-deploy"
+/app|workspace scenario runtime action|data-testid="workspace-scenario-action-runtime"
 /app|runtime deployments section|data-testid="runtime-deployments-section"
 /app|runtime deployments title|data-testid="runtime-deployments-title"
 /app|runtime deployments list|data-testid="runtime-deployments-list"

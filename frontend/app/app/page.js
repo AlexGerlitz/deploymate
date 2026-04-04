@@ -642,6 +642,64 @@ export default function HomePage() {
       actionLabel: currentUser?.is_admin ? "Open admin surface" : "View upgrade options",
     },
   ];
+  const workspaceScenarioCards = [
+    {
+      key: "deploy",
+      label: "Deploy",
+      title: deployments.length > 0 ? "Start the next rollout" : "Launch the first deployment",
+      detail:
+        templates.length > 0
+          ? "Use the guided deployment form and available templates to ship the next container quickly."
+          : "Open the deployment form first, then pick image, ports, and env vars in one obvious path.",
+      href: "#create-deployment",
+      actionLabel: "Create deployment",
+      primary: true,
+    },
+    {
+      key: "runtime",
+      label: "Runtime",
+      title: opsSnapshot.deployments.failed > 0 ? "Review live incidents" : "Review live deployments",
+      detail:
+        opsSnapshot.deployments.failed > 0
+          ? "Failed rollouts already need attention, so go straight to the live deployment list and open one detail page."
+          : "Open the current deployment list when you want to check health, activity, and runtime status first.",
+      href: "#runtime-deployments",
+      actionLabel: opsSnapshot.deployments.failed > 0 ? "Review deployments" : "Open live deployments",
+      primary: false,
+    },
+    ...(currentUser?.is_admin
+      ? [
+          {
+            key: "servers",
+            label: "Servers",
+            title: "Review server targets",
+            detail: "Open the dedicated server workspace when you need to add, test, diagnose, or clean up rollout targets.",
+            href: "/app/server-review",
+            actionLabel: "Open server review",
+            primary: false,
+          },
+          {
+            key: "recovery",
+            label: "Recovery",
+            title: "Review backup and recovery",
+            detail: "Open the admin recovery path when you need restore validation, import review, or controlled preparation handoff.",
+            href: "/app/users",
+            actionLabel: "Open recovery path",
+            primary: false,
+          },
+        ]
+      : [
+          {
+            key: "upgrade",
+            label: "Upgrade",
+            title: "Unlock more workspace depth",
+            detail: "Commercial and team workflows stay separate from the runtime path until you need them.",
+            href: "/upgrade",
+            actionLabel: "View upgrade options",
+            primary: false,
+          },
+        ]),
+  ];
   const reviewerPathItems = [
     {
       label: "Start here",
@@ -1895,6 +1953,33 @@ export default function HomePage() {
             </article>
           ))}
         </section>
+
+        <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
+          <div className="sectionHeader workspaceGuideHeader">
+            <div>
+              <h2 data-testid="workspace-scenario-title">Start with one obvious path</h2>
+              <p className="formHint">
+                Pick the thing you want to do first. The rest of the workspace stays available below once the main path is clear.
+              </p>
+            </div>
+          </div>
+          <div className="workspaceReviewerGrid" data-testid="workspace-scenario-grid">
+            {workspaceScenarioCards.map((card) => (
+              <article key={card.key} className="workspaceReviewerCard" data-testid={`workspace-scenario-item-${card.key}`}>
+                <span>{card.label}</span>
+                <strong>{card.title}</strong>
+                <p>{card.detail}</p>
+                <Link
+                  href={card.href}
+                  className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                  data-testid={`workspace-scenario-action-${card.key}`}
+                >
+                  {card.actionLabel}
+                </Link>
+              </article>
+            ))}
+          </div>
+        </article>
 
         <div className="workspaceBannerStack">
           {error ? <div className="banner error">{error}</div> : null}
