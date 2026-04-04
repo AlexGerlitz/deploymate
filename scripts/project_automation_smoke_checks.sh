@@ -271,6 +271,8 @@ automation_smoke_restore_checks() {
 /app/users|restore import plan confirmation|data-testid="restore-import-plan-confirmation"
 /app/users|restore import plan json button|data-testid="restore-import-plan-json-button"
 /app/users|restore import plan markdown button|data-testid="restore-import-plan-markdown-button"
+/app/users|restore open import review button|data-testid="restore-open-import-review-button"
+/app/users|restore import review handoff note|data-testid="restore-import-review-handoff-note"
 /app/users|restore import plan sections|data-testid="restore-import-plan-sections"
 /app/users|restore section filter|data-testid="restore-section-filter"
 /app/users|restore section search|data-testid="restore-section-search"

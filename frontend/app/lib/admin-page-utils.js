@@ -45,6 +45,45 @@ export function triggerFileDownload(filename, blob) {
   URL.revokeObjectURL(url);
 }
 
+export function loadSessionJson(storageKey) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const value = window.sessionStorage.getItem(storageKey);
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistSessionJson(storageKey, value) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    window.sessionStorage.setItem(storageKey, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function removeSessionValue(storageKey) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    window.sessionStorage.removeItem(storageKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function escapeCsvCell(value) {
   const normalized =
     value === null || value === undefined ? "" : String(value);

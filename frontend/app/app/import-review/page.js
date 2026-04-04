@@ -5,13 +5,16 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { AdminFeedbackBanners, AdminPageHeader } from "../admin-ui";
 import {
   copyTextToClipboard,
+  loadSessionJson,
   readJsonOrError,
+  removeSessionValue,
   triggerFileDownload,
 } from "../../lib/admin-page-utils";
 import {
   buildImportReviewApprovalPacket,
   buildImportReviewCsv,
   buildImportReviewMarkdown,
+  importReviewHandoffStorageKey,
 } from "../../lib/import-review-feature-pack";
 
 const apiBaseUrl =
@@ -37,8 +40,20 @@ function formatPreparationMode(mode) {
     .join(" ");
 }
 
+function readImportReviewHandoff() {
+  const payload = loadSessionJson(importReviewHandoffStorageKey);
+
+  if (!payload || !payload.workspace || !payload.workspace.import_plan || !payload.workspace.dry_run) {
+    return null;
+  }
+
+  return payload;
+}
+
 function ImportReviewPageContent() {
   const [workspace, setWorkspace] = useState(null);
+  const [workspaceSource, setWorkspaceSource] = useState("loading");
+  const [handoffAvailable, setHandoffAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [planStateFilter, setPlanStateFilter] = useState("all");
@@ -46,20 +61,36 @@ function ImportReviewPageContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  async function loadWorkspace() {
+  async function loadWorkspace(options = {}) {
+    const { forceLive = false } = options;
     setLoading(true);
     setError("");
     try {
+      if (!forceLive) {
+        const handoff = readImportReviewHandoff();
+        if (handoff) {
+          setWorkspace(handoff.workspace);
+          setWorkspaceSource("restore_handoff");
+          setHandoffAvailable(true);
+          setTypedReviewValue("");
+          setSuccess("Import review workspace loaded from the restore handoff.");
+          return;
+        }
+      }
+
       const response = await fetch(`${apiBaseUrl}/import-review`, {
         credentials: "include",
         cache: "no-store",
       });
       const data = await readJsonOrError(response, "Failed to load import review workspace.");
       setWorkspace(data);
+      setWorkspaceSource("live_backup");
+      setHandoffAvailable(Boolean(readImportReviewHandoff()));
       setTypedReviewValue("");
-      setSuccess("Import review workspace refreshed.");
+      setSuccess(forceLive ? "Import review workspace refreshed from the current live backup." : "Import review workspace refreshed.");
     } catch (requestError) {
       setWorkspace(null);
+      setWorkspaceSource("error");
       setError(
         requestError instanceof Error
           ? requestError.message
@@ -73,6 +104,12 @@ function ImportReviewPageContent() {
   useEffect(() => {
     loadWorkspace();
   }, []);
+
+  async function handleUseLiveBackupWorkspace() {
+    removeSessionValue(importReviewHandoffStorageKey);
+    setHandoffAvailable(false);
+    await loadWorkspace({ forceLive: true });
+  }
 
   const visibleSections = useMemo(() => {
     if (!workspace) {
@@ -251,6 +288,44 @@ function ImportReviewPageContent() {
               </div>
             </div>
           </div>
+
+          <article className="card compactCard" data-testid="import-review-source-card">
+            <div className="sectionHeader">
+              <div>
+                <h3 data-testid="import-review-source-title">Workspace source</h3>
+                <p className="formHint">
+                  Keep review tied to the exact bundle you just validated, or switch back to the current live backup when you need a fresh baseline.
+                </p>
+              </div>
+            </div>
+            <div className="row">
+              <span className="label">Current source</span>
+              <span data-testid="import-review-source-badge">
+                {workspaceSource === "restore_handoff" ? "restore handoff" : "live backup"}
+              </span>
+            </div>
+            <div className="row">
+              <span className="label">Handoff available</span>
+              <span data-testid="import-review-handoff-available">{handoffAvailable ? "yes" : "no"}</span>
+            </div>
+            <div className="row">
+              <span className="label">Bundle name</span>
+              <span data-testid="import-review-source-bundle">{workspace.bundle_manifest.bundle_name}</span>
+            </div>
+            <div className="actionCluster">
+              <button
+                type="button"
+                className="softButton"
+                data-testid="import-review-use-live-button"
+                onClick={handleUseLiveBackupWorkspace}
+              >
+                Use current live backup
+              </button>
+              <Link href="/app/users" className="secondaryButton" data-testid="import-review-restore-link">
+                Back to restore workspace
+              </Link>
+            </div>
+          </article>
 
           <div className="banner error" data-testid="import-review-apply-boundary-banner">
             {workspace.import_plan.summary.apply_block_reason}

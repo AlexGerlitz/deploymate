@@ -41,6 +41,7 @@ import {
   copyTextToClipboard,
   createChoiceFilterDefinition,
   createTextFilterDefinition,
+  persistSessionJson,
   readErrorMessageFromResponse,
   readJsonOrError,
   sortItemsByDateMode,
@@ -56,6 +57,11 @@ import {
   buildRestoreReportDigest,
   buildSelectedUsersCsv,
 } from "../../lib/admin-export-utils";
+import {
+  buildImportReviewHandoffPayload,
+  importReviewFeatureRoute,
+  importReviewHandoffStorageKey,
+} from "../../lib/import-review-feature-pack";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -1131,6 +1137,29 @@ function UsersPageContent() {
     setSuccess("Controlled import plan markdown downloaded.");
   }
 
+  function handleOpenImportReviewWorkspace() {
+    if (!restoreDryRun || !restoreImportPlan) {
+      setError("Build the controlled import plan before opening import review.");
+      setSuccess("");
+      return;
+    }
+
+    const handoffPayload = buildImportReviewHandoffPayload({
+      generated_at: new Date().toISOString(),
+      bundle_manifest: restoreDryRun.manifest,
+      dry_run: restoreDryRun,
+      import_plan: restoreImportPlan,
+    });
+
+    if (!handoffPayload || !persistSessionJson(importReviewHandoffStorageKey, handoffPayload)) {
+      setError("Failed to stage the import review handoff in this browser session.");
+      setSuccess("");
+      return;
+    }
+
+    router.push(`${importReviewFeatureRoute}?source=restore-handoff`);
+  }
+
   function resetUserFilters() {
     setQuery("");
     setRoleFilter("all");
@@ -1640,6 +1669,17 @@ function UsersPageContent() {
                     >
                       Plan markdown
                     </button>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      data-testid="restore-open-import-review-button"
+                      onClick={handleOpenImportReviewWorkspace}
+                    >
+                      Open import review workspace
+                    </button>
+                  </div>
+                  <div className="banner subtle" data-testid="restore-import-review-handoff-note">
+                    Continue on a dedicated review screen with this exact bundle, dry-run result, and controlled import plan.
                   </div>
                   <div className="overviewAttentionList" data-testid="restore-import-plan-sections">
                     {restoreImportPlan.sections.map((section) => (

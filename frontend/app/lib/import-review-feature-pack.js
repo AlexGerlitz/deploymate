@@ -1,6 +1,19 @@
 import { escapeCsvCell } from "./admin-page-utils";
 
 export const importReviewFeatureRoute = "/app/import-review";
+export const importReviewHandoffStorageKey = "deploymate.admin.importReview.handoff";
+
+export function buildImportReviewHandoffPayload(workspace) {
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    source: "restore_workspace",
+    stored_at: new Date().toISOString(),
+    workspace,
+  };
+}
 
 export function buildImportReviewCsv(sections = []) {
   const rows = [[
