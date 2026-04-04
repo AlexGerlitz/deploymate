@@ -180,6 +180,17 @@ function appendAuditEntry(currentItems, nextItem) {
   return [nextItem, ...currentItems].slice(0, 20);
 }
 
+function scrollToElement(sectionId) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const element = document.getElementById(sectionId);
+  if (element) {
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 function ServerReviewPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -875,6 +886,12 @@ function ServerReviewPageContent() {
         loading={loading}
         onRefresh={() => loadServers()}
         refreshTestId="server-review-refresh"
+        primaryAction={{
+          label: "Add server target",
+          testId: "server-review-primary-action-button",
+          onClick: () => scrollToElement("server-review-create-server-section"),
+          disabled: false,
+        }}
         actions={[
           {
             label: "Export JSON",
@@ -905,6 +922,7 @@ function ServerReviewPageContent() {
         subtitle="Create new SSH-key server targets here so the whole server workflow stays inside this surface."
         badge="Create"
         defaultOpen={servers.length === 0}
+        sectionId="server-review-create-server-section"
         testId="server-review-create-server"
       >
         <form className="form" onSubmit={handleCreateServer}>

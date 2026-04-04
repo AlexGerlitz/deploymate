@@ -296,6 +296,14 @@ function ImportReviewPageContent() {
         loading={loading}
         onRefresh={loadWorkspace}
         refreshTestId="import-review-refresh-button"
+        backHref="/app/users"
+        backLabel="Restore workspace"
+        primaryAction={{
+          label: "Download preparation packet",
+          testId: "import-review-primary-action-button",
+          onClick: handleDownloadPreparationPacket,
+          disabled: !workspace,
+        }}
         actions={[
           {
             label: "Plan JSON",
@@ -333,7 +341,7 @@ function ImportReviewPageContent() {
             onClick: handleDownloadPreparationPacket,
             disabled: !workspace,
           },
-        ]}
+          ]}
       />
 
       <AdminFeedbackBanners
@@ -373,6 +381,43 @@ function ImportReviewPageContent() {
               </div>
             </div>
           </div>
+
+          <article className="card compactCard" data-testid="import-review-main-next-step-card">
+            <div className="sectionHeader">
+              <div>
+                <h3 data-testid="import-review-main-next-step-title">Main next step</h3>
+                <p className="formHint">
+                  Finish review here, then hand off the controlled preparation packet. Export tools stay below as secondary actions.
+                </p>
+              </div>
+            </div>
+            <div className="row">
+              <span className="label">Preparation status</span>
+              <span data-testid="import-review-main-next-step-status">{workspace.import_plan.summary.preparation_status}</span>
+            </div>
+            <div className="row">
+              <span className="label">What to do</span>
+              <span data-testid="import-review-main-next-step-copy">{workspace.import_plan.summary.preparation_next_step}</span>
+            </div>
+            <div className="actionCluster">
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="import-review-main-next-step-button"
+                onClick={handleDownloadPreparationPacket}
+              >
+                Download preparation packet
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="import-review-main-next-step-copy-button"
+                onClick={handleCopyPreparationSummary}
+              >
+                Copy preparation summary
+              </button>
+            </div>
+          </article>
 
           <article className="card compactCard" data-testid="import-review-source-card">
             <div className="sectionHeader">

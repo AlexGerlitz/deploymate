@@ -108,6 +108,7 @@ automation_smoke_admin_checks() {
   cat <<'EOF'
 /register|register copy|Create Trial Account|Public signup is not enabled
 /app/users|users page title|data-testid="users-page-title"
+/app/users|users primary action button|data-testid="users-primary-action-button"
 /app/users|backup panel title|data-testid="backup-panel-title"
 /app/users|admin smoke banner|data-testid="admin-smoke-banner"
 /app/users|users refresh button|data-testid="users-refresh-button"
@@ -295,6 +296,7 @@ EOF
 
 automation_smoke_servers_checks() {
   cat <<'EOF'
+/app/server-review|server review primary action button|data-testid="server-review-primary-action-button"
 /app|servers card|data-testid="servers-card"
 /app|servers title|data-testid="servers-title"
 /app|servers search input|data-testid="servers-search-input"|data-testid="servers-restricted-banner"

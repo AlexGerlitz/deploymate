@@ -108,6 +108,17 @@ function formatPreparationMode(mode) {
     .join(" ");
 }
 
+function scrollToElement(sectionId) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const element = document.getElementById(sectionId);
+  if (element) {
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 function UsersPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -1239,6 +1250,12 @@ function UsersPageContent() {
           loading={loading}
           onRefresh={refreshPageData}
           refreshTestId="users-refresh-button"
+          primaryAction={{
+            label: "Create user",
+            testId: "users-primary-action-button",
+            onClick: () => scrollToElement("users-create-user-card"),
+            disabled: false,
+          }}
           actions={[
             { label: "Copy link", testId: "users-copy-link-button", onClick: handleCopyCurrentView },
             { label: "Export CSV", testId: "users-export-button", onClick: handleDownloadUsersExport },
@@ -1988,7 +2005,7 @@ function UsersPageContent() {
           </div>
         </article>
 
-        <article className="card formCard adminToolCard">
+        <article id="users-create-user-card" className="card formCard adminToolCard">
           <div className="adminToolHeader">
             <span className="adminToolEyebrow">After review</span>
             <h2>Add teammate</h2>

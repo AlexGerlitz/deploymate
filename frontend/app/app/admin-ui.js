@@ -9,6 +9,9 @@ export function AdminPageHeader({
   loading,
   onRefresh,
   refreshTestId,
+  backHref = "/app",
+  backLabel = "Back",
+  primaryAction = null,
   actions = [],
 }) {
   return (
@@ -21,18 +24,31 @@ export function AdminPageHeader({
           <p>{subtitle}</p>
         </div>
         <div className="buttonRow workspaceHeroActions">
-          <Link href="/app" className="linkButton workspaceSecondaryAction">
-            Back
+          <Link href={backHref} className="linkButton workspaceSecondaryAction">
+            {backLabel}
           </Link>
-          <button
-            type="button"
-            className="landingButton primaryButton workspacePrimaryAction"
-            data-testid={refreshTestId}
-            onClick={onRefresh}
-            disabled={loading}
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
+          {primaryAction ? (
+            <button
+              type="button"
+              className="landingButton primaryButton workspacePrimaryAction"
+              data-testid={primaryAction.testId}
+              onClick={primaryAction.onClick}
+              disabled={primaryAction.disabled}
+            >
+              {primaryAction.label}
+            </button>
+          ) : null}
+          {onRefresh ? (
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid={refreshTestId}
+              onClick={onRefresh}
+              disabled={loading}
+            >
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+          ) : null}
           {actions.map((action) => (
             <button
               key={action.label}
@@ -66,7 +82,11 @@ export function AdminPageHeader({
         <div className="workspaceHeroBadge workspaceHeroSpotlight">
           <span>What matters now</span>
           <strong>{title}</strong>
-          <p>Use this surface to review signals quickly, make deliberate changes, and share the same view with others.</p>
+          <p>
+            {primaryAction
+              ? `Main next step: ${primaryAction.label}. Secondary tools stay available, but the primary path should be obvious first.`
+              : "Use this surface to review signals quickly, make deliberate changes, and share the same view with others."}
+          </p>
         </div>
       </div>
     </section>
@@ -385,11 +405,12 @@ export function AdminDisclosureSection({
   subtitle = "",
   badge = "",
   defaultOpen = false,
+  sectionId,
   testId,
   children,
 }) {
   return (
-    <details className="adminDisclosure" open={defaultOpen} data-testid={testId}>
+    <details id={sectionId} className="adminDisclosure" open={defaultOpen} data-testid={testId}>
       <summary className="adminDisclosureSummary">
         <div className="adminDisclosureCopy">
           <strong>{title}</strong>
