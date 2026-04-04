@@ -327,6 +327,14 @@ def _build_restore_import_plan(report: RestoreDryRunResponse) -> RestoreImportPl
     ]
     typed_review_phrase = f"acknowledge import review {report.manifest.bundle_name}"
     approval_status = "approval_blocked" if blocked_sections else "approval_required"
+    approval_packet_title = f"Import review approval for {report.manifest.bundle_name}"
+    approval_subject_line = (
+        f"[DeployMate import review] {report.manifest.bundle_name} requires approval handoff"
+    )
+    approval_share_summary = (
+        f"Bundle {report.manifest.bundle_name}: plan {plan_status}, "
+        f"included {len(included_sections)}, review {len(review_sections)}, blocked {len(blocked_sections)}."
+    )
     approval_summary = (
         "Approval can only cover review scope and preparation handoff. Live apply remains blocked until a future controlled restore flow exists."
     )
@@ -340,6 +348,9 @@ def _build_restore_import_plan(report: RestoreDryRunResponse) -> RestoreImportPl
     ]
     approval_handoff_note = (
         "Use this packet to hand off a review decision, not an execution decision. If approval is granted, the next step is still controlled preparation only."
+    )
+    approval_next_step = (
+        "Send the approval packet to the reviewer or approver, then keep work at the review/preparation boundary until a separate controlled restore flow exists."
     )
     reviewer_guidance = (
         "This plan is for operator review only. It narrows future import scope without authorizing any live restore apply."
@@ -368,10 +379,14 @@ def _build_restore_import_plan(report: RestoreDryRunResponse) -> RestoreImportPl
             blocked_sections=blocked_sections,
             excluded_sections=excluded_sections,
             approval_status=approval_status,
+            approval_packet_title=approval_packet_title,
+            approval_subject_line=approval_subject_line,
+            approval_share_summary=approval_share_summary,
             approval_summary=approval_summary,
             approval_decision_question=approval_decision_question,
             approval_checklist=approval_checklist,
             approval_handoff_note=approval_handoff_note,
+            approval_next_step=approval_next_step,
         ),
         sections=sections,
     )

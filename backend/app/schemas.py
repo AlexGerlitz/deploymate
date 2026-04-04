@@ -486,10 +486,14 @@ class RestoreImportPlanSummary(BaseModel):
     blocked_sections: list[str] = Field(default_factory=list)
     excluded_sections: list[str] = Field(default_factory=list)
     approval_status: Literal["approval_required", "approval_blocked"] = "approval_required"
+    approval_packet_title: str = ""
+    approval_subject_line: str = ""
+    approval_share_summary: str = ""
     approval_summary: str = ""
     approval_decision_question: str = ""
     approval_checklist: list[str] = Field(default_factory=list)
     approval_handoff_note: str = ""
+    approval_next_step: str = ""
 
 
 class RestoreImportPlanResponse(BaseModel):

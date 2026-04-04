@@ -12,6 +12,7 @@ import {
 } from "../../lib/admin-page-utils";
 import {
   buildImportReviewApprovalPacket,
+  buildImportReviewApprovalTrail,
   buildImportReviewCsv,
   buildImportReviewMarkdown,
   importReviewHandoffStorageKey,
@@ -185,12 +186,42 @@ function ImportReviewPageContent() {
     setSuccess("Approval packet markdown downloaded.");
   }
 
+  function handleDownloadApprovalTrailJson() {
+    if (!workspace) {
+      return;
+    }
+    const trail = buildImportReviewApprovalTrail(workspace);
+    const blob = new Blob([JSON.stringify(trail, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-import-review-approval-trail.json", blob);
+    setSuccess("Approval trail JSON downloaded.");
+  }
+
   async function handleCopyApprovalQuestion() {
     if (!workspace) {
       return;
     }
     await copyTextToClipboard(workspace.import_plan.summary.approval_decision_question);
     setSuccess("Approval decision question copied.");
+  }
+
+  async function handleCopyApprovalSummary() {
+    if (!workspace) {
+      return;
+    }
+    await copyTextToClipboard(
+      [
+        workspace.import_plan.summary.approval_packet_title,
+        workspace.import_plan.summary.approval_subject_line,
+        workspace.import_plan.summary.approval_share_summary,
+        workspace.import_plan.summary.approval_decision_question,
+        `Next step: ${workspace.import_plan.summary.approval_next_step}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+    setSuccess("Approval handoff summary copied.");
   }
 
   async function handleCopyConfirmation() {
@@ -246,6 +277,12 @@ function ImportReviewPageContent() {
             label: "Approval packet",
             testId: "import-review-approval-packet-button",
             onClick: handleDownloadApprovalPacket,
+            disabled: !workspace,
+          },
+          {
+            label: "Approval trail JSON",
+            testId: "import-review-approval-trail-button",
+            onClick: handleDownloadApprovalTrailJson,
             disabled: !workspace,
           },
         ]}
@@ -446,6 +483,18 @@ function ImportReviewPageContent() {
               <span data-testid="import-review-approval-status">{workspace.import_plan.summary.approval_status}</span>
             </div>
             <div className="row">
+              <span className="label">Packet title</span>
+              <span data-testid="import-review-approval-packet-title">{workspace.import_plan.summary.approval_packet_title}</span>
+            </div>
+            <div className="row">
+              <span className="label">Subject line</span>
+              <span data-testid="import-review-approval-subject-line">{workspace.import_plan.summary.approval_subject_line}</span>
+            </div>
+            <div className="row">
+              <span className="label">Share summary</span>
+              <span data-testid="import-review-approval-share-summary">{workspace.import_plan.summary.approval_share_summary}</span>
+            </div>
+            <div className="row">
               <span className="label">Decision question</span>
               <span data-testid="import-review-approval-question">{workspace.import_plan.summary.approval_decision_question}</span>
             </div>
@@ -465,6 +514,10 @@ function ImportReviewPageContent() {
               <span className="label">Handoff note</span>
               <span data-testid="import-review-approval-handoff-note">{workspace.import_plan.summary.approval_handoff_note}</span>
             </div>
+            <div className="row">
+              <span className="label">Next step</span>
+              <span data-testid="import-review-approval-next-step">{workspace.import_plan.summary.approval_next_step}</span>
+            </div>
             <div className="actionCluster">
               <button
                 type="button"
@@ -476,11 +529,27 @@ function ImportReviewPageContent() {
               </button>
               <button
                 type="button"
+                className="secondaryButton"
+                data-testid="import-review-approval-trail-download-button"
+                onClick={handleDownloadApprovalTrailJson}
+              >
+                Download approval trail JSON
+              </button>
+              <button
+                type="button"
                 className="softButton"
                 data-testid="import-review-approval-copy-question-button"
                 onClick={handleCopyApprovalQuestion}
               >
                 Copy decision question
+              </button>
+              <button
+                type="button"
+                className="softButton"
+                data-testid="import-review-approval-copy-summary-button"
+                onClick={handleCopyApprovalSummary}
+              >
+                Copy handoff summary
               </button>
             </div>
           </article>

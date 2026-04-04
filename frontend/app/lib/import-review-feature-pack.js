@@ -110,9 +110,19 @@ export function buildImportReviewApprovalPacket(workspace) {
   const lines = [
     "# Import Review Approval Packet",
     "",
+    workspace.import_plan.summary.approval_packet_title || `Import review approval for ${workspace.bundle_manifest.bundle_name}`,
+    "",
     `Bundle: ${workspace.bundle_manifest.bundle_name}`,
     `Plan ID: ${workspace.import_plan.summary.plan_id}`,
     `Approval status: ${workspace.import_plan.summary.approval_status}`,
+    "",
+    "## Share Summary",
+    "",
+    workspace.import_plan.summary.approval_share_summary || "No share summary available.",
+    "",
+    "## Subject Line",
+    "",
+    workspace.import_plan.summary.approval_subject_line || "No subject line available.",
     "",
     "## Decision Question",
     "",
@@ -139,6 +149,37 @@ export function buildImportReviewApprovalPacket(workspace) {
   }
 
   lines.push("", "## Scope", "", workspace.import_plan.summary.plan_scope_summary || "No scope summary available.");
+  lines.push("", "## Next Step", "", workspace.import_plan.summary.approval_next_step || "No next step available.");
 
   return lines.join("\n");
+}
+
+export function buildImportReviewApprovalTrail(workspace) {
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    generated_at: workspace.generated_at,
+    bundle_name: workspace.bundle_manifest.bundle_name,
+    source_generated_at: workspace.bundle_manifest.generated_at,
+    dry_run_readiness: workspace.dry_run.summary.readiness_status,
+    plan_status: workspace.import_plan.summary.plan_status,
+    plan_id: workspace.import_plan.summary.plan_id,
+    approval_status: workspace.import_plan.summary.approval_status,
+    approval_packet_title: workspace.import_plan.summary.approval_packet_title,
+    approval_subject_line: workspace.import_plan.summary.approval_subject_line,
+    approval_share_summary: workspace.import_plan.summary.approval_share_summary,
+    approval_decision_question: workspace.import_plan.summary.approval_decision_question,
+    approval_summary: workspace.import_plan.summary.approval_summary,
+    approval_handoff_note: workspace.import_plan.summary.approval_handoff_note,
+    approval_next_step: workspace.import_plan.summary.approval_next_step,
+    plan_scope_summary: workspace.import_plan.summary.plan_scope_summary,
+    reviewer_guidance: workspace.import_plan.summary.reviewer_guidance,
+    typed_confirmation_phrase: workspace.import_plan.summary.typed_confirmation_phrase,
+    included_sections: workspace.import_plan.summary.included_sections || [],
+    review_sections: workspace.import_plan.summary.review_sections || [],
+    blocked_sections: workspace.import_plan.summary.blocked_sections || [],
+    excluded_sections: workspace.import_plan.summary.excluded_sections || [],
+  };
 }

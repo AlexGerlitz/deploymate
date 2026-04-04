@@ -138,6 +138,9 @@ class ImportReviewApiFlowTests(unittest.TestCase):
                     ],
                     "typed_review_phrase": "acknowledge import review deploymate-backup-live",
                     "approval_status": "approval_blocked",
+                    "approval_packet_title": "Import review approval for deploymate-backup-live",
+                    "approval_subject_line": "[DeployMate import review] deploymate-backup-live requires approval handoff",
+                    "approval_share_summary": "Bundle deploymate-backup-live: plan blocked, included 0, review 1, blocked 1.",
                     "approval_summary": "Approval can only cover review scope and preparation handoff.",
                     "approval_decision_question": "Do we approve this bundle for continued review and preparation work, without approving any live restore apply?",
                     "approval_checklist": [
@@ -145,6 +148,7 @@ class ImportReviewApiFlowTests(unittest.TestCase):
                         "Approval here does not mean permission to run live restore apply.",
                     ],
                     "approval_handoff_note": "Use this packet to hand off a review decision, not an execution decision.",
+                    "approval_next_step": "Send the approval packet to the reviewer or approver, then keep work at the review/preparation boundary until a separate controlled restore flow exists.",
                     "plan_scope_summary": "Controlled import scope: hold users for review; block deployments",
                     "reviewer_guidance": "Review only. No live apply is authorized.",
                     "typed_confirmation_phrase": "review import plan deploymate-backup-live",
@@ -187,6 +191,8 @@ class ImportReviewApiFlowTests(unittest.TestCase):
         self.assertIn("blocked", payload["import_plan"]["summary"]["apply_block_reason"].lower())
         self.assertEqual(payload["import_plan"]["summary"]["apply_readiness_status"], "not_ready")
         self.assertEqual(payload["import_plan"]["summary"]["approval_status"], "approval_blocked")
+        self.assertIn("approval", payload["import_plan"]["summary"]["approval_packet_title"].lower())
+        self.assertIn("deploymate-backup-live", payload["import_plan"]["summary"]["approval_subject_line"])
         self.assertEqual(payload["import_plan"]["sections"][0]["plan_state"], "review")
 
 
