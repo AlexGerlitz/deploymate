@@ -159,6 +159,22 @@ class ImportReviewApiFlowTests(unittest.TestCase):
                     ],
                     "preparation_handoff_note": "Use this handoff when the next person needs to prepare documentation, sequence review work, or line up prerequisites without moving into live restore apply.",
                     "preparation_next_step": "Document the included scope, assign review work for review-required sections, and keep blocked sections out of the preparation path until the next dry-run clears them.",
+                    "workflow_focus": "Resolve blocked sections before any preparation handoff can be treated as ready.",
+                    "workflow_summary": "Validate restore bundle -> Review import scope -> Resolve blocked sections -> Hand off controlled preparation",
+                    "workflow_steps": [
+                        {
+                            "key": "dry_run",
+                            "title": "Validate restore bundle",
+                            "status": "complete",
+                            "detail": "Dry-run already ran on this bundle and exposed the current risk profile.",
+                        },
+                        {
+                            "key": "blocked_review",
+                            "title": "Resolve blocked sections",
+                            "status": "current",
+                            "detail": "Blocked sections still stop the flow here.",
+                        },
+                    ],
                     "plan_scope_summary": "Controlled import scope: hold users for review; block deployments",
                     "reviewer_guidance": "Review only. No live apply is authorized.",
                     "typed_confirmation_phrase": "review import plan deploymate-backup-live",
@@ -205,6 +221,8 @@ class ImportReviewApiFlowTests(unittest.TestCase):
         self.assertIn("deploymate-backup-live", payload["import_plan"]["summary"]["approval_subject_line"])
         self.assertEqual(payload["import_plan"]["summary"]["preparation_status"], "preparation_blocked")
         self.assertIn("preparation", payload["import_plan"]["summary"]["preparation_packet_title"].lower())
+        self.assertIn("blocked sections", payload["import_plan"]["summary"]["workflow_focus"].lower())
+        self.assertGreaterEqual(len(payload["import_plan"]["summary"]["workflow_steps"]), 2)
         self.assertEqual(payload["import_plan"]["sections"][0]["plan_state"], "review")
 
 

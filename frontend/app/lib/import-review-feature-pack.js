@@ -79,6 +79,25 @@ export function buildImportReviewMarkdown(workspace) {
     "",
     workspace.import_plan.summary.plan_scope_summary || "No scope summary available.",
     "",
+    "## Workflow Focus",
+    "",
+    workspace.import_plan.summary.workflow_focus || "No workflow focus available.",
+    "",
+    "## Workflow Steps",
+    "",
+  ];
+
+  if (!(workspace.import_plan.summary.workflow_steps || []).length) {
+    lines.push("No workflow steps available.", "");
+  } else {
+    for (const step of workspace.import_plan.summary.workflow_steps) {
+      lines.push(`- ${step.title}: ${step.status}`);
+      lines.push(`  detail: ${step.detail || "No step detail available."}`);
+    }
+    lines.push("");
+  }
+
+  lines.push(
     "## Reviewer Guidance",
     "",
     workspace.import_plan.summary.reviewer_guidance || "No reviewer guidance available.",
@@ -89,7 +108,7 @@ export function buildImportReviewMarkdown(workspace) {
     "",
     "## Sections",
     "",
-  ];
+  );
 
   for (const section of workspace.import_plan.sections || []) {
     lines.push(`- ${section.name}: ${section.plan_state}`);

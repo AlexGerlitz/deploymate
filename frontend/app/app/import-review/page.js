@@ -419,6 +419,49 @@ function ImportReviewPageContent() {
             </div>
           </article>
 
+          <article className="card compactCard" data-testid="import-review-sequencing-card">
+            <div className="sectionHeader">
+              <div>
+                <h3 data-testid="import-review-sequencing-title">Recovery sequence</h3>
+                <p className="formHint">
+                  Follow this order. It keeps review, preparation, and any future restore boundary in a safe sequence instead of turning the screen into a toolbox.
+                </p>
+              </div>
+            </div>
+            <div className="row">
+              <span className="label">Current focus</span>
+              <span data-testid="import-review-sequencing-focus">{workspace.import_plan.summary.workflow_focus}</span>
+            </div>
+            <div className="row">
+              <span className="label">Sequence summary</span>
+              <span data-testid="import-review-sequencing-summary">{workspace.import_plan.summary.workflow_summary}</span>
+            </div>
+            <div className="overviewAttentionList" data-testid="import-review-sequencing-steps">
+              {(workspace.import_plan.summary.workflow_steps || []).map((step) => (
+                <div
+                  key={step.key}
+                  className="overviewAttentionItem"
+                  data-testid={`import-review-sequencing-step-${step.key}`}
+                >
+                  <div className="row">
+                    <span className="label">Step</span>
+                    <span>{step.title}</span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Status</span>
+                    <span className={`status ${step.status === "blocked" ? "error" : step.status === "current" ? "warn" : step.status === "complete" ? "healthy" : "unknown"}`}>
+                      {step.status}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <span className="label">Detail</span>
+                    <span>{step.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+
           <article className="card compactCard" data-testid="import-review-source-card">
             <div className="sectionHeader">
               <div>

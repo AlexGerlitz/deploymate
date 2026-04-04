@@ -468,6 +468,13 @@ class RestoreImportPlanSection(BaseModel):
     recommended_action: str = ""
 
 
+class RestoreWorkflowStep(BaseModel):
+    key: str
+    title: str
+    status: Literal["complete", "current", "upcoming", "blocked"] = "upcoming"
+    detail: str = ""
+
+
 class RestoreImportPlanSummary(BaseModel):
     plan_id: str
     plan_status: Literal["ready_for_review", "review_required", "blocked"] = "review_required"
@@ -501,6 +508,9 @@ class RestoreImportPlanSummary(BaseModel):
     preparation_checklist: list[str] = Field(default_factory=list)
     preparation_handoff_note: str = ""
     preparation_next_step: str = ""
+    workflow_focus: str = ""
+    workflow_summary: str = ""
+    workflow_steps: list[RestoreWorkflowStep] = Field(default_factory=list)
 
 
 class RestoreImportPlanResponse(BaseModel):

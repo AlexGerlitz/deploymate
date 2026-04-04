@@ -377,6 +377,91 @@ def _build_restore_import_plan(report: RestoreDryRunResponse) -> RestoreImportPl
     preparation_next_step = (
         "Document the included scope, assign review work for review-required sections, and keep blocked sections out of the preparation path until the next dry-run clears them."
     )
+    if blocked_sections:
+        workflow_focus = "Resolve blocked sections before any preparation handoff can be treated as ready."
+        workflow_steps = [
+            {
+                "key": "dry_run",
+                "title": "Validate restore bundle",
+                "status": "complete",
+                "detail": "Dry-run already ran on this bundle and exposed the current risk profile.",
+            },
+            {
+                "key": "import_review",
+                "title": "Review import scope",
+                "status": "complete",
+                "detail": "The operator already reviewed bundle scope, boundary messaging, and section states.",
+            },
+            {
+                "key": "blocked_review",
+                "title": "Resolve blocked sections",
+                "status": "current",
+                "detail": "Blocked sections still stop the flow here. Clean them up and rerun dry-run before safe preparation can move forward.",
+            },
+            {
+                "key": "preparation_handoff",
+                "title": "Hand off controlled preparation",
+                "status": "blocked",
+                "detail": "Preparation stays downstream, but it is not the active focus until blocked sections clear.",
+            },
+        ]
+    elif review_sections:
+        workflow_focus = "Move through review-required sections, then hand off controlled preparation."
+        workflow_steps = [
+            {
+                "key": "dry_run",
+                "title": "Validate restore bundle",
+                "status": "complete",
+                "detail": "Dry-run already validated the current bundle shape and risk profile.",
+            },
+            {
+                "key": "import_review",
+                "title": "Review import scope",
+                "status": "complete",
+                "detail": "Import review already narrowed the scope and confirmed the non-apply boundary.",
+            },
+            {
+                "key": "review_sections",
+                "title": "Clear review-required sections",
+                "status": "current",
+                "detail": "Review-required sections still need operator cleanup before the preparation handoff is fully ready.",
+            },
+            {
+                "key": "preparation_handoff",
+                "title": "Hand off controlled preparation",
+                "status": "upcoming",
+                "detail": "Preparation becomes the next safe stage once review-required sections are settled.",
+            },
+        ]
+    else:
+        workflow_focus = "The flow is ready to move from review into controlled preparation handoff."
+        workflow_steps = [
+            {
+                "key": "dry_run",
+                "title": "Validate restore bundle",
+                "status": "complete",
+                "detail": "Dry-run already ran and no blocked or review-required sections remain in the current plan.",
+            },
+            {
+                "key": "import_review",
+                "title": "Review import scope",
+                "status": "complete",
+                "detail": "Import review already confirmed the safe scope and non-apply boundary.",
+            },
+            {
+                "key": "preparation_handoff",
+                "title": "Hand off controlled preparation",
+                "status": "current",
+                "detail": "Preparation handoff is now the active next step for this bundle.",
+            },
+            {
+                "key": "future_apply",
+                "title": "Wait for future controlled apply flow",
+                "status": "upcoming",
+                "detail": "Live restore apply still stays outside the current product boundary.",
+            },
+        ]
+    workflow_summary = " -> ".join(step["title"] for step in workflow_steps)
     reviewer_guidance = (
         "This plan is for operator review only. It narrows future import scope without authorizing any live restore apply."
     )
@@ -419,6 +504,9 @@ def _build_restore_import_plan(report: RestoreDryRunResponse) -> RestoreImportPl
             preparation_checklist=preparation_checklist,
             preparation_handoff_note=preparation_handoff_note,
             preparation_next_step=preparation_next_step,
+            workflow_focus=workflow_focus,
+            workflow_summary=workflow_summary,
+            workflow_steps=workflow_steps,
         ),
         sections=sections,
     )
