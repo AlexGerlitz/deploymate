@@ -99,7 +99,9 @@ start_frontend_smoke_server() {
     frontend_smoke_load_state
     FRONTEND_SMOKE_SERVER_PID="${FRONTEND_SMOKE_SERVER_PID:-}"
   else
-    NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_DIST_DIR="$DIST_DIR" \
+    NEXT_PUBLIC_SMOKE_TEST_MODE=1 \
+      NEXT_PUBLIC_SMOKE_RESTORE_REPORT="${NEXT_PUBLIC_SMOKE_RESTORE_REPORT:-}" \
+      NEXT_DIST_DIR="$DIST_DIR" \
       bash -lc "cd \"$FRONTEND_DIR\" && exec npm run dev -- --hostname 127.0.0.1 --port \"$PORT\"" >"$SERVER_LOG" 2>&1 &
     FRONTEND_SMOKE_SERVER_PID=$!
   fi

@@ -302,6 +302,7 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
     FRONTEND_SMOKE_PORT=3002 \
     FRONTEND_SMOKE_LOG="/tmp/deploymate-frontend-restore-shared.log" \
     FRONTEND_SMOKE_DIST_DIR=".next-smoke-restore-3002" \
+    FRONTEND_SMOKE_REUSE_SERVER=0 \
     NEXT_PUBLIC_SMOKE_RESTORE_REPORT=1 \
       bash scripts/frontend_restore_smoke.sh
 

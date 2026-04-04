@@ -17,3 +17,7 @@ frontend/.env.*.local
 .logs/
 automation-core-dist/
 product-starter-dist/
+prompt.md
+SESSION_MEMORY.md
+HANDOFF.local.md
+ROADMAP.local.md

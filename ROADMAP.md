@@ -14,6 +14,16 @@ teams that want:
 - a runtime surface that is readable in one pass
 - admin workflows that feel productized rather than bolted on
 - release and recovery discipline around the app, not outside it
+- a first-run experience where a non-technical user can still see the obvious next click
+
+## Long-Lived Product Rule
+
+- Strategic direction should not drift between sessions just because the current chat focused on one local screen.
+- The product is not aiming for “more controls”; it is aiming for “clearer action”.
+- The main path must become understandable in plain language for a person who thinks in terms of:
+  - connect server
+  - see if service is alive
+  - know what to do next
 
 ## What Is Already True
 
@@ -32,6 +42,7 @@ release story.
 Near-term slices:
 
 - keep tightening the reviewer path from login to runtime to admin surfaces
+- tighten the newbie path from server connection to “service is healthy / service needs help”
 - keep the repo root easy to skim for product, architecture, and release context
 - make release milestones legible through docs and public notes
 
@@ -45,6 +56,7 @@ Near-term slices:
 - deepen automated coverage for deployment creation, redeploy, delete, and diagnostics
 - keep runtime smoke coverage aligned with the strongest user-visible paths
 - preserve clear degraded-mode behavior instead of hiding partial failures
+- keep runtime language understandable enough that safety does not depend on expert vocabulary
 
 ### 3. Recovery and operator safety
 
@@ -73,6 +85,8 @@ Near-term slices:
 ### Product polish
 
 - keep deployment detail ergonomics strong
+- make first-screen calls to action more obvious than secondary controls
+- keep the server-connection path and runtime path feeling like one continuous product story
 - keep exports, audit, and review flows consistent across admin surfaces
 - improve seeded demo readability where it strengthens first-pass evaluation
 
