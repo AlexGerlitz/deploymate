@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
-  AdminDisclosureSection,
   AdminFeedbackBanners,
   AdminSurfaceActionStarter,
   AdminSurfaceQueue,
@@ -567,94 +566,10 @@ function ServerReviewPageContent() {
         </div>
       </article>
 
-      <AdminDisclosureSection
-        title="Edit selected server"
-        subtitle="Use this only after one server is already understood and you know exactly what needs to change."
-        badge={selectedItem ? "Edit" : "Pick one"}
-        defaultOpen={false}
-        sectionId="server-review-edit-server"
-        testId="server-review-edit-server"
-      >
-        {selectedItem ? (
-          <form className="form" onSubmit={handleUpdateServer}>
-            <label className="field">
-              <span>Name</span>
-              <input
-                name="name"
-                value={editForm.name}
-                onChange={updateEditFormField}
-                disabled={serverUpdating}
-                required
-                data-testid="server-review-edit-name"
-              />
-            </label>
-            <label className="field">
-              <span>Host</span>
-              <input
-                name="host"
-                value={editForm.host}
-                onChange={updateEditFormField}
-                disabled={serverUpdating}
-                required
-                data-testid="server-review-edit-host"
-              />
-            </label>
-            <label className="field">
-              <span>Port</span>
-              <input
-                name="port"
-                type="number"
-                min="1"
-                max="65535"
-                value={editForm.port}
-                onChange={updateEditFormField}
-                disabled={serverUpdating}
-                required
-                data-testid="server-review-edit-port"
-              />
-            </label>
-            <label className="field">
-              <span>Username</span>
-              <input
-                name="username"
-                value={editForm.username}
-                onChange={updateEditFormField}
-                disabled={serverUpdating}
-                required
-                data-testid="server-review-edit-username"
-              />
-            </label>
-            <label className="field">
-              <span>SSH key</span>
-              <textarea
-                name="ssh_key"
-                rows={6}
-                value={editForm.ssh_key}
-                onChange={updateEditFormField}
-                placeholder="Leave empty to keep the current key, or paste a replacement private key."
-                disabled={serverUpdating}
-                data-testid="server-review-edit-ssh-key"
-              />
-            </label>
-            <div className="formActions">
-              <button
-                type="submit"
-                disabled={serverUpdating}
-                data-testid="server-review-edit-submit"
-              >
-                {serverUpdating ? "Saving..." : "Save server changes"}
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="empty">Pick a server from the queue or table to edit it here.</div>
-        )}
-      </AdminDisclosureSection>
-
       <div id="server-review-live-queue">
         <AdminSurfaceQueue
-          title="Saved servers"
-          description="Save one server, focus it here, test the connection, then continue to app setup."
+          title="Your servers"
+          description="Choose one server here to check it, edit it, or continue to app setup."
           searchLabel="Search saved servers"
           searchValue={query}
           onSearchChange={(event) => setQuery(event.target.value)}
@@ -700,6 +615,15 @@ function ServerReviewPageContent() {
                 >
                   {item.id === selectedItemId ? "Focused" : "Focus server"}
                 </button>
+                {item.id === selectedItemId ? null : (
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => handleSelectItem(item.id)}
+                  >
+                    Edit
+                  </button>
+                )}
                 <button
                   type="button"
                   className="secondaryButton"
@@ -736,6 +660,78 @@ function ServerReviewPageContent() {
                   {deletingServerId === item.id ? "Deleting..." : "Delete"}
                 </button>
               </div>
+              {item.id === selectedItemId ? (
+                <form className="form" onSubmit={handleUpdateServer}>
+                  <label className="field">
+                    <span>Name</span>
+                    <input
+                      name="name"
+                      value={editForm.name}
+                      onChange={updateEditFormField}
+                      disabled={serverUpdating}
+                      required
+                      data-testid="server-review-edit-name"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Host</span>
+                    <input
+                      name="host"
+                      value={editForm.host}
+                      onChange={updateEditFormField}
+                      disabled={serverUpdating}
+                      required
+                      data-testid="server-review-edit-host"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Port</span>
+                    <input
+                      name="port"
+                      type="number"
+                      min="1"
+                      max="65535"
+                      value={editForm.port}
+                      onChange={updateEditFormField}
+                      disabled={serverUpdating}
+                      required
+                      data-testid="server-review-edit-port"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Username</span>
+                    <input
+                      name="username"
+                      value={editForm.username}
+                      onChange={updateEditFormField}
+                      disabled={serverUpdating}
+                      required
+                      data-testid="server-review-edit-username"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>SSH key</span>
+                    <textarea
+                      name="ssh_key"
+                      rows={6}
+                      value={editForm.ssh_key}
+                      onChange={updateEditFormField}
+                      placeholder="Leave empty to keep the current key, or paste a replacement private key."
+                      disabled={serverUpdating}
+                      data-testid="server-review-edit-ssh-key"
+                    />
+                  </label>
+                  <div className="formActions">
+                    <button
+                      type="submit"
+                      disabled={serverUpdating}
+                      data-testid="server-review-edit-submit"
+                    >
+                      {serverUpdating ? "Saving..." : "Save changes"}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
             </AdminSurfaceQueueCard>
           ))}
         </AdminSurfaceQueue>
