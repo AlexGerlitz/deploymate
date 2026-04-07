@@ -90,6 +90,14 @@ export default function HomePage() {
     : deployments.length === 0
       ? "You are already past Step 1. The next move is entering one Docker image or using a saved template."
       : "Use the deployment workspace for the next action. Keep admin and reports secondary until the runtime story is clear.";
+  const explanationTitle = servers.length === 0
+    ? "What happens after you connect a server"
+    : "What happens next";
+  const explanationBody = servers.length === 0
+    ? "After Step 1, open the deploy screen, enter one Docker image, and then check whether the app is healthy."
+    : deployments.length === 0
+      ? "After Step 1, choose what to run, create the first deployment, and then review status."
+      : "Use the deployment workspace to review status first, then make the next rollout deliberately.";
   const beginnerSteps = [
     {
       key: "step-1",
@@ -492,129 +500,87 @@ export default function HomePage() {
               <p className="formHint">{heroSupportText}</p>
             </div>
             <div className="buttonRow workspaceHeroActions">
-              <Link
-                href={overviewPrimaryPath.href}
-                className="landingButton primaryButton workspacePrimaryAction"
-              >
-                {overviewPrimaryPath.label}
-              </Link>
-              {servers.length > 0 ? (
-                <Link href="/app/deployment-workflow" className="linkButton workspaceSecondaryAction">
-                  Open deploy step
-                </Link>
-              ) : null}
               <button type="button" onClick={handleLogout} className="workspaceGhostAction">
                 Logout
               </button>
             </div>
           </div>
 
-          <div className="workspaceHeroSummary">
-            <div className="workspaceHeroMetric">
-              <span>Step 1</span>
-              <strong>{servers.length === 0 ? "Connect server" : "Server ready"}</strong>
-              <p>
-                {servers.length === 0
-                  ? "Add one server target so DeployMate can reach your machine."
-                  : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved for rollout.`}
-              </p>
+          <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2 data-testid="workspace-scenario-title">Try it now</h2>
+                <p className="formHint">
+                  Start with one action. The explanation sits lower on the page.
+                </p>
+              </div>
             </div>
-            <div className="workspaceHeroMetric">
-              <span>Step 2</span>
-              <strong>{deployments.length === 0 ? "Choose app" : "Deploy next change"}</strong>
-              <p>
-                Open the deploy screen, enter a Docker image, or use a saved template.
-              </p>
+            <div className="workspaceGuideGrid" data-testid="workspace-scenario-grid">
+              <div className="stepsGrid workspaceGuideSteps">
+                {beginnerSteps.map((card) => (
+                  <article
+                    key={card.key}
+                    className="stepCard workspaceStepCard"
+                    data-testid={`workspace-scenario-item-${card.key}`}
+                  >
+                    <span className="stepNumber">{card.step}</span>
+                    <h3>{card.title}</h3>
+                    <p>
+                      {card.step === "Step 1"
+                        ? "Add one server."
+                        : card.step === "Step 2"
+                          ? "Enter one image."
+                          : "Check whether it works."}
+                    </p>
+                    <Link
+                      href={card.href}
+                      className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                      data-testid={`workspace-scenario-action-${card.key}`}
+                    >
+                      {card.actionLabel}
+                    </Link>
+                  </article>
+                ))}
+              </div>
+              <aside className="workspaceGlancePanel">
+                <div className="workspaceGlanceHeader">
+                  <span className="eyebrow">Current state</span>
+                  <strong>{beginnerStatusSummary}</strong>
+                </div>
+                <div className="workspaceGlanceList">
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Step 1</span>
+                    <strong>{servers.length === 0 ? "Connect server" : "Server ready"}</strong>
+                    <p>
+                      {servers.length === 0
+                        ? "Add one server target so DeployMate can reach your machine."
+                        : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved for rollout.`}
+                    </p>
+                  </div>
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Step 2</span>
+                    <strong>{deployments.length === 0 ? "Choose app" : "Deploy next change"}</strong>
+                    <p>
+                      Open the deploy screen, enter a Docker image, or use a saved template.
+                    </p>
+                  </div>
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Next best step</span>
+                    <strong>Keep the first pass simple</strong>
+                    <p>{beginnerNextStep}</p>
+                  </div>
+                </div>
+              </aside>
             </div>
-            <div className="workspaceHeroMetric">
-              <span>Step 3</span>
-              <strong>{deployments.length === 0 ? "Check result" : "Review status"}</strong>
-              <p>
-                Start the app, then check whether it is healthy and reachable.
-              </p>
-            </div>
-            <div className="workspaceHeroBadge workspaceHeroSpotlight">
-              <span>Next best step</span>
-              <strong>{beginnerStatusSummary}</strong>
-              <p>{beginnerNextStep}</p>
-            </div>
-          </div>
+          </article>
         </section>
 
-        <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
+        <article className="card formCard workspaceGuidePanel">
           <div className="sectionHeader workspaceGuideHeader">
-            <div>
-              <h2 data-testid="workspace-scenario-title">Try it now</h2>
-              <p className="formHint">
-                Start with one action. Read the step-by-step explanation lower on the page only if you need it.
-              </p>
-            </div>
-          </div>
-          <div className="workspaceGuideGrid" data-testid="workspace-scenario-grid">
             <div className="stepsGrid workspaceGuideSteps">
-              {beginnerSteps.map((card) => (
-                <article
-                  key={card.key}
-                  className="stepCard workspaceStepCard"
-                  data-testid={`workspace-scenario-item-${card.key}`}
-                >
-                  <span className="stepNumber">{card.step}</span>
-                  <h3>{card.title}</h3>
-                  <p>
-                    {card.step === "Step 1"
-                      ? "Add one server."
-                      : card.step === "Step 2"
-                        ? "Enter one image."
-                        : "Check whether it works."}
-                  </p>
-                  <Link
-                    href={card.href}
-                    className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
-                    data-testid={`workspace-scenario-action-${card.key}`}
-                  >
-                    {card.actionLabel}
-                  </Link>
-                </article>
-              ))}
+              <h2>{explanationTitle}</h2>
+              <p className="formHint">{explanationBody}</p>
             </div>
-            <aside className="workspaceGlancePanel">
-              <div className="workspaceGlanceHeader">
-                <span className="eyebrow">Current state</span>
-                <strong>Keep the first pass simple</strong>
-              </div>
-              <div className="workspaceGlanceList">
-                <div className="workspaceStatusCard workspaceGlanceItem">
-                  <span>Server targets</span>
-                  <strong>{servers.length}</strong>
-                  <p>
-                    {servers.length === 0
-                      ? "You have not connected a server yet."
-                      : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved.`}
-                  </p>
-                </div>
-                <div className="workspaceStatusCard workspaceGlanceItem">
-                  <span>Deployments</span>
-                  <strong>{deployments.length}</strong>
-                  <p>
-                    {deployments.length === 0
-                      ? "No app has been deployed yet."
-                      : `${opsSnapshot.deployments.running} running and ${opsSnapshot.deployments.failed} failed.`}
-                  </p>
-                </div>
-                <div className="workspaceStatusCard workspaceGlanceItem">
-                  <span>Templates</span>
-                  <strong>{templates.length}</strong>
-                  <p>
-                    {templates.length === 0
-                      ? "No saved templates yet. Start with one image."
-                      : `${templates.length} template${templates.length === 1 ? "" : "s"} saved for repeat use.`}
-                  </p>
-                </div>
-              </div>
-              <div className="workspaceMetaLine">
-                <span>{beginnerNextStep}</span>
-              </div>
-            </aside>
           </div>
         </article>
 
