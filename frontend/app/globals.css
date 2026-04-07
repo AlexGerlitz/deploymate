@@ -2835,6 +2835,30 @@ button.landingButton.primaryButton:disabled {
     width: 100%;
   }
 
+  .inlineHelpGroup {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    padding-right: 30px;
+  }
+
+  .inlineHelpGroup > .secondaryButton,
+  .inlineHelpGroup > .landingButton {
+    width: 100%;
+  }
+
+  .inlineHelpGroup > .inlineHelp {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .inlineHelpGroup .inlineHelpBubble {
+    right: 0;
+    width: min(240px, calc(100vw - 56px));
+  }
+
   .authCardHeader,
   .authCardFooter {
     flex-direction: column;
