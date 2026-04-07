@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   AdminFeedbackBanners,
-  AdminSurfaceActionStarter,
   AdminSurfaceQueue,
   AdminSurfaceQueueCard,
 } from "../admin-ui";
@@ -569,7 +568,7 @@ function ServerReviewPageContent() {
       <div id="server-review-live-queue">
         <AdminSurfaceQueue
           title="Your servers"
-          description="Choose one server here to check it, edit it, or continue to app setup."
+          description="Keep all server actions here: check it, edit it, or continue to app setup."
           searchLabel="Search saved servers"
           searchValue={query}
           onSearchChange={(event) => setQuery(event.target.value)}
@@ -631,7 +630,7 @@ function ServerReviewPageContent() {
                   onClick={() => handleRunStarterAction("primary", item.id)}
                   disabled={actionLoadingId === item.id}
                 >
-                  {starterStrings.primaryActionLabel}
+                  Run full check
                 </button>
                 <button
                   type="button"
@@ -640,7 +639,7 @@ function ServerReviewPageContent() {
                   onClick={() => handleRunStarterAction("secondary", item.id)}
                   disabled={actionLoadingId === item.id}
                 >
-                  {starterStrings.secondaryActionLabel}
+                  Check connection
                 </button>
                 {item.segment === "ready" ? (
                   <Link
@@ -661,112 +660,92 @@ function ServerReviewPageContent() {
                 </button>
               </div>
               {item.id === selectedItemId ? (
-                <form className="form" onSubmit={handleUpdateServer}>
+                <>
+                  <form className="form" onSubmit={handleUpdateServer}>
+                    <label className="field">
+                      <span>Name</span>
+                      <input
+                        name="name"
+                        value={editForm.name}
+                        onChange={updateEditFormField}
+                        disabled={serverUpdating}
+                        required
+                        data-testid="server-review-edit-name"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Host</span>
+                      <input
+                        name="host"
+                        value={editForm.host}
+                        onChange={updateEditFormField}
+                        disabled={serverUpdating}
+                        required
+                        data-testid="server-review-edit-host"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Port</span>
+                      <input
+                        name="port"
+                        type="number"
+                        min="1"
+                        max="65535"
+                        value={editForm.port}
+                        onChange={updateEditFormField}
+                        disabled={serverUpdating}
+                        required
+                        data-testid="server-review-edit-port"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Username</span>
+                      <input
+                        name="username"
+                        value={editForm.username}
+                        onChange={updateEditFormField}
+                        disabled={serverUpdating}
+                        required
+                        data-testid="server-review-edit-username"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>SSH key</span>
+                      <textarea
+                        name="ssh_key"
+                        rows={6}
+                        value={editForm.ssh_key}
+                        onChange={updateEditFormField}
+                        placeholder="Leave empty to keep the current key, or paste a replacement private key."
+                        disabled={serverUpdating}
+                        data-testid="server-review-edit-ssh-key"
+                      />
+                    </label>
+                    <div className="formActions">
+                      <button
+                        type="submit"
+                        disabled={serverUpdating}
+                        data-testid="server-review-edit-submit"
+                      >
+                        {serverUpdating ? "Saving..." : "Save changes"}
+                      </button>
+                    </div>
+                  </form>
                   <label className="field">
-                    <span>Name</span>
-                    <input
-                      name="name"
-                      value={editForm.name}
-                      onChange={updateEditFormField}
-                      disabled={serverUpdating}
-                      required
-                      data-testid="server-review-edit-name"
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Host</span>
-                    <input
-                      name="host"
-                      value={editForm.host}
-                      onChange={updateEditFormField}
-                      disabled={serverUpdating}
-                      required
-                      data-testid="server-review-edit-host"
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Port</span>
-                    <input
-                      name="port"
-                      type="number"
-                      min="1"
-                      max="65535"
-                      value={editForm.port}
-                      onChange={updateEditFormField}
-                      disabled={serverUpdating}
-                      required
-                      data-testid="server-review-edit-port"
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Username</span>
-                    <input
-                      name="username"
-                      value={editForm.username}
-                      onChange={updateEditFormField}
-                      disabled={serverUpdating}
-                      required
-                      data-testid="server-review-edit-username"
-                    />
-                  </label>
-                  <label className="field">
-                    <span>SSH key</span>
+                    <span>Add note for the next check</span>
                     <textarea
-                      name="ssh_key"
-                      rows={6}
-                      value={editForm.ssh_key}
-                      onChange={updateEditFormField}
-                      placeholder="Leave empty to keep the current key, or paste a replacement private key."
-                      disabled={serverUpdating}
-                      data-testid="server-review-edit-ssh-key"
+                      rows={3}
+                      value={actionNote}
+                      onChange={(event) => setActionNote(event.target.value)}
+                      placeholder={starterStrings.actionNotePlaceholder}
                     />
                   </label>
-                  <div className="formActions">
-                    <button
-                      type="submit"
-                      disabled={serverUpdating}
-                      data-testid="server-review-edit-submit"
-                    >
-                      {serverUpdating ? "Saving..." : "Save changes"}
-                    </button>
-                  </div>
-                </form>
+                </>
               ) : null}
             </AdminSurfaceQueueCard>
           ))}
         </AdminSurfaceQueue>
       </div>
-
-      <AdminSurfaceActionStarter
-        title={starterStrings.actionSectionTitle}
-        description={`${starterStrings.actionSectionDescription} ${starterStrings.actionFocusHint}`}
-        testId="server-review-action-starter"
-        status={selectedItem?.status || ""}
-        item={selectedItem}
-        noteValue={actionNote}
-        onNoteChange={(event) => setActionNote(event.target.value)}
-        notePlaceholder={starterStrings.actionNotePlaceholder}
-        primaryActionLabel={starterStrings.primaryActionLabel}
-        secondaryActionLabel={starterStrings.secondaryActionLabel}
-        onPrimaryAction={() => handleRunStarterAction("primary")}
-        onSecondaryAction={() => handleRunStarterAction("secondary")}
-        actionDisabled={selectedItem ? actionLoadingId === selectedItem.id : true}
-        emptyText="No saved server selected yet."
-      />
-
-      {selectedItem ? (
-        <div className="adminFilterActions">
-          <button
-            type="button"
-            className="dangerButton"
-            data-testid="server-review-delete-selected"
-            onClick={() => handleDeleteServer(selectedItem.id)}
-            disabled={deletingServerId === selectedItem.id}
-          >
-            {deletingServerId === selectedItem.id ? "Deleting selected..." : "Delete selected server"}
-          </button>
-        </div>
-      ) : null}
     </main>
   );
 }

@@ -1,8 +1,6 @@
 import "./globals.css";
 import Link from "next/link";
 import { Manrope, Space_Grotesk } from "next/font/google";
-import { buildBusinessMailto } from "./lib/public-contact";
-
 const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -26,41 +24,17 @@ export default function RootLayout({ children }) {
         {children}
         <footer className="siteFooter">
           <div className="container siteFooterInner">
-            <div className="siteFooterBrand">
-              <span className="siteFooterEyebrow">DeployMate</span>
-              <strong>Source-available deployment control for small teams.</strong>
-              <p>
-                Public product evaluation stays open. Commercial use of the code requires a
-                separate license.
-              </p>
-            </div>
-
             <div className="siteFooterLinks" aria-label="Footer links">
               <Link href="/" className="siteFooterLink">
-                Homepage
+                Home
               </Link>
               <Link href="/login" className="siteFooterLink">
-                Live product
+                Open app
               </Link>
-              <Link href="/commercial-license" className="siteFooterLink">
-                Commercial license
-              </Link>
-              <Link href="/upgrade" className="siteFooterLink">
-                Request access
-              </Link>
-              <a
-                href={buildBusinessMailto("DeployMate commercial license")}
-                className="siteFooterLink"
-              >
-                Email licensing
-              </a>
             </div>
 
             <div className="siteFooterMeta">
-              <span>Business use, SaaS, internal company rollout, and resale require explicit permission. First response usually within 2 business days.</span>
-              <a href="https://deploymatecloud.ru" className="inlineLink">
-                deploymatecloud.ru
-              </a>
+              <span>DeployMate</span>
             </div>
           </div>
         </footer>
