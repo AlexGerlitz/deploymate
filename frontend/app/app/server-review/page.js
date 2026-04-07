@@ -602,6 +602,11 @@ function ServerReviewPageContent() {
               body={item.note}
               status={item.id === selectedItemId ? `${item.status} · focused` : item.status}
             >
+              {item.segment === "ready" ? (
+                <div className="banner success">
+                  Step 1 done. This server is ready. Next: choose your app.
+                </div>
+              ) : null}
               <p className="formHint">
                 <strong>{starterStrings.cardMetaLabel}:</strong> {item.meta}
               </p>
@@ -647,9 +652,9 @@ function ServerReviewPageContent() {
                 {item.segment === "ready" ? (
                   <Link
                     href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
-                    className="landingButton secondaryButton"
+                    className="landingButton primaryButton"
                   >
-                    Choose app
+                    Choose app next
                   </Link>
                 ) : null}
                 <button

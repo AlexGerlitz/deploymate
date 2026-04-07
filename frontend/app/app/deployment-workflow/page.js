@@ -29,7 +29,6 @@ import {
   normalizeCreateDeploymentError,
   normalizeDeploymentActionError,
   readJsonOrError,
-  rolloutReviewerCopy,
 } from "../../lib/runtime-workspace-utils";
 
 const apiBaseUrl =
@@ -195,16 +194,6 @@ function DeploymentWorkflowPageContent() {
     href: workflowState.href,
     actionLabel: workflowState.actionLabel,
   };
-  const workflowHeroPrimaryAction =
-    workflowState.mode === "prerequisite"
-      ? {
-          href: "/app/server-review",
-          label: "Open server review",
-        }
-      : {
-          href: "#create-deployment",
-          label: "Create deployment",
-        };
   const primaryRuntimeDeployment =
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     filteredDeployments[0] ||
@@ -219,6 +208,9 @@ function DeploymentWorkflowPageContent() {
   const requestedSource = searchParams.get("source") || "";
   const selectedCreateServer =
     servers.find((server) => server.id === form.server_id) || null;
+  const selectedServerLabel = selectedCreateServer
+    ? formatServerLabel(selectedCreateServer.name, selectedCreateServer.host)
+    : "";
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -1160,17 +1152,6 @@ function DeploymentWorkflowPageContent() {
     }
   }
 
-  async function handleLogout() {
-    try {
-      await fetch(`${apiBaseUrl}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } finally {
-      router.replace("/login");
-    }
-  }
-
   async function handleCopyNextStep() {
     try {
       await copyTextToClipboard(workflowNextStep.nextStep);
@@ -1236,71 +1217,35 @@ function DeploymentWorkflowPageContent() {
   return (
     <main className="page">
       <div className="container">
-        <section className="workspaceHero">
-          <div className="workspaceHeroBackdrop" />
-          <div className="header workspaceHeroHeader">
+        <article className="card formCard">
+          <div className="header">
             <div>
-              <div className="eyebrow">Deployment workspace</div>
-              <h1 data-testid="deployment-workflow-title">Deployment workflow</h1>
-              <p>
-                {currentUser
-                  ? `Logged in as ${currentUser.username}. ${workflowPriority}`
-                  : rolloutReviewerCopy.workflow.heroBody}
+              <div className="eyebrow">Step 2</div>
+              <h1 data-testid="deployment-workflow-title">Choose your app</h1>
+              <p className="formHint">
+                {selectedCreateServer
+                  ? `Step 1 is done on ${selectedServerLabel}. Now choose what to run on this server.`
+                  : workflowPriority}
               </p>
             </div>
-            <div className="buttonRow workspaceHeroActions">
-              <Link href={workflowHeroPrimaryAction.href} className="landingButton primaryButton workspacePrimaryAction">
-                {workflowHeroPrimaryAction.label}
+            <div className="buttonRow">
+              <Link href="/app/server-review" className="linkButton">
+                Back to server step
               </Link>
-              <Link href="/app" className="workspaceGhostAction">
-                Back to overview
+              <Link href="/app" className="linkButton">
+                Overview
               </Link>
               <button
                 type="button"
                 onClick={() => refreshWorkspace()}
                 disabled={loading || serversLoading || templatesLoading}
-                className="linkButton workspaceSecondaryAction"
+                className="secondaryButton"
               >
                 {loading || serversLoading || templatesLoading ? "Refreshing..." : "Refresh"}
               </button>
-              <button type="button" onClick={handleLogout} className="workspaceGhostAction">
-                Logout
-              </button>
             </div>
           </div>
-
-          <div className="workspaceHeroSummary">
-            <div className="workspaceHeroMetric">
-              <span>Deployments</span>
-              <strong>{runningDeploymentCount}</strong>
-              <p>
-                Running now · {deployments.length} total · {failedDeploymentCount} failed
-              </p>
-            </div>
-            <div className="workspaceHeroMetric">
-              <span>Templates</span>
-              <strong>{templates.length}</strong>
-              <p>
-                Saved rollout presets · {templates.filter((template) => (template.use_count || 0) > 0).length} used ·{" "}
-                {templates.filter((template) => (template.use_count || 0) === 0).length} unused
-              </p>
-            </div>
-            <div className="workspaceHeroMetric">
-              <span>Targets</span>
-              <strong>{servers.length}</strong>
-              <p>
-                Saved server targets · {localDeploymentsEnabled ? "local and remote" : "remote only"} rollout mode
-              </p>
-            </div>
-            <div className="workspaceHeroBadge workspaceHeroSpotlight">
-              <span>Main next step</span>
-              <strong>{workflowPriority}</strong>
-              <p>
-                {rolloutReviewerCopy.workflow.spotlightBody}
-              </p>
-            </div>
-          </div>
-        </section>
+        </article>
 
         {error ? <div className="banner error">{error}</div> : null}
         {serversError ? <div className="banner error">{serversError}</div> : null}
@@ -1312,6 +1257,24 @@ function DeploymentWorkflowPageContent() {
           <div className="banner success" data-testid="deployment-workflow-template-bridge-banner">
             {workflowMessage}
           </div>
+        ) : null}
+        {requestedSource === "server-review" && selectedCreateServer ? (
+          <article className="card formCard">
+            <div className="sectionHeader">
+              <div>
+                <h2>Server ready</h2>
+                <p className="formHint">
+                  Step 1 is complete for <strong>{selectedCreateServer.name}</strong>. Stay on this server and choose the app you want to run next.
+                </p>
+              </div>
+              <span className="status healthy">ready</span>
+            </div>
+            <div className="backupSummaryBadges">
+              <span className="status info">{selectedServerLabel}</span>
+              <span className="status healthy">Step 1 done</span>
+              <span className="status unknown">Now: choose app</span>
+            </div>
+          </article>
         ) : null}
         {smokeMode ? (
           <div className="banner subtle">
