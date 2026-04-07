@@ -189,6 +189,294 @@ export const rolloutReviewerCopy = {
   },
 };
 
+export function buildOverviewPrimaryPath({
+  isAdmin,
+  deploymentsTotal,
+  failedDeployments,
+  serversTotal,
+}) {
+  if (failedDeployments > 0) {
+    return {
+      href: "/app/deployment-workflow",
+      label: "Review deployments",
+      title: "Review the live runtime first",
+      detail:
+        "A rollout already needs attention, so the main path is the deployment workspace and one focused runtime review before more changes.",
+      reason: "incident",
+    };
+  }
+
+  if (isAdmin && serversTotal === 0) {
+    return {
+      href: "/app/server-review",
+      label: "Add first server target",
+      title: "Connect the first server",
+      detail:
+        "Start in Server Review so DeployMate can confirm one saved target before the first remote rollout path becomes the main story.",
+      reason: "server-setup",
+    };
+  }
+
+  if (deploymentsTotal === 0) {
+    return {
+      href: "/app/deployment-workflow",
+      label: "Launch first deployment",
+      title: "Start the first deployment",
+      detail:
+        "Open the deployment workspace and use the guided create path so image, target, ports, and env vars stay in one obvious lane.",
+      reason: "first-deploy",
+    };
+  }
+
+  return {
+    href: "/app/deployment-workflow",
+    label: "Open deployment workflow",
+    title: "Start the next rollout",
+    detail:
+      "The deployment workspace remains the shortest path for live review, template reuse, and the next deliberate rollout.",
+    reason: "steady-state",
+  };
+}
+
+export function buildDeploymentWorkflowState({
+  isAdmin,
+  localDeploymentsEnabled,
+  deploymentsTotal,
+  failedDeployments,
+  serversTotal,
+}) {
+  if (failedDeployments > 0) {
+    return {
+      mode: "live",
+      title: "Review the failed rollout first",
+      detail:
+        "One deployment already needs attention, so the clearest next step is opening the live queue and drilling into the affected runtime before making more changes.",
+      href: "#runtime-deployments",
+      actionLabel: "Open live deployments",
+      bannerTone: "warning",
+      blocker: false,
+    };
+  }
+
+  if (!localDeploymentsEnabled && isAdmin && serversTotal === 0) {
+    return {
+      mode: "prerequisite",
+      title: "Connect a server before the first rollout",
+      detail:
+        "This environment is remote-only, so the first useful step is saving one server target in Server Review before opening the guided deploy form.",
+      href: "/app/server-review",
+      actionLabel: "Open server review",
+      bannerTone: "blocking",
+      blocker: true,
+    };
+  }
+
+  if (deploymentsTotal === 0) {
+    return {
+      mode: "create",
+      title: "Start the first deployment",
+      detail:
+        "If you came here to make something work, the main path is the guided create form below. It keeps image, target, ports, env vars, and template save in one place.",
+      href: "#create-deployment",
+      actionLabel: "Create deployment",
+      bannerTone: "first-run",
+      blocker: false,
+    };
+  }
+
+  return {
+    mode: "create",
+    title: "Start the next rollout",
+    detail:
+      "Use the guided create form for the next deliberate rollout, and keep live review nearby when you need to verify current runtime first.",
+    href: "#create-deployment",
+    actionLabel: "Create deployment",
+    bannerTone: "steady-state",
+    blocker: false,
+  };
+}
+
+export function buildServerReviewNextStep({
+  hasServers,
+  selectedItem,
+  readyCount,
+  authCount,
+  diagnosticsCount,
+  filteredCount,
+}) {
+  if (!hasServers) {
+    return {
+      focus: "First server target is still missing",
+      nextStep:
+        "Add one SSH server target, then run a connection test or diagnostics pass so DeployMate can tell you whether remote rollout is actually ready.",
+      primaryAction: "Jump to add server form",
+      secondaryAction: "",
+      tone: "warn",
+    };
+  }
+
+  if (!selectedItem) {
+    return {
+      focus: "Choose one saved target",
+      nextStep:
+        "Focus one server from the live queue and remove uncertainty there before using bulk tools, exports, or edits.",
+      primaryAction: "Focus live server queue",
+      secondaryAction: "",
+      tone: "info",
+    };
+  }
+
+  if (selectedItem.segment === "ready") {
+    return {
+      focus: `${selectedItem.label} is ready for rollout work`,
+      nextStep:
+        "Open Deployment Workflow while this server is already understood, and use it as the target for the next deliberate rollout.",
+      primaryAction: "Open deployment workflow",
+      secondaryAction: "Copy next step",
+      tone: "healthy",
+    };
+  }
+
+  if (selectedItem.segment === "auth") {
+    return {
+      focus: `${selectedItem.label} still needs auth review`,
+      nextStep:
+        "Fix the SSH credential path or replace the key before trusting diagnostics or using this target for a rollout.",
+      primaryAction: "Edit selected server",
+      secondaryAction: "Copy next step",
+      tone: "error",
+    };
+  }
+
+  if (selectedItem.testResult?.status === "error") {
+    return {
+      focus: `${selectedItem.label} failed the latest connectivity check`,
+      nextStep:
+        "Run diagnostics to get a fuller picture, then decide whether the target is recoverable or should stay out of the rollout path for now.",
+      primaryAction: "Run diagnostics",
+      secondaryAction: "Copy next step",
+      tone: "error",
+    };
+  }
+
+  return {
+    focus:
+      filteredCount === 1
+        ? `${selectedItem.label} is the current review target`
+        : `${selectedItem.label} is the current review focus`,
+    nextStep:
+      readyCount > 0
+        ? `At least ${readyCount} server target${readyCount === 1 ? " is" : "s are"} already ready. Remove uncertainty on this one next, then move into Deployment Workflow.`
+        : authCount > 0
+          ? `There ${authCount === 1 ? "is" : "are"} ${authCount} auth-review target${authCount === 1 ? "" : "s"} visible. Use diagnostics or a connection test here before deciding what is actually ready.`
+          : `Use diagnostics or a connection test on this target now. ${diagnosticsCount} visible server target${diagnosticsCount === 1 ? " is" : "s are"} still waiting on deeper review.`,
+    primaryAction: selectedItem.segment === "diagnostics" ? "Run diagnostics" : "Test connection",
+    secondaryAction: "Copy next step",
+    tone: "warn",
+  };
+}
+
+export function buildDeploymentWorkflowNextStep({
+  workflowState,
+  localDeploymentsEnabled,
+  deploymentLimitReached,
+  filteredDeployments,
+  templatesCount,
+  serversCount,
+  form,
+  templateName,
+  templateFormPreflight,
+}) {
+  if (workflowState.mode === "prerequisite") {
+    return {
+      focus: "Remote rollout is blocked on server setup",
+      nextStep:
+        "Open Server Review, save one target, and run one connectivity check there before treating deployment creation as the main path.",
+      primaryAction: "Open server review",
+      secondaryAction: "Copy next step",
+      tone: "error",
+    };
+  }
+
+  const failedDeployment =
+    filteredDeployments.find((deployment) => deployment.status === "failed") ||
+    null;
+
+  if (failedDeployment) {
+    return {
+      focus: `${failedDeployment.container_name || failedDeployment.image || "Failed deployment"} needs review`,
+      nextStep:
+        "Open the focused runtime card or deployment detail first, understand the failure, and only then decide whether another rollout is actually safe.",
+      primaryAction: "Open live deployments",
+      secondaryAction: "Copy next step",
+      tone: "error",
+    };
+  }
+
+  if (deploymentLimitReached) {
+    return {
+      focus: "Deployment limit reached",
+      nextStep:
+        "Free capacity or upgrade the current plan before trying to create another deployment from this workspace.",
+      primaryAction: "Review live deployments",
+      secondaryAction: "Copy next step",
+      tone: "error",
+    };
+  }
+
+  if (templateFormPreflight.errors.length > 0) {
+    return {
+      focus: "Current rollout draft is blocked",
+      nextStep: templateFormPreflight.errors[0],
+      primaryAction: "Fix the create form",
+      secondaryAction: "Copy next step",
+      tone: "warn",
+    };
+  }
+
+  if (form.image.trim()) {
+    return {
+      focus: "Current rollout draft is ready for a deliberate check",
+      nextStep:
+        !localDeploymentsEnabled && !form.server_id
+          ? "Choose a saved remote server target, then create the deployment or save the draft as a reusable template."
+          : templateName.trim()
+            ? `Image is set and template name "${templateName.trim()}" is ready. Create the deployment now or save this exact draft as a reusable template.`
+            : "Image is set. Create the deployment now if defaults are enough, or open advanced setup only for ports, env vars, target selection, or template save.",
+      primaryAction: "Create deployment",
+      secondaryAction: templatesCount > 0 ? "Review templates" : "Copy next step",
+      tone: "healthy",
+    };
+  }
+
+  if (templatesCount > 0) {
+    return {
+      focus: "Template reuse is ready",
+      nextStep:
+        "Open the templates lane if you want a faster repeat rollout, or set a fresh image in the create form when this deploy should start from scratch.",
+      primaryAction: "Open templates",
+      secondaryAction: "Copy next step",
+      tone: "info",
+    };
+  }
+
+  return {
+    focus:
+      serversCount > 0
+        ? "First rollout path is open"
+        : localDeploymentsEnabled
+          ? "Local rollout path is open"
+          : "Start with one clear rollout draft",
+    nextStep:
+      serversCount > 0
+        ? "Set the image first, then use the guided form to choose target, ports, env vars, and optional template save without leaving this workspace."
+        : "Set the image first so the main rollout path becomes concrete. Everything else can stay closed until the deployment idea is real.",
+    primaryAction: "Create deployment",
+    secondaryAction: "Copy next step",
+    tone: "info",
+  };
+}
+
 export function normalizeDeploymentActionError(message, fallbackMessage) {
   if (!message) {
     return fallbackMessage;

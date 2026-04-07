@@ -11,7 +11,12 @@ import {
   smokeUser,
 } from "../../lib/smoke-fixtures";
 import {
+  copyTextToClipboard,
+} from "../../lib/admin-page-utils";
+import {
   buildDeploymentUrl,
+  buildDeploymentWorkflowNextStep,
+  buildDeploymentWorkflowState,
   buildEnvRowsFromObject,
   buildEnvIssues,
   buildRolloutDraftSummary,
@@ -116,6 +121,8 @@ function DeploymentWorkflowPageContent() {
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(normalizedDeploymentQuery));
   });
+  const runningDeploymentCount = deployments.filter((deployment) => deployment.status === "running").length;
+  const failedDeploymentCount = deployments.filter((deployment) => deployment.status === "failed").length;
   const normalizedTemplateQuery = templateQuery.trim().toLowerCase();
   const filteredTemplates = [...templates]
     .filter((template) => {
@@ -166,30 +173,38 @@ function DeploymentWorkflowPageContent() {
   const secondaryTemplates = primaryTemplate
     ? filteredTemplates.filter((template) => template.id !== primaryTemplate.id)
     : [];
+  const workflowState = buildDeploymentWorkflowState({
+    isAdmin: Boolean(currentUser?.is_admin),
+    localDeploymentsEnabled,
+    deploymentsTotal: deployments.length,
+    failedDeployments: failedDeploymentCount,
+    serversTotal: servers.length,
+  });
   const workflowPriority =
-    deployments.some((deployment) => deployment.status === "failed")
-      ? "Failed rollout needs review before the next deploy."
-      : templates.length > 0
-        ? "Template-driven rollout path is ready."
-        : "Create the next deployment from one guided workspace.";
-  const workflowPrimaryMode = deployments.some((deployment) => deployment.status === "failed")
-    ? "live"
-    : "create";
-  const workflowPrimaryAction = workflowPrimaryMode === "live"
-    ? {
-        title: "Review the failed rollout first",
-        detail:
-          "One deployment already needs attention, so the clearest next step is opening the live queue and drilling into the affected runtime before making more changes.",
-        href: "#runtime-deployments",
-        actionLabel: "Open live deployments",
-      }
-    : {
-        title: "Start the next rollout",
-        detail:
-          "If you came here to make something work, the main path is the guided create form below. It keeps image, target, ports, env vars, and template save in one place.",
-        href: "#create-deployment",
-        actionLabel: "Create deployment",
-      };
+    workflowState.mode === "prerequisite"
+      ? "Remote rollout path needs one server target before deployment creation."
+      : workflowState.mode === "live"
+        ? "Failed rollout needs review before the next deploy."
+        : templates.length > 0
+          ? "Template-driven rollout path is ready."
+          : "Create the next deployment from one guided workspace.";
+  const workflowPrimaryMode = workflowState.mode === "live" ? "live" : "create";
+  const workflowPrimaryAction = {
+    title: workflowState.title,
+    detail: workflowState.detail,
+    href: workflowState.href,
+    actionLabel: workflowState.actionLabel,
+  };
+  const workflowHeroPrimaryAction =
+    workflowState.mode === "prerequisite"
+      ? {
+          href: "/app/server-review",
+          label: "Open server review",
+        }
+      : {
+          href: "#create-deployment",
+          label: "Create deployment",
+        };
   const primaryRuntimeDeployment =
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     filteredDeployments[0] ||
@@ -200,6 +215,10 @@ function DeploymentWorkflowPageContent() {
   const requestedTemplateId = searchParams.get("template") || "";
   const requestedTemplateAction = searchParams.get("template_action") || "preview";
   const requestedTemplateSource = searchParams.get("template_source") || "";
+  const requestedServerId = searchParams.get("server") || "";
+  const requestedSource = searchParams.get("source") || "";
+  const selectedCreateServer =
+    servers.find((server) => server.id === form.server_id) || null;
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -482,12 +501,52 @@ function DeploymentWorkflowPageContent() {
   ]);
 
   useEffect(() => {
+    if (workflowState.mode === "live") {
+      setWorkflowTab("live");
+      return;
+    }
+
+    if (workflowState.mode === "prerequisite" && workflowTab === "live") {
+      setWorkflowTab("create");
+    }
+  }, [workflowState.mode, workflowTab]);
+
+  useEffect(() => {
     if (requestedTemplateSource !== "deployment-detail") {
       return;
     }
 
     setWorkflowMessage("Template opened from deployment detail. Review, reuse, or edit it here in the main rollout workspace.");
   }, [requestedTemplateSource]);
+
+  useEffect(() => {
+    if (!requestedServerId || servers.length === 0) {
+      return;
+    }
+
+    const targetServer = servers.find((server) => server.id === requestedServerId);
+    if (!targetServer) {
+      return;
+    }
+
+    setForm((currentForm) => {
+      if (currentForm.server_id === targetServer.id) {
+        return currentForm;
+      }
+
+      return {
+        ...currentForm,
+        server_id: targetServer.id,
+      };
+    });
+    setWorkflowTab("create");
+
+    if (requestedSource === "server-review") {
+      setWorkflowMessage(
+        `Server "${targetServer.name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`,
+      );
+    }
+  }, [requestedServerId, requestedSource, servers]);
 
   useEffect(() => {
     if (!requestedTemplateId || templates.length === 0) {
@@ -814,7 +873,8 @@ function DeploymentWorkflowPageContent() {
         server_id: form.server_id,
       });
       setEnvRows([{ key: "", value: "" }]);
-      setSubmitSuccess("Deployment created successfully.");
+      setWorkflowTab("live");
+      setSubmitSuccess("Deployment created. Open runtime detail next while this rollout is still fresh.");
       await refreshWorkspace();
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -1111,6 +1171,15 @@ function DeploymentWorkflowPageContent() {
     }
   }
 
+  async function handleCopyNextStep() {
+    try {
+      await copyTextToClipboard(workflowNextStep.nextStep);
+      setWorkflowMessage("Deployment workflow next-step summary copied.");
+    } catch {
+      setTemplateDeployError("Failed to copy the deployment workflow next step.");
+    }
+  }
+
   const currentDraft = buildCurrentDraft();
   const templateFormPreflight = validateTemplateDraft(currentDraft, {
     ignoreTemplateId: editingTemplateId,
@@ -1119,6 +1188,17 @@ function DeploymentWorkflowPageContent() {
     submitting ||
     deploymentLimitReached ||
     (!localDeploymentsEnabled && !form.server_id);
+  const workflowNextStep = buildDeploymentWorkflowNextStep({
+    workflowState,
+    localDeploymentsEnabled,
+    deploymentLimitReached,
+    filteredDeployments,
+    templatesCount: templates.length,
+    serversCount: servers.length,
+    form,
+    templateName,
+    templateFormPreflight,
+  });
   const previewDiffRows = buildTemplateDiff(primaryTemplate, currentDraft, servers);
 
   if (!authChecked) {
@@ -1169,23 +1249,12 @@ function DeploymentWorkflowPageContent() {
               </p>
             </div>
             <div className="buttonRow workspaceHeroActions">
-              <Link href="#create-deployment" className="landingButton primaryButton workspacePrimaryAction">
-                Create deployment
-              </Link>
-              <Link href="#runtime-deployments" className="workspaceGhostAction">
-                Live deployments
-              </Link>
-              <Link href="#templates" className="workspaceGhostAction">
-                Templates
+              <Link href={workflowHeroPrimaryAction.href} className="landingButton primaryButton workspacePrimaryAction">
+                {workflowHeroPrimaryAction.label}
               </Link>
               <Link href="/app" className="workspaceGhostAction">
                 Back to overview
               </Link>
-              {currentUser?.is_admin ? (
-                <Link href="/app/server-review" className="workspaceGhostAction">
-                  Server review
-                </Link>
-              ) : null}
               <button
                 type="button"
                 onClick={() => refreshWorkspace()}
@@ -1203,10 +1272,9 @@ function DeploymentWorkflowPageContent() {
           <div className="workspaceHeroSummary">
             <div className="workspaceHeroMetric">
               <span>Deployments</span>
-              <strong>{deployments.filter((deployment) => deployment.status === "running").length}</strong>
+              <strong>{runningDeploymentCount}</strong>
               <p>
-                Running now · {deployments.length} total ·{" "}
-                {deployments.filter((deployment) => deployment.status === "failed").length} failed
+                Running now · {deployments.length} total · {failedDeploymentCount} failed
               </p>
             </div>
             <div className="workspaceHeroMetric">
@@ -1250,6 +1318,43 @@ function DeploymentWorkflowPageContent() {
             Smoke mode uses fixture data for deployment workflow surfaces.
           </div>
         ) : null}
+        {workflowState.mode === "prerequisite" ? (
+          <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-prerequisite-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2 data-testid="deployment-workflow-prerequisite-title">{workflowState.title}</h2>
+                <p className="formHint">
+                  {workflowState.detail} Save one target there first, then return here for the guided deploy form.
+                </p>
+              </div>
+            </div>
+            <div className="workspaceReviewerGrid">
+              <article className="workspaceReviewerCard">
+                <span>1. Connect target</span>
+                <strong>Open Server Review</strong>
+                <p>Add one SSH server target so remote rollout has a real destination.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>2. Remove uncertainty</span>
+                <strong>Run one check</strong>
+                <p>Test connectivity or diagnostics on that target before rollout creation becomes the main path.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>3. Return here</span>
+                <strong>Create first deployment</strong>
+                <p>Come back to this workspace after one target is clear and use the guided form below.</p>
+              </article>
+            </div>
+            <div className="formActions">
+              <Link href="/app/server-review" className="landingButton primaryButton">
+                Open server review
+              </Link>
+              <Link href="/app" className="landingButton secondaryButton">
+                Back to overview
+              </Link>
+            </div>
+          </article>
+        ) : null}
 
         <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-primary-action-card">
           <div className="sectionHeader workspaceGuideHeader">
@@ -1265,7 +1370,9 @@ function DeploymentWorkflowPageContent() {
               <span>Do this now</span>
               <strong>{workflowPrimaryAction.actionLabel}</strong>
               <p>
-                {workflowPrimaryMode === "live"
+                {workflowState.mode === "prerequisite"
+                  ? "This workspace is ready for rollout work, but the remote-only prerequisite still comes first."
+                  : workflowPrimaryMode === "live"
                   ? "A failed rollout already exists, so review the live queue before creating anything new."
                   : "Start the next deployment from one guided form instead of scanning the whole workspace."}
               </p>
@@ -1274,8 +1381,8 @@ function DeploymentWorkflowPageContent() {
               </Link>
             </article>
             <article className="workspaceReviewerCard">
-              <span>Or switch lane</span>
-              <strong>Keep only one lane open</strong>
+              <span>Core lanes</span>
+              <strong>Use one lane at a time</strong>
               <p>
                 Live review, create, and templates are still here, but only one should stay open on screen at a time.
               </p>
@@ -1311,6 +1418,86 @@ function DeploymentWorkflowPageContent() {
                 </button>
               </div>
             </article>
+          </div>
+        </article>
+
+        <article className="card formCard" data-testid="deployment-workflow-main-next-step-card">
+          <div className="sectionHeader">
+            <div>
+              <h2 data-testid="deployment-workflow-main-next-step-title">Main next step</h2>
+              <p className="formHint">
+                Keep one lane active at a time. Live runtime review, rollout creation, and template reuse can all happen here, but only one should define the next decision.
+              </p>
+            </div>
+          </div>
+          <div className="row">
+            <span className="label">Current focus</span>
+            <span data-testid="deployment-workflow-main-next-step-focus">{workflowNextStep.focus}</span>
+          </div>
+          <div className="row">
+            <span className="label">What to do</span>
+            <span data-testid="deployment-workflow-main-next-step-copy">{workflowNextStep.nextStep}</span>
+          </div>
+          <div className="backupSummaryBadges">
+            <span className={`status ${workflowNextStep.tone}`}>filtered {filteredDeployments.length}</span>
+            <span className="status healthy">running {runningDeploymentCount}</span>
+            <span className="status error">failed {failedDeploymentCount}</span>
+            <span className="status info">templates {templates.length}</span>
+          </div>
+          <div className="actionCluster">
+            {workflowState.mode === "prerequisite" ? (
+              <Link
+                href="/app/server-review"
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+              >
+                Open server review
+              </Link>
+            ) : failedDeploymentCount > 0 ? (
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+                onClick={() => setWorkflowTab("live")}
+              >
+                Open live deployments
+              </button>
+            ) : workflowNextStep.primaryAction === "Open templates" ? (
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+                onClick={() => setWorkflowTab("templates")}
+              >
+                Open templates
+              </button>
+            ) : workflowNextStep.primaryAction === "Fix the create form" ? (
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+                onClick={() => setWorkflowTab("create")}
+              >
+                Fix the create form
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+                onClick={() => setWorkflowTab("create")}
+              >
+                Create deployment
+              </button>
+            )}
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="deployment-workflow-main-next-step-copy-button"
+              onClick={handleCopyNextStep}
+            >
+              Copy next step
+            </button>
           </div>
         </article>
 
@@ -1519,11 +1706,18 @@ function DeploymentWorkflowPageContent() {
         <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
           <h2 data-testid="create-deployment-title">Create deployment</h2>
           <p className="formHint">
-            Start with the smallest possible rollout: image first, then open advanced setup only if you need naming, ports, env vars, server targeting, or template save.
+            {workflowState.mode === "prerequisite"
+              ? "This form becomes the main path after one server target is saved in Server Review. Once that prerequisite is done, start with image first and open advanced setup only when needed."
+              : "Start with the smallest possible rollout: image first, then open advanced setup only if you need naming, ports, env vars, server targeting, or template save."}
           </p>
           {!localDeploymentsEnabled ? (
             <div className="banner subtle">
               This environment is running in remote-only mode. Local host deployments are disabled.
+            </div>
+          ) : null}
+          {workflowState.mode === "prerequisite" ? (
+            <div className="banner subtle" data-testid="create-deployment-prerequisite-banner">
+              Remote-only rollout is enabled and no saved server targets are available yet. Open Server Review first, then return here.
             </div>
           ) : null}
           {editingTemplateId ? (
@@ -1553,8 +1747,12 @@ function DeploymentWorkflowPageContent() {
 
             <div className="banner subtle" data-testid="create-deployment-quickstart-banner">
               {form.image.trim()
-                ? "Image is set. Create now if defaults are enough, or open advanced setup for ports, env vars, server target, and template save."
-                : "Set the image first. Everything else is optional and can stay closed until you actually need it."}
+                ? selectedCreateServer
+                  ? `Image is set and target "${selectedCreateServer.name}" is already selected. Create now if defaults are enough, or open advanced setup only for ports, env vars, or template save.`
+                  : "Image is set. Create now if defaults are enough, or open advanced setup for ports, env vars, server target, and template save."
+                : selectedCreateServer && requestedSource === "server-review"
+                  ? `Target "${selectedCreateServer.name}" is already selected from Server Review. Set the image next and keep the rest closed unless the rollout really needs more.`
+                  : "Set the image first. Everything else is optional and can stay closed until you actually need it."}
             </div>
 
             <div className="formActions">
@@ -1771,11 +1969,16 @@ function DeploymentWorkflowPageContent() {
           {submitSuccess ? (
             <div className="banner success">
               <div>{submitSuccess}</div>
+              {createdDeployment?.container_name || createdDeployment?.image ? (
+                <div className="formHint">
+                  New rollout: {createdDeployment.container_name || createdDeployment.image}
+                </div>
+              ) : null}
               {createdDeployment?.id || buildDeploymentUrl(createdDeployment) ? (
                 <div className="successActions">
                   {createdDeployment?.id ? (
-                    <Link href={`/deployments/${createdDeployment.id}`} className="linkButton">
-                      View details
+                    <Link href={`/deployments/${createdDeployment.id}`} className="landingButton primaryButton">
+                      Open runtime detail
                     </Link>
                   ) : null}
                   {buildDeploymentUrl(createdDeployment) ? (
@@ -1788,6 +1991,14 @@ function DeploymentWorkflowPageContent() {
                       Open app
                     </a>
                   ) : null}
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => setWorkflowTab("live")}
+                    data-testid="create-deployment-success-open-live-button"
+                  >
+                    Review live queue
+                  </button>
                 </div>
               ) : null}
             </div>

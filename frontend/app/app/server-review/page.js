@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
@@ -47,7 +48,10 @@ import {
   runServerReviewStarterAction,
   updateServerReviewServer,
 } from "./starter-api";
-import { formatDate } from "../../lib/runtime-workspace-utils";
+import {
+  buildServerReviewNextStep,
+  formatDate,
+} from "../../lib/runtime-workspace-utils";
 
 const savedViewsStorageKey = "deploymate.admin.server-review.savedViews";
 
@@ -327,6 +331,17 @@ function ServerReviewPageContent() {
     filteredItems[0] ||
     items[0] ||
     null;
+  const readyCount = items.filter((item) => item.segment === "ready").length;
+  const authCount = items.filter((item) => item.segment === "auth").length;
+  const diagnosticsCount = items.filter((item) => item.segment === "diagnostics").length;
+  const serverReviewNextStep = buildServerReviewNextStep({
+    hasServers: servers.length > 0,
+    selectedItem,
+    readyCount,
+    authCount,
+    diagnosticsCount,
+    filteredCount: filteredItems.length,
+  });
 
   useEffect(() => {
     if (!selectedItem) {
@@ -352,10 +367,64 @@ function ServerReviewPageContent() {
   const selectedItems = items.filter((item) => selectedItemIds.includes(item.id));
   const starterMutationPreview = buildStarterMutationPreview(selectedItem, actionNote);
   const hasServers = servers.length > 0;
-  const topPriorityTitle = hasServers ? "Review one saved server first" : "Add your first server target";
-  const topPriorityBody = hasServers
-    ? "Pick one saved server, test the connection or run diagnostics, and only then open editing, exports, or deeper review tools."
-    : "Fill in one SSH target first so this workspace can tell you whether the server is reachable and ready for rollout work.";
+  const selectedServerReady = selectedItem?.segment === "ready";
+  const selectedReadyDeploymentHref = selectedItem
+    ? `/app/deployment-workflow?server=${selectedItem.id}&source=server-review`
+    : "/app/deployment-workflow";
+  const serverJourneySteps = [
+    {
+      key: "save",
+      label: "1. Save one server",
+      state: hasServers ? "Done" : "Do now",
+      detail: hasServers
+        ? "A server target is already saved in this workspace."
+        : "Name, host, port, username, and one SSH key are enough to begin.",
+    },
+    {
+      key: "verify",
+      label: "2. Remove uncertainty",
+      state: selectedServerReady ? "Done" : hasServers ? "Next" : "Waiting",
+      detail: selectedServerReady
+        ? "The focused server already has a successful connection or diagnostics result."
+        : hasServers
+          ? "Focus one saved target and run a connection test or diagnostics pass."
+          : "Verification starts after the first target exists.",
+    },
+    {
+      key: "deploy",
+      label: "3. Open rollout work",
+      state: selectedServerReady ? "Ready" : hasServers ? "Soon" : "Later",
+      detail: selectedServerReady
+        ? "Move into Deployment Workflow while one target is already understood."
+        : hasServers
+          ? "Open Deployment Workflow after one server decision is clear."
+          : "The deploy path becomes useful after server setup is done.",
+    },
+  ];
+  const serverJourneyPrimaryAction = !hasServers
+    ? {
+        label: "Jump to add server form",
+        kind: "button",
+        onClick: () => scrollToElement("server-review-create-server-section"),
+      }
+    : selectedServerReady
+      ? {
+          label: "Open deployment workflow",
+          kind: "link",
+          href: selectedReadyDeploymentHref,
+        }
+      : {
+          label: "Focus live server queue",
+          kind: "button",
+          onClick: () => scrollToElement("server-review-live-queue"),
+        };
+  const serverJourneySecondaryAction =
+    hasServers && !selectedServerReady
+      ? {
+          label: "Open deployment workflow later",
+          href: selectedReadyDeploymentHref,
+        }
+      : null;
 
   const visibleAuditItems = useMemo(() => {
     const normalizedAuditQuery = auditQuery.trim().toLowerCase();
@@ -770,6 +839,17 @@ function ServerReviewPageContent() {
     }
   }
 
+  async function handleCopyNextStep() {
+    try {
+      await copyTextToClipboard(serverReviewNextStep.nextStep);
+      setSuccess("Server review next-step summary copied.");
+      setError("");
+    } catch {
+      setError("Failed to copy the server review next step.");
+      setSuccess("");
+    }
+  }
+
   function handleApplyBulkAction() {
     if (!selectedItemIds.length || !bulkStatusValue) {
       setError("Select at least one server and a follow-up state before applying the local bulk review label.");
@@ -885,13 +965,6 @@ function ServerReviewPageContent() {
           onClick: () => scrollToElement("server-review-create-server-section"),
           disabled: false,
         }}
-        actions={[
-          {
-            label: "Export JSON",
-            testId: "server-review-header-export-json",
-            onClick: handleExportJson,
-          },
-        ]}
       />
 
       <AdminFeedbackBanners
@@ -910,46 +983,119 @@ function ServerReviewPageContent() {
         spotlightBody={starterStrings.spotlightBody}
       />
 
-      <article className="card formCard" data-testid="server-review-first-step">
-        <div className="sectionHeader">
+      <article className="card formCard workspaceGuidePanel" data-testid="server-review-journey-card">
+        <div className="sectionHeader workspaceGuideHeader">
           <div>
-            <h2>{topPriorityTitle}</h2>
-            <p>{topPriorityBody}</p>
+            <h2 data-testid="server-review-journey-title">From server setup to live rollout</h2>
+            <p className="formHint">
+              This page should end with one clear handoff into deployment work, not with more queue tools.
+            </p>
           </div>
         </div>
-        <div className="overviewGrid" data-testid="server-review-first-step-grid">
-          <article className="overviewCard">
-            <span>Do this now</span>
-            <strong>{hasServers ? "Focus one server and remove uncertainty" : "Create one SSH server target"}</strong>
-            <div className="overviewMeta">
-              <span>
-                {hasServers
-                  ? "Use the live queue below, run one connection test or diagnostics pass, and avoid jumping into exports or bulk review first."
-                  : "Name, host, port, username, and SSH key are enough to begin. Everything else can wait until the first target is saved."}
-              </span>
-            </div>
-            <div className="adminFilterActions">
-              <button
-                type="button"
-                className="primaryButton"
-                data-testid="server-review-first-step-action"
-                onClick={() =>
-                  scrollToElement(hasServers ? "server-review-live-queue" : "server-review-create-server-section")
-                }
-              >
-                {hasServers ? "Open live server queue" : "Jump to add server form"}
-              </button>
-            </div>
-          </article>
-          <article className="overviewCard">
-            <span>Later</span>
-            <strong>Use deeper review tools only after one server is clear</strong>
-            <div className="overviewMeta">
-              <span>
-                Edit, table comparison, saved views, exports, and activity are still here, but they should not compete with the first server action.
-              </span>
-            </div>
-          </article>
+        <div className="workspaceReviewerGrid">
+          {serverJourneySteps.map((step) => (
+            <article key={step.key} className="workspaceReviewerCard">
+              <span>{step.label}</span>
+              <strong>{step.state}</strong>
+              <p>{step.detail}</p>
+            </article>
+          ))}
+        </div>
+        <div className="adminFilterActions">
+          {serverJourneyPrimaryAction.kind === "link" ? (
+            <Link href={serverJourneyPrimaryAction.href} className="landingButton primaryButton">
+              {serverJourneyPrimaryAction.label}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="primaryButton"
+              data-testid="server-review-journey-primary-action"
+              onClick={serverJourneyPrimaryAction.onClick}
+            >
+              {serverJourneyPrimaryAction.label}
+            </button>
+          )}
+          {serverJourneySecondaryAction ? (
+            <Link href={serverJourneySecondaryAction.href} className="landingButton secondaryButton">
+              {serverJourneySecondaryAction.label}
+            </Link>
+          ) : null}
+        </div>
+      </article>
+
+      <article className="card formCard" data-testid="server-review-main-next-step-card">
+        <div className="sectionHeader">
+          <div>
+            <h2 data-testid="server-review-main-next-step-title">Main next step</h2>
+            <p className="formHint">
+              Work one saved target to a clear decision first. Edit, table review, audit, exports, and bulk labels stay secondary until the current server story is obvious.
+            </p>
+          </div>
+        </div>
+        <div className="row">
+          <span className="label">Current focus</span>
+          <span data-testid="server-review-main-next-step-focus">{serverReviewNextStep.focus}</span>
+        </div>
+        <div className="row">
+          <span className="label">What to do</span>
+          <span data-testid="server-review-main-next-step-copy">{serverReviewNextStep.nextStep}</span>
+        </div>
+        <div className="backupSummaryBadges">
+          <span className={`status ${serverReviewNextStep.tone}`}>visible {filteredItems.length}</span>
+          <span className="status healthy">ready {readyCount}</span>
+          <span className="status warn">diagnostics {diagnosticsCount}</span>
+          <span className="status error">auth {authCount}</span>
+        </div>
+        <div className="actionCluster">
+          {!hasServers ? (
+            <button
+              type="button"
+              className="landingButton primaryButton"
+              data-testid="server-review-main-next-step-button"
+              onClick={() => scrollToElement("server-review-create-server-section")}
+            >
+              Jump to add server form
+            </button>
+          ) : selectedServerReady ? (
+            <Link
+              href={selectedReadyDeploymentHref}
+              className="landingButton primaryButton"
+              data-testid="server-review-main-next-step-button"
+            >
+              Open deployment workflow
+            </Link>
+          ) : selectedItem?.segment === "auth" ? (
+            <button
+              type="button"
+              className="landingButton primaryButton"
+              data-testid="server-review-main-next-step-button"
+              onClick={() => scrollToElement("server-review-edit-server")}
+            >
+              Edit selected server
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="landingButton primaryButton"
+              data-testid="server-review-main-next-step-button"
+              onClick={() =>
+                selectedItem
+                  ? handleRunStarterAction(selectedItem.segment === "diagnostics" ? "primary" : "secondary")
+                  : scrollToElement("server-review-live-queue")
+              }
+            >
+              {selectedItem?.segment === "diagnostics" ? "Run diagnostics" : "Test connection"}
+            </button>
+          )}
+          <button
+            type="button"
+            className="secondaryButton"
+            data-testid="server-review-main-next-step-copy-button"
+            onClick={handleCopyNextStep}
+          >
+            Copy next step
+          </button>
         </div>
       </article>
 
@@ -1042,6 +1188,7 @@ function ServerReviewPageContent() {
         subtitle="Use this only after one server is already understood and you know exactly what needs to change."
         badge={selectedItem ? "Edit" : "Pick one"}
         defaultOpen={false}
+        sectionId="server-review-edit-server"
         testId="server-review-edit-server"
       >
         {selectedItem ? (
@@ -1242,12 +1389,12 @@ function ServerReviewPageContent() {
         </div>
       ) : null}
 
-      <AdminDisclosureSection
-        title="Advanced review tools"
-        subtitle="Open this only after the first server decision is already clear."
-        badge="Later"
-        defaultOpen={false}
-        testId="server-review-advanced-tools"
+        <AdminDisclosureSection
+          title="Advanced review tools"
+          subtitle="Open this only after one server is clearly ready, blocked, or not worth pursuing."
+          badge="Later"
+          defaultOpen={false}
+          testId="server-review-advanced-tools"
       >
         <AdminSurfaceTable
           title="Server review table"
@@ -1477,19 +1624,6 @@ function ServerReviewPageContent() {
           </p>
         </AdminDisclosureSection>
 
-        <AdminDisclosureSection
-          title="What this proved"
-          subtitle="This page started from the scaffold, then got wired into the real server API."
-          badge="Real surface"
-          defaultOpen={false}
-          testId="server-review-next-steps"
-        >
-          <ol className="formHint">
-            <li>The scaffold can now start a real server review page instead of only a local demo queue.</li>
-            <li>Queue, table, saved views, export, and audit shell were reusable enough to survive contact with a real feature.</li>
-            <li>The next useful follow-up is deciding whether this page should replace the server block on the main workspace.</li>
-          </ol>
-        </AdminDisclosureSection>
       </AdminDisclosureSection>
     </main>
   );

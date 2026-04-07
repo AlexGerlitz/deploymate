@@ -24,6 +24,7 @@ teams that want:
   - connect server
   - see if service is alive
   - know what to do next
+- The compact source of truth for these constraints now lives in [PROJECT-RULES.md](PROJECT-RULES.md).
 
 ## What Is Already True
 

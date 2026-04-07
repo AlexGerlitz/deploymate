@@ -377,55 +377,148 @@ function buildRedeployImpactSummary({
   return lines.join("\n");
 }
 
-function buildDetailIntent(deployment, health, diagnostics, attentionItems) {
+function buildRuntimeDecisionState(deployment, health, diagnostics, attentionItems, activity) {
+  const latestEvent = Array.isArray(activity) && activity.length > 0 ? activity[0] : null;
+  const recentFailureCount = diagnostics?.activity?.recent_failure_count || 0;
+  const errorCount = attentionItems.filter((item) => item.status === "error").length;
+  const warnCount = attentionItems.filter((item) => item.status === "warn").length;
+
   if (deployment?.status === "failed") {
     return {
-      key: "stabilize",
-      title: "Stabilize this rollout first",
-      detail:
-        "The current deployment is already failed, so the first job is understanding the failure and deciding whether a redeploy is actually safe.",
-      primaryHref: "#runtime-detail-main-next-step",
-      primaryAction: "Review main next step",
+      tone: "error",
+      label: "Blocked",
+      focus: `${deployment.container_name || deployment.image || "This deployment"} is currently failed`,
+      why:
+        "The runtime is already in a failed state, so the first job is understanding the failure before another rollout change competes for attention.",
+      nextStep:
+        "Read the attention items, diagnostics, and recent activity first. Only redeploy after the root cause is concrete enough to explain.",
+      primaryHref: "#runtime-detail-attention-list",
+      primaryAction: "Review runtime issues",
       secondaryHref: "#runtime-detail-activity-tools",
-      secondaryAction: "Open activity and diagnostics",
+      secondaryAction: "Open deeper runtime tools",
+      badges: [
+        { label: "errors", value: `${errorCount}`, tone: "error" },
+        { label: "warnings", value: `${warnCount}`, tone: "warn" },
+        { label: "recent failures", value: `${recentFailureCount}`, tone: "error" },
+      ],
     };
   }
 
   if (health?.status && health.status !== "healthy") {
     return {
-      key: "health-review",
-      title: "Review runtime health before changing anything",
-      detail:
-        "Health is degraded, so this page should act as a runtime review surface first and only become a rollout-change surface after the issue is understood.",
-      primaryHref: "#runtime-detail-main-next-step",
-      primaryAction: "Review main next step",
+      tone: health.status === "unavailable" ? "warn" : "error",
+      label: "Review",
+      focus: `Health is ${health.status}`,
+      why:
+        health?.error ||
+        "Health is degraded, so this page should act as a runtime review surface before it becomes a rollout-change surface.",
+      nextStep:
+        "Confirm whether the runtime is actually alive, read the health error or latency signal, and inspect activity before deciding on a redeploy.",
+      primaryHref: "#runtime-detail-attention-list",
+      primaryAction: "Review health and warnings",
       secondaryHref: "#runtime-detail-activity-tools",
-      secondaryAction: "Open deeper runtime tools",
+      secondaryAction: "Open activity and diagnostics",
+      badges: [
+        { label: "health", value: health.status, tone: health.status === "unavailable" ? "warn" : "error" },
+        { label: "errors", value: `${errorCount}`, tone: errorCount > 0 ? "error" : "unknown" },
+        { label: "warnings", value: `${warnCount}`, tone: warnCount > 0 ? "warn" : "unknown" },
+      ],
     };
   }
 
-  if (diagnostics?.activity?.recent_failure_count > 0 || attentionItems.length > 0) {
+  if (recentFailureCount > 0 || attentionItems.length > 0) {
     return {
-      key: "attention-review",
-      title: "Clear the runtime warnings first",
-      detail:
-        "This rollout is not fully clean yet, so review the highlighted warnings and only prepare the next change after the current state is believable.",
-      primaryHref: "#runtime-detail-main-next-step",
-      primaryAction: "Review main next step",
-      secondaryHref: "#runtime-detail-redeploy",
-      secondaryAction: "Open redeploy draft",
+      tone: "warn",
+      label: "Review",
+      focus: `${attentionItems.length} active runtime warning${attentionItems.length === 1 ? "" : "s"} still need explanation`,
+      why:
+        recentFailureCount > 0
+          ? `${recentFailureCount} recent failure event${recentFailureCount === 1 ? "" : "s"} still sit in diagnostics history.`
+          : "The runtime is not clean yet, so the warnings should be understood before a new rollout becomes the main story.",
+      nextStep:
+        "Work through the attention list and confirm the runtime is believable. Then decide whether the next safe move is stability, handoff, or a deliberate redeploy.",
+      primaryHref: "#runtime-detail-attention-list",
+      primaryAction: "Review attention items",
+      secondaryHref: "#runtime-detail-handoff-tools",
+      secondaryAction: "Open handoff tools",
+      badges: [
+        { label: "errors", value: `${errorCount}`, tone: errorCount > 0 ? "error" : "unknown" },
+        { label: "warnings", value: `${warnCount}`, tone: warnCount > 0 ? "warn" : "unknown" },
+        { label: "last event", value: latestEvent?.level || "none", tone: latestEvent?.level === "error" ? "error" : latestEvent?.level === "warn" ? "warn" : "healthy" },
+      ],
     };
   }
 
   return {
-    key: "steady-state",
-    title: "This rollout looks stable",
-    detail:
-      "Use this screen to preserve the current state, save a reusable template, or prepare a deliberate redeploy without mixing those actions into incident work.",
+    tone: "healthy",
+    label: "Ready",
+    focus: "Runtime looks stable enough for a deliberate change",
+    why:
+      "No active runtime warnings are leading the page right now, so redeploy, handoff, and template actions can stay deliberate instead of reactive.",
+    nextStep:
+      "Keep the current rollout stable, or prepare one explicit change in the redeploy form when you are ready to change image, ports, or env vars on purpose.",
     primaryHref: "#runtime-detail-redeploy",
     primaryAction: "Prepare rollout change",
     secondaryHref: "#runtime-detail-handoff-tools",
-    secondaryAction: "Open handoff and template tools",
+    secondaryAction: "Open handoff tools",
+    badges: [
+      { label: "health", value: health?.status || "unknown", tone: "healthy" },
+      { label: "attention", value: `${attentionItems.length}`, tone: "healthy" },
+      { label: "recent failures", value: `${recentFailureCount}`, tone: recentFailureCount > 0 ? "warn" : "healthy" },
+    ],
+  };
+}
+
+function buildChangeReadinessState(redeployPreflight, redeployChangeRows, form, suggestedPorts) {
+  if (redeployPreflight.errors.length > 0) {
+    return {
+      tone: "error",
+      label: "Blocked",
+      focus: "The current redeploy draft cannot be applied yet",
+      why: redeployPreflight.errors[0],
+      nextStep: "Fix the draft error first. After that, reopen review and confirm the rollout change explicitly.",
+    };
+  }
+
+  if (!form.image.trim()) {
+    return {
+      tone: "warn",
+      label: "Waiting",
+      focus: "The redeploy draft is still missing the image",
+      why: "A deliberate rollout change starts with a valid image reference.",
+      nextStep: "Set the image first, then adjust ports, env vars, or the container name only if the runtime really needs those changes.",
+    };
+  }
+
+  if (redeployChangeRows.length === 0) {
+    return {
+      tone: "warn",
+      label: "Review",
+      focus: "No visible config changes are queued",
+      why: "Submitting now would simply re-run the current rollout with the same visible settings.",
+      nextStep: "Either keep the runtime stable as-is, or make a specific image, port, env, or name change before confirming redeploy.",
+    };
+  }
+
+  if (redeployPreflight.warnings.length > 0) {
+    return {
+      tone: "warn",
+      label: "Review",
+      focus: "The draft is valid but still needs operator judgment",
+      why: redeployPreflight.warnings[0],
+      nextStep: "Read the impact summary, check the suggested ports if needed, and only then confirm redeploy.",
+    };
+  }
+
+  return {
+    tone: "healthy",
+    label: "Ready",
+    focus: `${redeployChangeRows.length} rollout change${redeployChangeRows.length === 1 ? "" : "s"} are ready for review`,
+    why:
+      suggestedPorts.length > 0 && !form.external_port.trim()
+        ? "Suggested ports are available if you want a safer external port choice before redeploy."
+        : "The draft currently passes validation and is ready for explicit review.",
+    nextStep: "Open redeploy review, inspect the impact summary, and confirm only if this is the intended runtime change.",
   };
 }
 
@@ -565,11 +658,12 @@ export default function DeploymentDetailsPage({ params }) {
     diagnostics,
     attentionItems,
   );
-  const detailIntent = buildDetailIntent(
+  const runtimeDecisionState = buildRuntimeDecisionState(
     deployment,
     health,
     diagnostics,
     attentionItems,
+    activity,
   );
   const detailGlanceItems = [
     {
@@ -603,6 +697,12 @@ export default function DeploymentDetailsPage({ params }) {
   ];
   const redeployPreflight = buildRedeployValidation(form, envRows);
   const redeployChangeRows = buildRedeployChangeRows(deployment, form, envRows);
+  const changeReadinessState = buildChangeReadinessState(
+    redeployPreflight,
+    redeployChangeRows,
+    form,
+    suggestedPorts,
+  );
   const redeployConfirmationTarget = deployment?.container_name || deployment?.id || "";
   const redeployConfirmationPhrase = buildReviewConfirmationPhrase(
     "redeploy",
@@ -614,37 +714,6 @@ export default function DeploymentDetailsPage({ params }) {
     deploymentUrl,
     changeRows: redeployChangeRows,
   });
-  const mainNextStepCards = [
-    {
-      key: "focus",
-      label: "Focus now",
-      title: detailIntent.title,
-      detail: detailIntent.detail,
-      href: detailIntent.primaryHref,
-      actionLabel: detailIntent.primaryAction,
-      primary: true,
-    },
-    {
-      key: "handoff",
-      label: "Explain it clearly",
-      title: "Create a teammate-ready runtime handoff",
-      detail:
-        "The plain-language summary and downloadable handoff packet stay ready when you need to explain the current state without making someone reconstruct it from raw logs.",
-      href: "#runtime-detail-handoff-tools",
-      actionLabel: "Open handoff tools",
-      primary: false,
-    },
-    {
-      key: "guardrails",
-      label: "Be careful",
-      title: "Keep destructive actions behind review",
-      detail:
-        "Delete is available here, but only after an explicit review step and typed confirmation so it cannot compete with the main runtime path.",
-      href: "#runtime-detail-delete-controls",
-      actionLabel: "Open delete review",
-      primary: false,
-    },
-  ];
 
   async function loadDeploymentDiagnostics() {
     setDiagnosticsLoading(true);
@@ -963,6 +1032,10 @@ export default function DeploymentDetailsPage({ params }) {
     }
   }
 
+  async function handleCopyRuntimeNextStep() {
+    await copyText(runtimeDecisionState.nextStep, "Runtime next step");
+  }
+
   function handleDownloadIncidentSnapshot() {
     if (!incidentSnapshot) {
       return;
@@ -1192,11 +1265,11 @@ export default function DeploymentDetailsPage({ params }) {
                 Back to deployment workflow
               </Link>
               <Link
-                href={detailIntent.primaryHref}
+                href={runtimeDecisionState.primaryHref}
                 className="landingButton primaryButton workspacePrimaryAction"
                 data-testid="runtime-detail-open-redeploy-button"
               >
-                {detailIntent.primaryAction}
+                {runtimeDecisionState.primaryAction}
               </Link>
               {deploymentUrl ? (
                 <a
@@ -1283,43 +1356,28 @@ export default function DeploymentDetailsPage({ params }) {
               <div className="workspaceReviewerGrid">
                 <article
                   className="workspaceReviewerCard"
-                  data-testid={`runtime-detail-main-next-step-item-${mainNextStepCards[0].key}`}
+                  data-testid="runtime-detail-main-next-step-item-focus"
                 >
-                  <span>{mainNextStepCards[0].label}</span>
-                  <strong>{mainNextStepCards[0].title}</strong>
-                  <p>{mainNextStepCards[0].detail}</p>
-                  <Link
-                    href={mainNextStepCards[0].href}
-                    className="landingButton primaryButton"
-                    data-testid={`runtime-detail-main-next-step-action-${mainNextStepCards[0].key}`}
-                  >
-                    {mainNextStepCards[0].actionLabel}
-                  </Link>
-                </article>
-                <div className="list compactList">
-                  {mainNextStepCards.slice(1).map((card) => (
-                    <article
-                      key={card.key}
-                      className="card compactCard"
-                      data-testid={`runtime-detail-main-next-step-item-${card.key}`}
+                  <span>{runtimeDecisionState.label}</span>
+                  <strong>{runtimeDecisionState.focus}</strong>
+                  <p>{runtimeDecisionState.why}</p>
+                  <div className="actionCluster">
+                    <Link
+                      href={runtimeDecisionState.primaryHref}
+                      className="landingButton primaryButton"
+                      data-testid="runtime-detail-main-next-step-action-focus"
                     >
-                      <div className="row">
-                        <span className="label">{card.label}</span>
-                        <span>{card.title}</span>
-                      </div>
-                      <p>{card.detail}</p>
-                      <div className="actions">
-                        <Link
-                          href={card.href}
-                          className="linkButton"
-                          data-testid={`runtime-detail-main-next-step-action-${card.key}`}
-                        >
-                          {card.actionLabel}
-                        </Link>
-                      </div>
-                    </article>
-                  ))}
-                </div>
+                      {runtimeDecisionState.primaryAction}
+                    </Link>
+                    <Link
+                      href={runtimeDecisionState.secondaryHref}
+                      className="secondaryButton"
+                      data-testid="runtime-detail-main-next-step-action-secondary"
+                    >
+                      {runtimeDecisionState.secondaryAction}
+                    </Link>
+                  </div>
+                </article>
               </div>
 
               <aside className="workspaceGlancePanel">
@@ -1340,15 +1398,13 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
                 <div className="overviewAttentionItem" data-testid="runtime-detail-main-next-step-focus">
                   <div className="overviewAttentionHeader">
-                    <span className={`status ${attentionItems.length > 0 ? "warn" : "healthy"}`}>
-                      {attentionItems.length > 0 ? "review first" : "stable"}
+                    <span className={`status ${runtimeDecisionState.tone}`}>
+                      {runtimeDecisionState.label.toLowerCase()}
                     </span>
-                    <strong>{recommendedNextStep}</strong>
+                    <strong>{runtimeDecisionState.nextStep}</strong>
                   </div>
                   <p>
-                    {attentionItems.length > 0
-                      ? "Treat this as a runtime review surface first. Only move into redeploy after the current issues are understood."
-                      : "The runtime looks stable enough that the next deliberate change can start from the redeploy and template tools below."}
+                    {runtimeDecisionState.why}
                   </p>
                 </div>
                 <div className="workspaceMetaLine">
@@ -1405,6 +1461,66 @@ export default function DeploymentDetailsPage({ params }) {
               </button>
             </div>
           </article>
+
+          <article className="card formCard" data-testid="runtime-detail-decision-card">
+            <div className="sectionHeader">
+              <div>
+                <h2 data-testid="runtime-detail-decision-title">Decision status</h2>
+                <p className="formHint">
+                  This layer answers the main question first: is the runtime blocked, still under review, or stable enough for a deliberate change.
+                </p>
+              </div>
+            </div>
+            <div className="row">
+              <span className="label">Current state</span>
+              <span className={`status ${runtimeDecisionState.tone}`} data-testid="runtime-detail-decision-state">
+                {runtimeDecisionState.label}
+              </span>
+            </div>
+            <div className="row">
+              <span className="label">Focus</span>
+              <span data-testid="runtime-detail-decision-focus">{runtimeDecisionState.focus}</span>
+            </div>
+            <div className="row">
+              <span className="label">Why</span>
+              <span data-testid="runtime-detail-decision-why">{runtimeDecisionState.why}</span>
+            </div>
+            <div className="row">
+              <span className="label">What to do</span>
+              <span data-testid="runtime-detail-decision-next-step">{runtimeDecisionState.nextStep}</span>
+            </div>
+            <div className="backupSummaryBadges">
+              {runtimeDecisionState.badges.map((badge) => (
+                <span key={badge.label} className={`status ${badge.tone}`}>
+                  {badge.label} {badge.value}
+                </span>
+              ))}
+            </div>
+            <div className="actionCluster">
+              <Link
+                href={runtimeDecisionState.primaryHref}
+                className="landingButton primaryButton"
+                data-testid="runtime-detail-decision-primary-action"
+              >
+                {runtimeDecisionState.primaryAction}
+              </Link>
+              <Link
+                href={runtimeDecisionState.secondaryHref}
+                className="secondaryButton"
+                data-testid="runtime-detail-decision-secondary-action"
+              >
+                {runtimeDecisionState.secondaryAction}
+              </Link>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="runtime-detail-decision-copy-button"
+                onClick={handleCopyRuntimeNextStep}
+              >
+                Copy next step
+              </button>
+            </div>
+          </article>
         </div>
 
         {loading && !deployment ? <div className="empty">Loading deployment...</div> : null}
@@ -1454,9 +1570,84 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               </div>
             </div>
+
+            <article className="card compactCard" data-testid="runtime-detail-risk-breakdown-card">
+              <div className="sectionHeader">
+                <div>
+                  <h2 data-testid="runtime-detail-risk-breakdown-title">Why this state is leading</h2>
+                  <p className="formHint">
+                    These signals explain why this page currently behaves like a runtime review surface or a rollout-change surface.
+                  </p>
+                </div>
+              </div>
+              <div className="workspaceReviewerGrid">
+                <article className="workspaceReviewerCard">
+                  <span>Runtime</span>
+                  <strong>{deployment?.status || "unknown"}</strong>
+                  <p>
+                    {deployment?.status === "failed"
+                      ? "A failed deployment keeps the page in incident mode until the cause is understood."
+                      : "Deployment status alone is not currently forcing an incident path."}
+                  </p>
+                </article>
+                <article className="workspaceReviewerCard">
+                  <span>Health</span>
+                  <strong>{health?.status || "unknown"}</strong>
+                  <p>
+                    {health?.status && health.status !== "healthy"
+                      ? health?.error || "Health is degraded, so the runtime still needs review."
+                      : "Health is not currently the main blocker."}
+                  </p>
+                </article>
+                <article className="workspaceReviewerCard">
+                  <span>Diagnostics</span>
+                  <strong>{diagnostics?.activity?.recent_failure_count || 0} recent failures</strong>
+                  <p>
+                    {diagnostics?.activity?.recent_failure_count > 0
+                      ? "Recent failures in diagnostics history still need explanation before the next rollout."
+                      : "Diagnostics history is not currently adding new failure pressure."}
+                  </p>
+                </article>
+              </div>
+            </article>
             </section>
 
         <section hidden={detailTab !== "change"}>
+        <article className="card formCard" data-testid="runtime-detail-change-readiness-card">
+          <div className="sectionHeader">
+            <div>
+              <h2 data-testid="runtime-detail-change-readiness-title">Change readiness</h2>
+              <p className="formHint">
+                Treat the redeploy form as a deliberate change surface. It should tell you first whether the draft is blocked, still needs judgment, or is ready for explicit review.
+              </p>
+            </div>
+          </div>
+          <div className="row">
+            <span className="label">Current state</span>
+            <span className={`status ${changeReadinessState.tone}`} data-testid="runtime-detail-change-readiness-state">
+              {changeReadinessState.label}
+            </span>
+          </div>
+          <div className="row">
+            <span className="label">Focus</span>
+            <span data-testid="runtime-detail-change-readiness-focus">{changeReadinessState.focus}</span>
+          </div>
+          <div className="row">
+            <span className="label">Why</span>
+            <span data-testid="runtime-detail-change-readiness-why">{changeReadinessState.why}</span>
+          </div>
+          <div className="row">
+            <span className="label">What to do</span>
+            <span data-testid="runtime-detail-change-readiness-next-step">{changeReadinessState.nextStep}</span>
+          </div>
+          <div className="backupSummaryBadges">
+            <span className={`status ${changeReadinessState.tone}`}>changes {redeployChangeRows.length}</span>
+            <span className="status error">errors {redeployPreflight.errors.length}</span>
+            <span className="status warn">warnings {redeployPreflight.warnings.length}</span>
+            <span className="status info">ports {suggestedPorts.length}</span>
+          </div>
+        </article>
+
         <article className="card formCard adminToolCard" id="runtime-detail-redeploy">
           <div className="adminToolHeader">
             <span className="adminToolEyebrow">Next step</span>

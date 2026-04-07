@@ -14,6 +14,7 @@ import {
   smokeUser,
 } from "../lib/smoke-fixtures";
 import {
+  buildOverviewPrimaryPath,
   buildOpsSnapshot,
   buildOpsSummaryText,
   downloadJsonFile,
@@ -102,29 +103,49 @@ export default function HomePage() {
           : "Add server targets in server review when you want remote-only rollout paths.",
     },
   ];
+  const overviewPrimaryPath = buildOverviewPrimaryPath({
+    isAdmin: Boolean(currentUser?.is_admin),
+    deploymentsTotal: opsSnapshot.deployments.total,
+    failedDeployments: opsSnapshot.deployments.failed,
+    serversTotal: opsSnapshot.servers.total,
+  });
   const workspaceScenarioCards = [
     {
       key: "deploy",
-      label: "Deploy",
-      title: deployments.length > 0 ? "Start the next rollout" : "Launch the first deployment",
-      detail:
-        templates.length > 0
-          ? "Open the dedicated deployment workspace for guided create flow, template preview, and rollout actions in one place."
-          : "Start in the deployment workspace, then pick image, ports, env vars, and saved target without hunting through the whole app.",
-      href: "/app/deployment-workflow",
-      actionLabel: "Open deployment workflow",
+      label:
+        overviewPrimaryPath.reason === "server-setup"
+          ? "Servers"
+          : overviewPrimaryPath.reason === "incident"
+            ? "Runtime"
+            : "Deploy",
+      title: overviewPrimaryPath.title,
+      detail: overviewPrimaryPath.detail,
+      href: overviewPrimaryPath.href,
+      actionLabel: overviewPrimaryPath.label,
       primary: true,
     },
     {
       key: "runtime",
-      label: "Runtime",
-      title: opsSnapshot.deployments.failed > 0 ? "Review live incidents" : "Review live deployments",
+      label: overviewPrimaryPath.reason === "server-setup" ? "Then deploy" : "Runtime",
+      title:
+        overviewPrimaryPath.reason === "server-setup"
+          ? "Launch the first deployment"
+          : opsSnapshot.deployments.failed > 0
+            ? "Review live incidents"
+            : "Review live deployments",
       detail:
-        opsSnapshot.deployments.failed > 0
+        overviewPrimaryPath.reason === "server-setup"
+          ? "After one server target is saved, move into the deployment workspace for the guided rollout form and live runtime queue."
+          : opsSnapshot.deployments.failed > 0
           ? "Go straight to the deployment workspace and open a live runtime card before more rollout changes."
           : "Use the deployment workspace when you want the current list, health context, and a fast path into deployment detail.",
       href: "/app/deployment-workflow",
-      actionLabel: opsSnapshot.deployments.failed > 0 ? "Review deployments" : "Open live deployments",
+      actionLabel:
+        overviewPrimaryPath.reason === "server-setup"
+          ? "Open deployment workflow"
+          : opsSnapshot.deployments.failed > 0
+            ? "Review deployments"
+            : "Open live deployments",
       primary: false,
     },
     ...(currentUser?.is_admin
@@ -160,45 +181,52 @@ export default function HomePage() {
           },
         ]),
   ];
-  const reviewerPathItems = [
+  const firstRunContext = deployments.length > 0
+    ? "Start with the deployment workspace and one live runtime card. Open team/admin review only after the rollout story is already clear."
+    : overviewPrimaryPath.reason === "server-setup"
+      ? "This workspace has no saved server targets yet, so the next useful click is Server Review. Save one target there before treating rollout creation as the main path."
+      : "This environment has no live deployments yet, so the next useful step is opening the dedicated deployment workspace and following the guided create path.";
+  const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
+    opsSnapshot.attention_items.length === 1 ? "" : "s"
+  }`;
+  const coreSurfaceCards = [
     {
-      label: "Start here",
-      title:
-        opsSnapshot.deployments.total > 0
-          ? "Read the live deployment workspace"
-          : "Open the guided rollout workspace",
+      key: "overview",
+      label: "Overview",
+      title: "Read the current workspace state",
       detail:
-        opsSnapshot.deployments.total > 0
-          ? "Open the deployment workspace first, then step into one live deployment detail when you want health, logs, diagnostics, and activity together."
-          : "The deployment workspace now keeps the first rollout path, templates, and live list together instead of scattering them through the overview page.",
+        "Use this screen only to understand what matters now and choose the next obvious path without opening every advanced tool at once.",
+      href: "/app",
+      actionLabel: "Stay on overview",
+    },
+    {
+      key: "servers",
+      label: "Servers",
+      title: "Connect or verify rollout targets",
+      detail:
+        "Open Server Review when you need to add a target, test SSH access, run diagnostics, or confirm that remote rollout is really ready.",
+      href: "/app/server-review",
+      actionLabel: "Open server review",
+    },
+    {
+      key: "deployments",
+      label: "Deployments",
+      title: "Create or review live runtime",
+      detail:
+        "Open Deployment Workflow for the guided create path, the live deployment queue, and the fastest jump into runtime detail.",
       href: "/app/deployment-workflow",
       actionLabel: "Open deployment workflow",
     },
     {
-      label: "Then show depth",
-      title: currentUser?.is_admin ? "Open team access review" : "Open upgrade path",
-      detail: currentUser?.is_admin
-        ? "The users surface keeps access review, restore validation, and audit-oriented recovery flow separate from day-to-day rollout work."
-        : "The upgrade path keeps commercial next steps separate from the runtime workspace.",
-      href: currentUser?.is_admin ? "/app/users" : "/upgrade",
-      actionLabel: currentUser?.is_admin ? "Open users" : "Open upgrade",
-    },
-    {
-      label: "Finish with governance",
-      title: currentUser?.is_admin ? "Open the upgrade inbox" : "Return to runtime state",
-      detail: currentUser?.is_admin
-        ? "The upgrade inbox stays available when you need queue review, bulk status changes, and audit history after the product path is already clear."
-        : "Stay on the main workspace when you only need rollout proof and runtime clarity.",
-      href: currentUser?.is_admin ? "/app/upgrade-requests" : "/app/deployment-workflow",
-      actionLabel: currentUser?.is_admin ? "Open upgrade inbox" : "Back to deployments",
+      key: "templates",
+      label: "Templates",
+      title: "Reuse rollout defaults",
+      detail:
+        "Templates stay close to the deploy path so repeat rollouts, previews, and small edits do not become a separate product story.",
+      href: "/app/deployment-workflow#templates",
+      actionLabel: "Open templates",
     },
   ];
-  const firstRunContext = deployments.length > 0
-    ? "Start with the deployment workspace and one live runtime card. Open team/admin review only after the rollout story is already clear."
-    : "This environment has no live deployments yet, so the next useful step is opening the dedicated deployment workspace and following the guided create path.";
-  const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
-    opsSnapshot.attention_items.length === 1 ? "" : "s"
-  }`;
 
   async function fetchCurrentUser() {
     const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -573,26 +601,11 @@ export default function HomePage() {
             </div>
             <div className="buttonRow workspaceHeroActions">
               <Link
-                href="/app/deployment-workflow"
+                href={overviewPrimaryPath.href}
                 className="landingButton primaryButton workspacePrimaryAction"
               >
-                Open deployment workflow
+                {overviewPrimaryPath.label}
               </Link>
-              {currentUser?.is_admin ? (
-                <Link href="/app/server-review" className="workspaceGhostAction">
-                  Server review
-                </Link>
-              ) : null}
-              {currentUser?.is_admin ? (
-                <Link href="/app/users" className="workspaceGhostAction">
-                  Users
-                </Link>
-              ) : null}
-              {currentUser?.is_admin ? (
-                <Link href="/app/upgrade-requests" className="workspaceGhostAction">
-                  Upgrade inbox
-                </Link>
-              ) : null}
               <button
                 type="button"
                 onClick={() => refreshPage()}
@@ -739,15 +752,15 @@ export default function HomePage() {
           <article className="card formCard workspaceGuidePanel" data-testid="workspace-guide-card">
             <div className="sectionHeader workspaceGuideHeader">
               <div>
-                <h2 data-testid="workspace-guide-title">Secondary paths stay below the main route</h2>
+                <h2 data-testid="workspace-guide-title">Core product surfaces</h2>
                 <p className="formHint">
-                  Admin, recovery, and reviewer flows still matter, but they should not compete with the first deployment decision on page load.
+                  Keep the first pass inside these four surfaces. Anything heavier should stay secondary until the main deploy path is already clear.
                 </p>
               </div>
             </div>
             <div className="workspaceReviewerGrid" data-testid="workspace-reviewer-panel">
-              {reviewerPathItems.map((item) => (
-                <article key={item.label} className="workspaceReviewerCard">
+              {coreSurfaceCards.map((item) => (
+                <article key={item.key} className="workspaceReviewerCard">
                   <span>{item.label}</span>
                   <strong>{item.title}</strong>
                   <p>{item.detail}</p>
@@ -759,6 +772,38 @@ export default function HomePage() {
             </div>
           </article>
         </div>
+
+        {currentUser?.is_admin ? (
+          <AdminDisclosureSection
+            title="Advanced admin surfaces"
+            subtitle="Keep these paths available without letting them interrupt the main rollout story on first pass."
+            badge="Advanced"
+            testId="overview-advanced-admin-disclosure"
+          >
+            <div className="workspaceReviewerGrid">
+              <article className="workspaceReviewerCard">
+                <span>Users</span>
+                <strong>Manage team access later</strong>
+                <p>
+                  Open the users surface when access review, password recovery, exports, or restore planning is the real task.
+                </p>
+                <Link href="/app/users" className="landingButton secondaryButton">
+                  Open users
+                </Link>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>Upgrade inbox</span>
+                <strong>Handle commercial or queue review separately</strong>
+                <p>
+                  Keep upgrade triage and queue handling in its own workspace after the runtime story is already understood.
+                </p>
+                <Link href="/app/upgrade-requests" className="landingButton secondaryButton">
+                  Open upgrade inbox
+                </Link>
+              </article>
+            </div>
+          </AdminDisclosureSection>
+        ) : null}
 
         <AdminDisclosureSection
           title="Workspace signals and reports"

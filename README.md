@@ -190,6 +190,7 @@ Browser
 ```
 
 More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
+Project focus rules: see [PROJECT-RULES.md](PROJECT-RULES.md).
 
 ![Architecture flow](docs/architecture-flow.svg)
 

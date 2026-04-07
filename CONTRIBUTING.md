@@ -5,6 +5,8 @@
 - use `develop` as the active integration branch
 - keep changes scoped to one purpose when possible
 - prefer small, reviewable batches over unrelated mixed changes
+- keep the product centered on the main deploy path described in [PROJECT-RULES.md](PROJECT-RULES.md)
+- do not add new top-level product complexity unless it clearly improves that main path
 
 ## Local setup
 

@@ -1,6 +1,6 @@
 # DeployMate Handoff
 
-Updated: 2026-04-04
+Updated: 2026-04-07
 
 ## Current Product Goal
 
@@ -9,6 +9,7 @@ Updated: 2026-04-04
   - подключить сервер
   - увидеть, жив ли сервис
   - понять, что делать дальше без длинного скролла и лишнего жаргона
+- Для быстрой ресинхронизации Codex теперь использовать короткие команды из [CODEX-PROTOCOL.md](CODEX-PROTOCOL.md).
 
 ## Current Build Reality
 
@@ -16,14 +17,46 @@ Updated: 2026-04-04
 - `/app/server-review` сейчас главный экран для подключения и review серверов.
 - `/app/deployment-workflow` сейчас главный runtime/deploy workspace.
 - `deployment detail` стал более decision-first, чем раньше.
-- Уже сделаны большие UX-пакеты по упрощению верхнего пути в workflow и detail, но продукт ещё не считается достаточно простым для первого знакомства.
+- Week 1 now has a clearer first-pass story across the four main surfaces:
+  - `/app` chooses the obvious next path instead of surfacing too many competing actions
+  - `/app/server-review` now reads as `save -> verify -> deploy`
+  - `/app/deployment-workflow` now behaves like one active lane at a time: live, create, or templates
+  - `deployment detail` now answers state, risk, and next action more directly
+- продукт стал заметно понятнее с первого прохода, но Week 2 ещё нужен для более гладкого перехода от `server-review` к `deployment-workflow`
 
 ## Next Recommended Package
 
-- Следующий большой пакет должен строиться вокруг сценария новичка:
-  - сначала понятное добавление сервера
-  - потом понятный переход в live/runtime path
-  - меньше терминов и второстепенных controls на первом экране
+- Week 2 should build one continuous beginner path:
+  - save the first server
+  - remove uncertainty on that target
+  - land in deployment creation without re-learning the product
+  - keep copy, empty states, and CTA language aligned across those screens
+
+## Week 1 Result
+
+- The main product story is now more explicit: `server -> deploy -> observe`.
+- The first pass should stay inside four surfaces only:
+  - `Overview`
+  - `Servers`
+  - `Deployments`
+  - `Templates`
+- Admin, recovery, import, audit-heavy, and queue-heavy flows remain valid, but should stay secondary until the main path is already clear.
+- The current UI standard is no longer “show everything important”.
+- The new standard is “show the next obvious action first”.
+
+## Week 2 Focus
+
+- Reduce friction between `Server Review` and `Deployment Workflow`.
+- Make empty states and first-success states feel connected.
+- Keep one clear sentence on each screen explaining what the user should do next.
+- Cut any remaining repeated explanations or duplicated decision blocks that do not improve first-pass clarity.
+
+## Week 2 Progress
+
+- The `Server Review -> Deployment Workflow` bridge is now partially real, not just conceptual.
+- When a reviewed server is ready, `server-review` now opens `deployment-workflow` with that target preselected.
+- The create form now says more clearly when the target already came from `Server Review`, so the user knows the next move is simply setting the image.
+- After the first successful deploy, the success state now points straight to runtime detail instead of leaving the user in a vague success-only state.
 
 ## Current State
 
