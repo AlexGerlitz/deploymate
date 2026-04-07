@@ -959,12 +959,6 @@ function ServerReviewPageContent() {
         loading={loading}
         onRefresh={() => loadServers()}
         refreshTestId="server-review-refresh"
-        primaryAction={{
-          label: "Add server",
-          testId: "server-review-primary-action-button",
-          onClick: () => scrollToElement("server-review-create-server-section"),
-          disabled: false,
-        }}
       />
 
       <AdminFeedbackBanners
@@ -992,6 +986,89 @@ function ServerReviewPageContent() {
             </p>
           </div>
         </div>
+        <div id="server-review-create-server-section" className="workspaceGlancePanel">
+          <div className="workspaceGlanceHeader">
+            <span className="eyebrow">Start here</span>
+            <strong>Add your server</strong>
+          </div>
+          <p className="formHint">
+            Enter one server below. After you save it, run a connection test or full check before moving on.
+          </p>
+          <form className="form" onSubmit={handleCreateServer} data-testid="server-review-create-server">
+            <label className="field">
+              <span>Name</span>
+              <input
+                name="name"
+                value={serverForm.name}
+                onChange={updateServerFormField}
+                placeholder="prod-vps"
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-name"
+              />
+            </label>
+            <label className="field">
+              <span>Host</span>
+              <input
+                name="host"
+                value={serverForm.host}
+                onChange={updateServerFormField}
+                placeholder="203.0.113.10"
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-host"
+              />
+            </label>
+            <label className="field">
+              <span>Port</span>
+              <input
+                name="port"
+                type="number"
+                min="1"
+                max="65535"
+                value={serverForm.port}
+                onChange={updateServerFormField}
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-port"
+              />
+            </label>
+            <label className="field">
+              <span>Username</span>
+              <input
+                name="username"
+                value={serverForm.username}
+                onChange={updateServerFormField}
+                placeholder="deploy"
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-username"
+              />
+            </label>
+            <label className="field">
+              <span>SSH key</span>
+              <textarea
+                name="ssh_key"
+                rows={6}
+                value={serverForm.ssh_key}
+                onChange={updateServerFormField}
+                placeholder="Paste your SSH private key content here"
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-ssh-key"
+              />
+            </label>
+            <div className="formActions">
+              <button
+                type="submit"
+                disabled={serverSubmitting}
+                data-testid="server-review-create-submit"
+              >
+                {serverSubmitting ? "Adding..." : "Save server"}
+              </button>
+            </div>
+          </form>
+        </div>
         <div className="workspaceReviewerGrid">
           {serverJourneySteps.map((step) => (
             <article key={step.key} className="workspaceReviewerCard">
@@ -1002,7 +1079,7 @@ function ServerReviewPageContent() {
           ))}
         </div>
         <div className="adminFilterActions">
-          {serverJourneyPrimaryAction.kind === "link" ? (
+          {!hasServers ? null : serverJourneyPrimaryAction.kind === "link" ? (
             <Link href={serverJourneyPrimaryAction.href} className="landingButton primaryButton">
               {serverJourneyPrimaryAction.label}
             </Link>
@@ -1055,7 +1132,7 @@ function ServerReviewPageContent() {
               data-testid="server-review-main-next-step-button"
               onClick={() => scrollToElement("server-review-create-server-section")}
             >
-              Jump to add server form
+              Save first server below
             </button>
           ) : selectedServerReady ? (
             <Link
@@ -1098,90 +1175,6 @@ function ServerReviewPageContent() {
           </button>
         </div>
       </article>
-
-      <AdminDisclosureSection
-        title="Add your server"
-        subtitle="Enter one server here so DeployMate can connect to it and confirm it is ready for the next step."
-        badge={hasServers ? "Create another" : "Start here"}
-        defaultOpen={servers.length === 0}
-        sectionId="server-review-create-server-section"
-        testId="server-review-create-server"
-      >
-        <form className="form" onSubmit={handleCreateServer}>
-          <label className="field">
-            <span>Name</span>
-            <input
-              name="name"
-              value={serverForm.name}
-              onChange={updateServerFormField}
-              placeholder="prod-vps"
-              disabled={serverSubmitting}
-              required
-              data-testid="server-review-create-name"
-            />
-          </label>
-          <label className="field">
-            <span>Host</span>
-            <input
-              name="host"
-              value={serverForm.host}
-              onChange={updateServerFormField}
-              placeholder="203.0.113.10"
-              disabled={serverSubmitting}
-              required
-              data-testid="server-review-create-host"
-            />
-          </label>
-          <label className="field">
-            <span>Port</span>
-            <input
-              name="port"
-              type="number"
-              min="1"
-              max="65535"
-              value={serverForm.port}
-              onChange={updateServerFormField}
-              disabled={serverSubmitting}
-              required
-              data-testid="server-review-create-port"
-            />
-          </label>
-          <label className="field">
-            <span>Username</span>
-            <input
-              name="username"
-              value={serverForm.username}
-              onChange={updateServerFormField}
-              placeholder="deploy"
-              disabled={serverSubmitting}
-              required
-              data-testid="server-review-create-username"
-            />
-          </label>
-          <label className="field">
-            <span>SSH key</span>
-            <textarea
-              name="ssh_key"
-              rows={6}
-              value={serverForm.ssh_key}
-              onChange={updateServerFormField}
-	              placeholder="Paste your SSH private key content here"
-              disabled={serverSubmitting}
-              required
-              data-testid="server-review-create-ssh-key"
-            />
-          </label>
-          <div className="formActions">
-            <button
-              type="submit"
-              disabled={serverSubmitting}
-              data-testid="server-review-create-submit"
-            >
-              {serverSubmitting ? "Adding..." : "Save server"}
-            </button>
-          </div>
-        </form>
-      </AdminDisclosureSection>
 
       <AdminDisclosureSection
         title="Edit selected server"
