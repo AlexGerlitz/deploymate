@@ -294,7 +294,7 @@ function ServerReviewPageContent() {
 
   function handleSelectItem(itemId) {
     setSelectedItemId(itemId);
-    setSuccess("Focused the server action panel on the selected target.");
+    setSuccess("Opened this server.");
     setError("");
   }
 
@@ -600,11 +600,11 @@ function ServerReviewPageContent() {
               key={item.id}
               title={item.label}
               body={item.note}
-              status={item.id === selectedItemId ? `${item.status} · focused` : item.status}
+              status={item.id === selectedItemId ? `${item.status} · open` : item.status}
             >
               {item.segment === "ready" ? (
                 <div className="banner success">
-                  Step 1 done. This server is ready. Next: choose your app.
+                  Step 1 done. This server is ready. Next: choose what to run on it.
                 </div>
               ) : null}
               <p className="formHint">
@@ -620,7 +620,7 @@ function ServerReviewPageContent() {
                   data-testid={`${item.id}-focus`}
                   onClick={() => handleSelectItem(item.id)}
                 >
-                  {item.id === selectedItemId ? "Focused" : "Focus server"}
+                  {item.id === selectedItemId ? "Open now" : "Open"}
                 </button>
                 {item.id === selectedItemId ? null : (
                   <button
@@ -654,7 +654,7 @@ function ServerReviewPageContent() {
                     href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
                     className="landingButton primaryButton"
                   >
-                    Choose app next
+                    Choose what to run
                   </Link>
                 ) : null}
                 <button

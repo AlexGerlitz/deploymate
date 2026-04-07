@@ -1221,7 +1221,7 @@ function DeploymentWorkflowPageContent() {
           <div className="header">
             <div>
               <div className="eyebrow">Step 2</div>
-              <h1 data-testid="deployment-workflow-title">Choose your app</h1>
+              <h1 data-testid="deployment-workflow-title">Choose what to run</h1>
               <p className="formHint">
                 {selectedCreateServer
                   ? `Step 1 is done on ${selectedServerLabel}. Now choose what to run on this server.`
@@ -1264,7 +1264,7 @@ function DeploymentWorkflowPageContent() {
               <div>
                 <h2>Server ready</h2>
                 <p className="formHint">
-                  Step 1 is complete for <strong>{selectedCreateServer.name}</strong>. Stay on this server and choose the app you want to run next.
+                  Step 1 is complete for <strong>{selectedCreateServer.name}</strong>. Stay on this server and choose what to run next.
                 </p>
               </div>
               <span className="status healthy">ready</span>
@@ -1272,7 +1272,7 @@ function DeploymentWorkflowPageContent() {
             <div className="backupSummaryBadges">
               <span className="status info">{selectedServerLabel}</span>
               <span className="status healthy">Step 1 done</span>
-              <span className="status unknown">Now: choose app</span>
+              <span className="status unknown">Now: choose what to run</span>
             </div>
           </article>
         ) : null}
