@@ -78,26 +78,26 @@ export default function HomePage() {
     : overviewPrimaryPath.reason === "incident"
       ? "Next best step: open live deployments and review the problem first."
       : deployments.length === 0
-        ? "Next best step: open deployment workflow and enter one image."
-        : "Next best step: open deployment workflow and continue from one live deployment card.";
+        ? "Next best step: choose which app to run on that server."
+        : "Next best step: open your app list and continue from one running service.";
   const heroHeadline = servers.length === 0
     ? "Connect one server, choose what to run, and check that it works."
     : deployments.length === 0
-      ? "Your server is ready. Next choose what to run and create the first deployment."
+      ? "Your server is ready. Next choose which app to run and start it."
       : "Your app workspace is live. Review what is running, then deploy the next change.";
   const heroSupportText = servers.length === 0
     ? "DeployMate gives you one clear path: connect a server first, then deploy one app."
     : deployments.length === 0
-      ? "You are already past Step 1. The next move is entering one Docker image or using a saved template."
-      : "Use the deployment workspace for the next action. Keep admin and reports secondary until the runtime story is clear.";
+      ? "You are already past Step 1. The next move is choosing the app you want to run on that server."
+      : "Open the app workspace for the next action. Keep admin and reports secondary until the runtime story is clear.";
   const explanationTitle = servers.length === 0
     ? "What happens after you connect a server"
     : "What happens next";
   const explanationBody = servers.length === 0
-    ? "After Step 1, open the deploy screen, enter one Docker image, and then check whether the app is healthy."
+    ? "After Step 1, choose the app you want to run, start it, and then check whether it is healthy."
     : deployments.length === 0
-      ? "After Step 1, choose what to run, create the first deployment, and then review status."
-      : "Use the deployment workspace to review status first, then make the next rollout deliberately.";
+      ? "After Step 1, choose what app to run, start the first app, and then review status."
+      : "Open the app workspace to review status first, then make the next change deliberately.";
   const beginnerSteps = [
     {
       key: "step-1",
@@ -111,19 +111,19 @@ export default function HomePage() {
     {
       key: "step-2",
       step: "Step 2",
-      title: "Choose what to run",
-      detail: "Open the deploy screen, enter a Docker image, or use a saved template.",
+      title: "Choose your app",
+      detail: "Open the app setup screen, paste the app image, or use a ready template.",
       href: "/app/deployment-workflow",
-      actionLabel: "Open deploy step",
+      actionLabel: "Choose app to run",
       primary: overviewPrimaryPath.reason !== "server-setup",
     },
     {
       key: "step-3",
       step: "Step 3",
-      title: "Deploy and check status",
+      title: "Start it and check status",
       detail: "Start the app, then check whether it is running and healthy.",
       href: "/app/deployment-workflow",
-      actionLabel: "See live deployments",
+      actionLabel: "See running apps",
       primary: false,
     },
   ];
@@ -529,7 +529,7 @@ export default function HomePage() {
                       {card.step === "Step 1"
                         ? "Add one server."
                         : card.step === "Step 2"
-                          ? "Enter one image."
+                          ? "Choose one app."
                           : "Check whether it works."}
                     </p>
                     <Link
@@ -559,9 +559,9 @@ export default function HomePage() {
                   </div>
                   <div className="workspaceStatusCard workspaceGlanceItem">
                     <span>Step 2</span>
-                    <strong>{deployments.length === 0 ? "Choose app" : "Deploy next change"}</strong>
+                    <strong>{deployments.length === 0 ? "Choose app" : "Start next app"}</strong>
                     <p>
-                      Open the deploy screen, enter a Docker image, or use a saved template.
+                      Open the app setup screen, paste the app image, or use a ready template.
                     </p>
                   </div>
                   <div className="workspaceStatusCard workspaceGlanceItem">
