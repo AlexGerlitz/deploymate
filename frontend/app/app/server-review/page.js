@@ -1,43 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
-  AdminActiveFilters,
-  AdminAuditToolbar,
   AdminDisclosureSection,
   AdminFeedbackBanners,
-  AdminFilterFooter,
-  AdminSavedViews,
   AdminSurfaceActionStarter,
-  AdminSurfaceBulkStarter,
-  AdminSurfaceMutationPreview,
   AdminSurfaceQueue,
   AdminSurfaceQueueCard,
-  AdminSurfaceTable,
 } from "../admin-ui";
-import { formatSavedViews } from "../../lib/admin-saved-views";
-import { useAdminSavedViewsManager } from "../../lib/admin-page-hooks";
 import {
-  applyFilterDefinitions,
-  buildFilterChipsFromDefinitions,
-  buildFilterState,
-  copyTextToClipboard,
-  createChoiceFilterDefinition,
-  createTextFilterDefinition,
-  sortItemsByDateMode,
-  triggerFileDownload,
-} from "../../lib/admin-page-utils";
-import {
-  bulkStatusOptions,
   segmentFilterOptions,
-  starterMetrics,
   starterRuntimeMode,
-  starterTableColumns,
   starterStrings,
 } from "./starter-data";
-import { buildStarterMutationPreview, buildStarterSummaryMetrics } from "./starter-actions";
 import {
   createServerReviewServer,
   deleteServerReviewServer,
@@ -46,25 +23,6 @@ import {
   runServerReviewStarterAction,
   updateServerReviewServer,
 } from "./starter-api";
-import {
-  buildServerReviewNextStep,
-  formatDate,
-} from "../../lib/runtime-workspace-utils";
-
-const savedViewsStorageKey = "deploymate.admin.server-review.savedViews";
-
-function formatSavedServerViews(items) {
-  return formatSavedViews(items, {
-    formatDate,
-    summarizeFilters: (filters) =>
-      [
-        filters.q ? `search ${filters.q}` : null,
-        filters.segment && filters.segment !== "all" ? `focus ${filters.segment}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · "),
-  });
-}
 
 function buildServerMeta(server, diagnostics, suggestedPorts) {
   const target = `${server.username}@${server.host}:${server.port}`;
@@ -156,35 +114,8 @@ function mapServerToItem(server, runtimeState) {
   };
 }
 
-function buildAuditEntry({ id, label, scope, detail }) {
-  return {
-    id,
-    label,
-    scope,
-    detail,
-    created_at: new Date().toISOString(),
-  };
-}
-
-function appendAuditEntry(currentItems, nextItem) {
-  return [nextItem, ...currentItems].slice(0, 20);
-}
-
-function scrollToElement(sectionId) {
-  if (typeof document === "undefined") {
-    return;
-  }
-
-  const element = document.getElementById(sectionId);
-  if (element) {
-    element.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-}
-
 function ServerReviewPageContent() {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("Step 1 is ready. Save one server and then test the connection.");
@@ -192,21 +123,15 @@ function ServerReviewPageContent() {
   const [serverTestResults, setServerTestResults] = useState({});
   const [serverDiagnostics, setServerDiagnostics] = useState({});
   const [serverSuggestedPorts, setServerSuggestedPorts] = useState({});
-  const [auditItems, setAuditItems] = useState([]);
   const [selectedItemId, setSelectedItemId] = useState("");
-  const [selectedItemIds, setSelectedItemIds] = useState([]);
   const [actionNote, setActionNote] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
-  const [bulkStatusValue, setBulkStatusValue] = useState(() => bulkStatusOptions[0]?.value || "");
   const [loading, setLoading] = useState(false);
   const [serverSubmitting, setServerSubmitting] = useState(false);
   const [serverUpdating, setServerUpdating] = useState(false);
   const [deletingServerId, setDeletingServerId] = useState("");
-  const [query, setQuery] = useState(() => searchParams.get("q") || "");
-  const [segmentFilter, setSegmentFilter] = useState(() => searchParams.get("segment") || "all");
-  const [auditQuery, setAuditQuery] = useState(() => searchParams.get("audit_q") || "");
-  const [auditScope, setAuditScope] = useState(() => searchParams.get("audit_scope") || "all");
-  const [auditSort, setAuditSort] = useState(() => searchParams.get("audit_sort") || "newest");
+  const [query, setQuery] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState("all");
   const [serverForm, setServerForm] = useState({
     name: "",
     host: "",
@@ -221,55 +146,6 @@ function ServerReviewPageContent() {
     username: "",
     ssh_key: "",
   });
-
-  const primaryFilterDefinitions = [
-    createTextFilterDefinition({
-      key: "q",
-      value: query,
-      setValue: setQuery,
-      chipKey: "server-review-query",
-      chipLabel: `Search: ${query.trim()}`,
-      testId: "server-review-filter-chip-query",
-    }),
-    createChoiceFilterDefinition({
-      key: "segment",
-      value: segmentFilter,
-      setValue: setSegmentFilter,
-      chipKey: "server-review-segment",
-      chipLabel: `Focus: ${segmentFilter}`,
-      testId: "server-review-filter-chip-segment",
-    }),
-  ];
-  const { currentFilters, hasActiveFilters, syncedSearchParams } = buildFilterState(primaryFilterDefinitions);
-  const activeFilterChips = buildFilterChipsFromDefinitions(primaryFilterDefinitions);
-
-  const auditFilterDefinitions = [
-    createTextFilterDefinition({
-      key: "audit_q",
-      value: auditQuery,
-      setValue: setAuditQuery,
-      chipKey: "server-review-audit-query",
-      chipLabel: `Audit: ${auditQuery.trim()}`,
-      testId: "server-review-audit-chip-query",
-    }),
-    createChoiceFilterDefinition({
-      key: "audit_scope",
-      value: auditScope,
-      setValue: setAuditScope,
-      chipKey: "server-review-audit-scope",
-      chipLabel: `Scope: ${auditScope}`,
-      testId: "server-review-audit-chip-scope",
-    }),
-    createChoiceFilterDefinition({
-      key: "audit_sort",
-      value: auditSort,
-      setValue: setAuditSort,
-      resetValue: "newest",
-      activeWhen: (value) => value !== "newest",
-      serializeWhen: (value) => value !== "newest",
-    }),
-  ];
-  const activeAuditFilterChips = buildFilterChipsFromDefinitions(auditFilterDefinitions);
 
   const runtimeState = useMemo(
     () => ({
@@ -286,7 +162,7 @@ function ServerReviewPageContent() {
   );
 
   const filteredItems = useMemo(() => {
-    const normalized = currentFilters.q.trim().toLowerCase();
+    const normalized = query.trim().toLowerCase();
     return items.filter((item) => {
       const matchesQuery =
         !normalized ||
@@ -302,26 +178,10 @@ function ServerReviewPageContent() {
           .filter(Boolean)
           .some((value) => value.toLowerCase().includes(normalized));
       const matchesSegment =
-        currentFilters.segment === "all" || item.segment === currentFilters.segment;
+        segmentFilter === "all" || item.segment === segmentFilter;
       return matchesQuery && matchesSegment;
     });
-  }, [currentFilters.q, currentFilters.segment, items]);
-
-  const summaryMetrics = useMemo(() => {
-    const segmentSummary = buildStarterSummaryMetrics(filteredItems);
-    if (!segmentSummary) {
-      return starterMetrics;
-    }
-
-    return [
-      {
-        label: "Live queue",
-        value: segmentSummary,
-        description: "This view now reflects real server targets and their latest review state.",
-      },
-      ...starterMetrics.slice(1),
-    ];
-  }, [filteredItems]);
+  }, [items, query, segmentFilter]);
 
   const selectedItem =
     filteredItems.find((item) => item.id === selectedItemId) ||
@@ -329,17 +189,6 @@ function ServerReviewPageContent() {
     filteredItems[0] ||
     items[0] ||
     null;
-  const readyCount = items.filter((item) => item.segment === "ready").length;
-  const authCount = items.filter((item) => item.segment === "auth").length;
-  const diagnosticsCount = items.filter((item) => item.segment === "diagnostics").length;
-  const serverReviewNextStep = buildServerReviewNextStep({
-    hasServers: servers.length > 0,
-    selectedItem,
-    readyCount,
-    authCount,
-    diagnosticsCount,
-    filteredCount: filteredItems.length,
-  });
 
   useEffect(() => {
     if (!selectedItem) {
@@ -362,156 +211,6 @@ function ServerReviewPageContent() {
     });
   }, [selectedItemId, selectedItem]);
 
-  const selectedItems = items.filter((item) => selectedItemIds.includes(item.id));
-  const starterMutationPreview = buildStarterMutationPreview(selectedItem, actionNote);
-  const hasServers = servers.length > 0;
-  const selectedServerReady = selectedItem?.segment === "ready";
-  const selectedReadyDeploymentHref = selectedItem
-    ? `/app/deployment-workflow?server=${selectedItem.id}&source=server-review`
-    : "/app/deployment-workflow";
-  const serverJourneySteps = [
-    {
-      key: "save",
-      label: "1. Save one server",
-      state: hasServers ? "Done" : "Do now",
-      detail: hasServers
-        ? "A server target is already saved in this workspace."
-        : "Name, host, port, username, and one SSH key are enough to begin.",
-    },
-    {
-      key: "verify",
-      label: "2. Remove uncertainty",
-      state: selectedServerReady ? "Done" : hasServers ? "Next" : "Waiting",
-      detail: selectedServerReady
-        ? "The focused server already has a successful connection or diagnostics result."
-        : hasServers
-          ? "Focus one saved target and run a connection test or diagnostics pass."
-          : "Verification starts after the first target exists.",
-    },
-    {
-      key: "deploy",
-      label: "3. Choose your app",
-      state: selectedServerReady ? "Ready" : hasServers ? "Soon" : "Later",
-      detail: selectedServerReady
-        ? "Move into app setup while one server is already understood."
-        : hasServers
-          ? "Open app setup after one server decision is clear."
-          : "App setup becomes useful after server setup is done.",
-    },
-  ];
-  const serverJourneyPrimaryAction = !hasServers
-    ? {
-        label: "Jump to add server form",
-        kind: "button",
-        onClick: () => scrollToElement("server-review-create-server-section"),
-      }
-    : selectedServerReady
-      ? {
-          label: "Choose app to run",
-          kind: "link",
-          href: selectedReadyDeploymentHref,
-        }
-      : {
-          label: "Focus saved servers",
-          kind: "button",
-          onClick: () => scrollToElement("server-review-live-queue"),
-        };
-  const serverJourneySecondaryAction =
-    hasServers && !selectedServerReady
-      ? {
-          label: "Choose app later",
-          href: selectedReadyDeploymentHref,
-        }
-      : null;
-
-  const visibleAuditItems = useMemo(() => {
-    const normalizedAuditQuery = auditQuery.trim().toLowerCase();
-    const scopedItems = auditItems.filter((item) => auditScope === "all" || item.scope === auditScope);
-    const searchedItems = normalizedAuditQuery
-      ? scopedItems.filter((item) =>
-          [item.label, item.detail, item.scope].some((value) =>
-            value.toLowerCase().includes(normalizedAuditQuery),
-          ),
-        )
-      : scopedItems;
-    return sortItemsByDateMode(searchedItems, {
-      valueKey: "created_at",
-      mode: auditSort,
-    });
-  }, [auditItems, auditQuery, auditScope, auditSort]);
-
-  const visibleTableRows = useMemo(
-    () =>
-      filteredItems.map((item) => ({
-        ...item,
-        status: item.id === selectedItemId ? `${item.status} · focused` : item.status,
-      })),
-    [filteredItems, selectedItemId],
-  );
-
-  const {
-    savedViews,
-    savedViewName,
-    setSavedViewName,
-    savedViewsMetaText,
-    savedViewsSearch,
-    setSavedViewsSearch,
-    savedViewsSourceFilter,
-    setSavedViewsSourceFilter,
-    savedViewsSort,
-    setSavedViewsSort,
-    hasSavedViewNameMatch,
-    activeSavedViewId,
-    canSaveCurrentView,
-    visibleSavedViews,
-    savedViewsSummaryText,
-    handleSaveCurrentView,
-    handleApplySavedView,
-    handleUpdateCurrentView,
-    handleDeleteSavedView,
-    handleDownloadSavedViews,
-    handleImportSavedViews,
-    handleClearSavedViews,
-    handleClearImportedSavedViews,
-    handleResetSavedViewsTools,
-    handleUseCurrentSavedViewName,
-    handleCopySavedViewLink,
-  } = useAdminSavedViewsManager({
-    initialViews: formatSavedServerViews([
-      {
-        id: "server-review-saved-view-1",
-        name: "Diagnostics queue",
-        filters: { segment: "diagnostics" },
-        updatedAt: "2026-04-04T00:00:00.000Z",
-        source: "local",
-      },
-    ]),
-    formatViews: formatSavedServerViews,
-    storageKey: savedViewsStorageKey,
-    currentFilters,
-    hasFilters: hasActiveFilters,
-    applyViewFilters: (filters) => applyFilterDefinitions(primaryFilterDefinitions, filters),
-    pathname,
-    copyText: copyTextToClipboard,
-    setFeedback: setSuccess,
-    setError,
-    initialMetaText: "Using local browser storage.",
-    exportFilename: "deploymate-server-review-saved-views.json",
-    exportScope: "server-review",
-    summaryNoun: "server review",
-    emptyImportMessage: "No valid saved views found in this file.",
-    wrongScopeMessage: "This file is not a Server Review saved views export.",
-    saveSuccessMessage: "Saved current server review view.",
-    updateSuccessMessage: "Current server review view updated.",
-    deleteSuccessMessage: "Saved server review view removed.",
-    exportSuccessMessage: "Saved server review views exported.",
-    clearSuccessMessage: "Saved server review views cleared.",
-    clearImportedSuccessMessage: "Imported server review views removed.",
-    resetToolsSuccessMessage: "Saved server review tools reset.",
-    importMergeMessage: ({ total, replacedCount, skippedCount }) =>
-      `Saved server review views merged. Total: ${total}. Replaced: ${replacedCount}. Skipped by limit: ${skippedCount}.`,
-  });
-
   async function loadServers(silent = false) {
     if (!silent) {
       setLoading(true);
@@ -525,22 +224,7 @@ function ServerReviewPageContent() {
 
       if (nextServers[0] && !selectedItemId) {
         setSelectedItemId(nextServers[0].id);
-        setSelectedItemIds([nextServers[0].id]);
       }
-
-      setAuditItems((currentItems) =>
-        currentItems.length > 0
-          ? currentItems
-          : appendAuditEntry(
-              currentItems,
-              buildAuditEntry({
-                id: "server-review-audit-loaded",
-                label: "Server review loaded",
-                scope: "queue",
-                detail: `Loaded ${nextServers.length} server target${nextServers.length === 1 ? "" : "s"} from the live /servers API.`,
-              }),
-            ),
-      );
       setSuccess(`Loaded ${nextServers.length} live server target${nextServers.length === 1 ? "" : "s"}.`);
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -580,17 +264,6 @@ function ServerReviewPageContent() {
         ...current,
         [serverId]: actionResult,
       }));
-      setAuditItems((currentItems) =>
-        appendAuditEntry(
-          currentItems,
-          buildAuditEntry({
-            id: `server-review-diagnostics-${serverId}-${Date.now()}`,
-            label: "Diagnostics captured",
-            scope: "queue",
-            detail: `${actionResult.target} · ${actionResult.overall_status} · suggested ports ${suggestedPorts.join(", ") || "pending"}`,
-          }),
-        ),
-      );
       return {
         successMessage: `Diagnostics loaded for ${actionResult.target}.`,
       };
@@ -600,17 +273,6 @@ function ServerReviewPageContent() {
       ...current,
       [serverId]: actionResult,
     }));
-    setAuditItems((currentItems) =>
-      appendAuditEntry(
-        currentItems,
-        buildAuditEntry({
-          id: `server-review-test-${serverId}-${Date.now()}`,
-          label: "Connection tested",
-          scope: "queue",
-          detail: `${actionResult.target || serverId} · ${actionResult.status} · ${actionResult.message}`,
-        }),
-      ),
-    );
     return {
       successMessage: `Connection test finished: ${actionResult.message}`,
     };
@@ -634,29 +296,7 @@ function ServerReviewPageContent() {
 
   function handleSelectItem(itemId) {
     setSelectedItemId(itemId);
-    setSelectedItemIds((currentIds) => (currentIds.includes(itemId) ? currentIds : [...currentIds, itemId]));
     setSuccess("Focused the server action panel on the selected target.");
-    setError("");
-  }
-
-  function handleToggleSelection(itemId) {
-    setSelectedItemIds((currentIds) =>
-      currentIds.includes(itemId)
-        ? currentIds.filter((currentId) => currentId !== itemId)
-        : [...currentIds, itemId],
-    );
-    setSelectedItemId(itemId);
-    setSuccess("Updated bulk server selection.");
-    setError("");
-  }
-
-  function handleApplyBulkPreset(segment) {
-    const nextIds = filteredItems.filter((item) => item.segment === segment).map((item) => item.id);
-    setSelectedItemIds(nextIds);
-    if (nextIds[0]) {
-      setSelectedItemId(nextIds[0]);
-    }
-    setSuccess(`Selected ${nextIds.length} server target${nextIds.length === 1 ? "" : "s"} for ${segment}.`);
     setError("");
   }
 
@@ -683,18 +323,6 @@ function ServerReviewPageContent() {
       });
       await loadServers(true);
       setSelectedItemId(createdServer.id);
-      setSelectedItemIds([createdServer.id]);
-      setAuditItems((currentItems) =>
-        appendAuditEntry(
-          currentItems,
-          buildAuditEntry({
-            id: `server-review-create-${createdServer.id}`,
-            label: "Server target created",
-            scope: "queue",
-            detail: `${createdServer.username}@${createdServer.host}:${createdServer.port} added to server review.`,
-          }),
-        ),
-      );
       setSuccess(`Server target "${createdServer.name}" created.`);
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -737,19 +365,7 @@ function ServerReviewPageContent() {
         delete next[serverId];
         return next;
       });
-      setSelectedItemIds((currentIds) => currentIds.filter((itemId) => itemId !== serverId));
       setSelectedItemId((currentId) => (currentId === serverId ? "" : currentId));
-      setAuditItems((currentItems) =>
-        appendAuditEntry(
-          currentItems,
-          buildAuditEntry({
-            id: `server-review-delete-${serverId}-${Date.now()}`,
-            label: "Server target deleted",
-            scope: "queue",
-            detail: `${server?.name || serverId} removed from server review.`,
-          }),
-        ),
-      );
       setSuccess(`Server target "${server?.name || serverId}" deleted.`);
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -784,17 +400,6 @@ function ServerReviewPageContent() {
       });
       setServers((currentServers) =>
         currentServers.map((server) => (server.id === selectedItem.id ? updatedServer : server)),
-      );
-      setAuditItems((currentItems) =>
-        appendAuditEntry(
-          currentItems,
-          buildAuditEntry({
-            id: `server-review-update-${selectedItem.id}-${Date.now()}`,
-            label: "Server target updated",
-            scope: "queue",
-            detail: `${updatedServer.username}@${updatedServer.host}:${updatedServer.port} saved from the review editor.`,
-          }),
-        ),
       );
       setSuccess(`Server target "${updatedServer.name}" updated.`);
     } catch (requestError) {
@@ -837,116 +442,9 @@ function ServerReviewPageContent() {
     }
   }
 
-  async function handleCopyNextStep() {
-    try {
-      await copyTextToClipboard(serverReviewNextStep.nextStep);
-      setSuccess("Server review next-step summary copied.");
-      setError("");
-    } catch {
-      setError("Failed to copy the server review next step.");
-      setSuccess("");
-    }
-  }
-
-  function handleApplyBulkAction() {
-    if (!selectedItemIds.length || !bulkStatusValue) {
-      setError("Select at least one server and a follow-up state before applying the local bulk review label.");
-      setSuccess("");
-      return;
-    }
-
-    setServerTestResults((currentResults) => {
-      const nextResults = { ...currentResults };
-      for (const serverId of selectedItemIds) {
-        const currentResult = nextResults[serverId] || {};
-        nextResults[serverId] = {
-          ...currentResult,
-          status: bulkStatusValue === "ssh_ready" ? "success" : "error",
-          message: `Bulk follow-up label applied: ${bulkStatusValue}.`,
-          target: currentResult.target || serverId,
-        };
-      }
-      return nextResults;
-    });
-
-    setAuditItems((currentItems) =>
-      appendAuditEntry(
-        currentItems,
-        buildAuditEntry({
-          id: `server-review-bulk-${Date.now()}`,
-          label: "Bulk follow-up applied",
-          scope: "bulk",
-          detail: `${selectedItemIds.length} server target${selectedItemIds.length === 1 ? "" : "s"} marked ${bulkStatusValue}.`,
-        }),
-      ),
-    );
-    setSuccess(`Bulk follow-up label applied to ${selectedItemIds.length} server target${selectedItemIds.length === 1 ? "" : "s"}.`);
-    setError("");
-  }
-
-  function handleExportJson() {
-    const payload = {
-      surface: "server-review",
-      generated_at: new Date().toISOString(),
-      filters: currentFilters,
-      items: filteredItems,
-      audit: visibleAuditItems,
-    };
-    triggerFileDownload(
-      "deploymate-server-review.json",
-      new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json;charset=utf-8",
-      }),
-    );
-    setSuccess("Server review JSON export generated.");
-    setError("");
-  }
-
-  function handleExportCsv() {
-    const rows = [
-      ["id", "server", "status", "focus", "context", "note"],
-      ...filteredItems.map((item) => [item.id, item.label, item.status, item.segment, item.meta, item.note]),
-    ];
-    const csv = rows
-      .map((row) =>
-        row
-          .map((value) => String(value ?? "").replaceAll("\"", "\"\""))
-          .map((value) => `"${value}"`)
-          .join(","),
-      )
-      .join("\n");
-    triggerFileDownload(
-      "deploymate-server-review.csv",
-      new Blob([csv], { type: "text/csv;charset=utf-8" }),
-    );
-    setSuccess("Server review CSV export generated.");
-    setError("");
-  }
-
   useEffect(() => {
     loadServers();
   }, []);
-
-  useEffect(() => {
-    const nextQuery = searchParams.get("q") || "";
-    if (nextQuery !== query) {
-      setQuery(nextQuery);
-    }
-    const nextSegment = searchParams.get("segment") || "all";
-    if (nextSegment !== segmentFilter) {
-      setSegmentFilter(nextSegment);
-    }
-  }, [query, searchParams, segmentFilter]);
-
-  useEffect(() => {
-    const currentSearch = searchParams.toString();
-    if (currentSearch === syncedSearchParams) {
-      return;
-    }
-    router.replace(syncedSearchParams ? `${pathname}?${syncedSearchParams}` : pathname, {
-      scroll: false,
-    });
-  }, [pathname, router, searchParams, syncedSearchParams]);
 
   return (
     <main className="workspaceShell">
@@ -983,15 +481,7 @@ function ServerReviewPageContent() {
         successTestId="server-review-success"
       />
 
-      <article className="card formCard workspaceGuidePanel" data-testid="server-review-journey-card">
-        <div className="sectionHeader workspaceGuideHeader">
-          <div>
-            <h2 data-testid="server-review-journey-title">What to do on this page</h2>
-            <p className="formHint">
-              Finish one server here, then move on to choosing the app you want to run.
-            </p>
-          </div>
-        </div>
+      <article className="card formCard workspaceGuidePanel" data-testid="server-review-create-card">
         <div id="server-review-create-server-section" className="workspaceGlancePanel">
           <div className="workspaceGlanceHeader">
             <span className="eyebrow">Start here</span>
@@ -1074,111 +564,6 @@ function ServerReviewPageContent() {
               </button>
             </div>
           </form>
-        </div>
-        <div className="workspaceReviewerGrid">
-          {serverJourneySteps.map((step) => (
-            <article key={step.key} className="workspaceReviewerCard">
-              <span>{step.label}</span>
-              <strong>{step.state}</strong>
-              <p>{step.detail}</p>
-            </article>
-          ))}
-        </div>
-        <div className="adminFilterActions">
-          {!hasServers ? null : serverJourneyPrimaryAction.kind === "link" ? (
-            <Link href={serverJourneyPrimaryAction.href} className="landingButton primaryButton">
-              {serverJourneyPrimaryAction.label}
-            </Link>
-          ) : (
-            <button
-              type="button"
-              className="primaryButton"
-              data-testid="server-review-journey-primary-action"
-              onClick={serverJourneyPrimaryAction.onClick}
-            >
-              {serverJourneyPrimaryAction.label}
-            </button>
-          )}
-          {serverJourneySecondaryAction ? (
-            <Link href={serverJourneySecondaryAction.href} className="landingButton secondaryButton">
-              {serverJourneySecondaryAction.label}
-            </Link>
-          ) : null}
-        </div>
-      </article>
-
-      <article className="card formCard" data-testid="server-review-main-next-step-card">
-        <div className="sectionHeader">
-          <div>
-            <h2 data-testid="server-review-main-next-step-title">Main next step</h2>
-            <p className="formHint">
-              Work one server to a clear decision first. Edit tools, tables, audit, exports, and bulk labels stay secondary until this server is obviously ready or blocked.
-            </p>
-          </div>
-        </div>
-        <div className="row">
-          <span className="label">Current focus</span>
-          <span data-testid="server-review-main-next-step-focus">{serverReviewNextStep.focus}</span>
-        </div>
-        <div className="row">
-          <span className="label">What to do</span>
-          <span data-testid="server-review-main-next-step-copy">{serverReviewNextStep.nextStep}</span>
-        </div>
-        <div className="backupSummaryBadges">
-          <span className={`status ${serverReviewNextStep.tone}`}>visible {filteredItems.length}</span>
-          <span className="status healthy">ready {readyCount}</span>
-          <span className="status warn">diagnostics {diagnosticsCount}</span>
-          <span className="status error">auth {authCount}</span>
-        </div>
-        <div className="actionCluster">
-          {!hasServers ? (
-            <button
-              type="button"
-              className="landingButton primaryButton"
-              data-testid="server-review-main-next-step-button"
-              onClick={() => scrollToElement("server-review-create-server-section")}
-            >
-              Save first server below
-            </button>
-          ) : selectedServerReady ? (
-            <Link
-              href={selectedReadyDeploymentHref}
-              className="landingButton primaryButton"
-              data-testid="server-review-main-next-step-button"
-            >
-              Choose app to run
-            </Link>
-          ) : selectedItem?.segment === "auth" ? (
-            <button
-              type="button"
-              className="landingButton primaryButton"
-              data-testid="server-review-main-next-step-button"
-              onClick={() => scrollToElement("server-review-edit-server")}
-            >
-              Edit selected server
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="landingButton primaryButton"
-              data-testid="server-review-main-next-step-button"
-              onClick={() =>
-                selectedItem
-                  ? handleRunStarterAction(selectedItem.segment === "diagnostics" ? "primary" : "secondary")
-                  : scrollToElement("server-review-live-queue")
-              }
-            >
-              {selectedItem?.segment === "diagnostics" ? "Run full check" : "Test connection"}
-            </button>
-          )}
-          <button
-            type="button"
-            className="secondaryButton"
-            data-testid="server-review-main-next-step-copy-button"
-            onClick={handleCopyNextStep}
-          >
-            Copy next step
-          </button>
         </div>
       </article>
 
@@ -1268,8 +653,8 @@ function ServerReviewPageContent() {
 
       <div id="server-review-live-queue">
         <AdminSurfaceQueue
-          title={starterStrings.queueTitle}
-          description={starterStrings.queueDescription}
+          title="Saved servers"
+          description="Save one server, focus it here, test the connection, then continue to app setup."
           searchLabel="Search saved servers"
           searchValue={query}
           onSearchChange={(event) => setQuery(event.target.value)}
@@ -1279,81 +664,80 @@ function ServerReviewPageContent() {
           emptyText="No saved servers match the current filters."
           items={filteredItems}
         >
-        <AdminActiveFilters filters={activeFilterChips} />
-        <label className="field">
-          <span>{starterStrings.segmentFilterLabel}</span>
-          <select
-            data-testid="server-review-segment-filter"
-            value={segmentFilter}
-            onChange={(event) => setSegmentFilter(event.target.value)}
-          >
-            {segmentFilterOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {filteredItems.map((item) => (
-          <AdminSurfaceQueueCard
-            key={item.id}
-            title={item.label}
-            body={item.note}
-            status={item.id === selectedItemId ? `${item.status} · focused` : item.status}
-          >
-            <p className="formHint">
-              <strong>{starterStrings.cardMetaLabel}:</strong> {item.meta}
-            </p>
-            <p className="formHint">
-              <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
-            </p>
-            <div className="adminFilterActions">
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid={`${item.id}-select`}
-                onClick={() => handleToggleSelection(item.id)}
-              >
-                {selectedItemIds.includes(item.id) ? "Selected" : "Select item"}
-              </button>
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid={`${item.id}-focus`}
-                onClick={() => handleSelectItem(item.id)}
-              >
-                {item.id === selectedItemId ? "Focused" : "Focus item"}
-              </button>
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid={`${item.id}-primary-action`}
-                onClick={() => handleRunStarterAction("primary", item.id)}
-                disabled={actionLoadingId === item.id}
-              >
-                {starterStrings.primaryActionLabel}
-              </button>
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid={`${item.id}-secondary-action`}
-                onClick={() => handleRunStarterAction("secondary", item.id)}
-                disabled={actionLoadingId === item.id}
-              >
-                {starterStrings.secondaryActionLabel}
-              </button>
-              <button
-                type="button"
-                className="dangerButton"
-                data-testid={`${item.id}-delete`}
-                onClick={() => handleDeleteServer(item.id)}
-                disabled={deletingServerId === item.id}
-              >
-                {deletingServerId === item.id ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </AdminSurfaceQueueCard>
-        ))}
+          <label className="field">
+            <span>{starterStrings.segmentFilterLabel}</span>
+            <select
+              data-testid="server-review-segment-filter"
+              value={segmentFilter}
+              onChange={(event) => setSegmentFilter(event.target.value)}
+            >
+              {segmentFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {filteredItems.map((item) => (
+            <AdminSurfaceQueueCard
+              key={item.id}
+              title={item.label}
+              body={item.note}
+              status={item.id === selectedItemId ? `${item.status} · focused` : item.status}
+            >
+              <p className="formHint">
+                <strong>{starterStrings.cardMetaLabel}:</strong> {item.meta}
+              </p>
+              <p className="formHint">
+                <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
+              </p>
+              <div className="adminFilterActions">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid={`${item.id}-focus`}
+                  onClick={() => handleSelectItem(item.id)}
+                >
+                  {item.id === selectedItemId ? "Focused" : "Focus server"}
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid={`${item.id}-primary-action`}
+                  onClick={() => handleRunStarterAction("primary", item.id)}
+                  disabled={actionLoadingId === item.id}
+                >
+                  {starterStrings.primaryActionLabel}
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  data-testid={`${item.id}-secondary-action`}
+                  onClick={() => handleRunStarterAction("secondary", item.id)}
+                  disabled={actionLoadingId === item.id}
+                >
+                  {starterStrings.secondaryActionLabel}
+                </button>
+                {item.segment === "ready" ? (
+                  <Link
+                    href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
+                    className="landingButton secondaryButton"
+                  >
+                    Choose app
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  className="dangerButton"
+                  data-testid={`${item.id}-delete`}
+                  onClick={() => handleDeleteServer(item.id)}
+                  disabled={deletingServerId === item.id}
+                >
+                  {deletingServerId === item.id ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </AdminSurfaceQueueCard>
+          ))}
         </AdminSurfaceQueue>
       </div>
 
@@ -1371,7 +755,7 @@ function ServerReviewPageContent() {
         onPrimaryAction={() => handleRunStarterAction("primary")}
         onSecondaryAction={() => handleRunStarterAction("secondary")}
         actionDisabled={selectedItem ? actionLoadingId === selectedItem.id : true}
-        emptyText="No server target selected yet."
+        emptyText="No saved server selected yet."
       />
 
       {selectedItem ? (
@@ -1387,243 +771,6 @@ function ServerReviewPageContent() {
           </button>
         </div>
       ) : null}
-
-        <AdminDisclosureSection
-          title="Advanced server tools"
-          subtitle="Open this only after one server is clearly ready, blocked, or not worth pursuing."
-          badge="Later"
-          defaultOpen={false}
-          testId="server-review-advanced-tools"
-      >
-        <AdminSurfaceTable
-          title="Server review table"
-          description="Use the denser table when you need to compare readiness, auth posture, and suggested next ports across multiple targets."
-          columns={starterTableColumns}
-          rows={visibleTableRows}
-          rowKey={(row) => row.id}
-          selectedRowId={selectedItemId}
-          emptyText="No rows match the current search."
-          emptyTestId="server-review-table-empty"
-          tableTestId="server-review-table"
-          renderCell={(row, column) => {
-            if (column.key === "label") {
-              return (
-                <div className="adminSurfaceTablePrimary">
-                  <strong>{row.label}</strong>
-                  <p className="formHint">{row.note}</p>
-                </div>
-              );
-            }
-            return row[column.key];
-          }}
-          renderActions={(row) => (
-            <>
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid={`${row.id}-table-select`}
-                onClick={() => handleToggleSelection(row.id)}
-              >
-                {selectedItemIds.includes(row.id) ? "Selected" : "Select"}
-              </button>
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid={`${row.id}-table-focus`}
-                onClick={() => handleSelectItem(row.id)}
-              >
-                {row.id === selectedItemId ? "Focused" : "Focus"}
-              </button>
-              <button
-                type="button"
-                className="dangerButton"
-                data-testid={`${row.id}-table-delete`}
-                onClick={() => handleDeleteServer(row.id)}
-                disabled={deletingServerId === row.id}
-              >
-                {deletingServerId === row.id ? "Deleting..." : "Delete"}
-              </button>
-            </>
-          )}
-        />
-
-        <AdminSurfaceBulkStarter
-          title={starterStrings.bulkSectionTitle}
-          description={starterStrings.bulkSectionDescription}
-          testId="server-review-bulk-starter"
-          presetOneLabel={starterStrings.bulkPresetOneLabel}
-          onPresetOne={() => handleApplyBulkPreset(starterStrings.bulkPresetOneSegment)}
-          presetTwoLabel={starterStrings.bulkPresetTwoLabel}
-          onPresetTwo={() => handleApplyBulkPreset(starterStrings.bulkPresetTwoSegment)}
-          selectedCount={selectedItemIds.length}
-          visibleCount={filteredItems.length}
-          statusValue={bulkStatusValue}
-          onStatusChange={(event) => setBulkStatusValue(event.target.value)}
-          statusOptions={bulkStatusOptions}
-          applyLabel={starterStrings.bulkApplyLabel}
-          onApply={handleApplyBulkAction}
-          applyDisabled={!selectedItemIds.length || !bulkStatusValue}
-        />
-
-        <AdminSurfaceMutationPreview
-          description="This preview now reflects the live server review actions instead of a fake starter mutation."
-          testId="server-review-mutation-starter"
-          routeLabel={starterStrings.mutationRouteLabel}
-          selectedSummary={selectedItems.map((item) => item.label).join(", ") || "Nothing selected"}
-          payload={starterMutationPreview}
-        />
-
-        <article className="card formCard">
-          <AdminFilterFooter
-            summary="This surface now uses the live /servers API for review data, diagnostics, and connection checks."
-            hint="Keep only the views and follow-up labels that support real operator review. Everything else should earn its place."
-            onReset={() => {
-              setQuery("");
-              setSegmentFilter("all");
-            }}
-            resetDisabled={!query && segmentFilter === "all"}
-            resetTestId="server-review-clear-filters"
-          />
-        </article>
-
-        <AdminSavedViews
-          title="Saved review views"
-          inputLabel="View name"
-          inputValue={savedViewName}
-          onInputChange={(event) => setSavedViewName(event.target.value)}
-          onSave={handleSaveCurrentView}
-          onUpdateCurrent={handleUpdateCurrentView}
-          saveDisabled={!canSaveCurrentView}
-          updateDisabled={!activeSavedViewId}
-          saveTestId="server-review-save-view"
-          updateTestId="server-review-update-view"
-          statusText={
-            hasSavedViewNameMatch
-              ? "A saved view with this name already exists and will be replaced."
-              : "Save filters you want to revisit during daily infra review."
-          }
-          metaText={savedViewsMetaText}
-          viewSummaryText={savedViewsSummaryText}
-          useCurrentNameLabel="Use active view name"
-          onUseCurrentName={handleUseCurrentSavedViewName}
-          useCurrentNameDisabled={!activeSavedViewId}
-          views={visibleSavedViews}
-          onApply={handleApplySavedView}
-          onDelete={handleDeleteSavedView}
-          onCopy={handleCopySavedViewLink}
-          searchValue={savedViewsSearch}
-          onSearchChange={(event) => setSavedViewsSearch(event.target.value)}
-          searchTestId="server-review-saved-views-search"
-          sourceFilter={savedViewsSourceFilter}
-          onSourceFilterChange={(event) => setSavedViewsSourceFilter(event.target.value)}
-          sourceFilterTestId="server-review-saved-views-source"
-          sortValue={savedViewsSort}
-          onSortChange={(event) => setSavedViewsSort(event.target.value)}
-          sortTestId="server-review-saved-views-sort"
-          actions={[
-            {
-              label: "Export views",
-              testId: "server-review-saved-views-export",
-              onClick: handleDownloadSavedViews,
-              disabled: savedViews.length === 0,
-            },
-            {
-              label: "Import views",
-              kind: "file",
-              testId: "server-review-saved-views-import",
-              accept: "application/json",
-              onChange: handleImportSavedViews,
-            },
-            {
-              label: "Clear imported",
-              testId: "server-review-saved-views-clear-imported",
-              onClick: handleClearImportedSavedViews,
-              disabled: savedViews.length === 0,
-            },
-            {
-              label: "Clear all",
-              testId: "server-review-saved-views-clear",
-              onClick: handleClearSavedViews,
-              disabled: savedViews.length === 0,
-            },
-            {
-              label: "Reset tools",
-              testId: "server-review-saved-views-reset-tools",
-              onClick: handleResetSavedViewsTools,
-            },
-          ]}
-          emptyText="No saved server review views yet."
-          listTestId="server-review-saved-views-list"
-          activeViewId={activeSavedViewId}
-        />
-
-        <AdminAuditToolbar
-          title="Review activity"
-          description="This local activity log records what the operator actually did on this page: refreshes, diagnostics, tests, and bulk follow-up labels."
-          query={auditQuery}
-          onQueryChange={(event) => setAuditQuery(event.target.value)}
-          queryPlaceholder="Search server review activity"
-          queryTestId="server-review-audit-search"
-          filterLabel="Scope"
-          filterValue={auditScope}
-          onFilterChange={(event) => setAuditScope(event.target.value)}
-          filterOptions={[
-            { value: "all", label: "All activity" },
-            { value: "queue", label: "Queue review" },
-            { value: "bulk", label: "Bulk follow-up" },
-          ]}
-          filterTestId="server-review-audit-scope"
-          sortValue={auditSort}
-          onSortChange={(event) => setAuditSort(event.target.value)}
-          sortTestId="server-review-audit-sort"
-          totalCount={visibleAuditItems.length}
-          summary="Use this log to explain what was reviewed and what changed during the current server review pass."
-          filters={activeAuditFilterChips}
-          emptyTestId="server-review-audit-empty"
-          emptyText="No review activity recorded yet."
-        >
-          <div className="adminSavedViewsList" data-testid="server-review-audit-list">
-            {visibleAuditItems.map((item) => (
-              <AdminSurfaceQueueCard
-                key={item.id}
-                title={item.label}
-                body={item.detail}
-                status={item.scope}
-              />
-            ))}
-          </div>
-        </AdminAuditToolbar>
-
-        <AdminDisclosureSection
-          title="Export and recovery"
-          subtitle="JSON and CSV export stay close at hand for handoff, audit, or operator review."
-          badge="Optional"
-          testId="server-review-export-starter"
-        >
-          <div className="adminFilterActions">
-            <button
-              type="button"
-              className="secondaryButton"
-              data-testid="server-review-export-json"
-              onClick={handleExportJson}
-            >
-              Export JSON
-            </button>
-            <button
-              type="button"
-              className="secondaryButton"
-              data-testid="server-review-export-csv"
-              onClick={handleExportCsv}
-            >
-              Export CSV
-            </button>
-          </div>
-          <p className="formHint">
-            The export reflects the live filtered queue and the current page activity log.
-          </p>
-        </AdminDisclosureSection>
-
-      </AdminDisclosureSection>
     </main>
   );
 }
