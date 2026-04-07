@@ -758,7 +758,7 @@ summary:focus-visible {
   display: inline-flex;
 }
 
-.inlineHelp summary {
+.inlineHelpButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -770,18 +770,18 @@ summary:focus-visible {
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  list-style: none;
   user-select: none;
   background: rgba(255, 255, 255, 0.92);
+  padding: 0;
 }
 
-.inlineHelp summary::-webkit-details-marker {
-  display: none;
+.inlineHelpButton:hover {
+  border-color: rgba(19, 34, 56, 0.28);
 }
 
 .inlineHelpBubble {
   position: absolute;
-  top: calc(100% + 8px);
+  bottom: calc(100% + 8px);
   right: 0;
   z-index: 20;
   width: min(260px, 70vw);

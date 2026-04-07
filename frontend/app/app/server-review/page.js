@@ -112,12 +112,20 @@ function mapServerToItem(server, runtimeState) {
   };
 }
 
-function InlineHelp({ label, text }) {
+function InlineHelp({ id, label, text, isOpen, onToggle }) {
   return (
-    <details className="inlineHelp">
-      <summary aria-label={label}>?</summary>
-      <div className="inlineHelpBubble">{text}</div>
-    </details>
+    <div className="inlineHelp" data-help-id={id}>
+      <button
+        type="button"
+        className="inlineHelpButton"
+        aria-label={label}
+        aria-expanded={isOpen}
+        onClick={() => onToggle(id)}
+      >
+        ?
+      </button>
+      {isOpen ? <div className="inlineHelpBubble">{text}</div> : null}
+    </div>
   );
 }
 
@@ -137,6 +145,7 @@ function ServerReviewPageContent() {
   const [serverSubmitting, setServerSubmitting] = useState(false);
   const [serverUpdating, setServerUpdating] = useState(false);
   const [deletingServerId, setDeletingServerId] = useState("");
+  const [openHelpId, setOpenHelpId] = useState("");
   const [query, setQuery] = useState("");
   const [segmentFilter, setSegmentFilter] = useState("all");
   const [serverForm, setServerForm] = useState({
@@ -453,6 +462,29 @@ function ServerReviewPageContent() {
     loadServers();
   }, []);
 
+  useEffect(() => {
+    function handlePointerDown(event) {
+      const helpRoot = event.target instanceof Element ? event.target.closest(".inlineHelp") : null;
+      if (!helpRoot) {
+        setOpenHelpId("");
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setOpenHelpId("");
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   return (
     <main className="workspaceShell">
       <article className="card formCard">
@@ -642,8 +674,11 @@ function ServerReviewPageContent() {
                   Run full check
                 </button>
                 <InlineHelp
+                  id={`full-check-${item.id}`}
                   label="What full check means"
                   text="Checks whether this server is reachable and whether the main setup looks healthy enough for the next step."
+                  isOpen={openHelpId === `full-check-${item.id}`}
+                  onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
                 />
                 <button
                   type="button"
@@ -663,8 +698,11 @@ function ServerReviewPageContent() {
                       Choose what to run
                     </Link>
                     <InlineHelp
+                      id={`choose-run-${item.id}`}
                       label="What choose what to run means"
                       text="This is where you tell DeployMate what app or service should start on this server."
+                      isOpen={openHelpId === `choose-run-${item.id}`}
+                      onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
                     />
                   </>
                 ) : null}
@@ -732,8 +770,11 @@ function ServerReviewPageContent() {
                       <span className="fieldLabelWithHelp">
                         <span>SSH key</span>
                         <InlineHelp
+                          id={`ssh-key-${item.id}`}
                           label="What SSH key means"
                           text="Paste the private key DeployMate should use to connect to this server."
+                          isOpen={openHelpId === `ssh-key-${item.id}`}
+                          onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
                         />
                       </span>
                       <textarea
