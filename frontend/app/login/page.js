@@ -13,11 +13,7 @@ export default async function LoginPage({ searchParams }) {
       <div className="container authLoginShell">
         <section className="authLoginStage">
           <div className="authLoginBackdrop">
-            <div className="authLoginHalo authLoginHaloPrimary" />
-            <div className="authLoginHalo authLoginHaloSecondary" />
             <div className="authLoginGlassPlane" />
-            <div className="authLoginGlassLine authLoginGlassLinePrimary" />
-            <div className="authLoginGlassLine authLoginGlassLineSecondary" />
             <div className="authLoginGlow authLoginGlowPrimary" />
             <div className="authLoginGlow authLoginGlowSecondary" />
             <div className="authLoginSpinner" aria-hidden="true" />
