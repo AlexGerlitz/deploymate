@@ -446,17 +446,18 @@ function ServerReviewPageContent() {
 
   return (
     <main className="workspaceShell">
-      <section className="workspaceHero">
-        <div className="workspaceHeroBackdrop" />
-        <div className="header workspaceHeroHeader">
+      <article className="card formCard">
+        <div className="header">
           <div>
             <div className="eyebrow">Step 1</div>
             <h1 data-testid="server-review-page-title">Connect your server</h1>
-            <p>Add one server, test the connection, and get it ready before you choose which app to run.</p>
+            <p className="formHint">
+              Add one server, check it, then move on to choosing the app you want to run.
+            </p>
           </div>
-          <div className="buttonRow workspaceHeroActions">
-            <Link href="/app" className="linkButton workspaceSecondaryAction">
-              Back to overview
+          <div className="buttonRow">
+            <Link href="/app" className="linkButton">
+              Back
             </Link>
             <button
               type="button"
@@ -469,7 +470,7 @@ function ServerReviewPageContent() {
             </button>
           </div>
         </div>
-      </section>
+      </article>
 
       <AdminFeedbackBanners
         smokeMode={starterRuntimeMode !== "api"}
@@ -566,20 +567,9 @@ function ServerReviewPageContent() {
       </article>
 
       <div id="server-review-live-queue">
-        <AdminSurfaceQueue
-          title="Your servers"
-          description="Keep all server actions here: check it, edit it, or continue to app setup."
-          searchLabel="Search saved servers"
-          searchValue={query}
-          onSearchChange={(event) => setQuery(event.target.value)}
-          searchPlaceholder={starterStrings.searchPlaceholder}
-          searchTestId="server-review-search"
-          emptyTestId="server-review-empty"
-          emptyText="No saved servers match the current filters."
-          items={filteredItems}
-        >
+        <article className="card formCard">
           <label className="field">
-            <span>{starterStrings.segmentFilterLabel}</span>
+            <span>Show</span>
             <select
               data-testid="server-review-segment-filter"
               value={segmentFilter}
@@ -592,6 +582,19 @@ function ServerReviewPageContent() {
               ))}
             </select>
           </label>
+        </article>
+        <AdminSurfaceQueue
+          title="Your servers"
+          description="Keep all server actions here: check it, edit it, or continue to app setup."
+          searchLabel="Search saved servers"
+          searchValue={query}
+          onSearchChange={(event) => setQuery(event.target.value)}
+          searchPlaceholder={starterStrings.searchPlaceholder}
+          searchTestId="server-review-search"
+          emptyTestId="server-review-empty"
+          emptyText="No saved servers match the current filters."
+          items={filteredItems}
+        >
           {filteredItems.map((item) => (
             <AdminSurfaceQueueCard
               key={item.id}
