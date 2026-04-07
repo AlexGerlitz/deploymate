@@ -9,7 +9,6 @@ import {
   AdminDisclosureSection,
   AdminFeedbackBanners,
   AdminFilterFooter,
-  AdminPageHeader,
   AdminSavedViews,
   AdminSurfaceActionStarter,
   AdminSurfaceBulkStarter,
@@ -952,14 +951,30 @@ function ServerReviewPageContent() {
 
   return (
     <main className="workspaceShell">
-      <AdminPageHeader
-        title="Step 1: Connect your server"
-        titleTestId="server-review-page-title"
-        subtitle="Add one server, test the connection, and get it ready before you choose which app to run."
-        loading={loading}
-        onRefresh={() => loadServers()}
-        refreshTestId="server-review-refresh"
-      />
+      <section className="workspaceHero">
+        <div className="workspaceHeroBackdrop" />
+        <div className="header workspaceHeroHeader">
+          <div>
+            <div className="eyebrow">Step 1</div>
+            <h1 data-testid="server-review-page-title">Connect your server</h1>
+            <p>Add one server, test the connection, and get it ready before you choose which app to run.</p>
+          </div>
+          <div className="buttonRow workspaceHeroActions">
+            <Link href="/app" className="linkButton workspaceSecondaryAction">
+              Back to overview
+            </Link>
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="server-review-refresh"
+              onClick={() => loadServers()}
+              disabled={loading}
+            >
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        </div>
+      </section>
 
       <AdminFeedbackBanners
         smokeMode={starterRuntimeMode !== "api"}
