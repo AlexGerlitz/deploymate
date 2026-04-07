@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminDisclosureSection } from "./admin-ui";
 import {
-  smokeDeployments,
   smokeMode,
-  smokeNotifications,
-  smokeOpsOverview,
-  smokeServers,
-  smokeTemplates,
+  smokeOverviewDeployments,
+  smokeOverviewNotifications,
+  smokeOverviewOpsOverview,
+  smokeOverviewServers,
+  smokeOverviewTemplates,
   smokeUser,
 } from "../lib/smoke-fixtures";
 import {
@@ -33,10 +33,10 @@ export default function HomePage() {
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
-  const [deployments, setDeployments] = useState(smokeMode ? smokeDeployments : []);
-  const [servers, setServers] = useState(smokeMode ? smokeServers : []);
-  const [notifications, setNotifications] = useState(smokeMode ? smokeNotifications : []);
-  const [templates, setTemplates] = useState(smokeMode ? smokeTemplates : []);
+  const [deployments, setDeployments] = useState(smokeMode ? smokeOverviewDeployments : []);
+  const [servers, setServers] = useState(smokeMode ? smokeOverviewServers : []);
+  const [notifications, setNotifications] = useState(smokeMode ? smokeOverviewNotifications : []);
+  const [templates, setTemplates] = useState(smokeMode ? smokeOverviewTemplates : []);
   const [loading, setLoading] = useState(!smokeMode);
   const [serversLoading, setServersLoading] = useState(!smokeMode);
   const [notificationsLoading, setNotificationsLoading] = useState(!smokeMode);
@@ -46,7 +46,7 @@ export default function HomePage() {
   const [serversError, setServersError] = useState("");
   const [notificationsError, setNotificationsError] = useState("");
   const [templatesError, setTemplatesError] = useState("");
-  const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeOpsOverview : null);
+  const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeOverviewOpsOverview : null);
   const [opsActionMessage, setOpsActionMessage] = useState("");
   const [opsActionError, setOpsActionError] = useState("");
 
@@ -68,11 +68,6 @@ export default function HomePage() {
     failedDeployments: opsSnapshot.deployments.failed,
     serversTotal: opsSnapshot.servers.total,
   });
-  const beginnerHeroBody = servers.length === 0
-    ? "This product helps you run an app on your own server. Start by connecting one server so DeployMate can reach it."
-    : deployments.length === 0
-      ? "Your server is connected. Next, choose what to run and create the first deployment."
-      : "Your app workspace is live. Review what is running, then deploy the next change when you are ready.";
   const beginnerStatusSummary = servers.length === 0
     ? "No server connected yet. Start with Step 1."
     : deployments.length === 0
@@ -85,6 +80,16 @@ export default function HomePage() {
       : deployments.length === 0
         ? "Next best step: open deployment workflow and enter one image."
         : "Next best step: open deployment workflow and continue from one live deployment card.";
+  const heroHeadline = servers.length === 0
+    ? "Connect one server, choose what to run, and check that it works."
+    : deployments.length === 0
+      ? "Your server is ready. Next choose what to run and create the first deployment."
+      : "Your app workspace is live. Review what is running, then deploy the next change.";
+  const heroSupportText = servers.length === 0
+    ? "DeployMate gives you one clear path: connect a server first, then deploy one app."
+    : deployments.length === 0
+      ? "You are already past Step 1. The next move is entering one Docker image or using a saved template."
+      : "Use the deployment workspace for the next action. Keep admin and reports secondary until the runtime story is clear.";
   const beginnerSteps = [
     {
       key: "step-1",
@@ -483,11 +488,8 @@ export default function HomePage() {
             <div>
               <div className="eyebrow">Begin here</div>
               <h1 data-testid="runtime-page-title">DeployMate</h1>
-              <p>
-                {currentUser
-                  ? `Logged in as ${currentUser.username}. ${beginnerHeroBody}`
-                  : "DeployMate helps you run an app on your server. First connect a server, then choose what to run, then deploy it."}
-              </p>
+              <p>{heroHeadline}</p>
+              <p className="formHint">{heroSupportText}</p>
             </div>
             <div className="buttonRow workspaceHeroActions">
               <Link
@@ -496,22 +498,11 @@ export default function HomePage() {
               >
                 {overviewPrimaryPath.label}
               </Link>
-              <button
-                type="button"
-                onClick={() => refreshPage()}
-                disabled={
-                  loading ||
-                  serversLoading ||
-                  notificationsLoading ||
-                  templatesLoading ||
-                  opsOverviewLoading
-                }
-                className="linkButton workspaceSecondaryAction"
-              >
-                {loading || serversLoading || notificationsLoading || templatesLoading || opsOverviewLoading
-                  ? "Refreshing..."
-                  : "Refresh"}
-              </button>
+              {servers.length > 0 ? (
+                <Link href="/app/deployment-workflow" className="linkButton workspaceSecondaryAction">
+                  Open deploy step
+                </Link>
+              ) : null}
               <button type="button" onClick={handleLogout} className="workspaceGhostAction">
                 Logout
               </button>
@@ -553,9 +544,9 @@ export default function HomePage() {
         <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
           <div className="sectionHeader workspaceGuideHeader">
             <div>
-              <h2 data-testid="workspace-scenario-title">What to do first</h2>
+              <h2 data-testid="workspace-scenario-title">Try it now</h2>
               <p className="formHint">
-                This product has one simple path: connect a server, choose what to run, then deploy and check the result.
+                Start with one action. Read the step-by-step explanation lower on the page only if you need it.
               </p>
             </div>
           </div>
@@ -569,7 +560,13 @@ export default function HomePage() {
                 >
                   <span className="stepNumber">{card.step}</span>
                   <h3>{card.title}</h3>
-                  <p>{card.detail}</p>
+                  <p>
+                    {card.step === "Step 1"
+                      ? "Add one server."
+                      : card.step === "Step 2"
+                        ? "Enter one image."
+                        : "Check whether it works."}
+                  </p>
                   <Link
                     href={card.href}
                     className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
@@ -643,9 +640,6 @@ export default function HomePage() {
               .
             </div>
           ) : null}
-          <div className="banner subtle" data-testid="workspace-first-pass-banner">
-            <strong>New here?</strong> Start with one server, then one deployment. Ignore admin and reports until the first app is running.
-          </div>
           {smokeMode ? (
             <div className="banner subtle" data-testid="runtime-smoke-banner">
               Smoke mode uses fixture data for overview and deployment entry surfaces.
@@ -656,50 +650,6 @@ export default function HomePage() {
             </div>
           )}
 
-          <article className="card formCard workspaceGuidePanel" data-testid="workspace-guide-card">
-            <div className="sectionHeader workspaceGuideHeader">
-              <div>
-                <h2 data-testid="workspace-guide-title">What each screen is for</h2>
-                <p className="formHint">
-                  Use these screens in order. Everything else should stay secondary until the first deployment story is clear.
-                </p>
-              </div>
-            </div>
-            <div className="workspaceReviewerGrid" data-testid="workspace-reviewer-panel">
-              <article className="workspaceReviewerCard">
-                <span>Overview</span>
-                <strong>Start here</strong>
-                <p>Use this page to understand the product and choose the next obvious step.</p>
-                <Link href="/app" className="landingButton secondaryButton">
-                  Stay on overview
-                </Link>
-              </article>
-              <article className="workspaceReviewerCard">
-                <span>Server setup</span>
-                <strong>Connect and verify a server</strong>
-                <p>Open Server Review to add one target and confirm that DeployMate can reach it.</p>
-                <Link href="/app/server-review" className="landingButton secondaryButton">
-                  Open server setup
-                </Link>
-              </article>
-              <article className="workspaceReviewerCard">
-                <span>Deploy</span>
-                <strong>Choose what to run</strong>
-                <p>Open Deployment Workflow to enter a Docker image or use a saved template.</p>
-                <Link href="/app/deployment-workflow" className="landingButton secondaryButton">
-                  Open deploy step
-                </Link>
-              </article>
-              <article className="workspaceReviewerCard">
-                <span>Status</span>
-                <strong>Check whether the app is healthy</strong>
-                <p>Use the deployment screens to review runtime state, logs, and next actions.</p>
-                <Link href="/app/deployment-workflow" className="landingButton secondaryButton">
-                  See live deployments
-                </Link>
-              </article>
-            </div>
-          </article>
         </div>
 
         {currentUser?.is_admin ? (

@@ -16,6 +16,67 @@ export const smokeUser = {
   },
 };
 
+export const smokeOverviewDeployments = [];
+
+export const smokeOverviewServers = [];
+
+export const smokeOverviewNotifications = [];
+
+export const smokeOverviewTemplates = [];
+
+export const smokeOverviewOpsOverview = {
+  generated_at: "2026-04-07T00:02:00Z",
+  user: {
+    username: "smoke-admin",
+    plan: "team",
+    role: "admin",
+  },
+  deployments: {
+    total: 0,
+    running: 0,
+    failed: 0,
+    pending: 0,
+    local: 0,
+    remote: 0,
+    exposed: 0,
+    public_urls: 0,
+  },
+  servers: {
+    total: 0,
+    password_auth: 0,
+    ssh_key_auth: 0,
+    unused: 0,
+  },
+  notifications: {
+    total: 0,
+    success: 0,
+    error: 0,
+    latest_error_title: null,
+    latest_error_at: null,
+  },
+  templates: {
+    total: 0,
+    unused: 0,
+    recently_used: 0,
+    top_template_name: null,
+    top_template_use_count: 0,
+  },
+  capabilities: {
+    local_docker_enabled: false,
+    ssh_host_key_checking: "yes",
+    strict_known_hosts_configured: true,
+    server_credentials_key_configured: true,
+    remote_only_recommended: true,
+  },
+  attention_items: [
+    {
+      level: "info",
+      title: "No server connected yet",
+      detail: "Start with Step 1 and save one server target before the first deployment.",
+    },
+  ],
+};
+
 export const smokeDeployments = [
   {
     id: "smoke-deployment",
