@@ -194,8 +194,7 @@ function ServerReviewPageContent() {
         ]
           .filter(Boolean)
           .some((value) => value.toLowerCase().includes(normalized));
-      const matchesSegment =
-        segmentFilter === "all" || item.segment === segmentFilter;
+      const matchesSegment = segmentFilter === "all" || item.segment === segmentFilter;
       return matchesQuery && matchesSegment;
     });
   }, [items, query, segmentFilter]);
@@ -206,6 +205,9 @@ function ServerReviewPageContent() {
     filteredItems[0] ||
     items[0] ||
     null;
+
+  const readyCount = items.filter((item) => item.segment === "ready").length;
+  const reviewCount = items.filter((item) => item.segment !== "ready").length;
 
   useEffect(() => {
     if (!selectedItem) {
@@ -248,9 +250,7 @@ function ServerReviewPageContent() {
         router.replace("/login");
         return;
       }
-      setError(
-        requestError instanceof Error ? requestError.message : "Failed to load server review data.",
-      );
+      setError(requestError instanceof Error ? requestError.message : "Failed to load server review data.");
       if (!silent) {
         setServers([]);
       }
@@ -487,29 +487,55 @@ function ServerReviewPageContent() {
   }, []);
 
   return (
-    <main className="workspaceShell">
-      <article className="card formCard">
-        <div className="header">
-          <div>
+    <main className="workspaceShell serverReviewPage">
+      <article className="card formCard serverReviewHero serverReviewReveal">
+        <div className="serverReviewHeroLayout">
+          <div className="serverReviewHeroCopy">
             <div className="eyebrow">Step 1</div>
             <h1 data-testid="server-review-page-title">Connect your server</h1>
-            <p className="formHint">
-              Add one server, check it, then move on to choosing the app you want to run.
+            <p className="serverReviewLead">
+              Add one server, check that it works, then choose what to run.
+            </p>
+            <p className="formHint serverReviewSubtleCopy">
+              Keep this step simple.
             </p>
           </div>
-          <div className="buttonRow">
-            <Link href="/app" className="linkButton">
-              Back
-            </Link>
-            <button
-              type="button"
-              className="secondaryButton"
-              data-testid="server-review-refresh"
-              onClick={() => loadServers()}
-              disabled={loading}
-            >
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
+          <div className="serverReviewHeroRail">
+            <div className="buttonRow serverReviewHeroActions">
+              <Link href="/app" className="linkButton">
+                Back
+              </Link>
+              <button
+                type="button"
+                className="secondaryButton"
+                data-testid="server-review-refresh"
+                onClick={() => loadServers()}
+                disabled={loading}
+              >
+                {loading ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+            <div className="serverReviewHeroPanel">
+              <span className="serverReviewPanelLabel">What matters now</span>
+              <strong>Save one server. Then check it.</strong>
+              <p>
+                You do not need to configure everything here. Just save the server and confirm it is ready.
+              </p>
+              <div className="serverReviewHeroStats" aria-label="Server review summary">
+                <div className="serverReviewHeroStat">
+                  <span>Saved</span>
+                  <strong>{items.length}</strong>
+                </div>
+                <div className="serverReviewHeroStat">
+                  <span>Ready</span>
+                  <strong>{readyCount}</strong>
+                </div>
+                <div className="serverReviewHeroStat">
+                  <span>Need review</span>
+                  <strong>{reviewCount}</strong>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </article>
@@ -522,95 +548,132 @@ function ServerReviewPageContent() {
         successTestId="server-review-success"
       />
 
-      <article className="card formCard workspaceGuidePanel" data-testid="server-review-create-card">
-        <div id="server-review-create-server-section" className="workspaceGlancePanel">
-          <div className="workspaceGlanceHeader">
-            <span className="eyebrow">Start here</span>
-            <strong>Add your server</strong>
-          </div>
-          <p className="formHint">
-            Enter one server below. After you save it, run a connection test or full check before moving on.
-          </p>
-          <form className="form" onSubmit={handleCreateServer} data-testid="server-review-create-server">
-            <label className="field">
-              <span>Name</span>
-              <input
-                name="name"
-                value={serverForm.name}
-                onChange={updateServerFormField}
-                placeholder="prod-vps"
-                disabled={serverSubmitting}
-                required
-                data-testid="server-review-create-name"
-              />
-            </label>
-            <label className="field">
-              <span>Host</span>
-              <input
-                name="host"
-                value={serverForm.host}
-                onChange={updateServerFormField}
-                placeholder="203.0.113.10"
-                disabled={serverSubmitting}
-                required
-                data-testid="server-review-create-host"
-              />
-            </label>
-            <label className="field">
-              <span>Port</span>
-              <input
-                name="port"
-                type="number"
-                min="1"
-                max="65535"
-                value={serverForm.port}
-                onChange={updateServerFormField}
-                disabled={serverSubmitting}
-                required
-                data-testid="server-review-create-port"
-              />
-            </label>
-            <label className="field">
-              <span>Username</span>
-              <input
-                name="username"
-                value={serverForm.username}
-                onChange={updateServerFormField}
-                placeholder="deploy"
-                disabled={serverSubmitting}
-                required
-                data-testid="server-review-create-username"
-              />
-            </label>
-            <label className="field">
-              <span>SSH key</span>
-              <textarea
-                name="ssh_key"
-                rows={6}
-                value={serverForm.ssh_key}
-                onChange={updateServerFormField}
-                placeholder="Paste your SSH private key content here"
-                disabled={serverSubmitting}
-                required
-                data-testid="server-review-create-ssh-key"
-              />
-            </label>
-            <div className="formActions">
-              <button
-                type="submit"
-                disabled={serverSubmitting}
-                data-testid="server-review-create-submit"
-              >
-                {serverSubmitting ? "Adding..." : "Save server"}
-              </button>
+      <article
+        className="card formCard workspaceGuidePanel serverReviewCreateCard serverReviewReveal"
+        data-testid="server-review-create-card"
+      >
+        <div className="serverReviewCreateLayout">
+          <div id="server-review-create-server-section" className="workspaceGlancePanel serverReviewCreatePanel">
+            <div className="workspaceGlanceHeader">
+              <span className="eyebrow">Start here</span>
+              <strong>Add your server</strong>
             </div>
-          </form>
+            <p className="formHint serverReviewSubtleCopy">
+              Save one server first. Then run a check before you move on.
+            </p>
+            <form className="form" onSubmit={handleCreateServer} data-testid="server-review-create-server">
+              <label className="field">
+                <span>Name</span>
+                <input
+                  name="name"
+                  value={serverForm.name}
+                  onChange={updateServerFormField}
+                  placeholder="prod-vps"
+                  disabled={serverSubmitting}
+                  required
+                  data-testid="server-review-create-name"
+                />
+              </label>
+              <label className="field">
+                <span>Host</span>
+                <input
+                  name="host"
+                  value={serverForm.host}
+                  onChange={updateServerFormField}
+                  placeholder="203.0.113.10"
+                  disabled={serverSubmitting}
+                  required
+                  data-testid="server-review-create-host"
+                />
+              </label>
+              <label className="field">
+                <span>Port</span>
+                <input
+                  name="port"
+                  type="number"
+                  min="1"
+                  max="65535"
+                  value={serverForm.port}
+                  onChange={updateServerFormField}
+                  disabled={serverSubmitting}
+                  required
+                  data-testid="server-review-create-port"
+                />
+              </label>
+              <label className="field">
+                <span>Username</span>
+                <input
+                  name="username"
+                  value={serverForm.username}
+                  onChange={updateServerFormField}
+                  placeholder="deploy"
+                  disabled={serverSubmitting}
+                  required
+                  data-testid="server-review-create-username"
+                />
+              </label>
+              <label className="field">
+                <span>SSH key</span>
+                <textarea
+                  name="ssh_key"
+                  rows={6}
+                  value={serverForm.ssh_key}
+                  onChange={updateServerFormField}
+                  placeholder="Paste your SSH private key content here"
+                  disabled={serverSubmitting}
+                  required
+                  data-testid="server-review-create-ssh-key"
+                />
+              </label>
+              <div className="formActions">
+                <button
+                  type="submit"
+                  className="landingButton primaryButton"
+                  disabled={serverSubmitting}
+                  data-testid="server-review-create-submit"
+                >
+                  {serverSubmitting ? "Adding..." : "Save server"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <aside className="serverReviewSoftPanel serverReviewNextPanel">
+            <span className="serverReviewPanelLabel">Next</span>
+            <h2>What to do after you save it</h2>
+            <p className="formHint">
+              Do one quick check, then continue.
+            </p>
+            <div className="serverReviewMiniSteps">
+              <div className="serverReviewMiniStep">
+                <strong>1. Save one server</strong>
+                <p>Add one SSH target.</p>
+              </div>
+              <div className="serverReviewMiniStep">
+                <strong>2. Check it</strong>
+                <p>Use connection test or full check.</p>
+              </div>
+              <div className="serverReviewMiniStep">
+                <strong>3. Choose what to run</strong>
+                <p>Move on only when the server looks ready.</p>
+              </div>
+            </div>
+          </aside>
         </div>
       </article>
 
-      <div id="server-review-live-queue">
-        <article className="card formCard">
-          <label className="field">
+      <div id="server-review-live-queue" className="serverReviewQueueStack">
+        <article className="card formCard serverReviewToolbarCard serverReviewReveal">
+          <div className="serverReviewToolbarHeader">
+            <div>
+              <span className="serverReviewPanelLabel">Saved servers</span>
+              <h2>Check a saved server</h2>
+            </div>
+            <p className="formHint">
+              Open one server, check it, then move on.
+            </p>
+          </div>
+          <label className="field serverReviewFilterField">
             <span>Show</span>
             <select
               data-testid="server-review-segment-filter"
@@ -625,9 +688,11 @@ function ServerReviewPageContent() {
             </select>
           </label>
         </article>
+
         <AdminSurfaceQueue
+          className="serverReviewQueueShell serverReviewReveal"
           title="Your servers"
-          description="Keep all server actions here: check it, edit it, or continue to app setup."
+          description="Open a server, check it, or continue to app setup."
           searchLabel="Search saved servers"
           searchValue={query}
           onSearchChange={(event) => setQuery(event.target.value)}
@@ -639,6 +704,7 @@ function ServerReviewPageContent() {
         >
           {filteredItems.map((item) => (
             <AdminSurfaceQueueCard
+              className={`serverReviewServerCard serverReviewReveal ${item.id === selectedItemId ? "isSelected" : ""}`.trim()}
               key={item.id}
               title={item.label}
               body={item.note}
@@ -646,15 +712,19 @@ function ServerReviewPageContent() {
             >
               {item.segment === "ready" ? (
                 <div className="banner success">
-                  Step 1 done. This server is ready. Next: choose what to run on it.
+                  This server is ready. Next: choose what to run.
                 </div>
               ) : null}
-              <p className="formHint">
-                <strong>{starterStrings.cardMetaLabel}:</strong> {item.meta}
-              </p>
-              <p className="formHint">
-                <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
-              </p>
+
+              <div className="serverReviewMetaStack">
+                <p className="formHint">
+                  <strong>{starterStrings.cardMetaLabel}:</strong> {item.meta}
+                </p>
+                <p className="formHint">
+                  <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
+                </p>
+              </div>
+
               <div className="serverReviewPrimaryActions">
                 <div className="inlineHelpGroup serverReviewActionWithHelp">
                   <button
@@ -670,11 +740,12 @@ function ServerReviewPageContent() {
                     id={`full-check-${item.id}`}
                     testId={`${item.id}-full-check-help`}
                     label="What full check means"
-                    text="Checks whether this server is reachable and whether the main setup looks healthy enough for the next step."
+                    text="Checks that this server is reachable and looks ready for the next step."
                     isOpen={openHelpId === `full-check-${item.id}`}
                     onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
                   />
                 </div>
+
                 <div className="inlineHelpGroup serverReviewActionWithHelp">
                   <button
                     type="button"
@@ -689,11 +760,12 @@ function ServerReviewPageContent() {
                     id={`check-connection-${item.id}`}
                     testId={`${item.id}-check-connection-help`}
                     label="What check connection means"
-                    text="Use this when you only want to confirm that DeployMate can sign in to the server. Use full check when you also want setup and readiness details."
+                    text="Use this when you only want to confirm that DeployMate can sign in."
                     isOpen={openHelpId === `check-connection-${item.id}`}
                     onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
                   />
                 </div>
+
                 {item.segment === "ready" ? (
                   <div className="inlineHelpGroup serverReviewActionWithHelp">
                     <Link
@@ -706,13 +778,14 @@ function ServerReviewPageContent() {
                       id={`choose-run-${item.id}`}
                       testId={`${item.id}-choose-run-help`}
                       label="What choose what to run means"
-                      text="This is where you tell DeployMate what app or service should start on this server."
+                      text="This is where you choose the app or service to start on this server."
                       isOpen={openHelpId === `choose-run-${item.id}`}
                       onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
                     />
                   </div>
                 ) : null}
               </div>
+
               <div className="adminFilterActions">
                 {item.id === selectedItemId ? null : (
                   <button
@@ -733,9 +806,10 @@ function ServerReviewPageContent() {
                   {deletingServerId === item.id ? "Deleting..." : "Delete"}
                 </button>
               </div>
+
               {item.id === selectedItemId ? (
                 <>
-                  <form className="form" onSubmit={handleUpdateServer}>
+                  <form className="form serverReviewEditForm" onSubmit={handleUpdateServer}>
                     <label className="field">
                       <span>Name</span>
                       <input
@@ -808,6 +882,7 @@ function ServerReviewPageContent() {
                     <div className="formActions">
                       <button
                         type="submit"
+                        className="landingButton primaryButton"
                         disabled={serverUpdating}
                         data-testid="server-review-edit-submit"
                       >
@@ -815,8 +890,9 @@ function ServerReviewPageContent() {
                       </button>
                     </div>
                   </form>
+
                   <label className="field">
-                    <span>Add note for the next check</span>
+                    <span>Note for the next check</span>
                     <textarea
                       rows={3}
                       value={actionNote}
@@ -836,7 +912,13 @@ function ServerReviewPageContent() {
 
 export default function ServerReviewPage() {
   return (
-    <Suspense fallback={<main className="workspaceShell"><div className="card formCard">Loading...</div></main>}>
+    <Suspense
+      fallback={
+        <main className="workspaceShell serverReviewPage">
+          <div className="card formCard serverReviewHero">Loading...</div>
+        </main>
+      }
+    >
       <ServerReviewPageContent />
     </Suspense>
   );

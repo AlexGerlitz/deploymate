@@ -462,6 +462,7 @@ export function AdminSurfaceSummary({
 }
 
 export function AdminSurfaceQueue({
+  className = "",
   title,
   description,
   searchLabel,
@@ -475,7 +476,7 @@ export function AdminSurfaceQueue({
   children,
 }) {
   return (
-    <article className="card formCard">
+    <article className={`card formCard ${className}`.trim()}>
       <div className="sectionHeader">
         <div>
           <h2>{title}</h2>
@@ -502,9 +503,9 @@ export function AdminSurfaceQueue({
   );
 }
 
-export function AdminSurfaceQueueCard({ title, body, status, children }) {
+export function AdminSurfaceQueueCard({ className = "", title, body, status, children }) {
   return (
-    <article className="card formCard">
+    <article className={`card formCard ${className}`.trim()}>
       <div className="sectionHeader">
         <div>
           <h3>{title}</h3>
