@@ -759,6 +759,36 @@ summary:focus-visible {
   gap: 6px;
 }
 
+.serverReviewPrimaryActions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.serverReviewActionWithHelp {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  padding-right: 30px;
+}
+
+.serverReviewActionButton {
+  width: 100%;
+  min-height: 46px;
+}
+
+.serverReviewActionWithHelp > .inlineHelp {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.serverReviewActionWithHelp .inlineHelpBubble {
+  right: 0;
+}
+
 .inlineHelp {
   position: relative;
   display: inline-flex;
@@ -2857,6 +2887,10 @@ button.landingButton.primaryButton:disabled {
   .inlineHelpGroup .inlineHelpBubble {
     right: 0;
     width: min(240px, calc(100vw - 56px));
+  }
+
+  .serverReviewPrimaryActions {
+    grid-template-columns: 1fr;
   }
 
   .authCardHeader,

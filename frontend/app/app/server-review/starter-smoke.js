@@ -6,28 +6,24 @@ export const starterSmokeChecks = [
     pattern: 'data-testid="server-review-page-title"',
   },
   {
+    label: "Server Review refresh button",
+    pattern: 'data-testid="server-review-refresh"',
+  },
+  {
+    label: "Server Review create card",
+    pattern: 'data-testid="server-review-create-card"',
+  },
+  {
     label: "Primary queue search",
     pattern: 'data-testid="server-review-search"',
   },
   {
-    label: "Review table starter",
-    pattern: 'data-testid="server-review-table"',
-  },
-  {
-    label: "Starter action panel",
-    pattern: 'data-testid="server-review-action-starter"',
-  },
-  {
-    label: "Starter bulk panel",
-    pattern: 'data-testid="server-review-bulk-starter"',
-  },
-  {
-    label: "Starter mutation preview",
-    pattern: 'data-testid="server-review-mutation-starter"',
+    label: "Server Review segment filter",
+    pattern: 'data-testid="server-review-segment-filter"',
   },
 ];
 
 export const starterSmokeFollowup = [
-  "Add this surface route to scripts/project_automation_smoke_checks.sh once the feature is real.",
-  "Promote the starter checks into a dedicated smoke only after the page stops being scaffold-only.",
+  "Keep this smoke aligned with the real queue-card based server-review page.",
+  "Queue-card actions load from client data, so curl-based smoke should stay focused on static page markers.",
 ];

@@ -112,12 +112,13 @@ function mapServerToItem(server, runtimeState) {
   };
 }
 
-function InlineHelp({ id, label, text, isOpen, onToggle }) {
+function InlineHelp({ id, label, text, testId, isOpen, onToggle }) {
   return (
     <div className="inlineHelp" data-help-id={id}>
       <button
         type="button"
         className="inlineHelpButton"
+        data-testid={testId}
         aria-label={label}
         aria-expanded={isOpen}
         onClick={() => onToggle(id)}
@@ -654,6 +655,64 @@ function ServerReviewPageContent() {
               <p className="formHint">
                 <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
               </p>
+              <div className="serverReviewPrimaryActions">
+                <div className="inlineHelpGroup serverReviewActionWithHelp">
+                  <button
+                    type="button"
+                    className="secondaryButton serverReviewActionButton"
+                    data-testid={`${item.id}-primary-action`}
+                    onClick={() => handleRunStarterAction("primary", item.id)}
+                    disabled={actionLoadingId === item.id}
+                  >
+                    Run full check
+                  </button>
+                  <InlineHelp
+                    id={`full-check-${item.id}`}
+                    testId={`${item.id}-full-check-help`}
+                    label="What full check means"
+                    text="Checks whether this server is reachable and whether the main setup looks healthy enough for the next step."
+                    isOpen={openHelpId === `full-check-${item.id}`}
+                    onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
+                  />
+                </div>
+                <div className="inlineHelpGroup serverReviewActionWithHelp">
+                  <button
+                    type="button"
+                    className="secondaryButton serverReviewActionButton"
+                    data-testid={`${item.id}-secondary-action`}
+                    onClick={() => handleRunStarterAction("secondary", item.id)}
+                    disabled={actionLoadingId === item.id}
+                  >
+                    Check connection
+                  </button>
+                  <InlineHelp
+                    id={`check-connection-${item.id}`}
+                    testId={`${item.id}-check-connection-help`}
+                    label="What check connection means"
+                    text="Use this when you only want to confirm that DeployMate can sign in to the server. Use full check when you also want setup and readiness details."
+                    isOpen={openHelpId === `check-connection-${item.id}`}
+                    onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
+                  />
+                </div>
+                {item.segment === "ready" ? (
+                  <div className="inlineHelpGroup serverReviewActionWithHelp">
+                    <Link
+                      href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
+                      className="landingButton primaryButton serverReviewActionButton"
+                    >
+                      Choose what to run
+                    </Link>
+                    <InlineHelp
+                      id={`choose-run-${item.id}`}
+                      testId={`${item.id}-choose-run-help`}
+                      label="What choose what to run means"
+                      text="This is where you tell DeployMate what app or service should start on this server."
+                      isOpen={openHelpId === `choose-run-${item.id}`}
+                      onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
+                    />
+                  </div>
+                ) : null}
+              </div>
               <div className="adminFilterActions">
                 {item.id === selectedItemId ? null : (
                   <button
@@ -664,50 +723,6 @@ function ServerReviewPageContent() {
                     Edit
                   </button>
                 )}
-                <div className="inlineHelpGroup">
-                  <button
-                    type="button"
-                    className="secondaryButton"
-                    data-testid={`${item.id}-primary-action`}
-                    onClick={() => handleRunStarterAction("primary", item.id)}
-                    disabled={actionLoadingId === item.id}
-                  >
-                    Run full check
-                  </button>
-                  <InlineHelp
-                    id={`full-check-${item.id}`}
-                    label="What full check means"
-                    text="Checks whether this server is reachable and whether the main setup looks healthy enough for the next step."
-                    isOpen={openHelpId === `full-check-${item.id}`}
-                    onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  data-testid={`${item.id}-secondary-action`}
-                  onClick={() => handleRunStarterAction("secondary", item.id)}
-                  disabled={actionLoadingId === item.id}
-                >
-                  Check connection
-                </button>
-                {item.segment === "ready" ? (
-                  <div className="inlineHelpGroup">
-                    <Link
-                      href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
-                      className="landingButton primaryButton"
-                    >
-                      Choose what to run
-                    </Link>
-                    <InlineHelp
-                      id={`choose-run-${item.id}`}
-                      label="What choose what to run means"
-                      text="This is where you tell DeployMate what app or service should start on this server."
-                      isOpen={openHelpId === `choose-run-${item.id}`}
-                      onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
-                    />
-                  </div>
-                ) : null}
                 <button
                   type="button"
                   className="dangerButton"
@@ -773,6 +788,7 @@ function ServerReviewPageContent() {
                         <span>SSH key</span>
                         <InlineHelp
                           id={`ssh-key-${item.id}`}
+                          testId={`${item.id}-ssh-key-help`}
                           label="What SSH key means"
                           text="Paste the private key DeployMate should use to connect to this server."
                           isOpen={openHelpId === `ssh-key-${item.id}`}

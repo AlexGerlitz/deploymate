@@ -326,8 +326,9 @@ EOF
 
 automation_smoke_servers_checks() {
   cat <<'EOF'
-/app/server-review|server review primary action button|data-testid="server-review-primary-action-button"
 /app/server-review|server review page title|data-testid="server-review-page-title"
+/app/server-review|server review refresh button|data-testid="server-review-refresh"
+/app/server-review|server review create card|data-testid="server-review-create-card"
 /app/server-review|server review create section|data-testid="server-review-create-server"
 /app/server-review|server review create name input|data-testid="server-review-create-name"
 /app/server-review|server review create host input|data-testid="server-review-create-host"
@@ -336,9 +337,7 @@ automation_smoke_servers_checks() {
 /app/server-review|server review create ssh key input|data-testid="server-review-create-ssh-key"
 /app/server-review|server review create submit button|data-testid="server-review-create-submit"
 /app/server-review|server review search input|data-testid="server-review-search"
-/app/server-review|server review starter action panel|data-testid="server-review-action-starter"
-/app/server-review|server review starter bulk panel|data-testid="server-review-bulk-starter"
-/app/server-review|server review starter mutation panel|data-testid="server-review-mutation-starter"
+/app/server-review|server review segment filter|data-testid="server-review-segment-filter"
 EOF
 }
 
