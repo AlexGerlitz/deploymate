@@ -189,7 +189,7 @@ function ServerReviewPageContent() {
   const searchParams = useSearchParams();
 
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("Real server review surface is ready. Refresh loads live server targets.");
+  const [success, setSuccess] = useState("Step 1 is ready. Save one server and then test the connection.");
   const [servers, setServers] = useState([]);
   const [serverTestResults, setServerTestResults] = useState({});
   const [serverDiagnostics, setServerDiagnostics] = useState({});
@@ -392,13 +392,13 @@ function ServerReviewPageContent() {
     },
     {
       key: "deploy",
-      label: "3. Open rollout work",
+      label: "3. Choose your app",
       state: selectedServerReady ? "Ready" : hasServers ? "Soon" : "Later",
       detail: selectedServerReady
-        ? "Move into Deployment Workflow while one target is already understood."
+        ? "Move into app setup while one server is already understood."
         : hasServers
-          ? "Open Deployment Workflow after one server decision is clear."
-          : "The deploy path becomes useful after server setup is done.",
+          ? "Open app setup after one server decision is clear."
+          : "App setup becomes useful after server setup is done.",
     },
   ];
   const serverJourneyPrimaryAction = !hasServers
@@ -409,19 +409,19 @@ function ServerReviewPageContent() {
       }
     : selectedServerReady
       ? {
-          label: "Open deployment workflow",
+          label: "Choose app to run",
           kind: "link",
           href: selectedReadyDeploymentHref,
         }
       : {
-          label: "Focus live server queue",
+          label: "Focus saved servers",
           kind: "button",
           onClick: () => scrollToElement("server-review-live-queue"),
         };
   const serverJourneySecondaryAction =
     hasServers && !selectedServerReady
       ? {
-          label: "Open deployment workflow later",
+          label: "Choose app later",
           href: selectedReadyDeploymentHref,
         }
       : null;
@@ -953,14 +953,14 @@ function ServerReviewPageContent() {
   return (
     <main className="workspaceShell">
       <AdminPageHeader
-        title="Server Review"
+        title="Step 1: Connect your server"
         titleTestId="server-review-page-title"
-        subtitle="Review saved server targets, confirm connectivity, and keep diagnostics close before the next rollout."
+        subtitle="Add one server, test the connection, and get it ready before you choose which app to run."
         loading={loading}
         onRefresh={() => loadServers()}
         refreshTestId="server-review-refresh"
         primaryAction={{
-          label: "Add server target",
+          label: "Add server",
           testId: "server-review-primary-action-button",
           onClick: () => scrollToElement("server-review-create-server-section"),
           disabled: false,
@@ -986,9 +986,9 @@ function ServerReviewPageContent() {
       <article className="card formCard workspaceGuidePanel" data-testid="server-review-journey-card">
         <div className="sectionHeader workspaceGuideHeader">
           <div>
-            <h2 data-testid="server-review-journey-title">From server setup to live rollout</h2>
+            <h2 data-testid="server-review-journey-title">What to do on this page</h2>
             <p className="formHint">
-              This page should end with one clear handoff into deployment work, not with more queue tools.
+              Finish one server here, then move on to choosing the app you want to run.
             </p>
           </div>
         </div>
@@ -1029,7 +1029,7 @@ function ServerReviewPageContent() {
           <div>
             <h2 data-testid="server-review-main-next-step-title">Main next step</h2>
             <p className="formHint">
-              Work one saved target to a clear decision first. Edit, table review, audit, exports, and bulk labels stay secondary until the current server story is obvious.
+              Work one server to a clear decision first. Edit tools, tables, audit, exports, and bulk labels stay secondary until this server is obviously ready or blocked.
             </p>
           </div>
         </div>
@@ -1063,7 +1063,7 @@ function ServerReviewPageContent() {
               className="landingButton primaryButton"
               data-testid="server-review-main-next-step-button"
             >
-              Open deployment workflow
+              Choose app to run
             </Link>
           ) : selectedItem?.segment === "auth" ? (
             <button
@@ -1085,7 +1085,7 @@ function ServerReviewPageContent() {
                   : scrollToElement("server-review-live-queue")
               }
             >
-              {selectedItem?.segment === "diagnostics" ? "Run diagnostics" : "Test connection"}
+              {selectedItem?.segment === "diagnostics" ? "Run full check" : "Test connection"}
             </button>
           )}
           <button
@@ -1100,8 +1100,8 @@ function ServerReviewPageContent() {
       </article>
 
       <AdminDisclosureSection
-        title="Add server target"
-        subtitle="Add one SSH target here so DeployMate can test it and show whether it is ready for rollout work."
+        title="Add your server"
+        subtitle="Enter one server here so DeployMate can connect to it and confirm it is ready for the next step."
         badge={hasServers ? "Create another" : "Start here"}
         defaultOpen={servers.length === 0}
         sectionId="server-review-create-server-section"
@@ -1177,7 +1177,7 @@ function ServerReviewPageContent() {
               disabled={serverSubmitting}
               data-testid="server-review-create-submit"
             >
-              {serverSubmitting ? "Adding..." : "Add server"}
+              {serverSubmitting ? "Adding..." : "Save server"}
             </button>
           </div>
         </form>
@@ -1271,13 +1271,13 @@ function ServerReviewPageContent() {
         <AdminSurfaceQueue
           title={starterStrings.queueTitle}
           description={starterStrings.queueDescription}
-          searchLabel="Search server targets"
+          searchLabel="Search saved servers"
           searchValue={query}
           onSearchChange={(event) => setQuery(event.target.value)}
           searchPlaceholder={starterStrings.searchPlaceholder}
           searchTestId="server-review-search"
           emptyTestId="server-review-empty"
-          emptyText="No server targets match the current review filters."
+          emptyText="No saved servers match the current filters."
           items={filteredItems}
         >
         <AdminActiveFilters filters={activeFilterChips} />
@@ -1390,7 +1390,7 @@ function ServerReviewPageContent() {
       ) : null}
 
         <AdminDisclosureSection
-          title="Advanced review tools"
+          title="Advanced server tools"
           subtitle="Open this only after one server is clearly ready, blocked, or not worth pursuing."
           badge="Later"
           defaultOpen={false}

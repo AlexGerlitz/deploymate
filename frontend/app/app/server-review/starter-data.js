@@ -1,25 +1,25 @@
 export const starterMetrics = [
   {
-    label: "Primary review",
-    value: "Connectivity",
-    description: "Start with one useful list plus diagnostics or connection-status action.",
+    label: "Step 1",
+    value: "Connect server",
+    description: "Save one server first, then check that DeployMate can reach it.",
   },
   {
-    label: "Secondary",
-    value: "Ports",
-    description: "Suggested ports and deeper diagnostics come after the first server review action works.",
+    label: "Step 2",
+    value: "Check connection",
+    description: "Use connection test or diagnostics only to remove uncertainty before the first app setup.",
   },
   {
     label: "Later",
-    value: "Audit/export",
-    description: "Audit and exports should support operations handoff, not distract from first-pass connectivity work.",
+    value: "Advanced tools",
+    description: "Tables, bulk tools, audit, and exports stay secondary until one server is clearly ready.",
   },
 ];
 export const segmentFilterOptions = [
-  { value: "all", label: "All review focus" },
-  { value: "diagnostics", label: "Diagnostics" },
+  { value: "all", label: "All servers" },
+  { value: "diagnostics", label: "Needs checks" },
   { value: "ready", label: "Ready" },
-  { value: "auth", label: "Auth review" },
+  { value: "auth", label: "Needs key fix" },
 ];
 export const bulkStatusOptions = [
   { value: "diagnostics_running", label: "Diagnostics follow-up" },
@@ -28,20 +28,20 @@ export const bulkStatusOptions = [
 ];
 
 export const starterStrings = {
-  searchPlaceholder: "Search server name, auth type, or diagnostics state",
-  queueTitle: "Current server slice",
-  queueDescription: "Review live saved server targets, then run the next meaningful action without leaving the page.",
-  summaryTitle: "Server review shape",
-  summaryDescription: "This page is for checking real saved targets: who needs diagnostics, who is ready, and who still needs auth review.",
-  spotlightBody: "Use this surface to review real servers quickly, confirm connectivity, and keep suggested next ports visible during the same pass.",
-  segmentFilterLabel: "Review focus",
+  searchPlaceholder: "Search by server name, host, or status",
+  queueTitle: "Saved servers",
+  queueDescription: "Save a server, check the connection, and keep one clear path into app setup.",
+  summaryTitle: "Step 1: Connect your server",
+  summaryDescription: "This page is for one beginner task first: save a server and confirm that DeployMate can reach it.",
+  spotlightBody: "Use this page to connect one server, remove uncertainty, and then continue into app setup only after one server is understood.",
+  segmentFilterLabel: "Show",
   segmentFilterDefault: "all",
-  cardMetaLabel: "Server context",
-  actionSectionTitle: "Live server actions",
-  actionSectionDescription: "Use the first action path to remove uncertainty: run diagnostics or test the connection on the selected server.",
-  actionFocusHint: "The point is to leave the page knowing whether the server is ready, blocked, or still needs auth review.",
-  actionNotePlaceholder: "Capture the operator note that explains why this server was checked.",
-  primaryActionLabel: "Run diagnostics",
+  cardMetaLabel: "Connection details",
+  actionSectionTitle: "Check the selected server",
+  actionSectionDescription: "Use one action to answer the only question that matters here: can DeployMate reach this server and is it ready for the next step?",
+  actionFocusHint: "This page is strongest when you leave knowing whether the selected server is ready, blocked, or needs a quick fix.",
+  actionNotePlaceholder: "Optional note about what you checked or what still needs fixing.",
+  primaryActionLabel: "Run full check",
   secondaryActionLabel: "Test connection",
   bulkSectionTitle: "Bulk follow-up labels",
   bulkSectionDescription: "Bulk actions here stay lightweight on purpose. Use them to label a review pass after you understand the real server state.",
@@ -54,10 +54,10 @@ export const starterStrings = {
 };
 
 export const starterTableColumns = [
-  { key: "label", label: "Queue item" },
+  { key: "label", label: "Server" },
   { key: "status", label: "Status" },
-  { key: "meta", label: "Server context" },
-  { key: "segment", label: "Ops focus" },
+  { key: "meta", label: "Connection details" },
+  { key: "segment", label: "Show" },
 ];
 
 export const starterRuntimeMode = "api";
