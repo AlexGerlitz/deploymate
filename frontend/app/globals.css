@@ -747,6 +747,54 @@ summary:focus-visible {
   font-size: 13px;
 }
 
+.fieldLabelWithHelp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inlineHelp {
+  position: relative;
+  display: inline-flex;
+}
+
+.inlineHelp summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(19, 34, 56, 0.18);
+  border-radius: 999px;
+  color: #5f6675;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.inlineHelp summary::-webkit-details-marker {
+  display: none;
+}
+
+.inlineHelpBubble {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(260px, 70vw);
+  padding: 10px 12px;
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 16px 30px rgba(17, 24, 39, 0.12);
+  color: #5f6675;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .adminDisclosure {
   margin-bottom: 18px;
   border: 1px solid rgba(19, 34, 56, 0.08);

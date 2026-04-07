@@ -112,6 +112,15 @@ function mapServerToItem(server, runtimeState) {
   };
 }
 
+function InlineHelp({ label, text }) {
+  return (
+    <details className="inlineHelp">
+      <summary aria-label={label}>?</summary>
+      <div className="inlineHelpBubble">{text}</div>
+    </details>
+  );
+}
+
 function ServerReviewPageContent() {
   const router = useRouter();
 
@@ -614,14 +623,6 @@ function ServerReviewPageContent() {
                 <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
               </p>
               <div className="adminFilterActions">
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  data-testid={`${item.id}-focus`}
-                  onClick={() => handleSelectItem(item.id)}
-                >
-                  {item.id === selectedItemId ? "Open now" : "Open"}
-                </button>
                 {item.id === selectedItemId ? null : (
                   <button
                     type="button"
@@ -640,6 +641,10 @@ function ServerReviewPageContent() {
                 >
                   Run full check
                 </button>
+                <InlineHelp
+                  label="What full check means"
+                  text="Checks whether this server is reachable and whether the main setup looks healthy enough for the next step."
+                />
                 <button
                   type="button"
                   className="secondaryButton"
@@ -650,12 +655,18 @@ function ServerReviewPageContent() {
                   Check connection
                 </button>
                 {item.segment === "ready" ? (
-                  <Link
-                    href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
-                    className="landingButton primaryButton"
-                  >
-                    Choose what to run
-                  </Link>
+                  <>
+                    <Link
+                      href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
+                      className="landingButton primaryButton"
+                    >
+                      Choose what to run
+                    </Link>
+                    <InlineHelp
+                      label="What choose what to run means"
+                      text="This is where you tell DeployMate what app or service should start on this server."
+                    />
+                  </>
                 ) : null}
                 <button
                   type="button"
@@ -718,7 +729,13 @@ function ServerReviewPageContent() {
                       />
                     </label>
                     <label className="field">
-                      <span>SSH key</span>
+                      <span className="fieldLabelWithHelp">
+                        <span>SSH key</span>
+                        <InlineHelp
+                          label="What SSH key means"
+                          text="Paste the private key DeployMate should use to connect to this server."
+                        />
+                      </span>
                       <textarea
                         name="ssh_key"
                         rows={6}
