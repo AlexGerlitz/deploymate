@@ -2398,6 +2398,14 @@ button.landingButton.primaryButton:disabled {
   padding: 72px 0;
 }
 
+.authFlowStage {
+  width: min(100%, 560px);
+}
+
+.authFlowStageCompact {
+  width: min(100%, 480px);
+}
+
 .authLoginBackdrop {
   position: absolute;
   inset: 0;
@@ -2466,6 +2474,14 @@ button.landingButton.primaryButton:disabled {
   font-size: 18px;
 }
 
+.authFlowIntro {
+  margin-bottom: 24px;
+}
+
+.authFlowLoadingIntro {
+  margin-bottom: 0;
+}
+
 .authLoginCard {
   position: relative;
   z-index: 1;
@@ -2479,6 +2495,10 @@ button.landingButton.primaryButton:disabled {
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     0 28px 70px rgba(148, 163, 184, 0.14);
   backdrop-filter: blur(22px);
+}
+
+.authFlowCard {
+  width: min(100%, 460px);
 }
 
 .authLoginCardTop {
@@ -2542,6 +2562,18 @@ button.landingButton.primaryButton:disabled {
 .authLoginFooter {
   justify-content: center;
   text-align: center;
+}
+
+.authFlowFooter {
+  gap: 10px;
+}
+
+.authFlowFooterActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 @keyframes authLoginFloat {
@@ -3380,6 +3412,8 @@ button.landingButton.primaryButton:disabled {
     padding: 44px 0 32px;
   }
 
+  .authFlowStage,
+  .authFlowStageCompact,
   .authLoginCard {
     width: 100%;
   }
@@ -3410,6 +3444,14 @@ button.landingButton.primaryButton:disabled {
   .authCardBadge,
   .landingMetaBadge {
     white-space: normal;
+  }
+
+  .authFlowFooterActions {
+    width: 100%;
+  }
+
+  .authFlowFooterActions > * {
+    width: 100%;
   }
 
   .landingCommercialStrip {
