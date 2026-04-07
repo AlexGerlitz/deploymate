@@ -664,22 +664,24 @@ function ServerReviewPageContent() {
                     Edit
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  data-testid={`${item.id}-primary-action`}
-                  onClick={() => handleRunStarterAction("primary", item.id)}
-                  disabled={actionLoadingId === item.id}
-                >
-                  Run full check
-                </button>
-                <InlineHelp
-                  id={`full-check-${item.id}`}
-                  label="What full check means"
-                  text="Checks whether this server is reachable and whether the main setup looks healthy enough for the next step."
-                  isOpen={openHelpId === `full-check-${item.id}`}
-                  onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
-                />
+                <div className="inlineHelpGroup">
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    data-testid={`${item.id}-primary-action`}
+                    onClick={() => handleRunStarterAction("primary", item.id)}
+                    disabled={actionLoadingId === item.id}
+                  >
+                    Run full check
+                  </button>
+                  <InlineHelp
+                    id={`full-check-${item.id}`}
+                    label="What full check means"
+                    text="Checks whether this server is reachable and whether the main setup looks healthy enough for the next step."
+                    isOpen={openHelpId === `full-check-${item.id}`}
+                    onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
+                  />
+                </div>
                 <button
                   type="button"
                   className="secondaryButton"
@@ -690,7 +692,7 @@ function ServerReviewPageContent() {
                   Check connection
                 </button>
                 {item.segment === "ready" ? (
-                  <>
+                  <div className="inlineHelpGroup">
                     <Link
                       href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
                       className="landingButton primaryButton"
@@ -704,7 +706,7 @@ function ServerReviewPageContent() {
                       isOpen={openHelpId === `choose-run-${item.id}`}
                       onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
                     />
-                  </>
+                  </div>
                 ) : null}
                 <button
                   type="button"

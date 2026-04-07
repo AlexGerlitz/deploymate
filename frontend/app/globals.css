@@ -753,6 +753,12 @@ summary:focus-visible {
   gap: 8px;
 }
 
+.inlineHelpGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .inlineHelp {
   position: relative;
   display: inline-flex;
