@@ -15,7 +15,6 @@ import {
   AdminSurfaceMutationPreview,
   AdminSurfaceQueue,
   AdminSurfaceQueueCard,
-  AdminSurfaceSummary,
   AdminSurfaceTable,
 } from "../admin-ui";
 import { formatSavedViews } from "../../lib/admin-saved-views";
@@ -982,14 +981,6 @@ function ServerReviewPageContent() {
         success={success}
         errorTestId="server-review-error"
         successTestId="server-review-success"
-      />
-
-      <AdminSurfaceSummary
-        title={starterStrings.summaryTitle}
-        description={starterStrings.summaryDescription}
-        metrics={summaryMetrics}
-        spotlightTitle="Live server review"
-        spotlightBody={starterStrings.spotlightBody}
       />
 
       <article className="card formCard workspaceGuidePanel" data-testid="server-review-journey-card">
