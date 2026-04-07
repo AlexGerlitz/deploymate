@@ -22,15 +22,16 @@ Updated: 2026-04-07
   - `/app/server-review` now reads as `save -> verify -> deploy`
   - `/app/deployment-workflow` now behaves like one active lane at a time: live, create, or templates
   - `deployment detail` now answers state, risk, and next action more directly
-- продукт стал заметно понятнее с первого прохода, но Week 2 ещё нужен для более гладкого перехода от `server-review` к `deployment-workflow`
+- продукт стал заметно понятнее с первого прохода, но живой walkthrough на проде показал более глубокую проблему:
+  новичок всё ещё не понимает, что делает продукт и какой у него первый шаг
 
 ## Next Recommended Package
 
-- Week 2 should build one continuous beginner path:
-  - save the first server
-  - remove uncertainty on that target
-  - land in deployment creation without re-learning the product
-  - keep copy, empty states, and CTA language aligned across those screens
+- Week 2 now needs to rebuild the beginner story itself:
+  - explain what the product does in plain language
+  - show the first step without requiring product knowledge
+  - keep `server-review` and `deployment-workflow` as step-based screens, not operator-first workspaces
+  - align copy, CTA language, and page order around a real novice path
 
 ## Week 1 Result
 
@@ -46,10 +47,11 @@ Updated: 2026-04-07
 
 ## Week 2 Focus
 
-- Reduce friction between `Server Review` and `Deployment Workflow`.
-- Make empty states and first-success states feel connected.
-- Keep one clear sentence on each screen explaining what the user should do next.
-- Cut any remaining repeated explanations or duplicated decision blocks that do not improve first-pass clarity.
+- Make the product understandable to a full novice without author explanation.
+- Turn `/app` into a simple `what this is / what to do first / what happens next` screen.
+- Reframe `/app/server-review` as `Step 1` instead of an operator review console.
+- Reframe `/app/deployment-workflow` as `Step 2` with plain language about image, deploy, and next action.
+- Remove or demote text that sounds like internal ops jargon on the first pass.
 
 ## Week 2 Progress
 
@@ -57,6 +59,10 @@ Updated: 2026-04-07
 - When a reviewed server is ready, `server-review` now opens `deployment-workflow` with that target preselected.
 - The create form now says more clearly when the target already came from `Server Review`, so the user knows the next move is simply setting the image.
 - After the first successful deploy, the success state now points straight to runtime detail instead of leaving the user in a vague success-only state.
+- A live prod walkthrough under the real admin account confirmed the current deeper problem:
+  - `/app` still sounds too smart instead of explaining the product simply
+  - `server-review` still feels like an internal review tool instead of `Step 1`
+  - `deployment-workflow` still assumes the user already understands terms like `image`, `template`, and `runtime`
 
 ## Current State
 

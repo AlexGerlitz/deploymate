@@ -21,7 +21,6 @@ import {
   formatDate,
   readErrorMessageFromResponse,
   readJsonOrError,
-  rolloutReviewerCopy,
   triggerFileDownload,
 } from "../lib/runtime-workspace-utils";
 
@@ -60,173 +59,64 @@ export default function HomePage() {
       notifications,
       templates,
     });
-  const workspacePriority =
-    opsSnapshot.attention_items[0]?.title ||
-    (opsSnapshot.deployments.failed > 0
-      ? "Failed deployments need review before the next rollout."
-      : "Workspace is clear enough for the next rollout.");
   const degradedOpsAttentionItems = opsSnapshot.attention_items.filter((item) =>
     item.title.includes("temporarily unavailable"),
   );
-  const workspaceFocusItems = [
-    {
-      label: "Priority",
-      value:
-        opsSnapshot.attention_items[0]?.title ||
-        (deployments.length === 0 ? "Start first rollout" : "Workspace is stable"),
-      detail:
-        opsSnapshot.attention_items[0]?.detail ||
-        "No blocking signal is leading the workspace right now.",
-    },
-    {
-      label: "Runtime",
-      value:
-        opsSnapshot.deployments.failed > 0
-          ? "Incident review first"
-          : deployments.length === 0
-            ? "Ready for first deployment"
-            : "Ready for next rollout",
-      detail:
-        deployments.length > 0
-          ? `${opsSnapshot.deployments.running} running · ${opsSnapshot.deployments.failed} failed · ${opsSnapshot.deployments.public_urls} public URLs`
-          : "Use the dedicated deployment workspace to launch the first service or save a reusable template.",
-    },
-    {
-      label: "Readiness",
-      value:
-        templates.length > 0
-          ? `${templates.length} template${templates.length === 1 ? "" : "s"} ready`
-          : "Guided deploy path ready",
-      detail:
-        servers.length > 0
-          ? `${servers.length} target${servers.length === 1 ? "" : "s"} saved for repeatable rollout.`
-          : "Add server targets in server review when you want remote-only rollout paths.",
-    },
-  ];
   const overviewPrimaryPath = buildOverviewPrimaryPath({
     isAdmin: Boolean(currentUser?.is_admin),
     deploymentsTotal: opsSnapshot.deployments.total,
     failedDeployments: opsSnapshot.deployments.failed,
     serversTotal: opsSnapshot.servers.total,
   });
-  const workspaceScenarioCards = [
+  const beginnerHeroBody = servers.length === 0
+    ? "This product helps you run an app on your own server. Start by connecting one server so DeployMate can reach it."
+    : deployments.length === 0
+      ? "Your server is connected. Next, choose what to run and create the first deployment."
+      : "Your app workspace is live. Review what is running, then deploy the next change when you are ready.";
+  const beginnerStatusSummary = servers.length === 0
+    ? "No server connected yet. Start with Step 1."
+    : deployments.length === 0
+      ? `${servers.length} server target${servers.length === 1 ? "" : "s"} connected. No deployments yet.`
+      : `${opsSnapshot.deployments.running} running · ${opsSnapshot.deployments.failed} failed · ${servers.length} server target${servers.length === 1 ? "" : "s"} saved.`;
+  const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
+    ? "Next best step: connect and verify one server."
+    : overviewPrimaryPath.reason === "incident"
+      ? "Next best step: open live deployments and review the problem first."
+      : deployments.length === 0
+        ? "Next best step: open deployment workflow and enter one image."
+        : "Next best step: open deployment workflow and continue from one live deployment card.";
+  const beginnerSteps = [
     {
-      key: "deploy",
-      label:
-        overviewPrimaryPath.reason === "server-setup"
-          ? "Servers"
-          : overviewPrimaryPath.reason === "incident"
-            ? "Runtime"
-            : "Deploy",
-      title: overviewPrimaryPath.title,
-      detail: overviewPrimaryPath.detail,
-      href: overviewPrimaryPath.href,
-      actionLabel: overviewPrimaryPath.label,
-      primary: true,
+      key: "step-1",
+      step: "Step 1",
+      title: "Connect a server",
+      detail: "Add one server and check that DeployMate can reach it over SSH.",
+      href: "/app/server-review",
+      actionLabel: "Open server setup",
+      primary: overviewPrimaryPath.reason === "server-setup",
     },
     {
-      key: "runtime",
-      label: overviewPrimaryPath.reason === "server-setup" ? "Then deploy" : "Runtime",
-      title:
-        overviewPrimaryPath.reason === "server-setup"
-          ? "Launch the first deployment"
-          : opsSnapshot.deployments.failed > 0
-            ? "Review live incidents"
-            : "Review live deployments",
-      detail:
-        overviewPrimaryPath.reason === "server-setup"
-          ? "After one server target is saved, move into the deployment workspace for the guided rollout form and live runtime queue."
-          : opsSnapshot.deployments.failed > 0
-          ? "Go straight to the deployment workspace and open a live runtime card before more rollout changes."
-          : "Use the deployment workspace when you want the current list, health context, and a fast path into deployment detail.",
+      key: "step-2",
+      step: "Step 2",
+      title: "Choose what to run",
+      detail: "Open the deploy screen, enter a Docker image, or use a saved template.",
       href: "/app/deployment-workflow",
-      actionLabel:
-        overviewPrimaryPath.reason === "server-setup"
-          ? "Open deployment workflow"
-          : opsSnapshot.deployments.failed > 0
-            ? "Review deployments"
-            : "Open live deployments",
+      actionLabel: "Open deploy step",
+      primary: overviewPrimaryPath.reason !== "server-setup",
+    },
+    {
+      key: "step-3",
+      step: "Step 3",
+      title: "Deploy and check status",
+      detail: "Start the app, then check whether it is running and healthy.",
+      href: "/app/deployment-workflow",
+      actionLabel: "See live deployments",
       primary: false,
     },
-    ...(currentUser?.is_admin
-      ? [
-          {
-            key: "servers",
-            label: "Servers",
-            title: "Review server targets",
-            detail: "Use the dedicated server workspace when you need to add, test, diagnose, or clean up rollout targets.",
-            href: "/app/server-review",
-            actionLabel: "Open server review",
-            primary: false,
-          },
-          {
-            key: "recovery",
-            label: "Recovery",
-            title: "Review backup and recovery",
-            detail: "Open the admin recovery path when you need restore validation, import review, or controlled preparation handoff.",
-            href: "/app/users",
-            actionLabel: "Open recovery path",
-            primary: false,
-          },
-        ]
-      : [
-          {
-            key: "upgrade",
-            label: "Upgrade",
-            title: "Unlock more workspace depth",
-            detail: "Commercial and team workflows stay separate from the core rollout path until you need them.",
-            href: "/upgrade",
-            actionLabel: "View upgrade options",
-            primary: false,
-          },
-        ]),
   ];
-  const firstRunContext = deployments.length > 0
-    ? "Start with the deployment workspace and one live runtime card. Open team/admin review only after the rollout story is already clear."
-    : overviewPrimaryPath.reason === "server-setup"
-      ? "This workspace has no saved server targets yet, so the next useful click is Server Review. Save one target there before treating rollout creation as the main path."
-      : "This environment has no live deployments yet, so the next useful step is opening the dedicated deployment workspace and following the guided create path.";
   const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
     opsSnapshot.attention_items.length === 1 ? "" : "s"
   }`;
-  const coreSurfaceCards = [
-    {
-      key: "overview",
-      label: "Overview",
-      title: "Read the current workspace state",
-      detail:
-        "Use this screen only to understand what matters now and choose the next obvious path without opening every advanced tool at once.",
-      href: "/app",
-      actionLabel: "Stay on overview",
-    },
-    {
-      key: "servers",
-      label: "Servers",
-      title: "Connect or verify rollout targets",
-      detail:
-        "Open Server Review when you need to add a target, test SSH access, run diagnostics, or confirm that remote rollout is really ready.",
-      href: "/app/server-review",
-      actionLabel: "Open server review",
-    },
-    {
-      key: "deployments",
-      label: "Deployments",
-      title: "Create or review live runtime",
-      detail:
-        "Open Deployment Workflow for the guided create path, the live deployment queue, and the fastest jump into runtime detail.",
-      href: "/app/deployment-workflow",
-      actionLabel: "Open deployment workflow",
-    },
-    {
-      key: "templates",
-      label: "Templates",
-      title: "Reuse rollout defaults",
-      detail:
-        "Templates stay close to the deploy path so repeat rollouts, previews, and small edits do not become a separate product story.",
-      href: "/app/deployment-workflow#templates",
-      actionLabel: "Open templates",
-    },
-  ];
 
   async function fetchCurrentUser() {
     const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -591,12 +481,12 @@ export default function HomePage() {
           <div className="workspaceHeroBackdrop" />
           <div className="header workspaceHeroHeader">
             <div>
-              <div className="eyebrow">Live workspace</div>
+              <div className="eyebrow">Begin here</div>
               <h1 data-testid="runtime-page-title">DeployMate</h1>
               <p>
                 {currentUser
-                  ? `Logged in as ${currentUser.username}. ${workspacePriority}`
-                  : rolloutReviewerCopy.overview.heroBody}
+                  ? `Logged in as ${currentUser.username}. ${beginnerHeroBody}`
+                  : "DeployMate helps you run an app on your server. First connect a server, then choose what to run, then deploy it."}
               </p>
             </div>
             <div className="buttonRow workspaceHeroActions">
@@ -630,57 +520,54 @@ export default function HomePage() {
 
           <div className="workspaceHeroSummary">
             <div className="workspaceHeroMetric">
-              <span>Deployments</span>
-              <strong>{opsSnapshot.deployments.running}</strong>
+              <span>Step 1</span>
+              <strong>{servers.length === 0 ? "Connect server" : "Server ready"}</strong>
               <p>
-                Running now · {opsSnapshot.deployments.total} total ·{" "}
-                {opsSnapshot.deployments.failed} failed
+                {servers.length === 0
+                  ? "Add one server target so DeployMate can reach your machine."
+                  : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved for rollout.`}
               </p>
             </div>
             <div className="workspaceHeroMetric">
-              <span>Targets</span>
-              <strong>{opsSnapshot.servers.total}</strong>
+              <span>Step 2</span>
+              <strong>{deployments.length === 0 ? "Choose app" : "Deploy next change"}</strong>
               <p>
-                Server targets · {opsSnapshot.servers.ssh_key_auth} SSH key ·{" "}
-                {opsSnapshot.servers.unused} idle
+                Open the deploy screen, enter a Docker image, or use a saved template.
               </p>
             </div>
             <div className="workspaceHeroMetric">
-              <span>Templates</span>
-              <strong>{opsSnapshot.templates.total}</strong>
+              <span>Step 3</span>
+              <strong>{deployments.length === 0 ? "Check result" : "Review status"}</strong>
               <p>
-                Saved rollout presets · {opsSnapshot.templates.recently_used} used in 7 days ·{" "}
-                {opsSnapshot.templates.unused} unused
+                Start the app, then check whether it is healthy and reachable.
               </p>
             </div>
             <div className="workspaceHeroBadge workspaceHeroSpotlight">
-              <span>What matters now</span>
-              <strong>{workspacePriority}</strong>
-              <p>
-                {rolloutReviewerCopy.overview.spotlightBody}
-              </p>
+              <span>Next best step</span>
+              <strong>{beginnerStatusSummary}</strong>
+              <p>{beginnerNextStep}</p>
             </div>
           </div>
         </section>
 
         <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
-            <div className="sectionHeader workspaceGuideHeader">
-              <div>
-              <h2 data-testid="workspace-scenario-title">{rolloutReviewerCopy.shared.obviousPathTitle}</h2>
+          <div className="sectionHeader workspaceGuideHeader">
+            <div>
+              <h2 data-testid="workspace-scenario-title">What to do first</h2>
               <p className="formHint">
-                {rolloutReviewerCopy.shared.obviousPathBody}
+                This product has one simple path: connect a server, choose what to run, then deploy and check the result.
               </p>
             </div>
           </div>
           <div className="workspaceGuideGrid" data-testid="workspace-scenario-grid">
             <div className="stepsGrid workspaceGuideSteps">
-              {workspaceScenarioCards.slice(0, 2).map((card) => (
+              {beginnerSteps.map((card) => (
                 <article
                   key={card.key}
                   className="stepCard workspaceStepCard"
                   data-testid={`workspace-scenario-item-${card.key}`}
                 >
-                  <span className="stepNumber">{card.label}</span>
+                  <span className="stepNumber">{card.step}</span>
                   <h3>{card.title}</h3>
                   <p>{card.detail}</p>
                   <Link
@@ -695,20 +582,40 @@ export default function HomePage() {
             </div>
             <aside className="workspaceGlancePanel">
               <div className="workspaceGlanceHeader">
-                <span className="eyebrow">Current focus</span>
-                <strong>Choose one path and ignore the rest</strong>
+                <span className="eyebrow">Current state</span>
+                <strong>Keep the first pass simple</strong>
               </div>
               <div className="workspaceGlanceList">
-                {workspaceFocusItems.map((item) => (
-                  <div key={item.label} className="workspaceStatusCard workspaceGlanceItem">
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                    <p>{item.detail}</p>
-                  </div>
-                ))}
+                <div className="workspaceStatusCard workspaceGlanceItem">
+                  <span>Server targets</span>
+                  <strong>{servers.length}</strong>
+                  <p>
+                    {servers.length === 0
+                      ? "You have not connected a server yet."
+                      : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved.`}
+                  </p>
+                </div>
+                <div className="workspaceStatusCard workspaceGlanceItem">
+                  <span>Deployments</span>
+                  <strong>{deployments.length}</strong>
+                  <p>
+                    {deployments.length === 0
+                      ? "No app has been deployed yet."
+                      : `${opsSnapshot.deployments.running} running and ${opsSnapshot.deployments.failed} failed.`}
+                  </p>
+                </div>
+                <div className="workspaceStatusCard workspaceGlanceItem">
+                  <span>Templates</span>
+                  <strong>{templates.length}</strong>
+                  <p>
+                    {templates.length === 0
+                      ? "No saved templates yet. Start with one image."
+                      : `${templates.length} template${templates.length === 1 ? "" : "s"} saved for repeat use.`}
+                  </p>
+                </div>
               </div>
               <div className="workspaceMetaLine">
-                <span>{firstRunContext}</span>
+                <span>{beginnerNextStep}</span>
               </div>
             </aside>
           </div>
@@ -737,7 +644,7 @@ export default function HomePage() {
             </div>
           ) : null}
           <div className="banner subtle" data-testid="workspace-first-pass-banner">
-            <strong>New here?</strong> {firstRunContext}
+            <strong>New here?</strong> Start with one server, then one deployment. Ignore admin and reports until the first app is running.
           </div>
           {smokeMode ? (
             <div className="banner subtle" data-testid="runtime-smoke-banner">
@@ -752,23 +659,45 @@ export default function HomePage() {
           <article className="card formCard workspaceGuidePanel" data-testid="workspace-guide-card">
             <div className="sectionHeader workspaceGuideHeader">
               <div>
-                <h2 data-testid="workspace-guide-title">Core product surfaces</h2>
+                <h2 data-testid="workspace-guide-title">What each screen is for</h2>
                 <p className="formHint">
-                  Keep the first pass inside these four surfaces. Anything heavier should stay secondary until the main deploy path is already clear.
+                  Use these screens in order. Everything else should stay secondary until the first deployment story is clear.
                 </p>
               </div>
             </div>
             <div className="workspaceReviewerGrid" data-testid="workspace-reviewer-panel">
-              {coreSurfaceCards.map((item) => (
-                <article key={item.key} className="workspaceReviewerCard">
-                  <span>{item.label}</span>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                  <Link href={item.href} className="landingButton secondaryButton">
-                    {item.actionLabel}
-                  </Link>
-                </article>
-              ))}
+              <article className="workspaceReviewerCard">
+                <span>Overview</span>
+                <strong>Start here</strong>
+                <p>Use this page to understand the product and choose the next obvious step.</p>
+                <Link href="/app" className="landingButton secondaryButton">
+                  Stay on overview
+                </Link>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>Server setup</span>
+                <strong>Connect and verify a server</strong>
+                <p>Open Server Review to add one target and confirm that DeployMate can reach it.</p>
+                <Link href="/app/server-review" className="landingButton secondaryButton">
+                  Open server setup
+                </Link>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>Deploy</span>
+                <strong>Choose what to run</strong>
+                <p>Open Deployment Workflow to enter a Docker image or use a saved template.</p>
+                <Link href="/app/deployment-workflow" className="landingButton secondaryButton">
+                  Open deploy step
+                </Link>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>Status</span>
+                <strong>Check whether the app is healthy</strong>
+                <p>Use the deployment screens to review runtime state, logs, and next actions.</p>
+                <Link href="/app/deployment-workflow" className="landingButton secondaryButton">
+                  See live deployments
+                </Link>
+              </article>
             </div>
           </article>
         </div>

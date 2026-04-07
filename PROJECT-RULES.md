@@ -59,10 +59,12 @@ These can stay in the product, but they must not compete with the main deploy pa
 ## UX Rules
 
 - The overview page should explain the workspace, not try to do everything.
+- The overview page should explain the product itself before it explains the workspace.
 - Server setup should feel like the natural first step when no target exists.
 - Deployment creation should feel like the natural next step after server setup.
 - Deployment detail should answer: what is running, is it healthy, and what should I do next.
 - Advanced controls should be visible only when they help the current decision.
+- If a full novice cannot explain the first step in 10 seconds, the screen is not ready.
 
 ## Engineering Rules
 
@@ -107,19 +109,19 @@ Required outputs:
 Success check:
 - a new user knows the first click and second click without guessing
 
-### Days 8-14: Make Server To Deploy Feel Continuous
+### Days 8-14: Make The Product Understandable To A Beginner
 
 Goal:
-- remove friction between adding a server and deploying the first service
+- make the first-time story understandable without author help
 
 Required outputs:
-- simplify server review copy and actions around create/test/diagnostics
-- make the transition from saved server to deploy workflow explicit
-- reduce repeated explanations and secondary controls
-- ensure empty states explain exactly what to do next
+- rewrite `/app` so it explains what the product does, what step comes first, and what happens after that
+- simplify `server-review` so it reads like `Step 1: connect and verify a server`
+- simplify `deployment-workflow` so it reads like `Step 2: choose what to run and deploy it`
+- remove or demote operator-heavy language that confuses a first-time user
 
 Success check:
-- user can go from zero servers to first deploy without confusion
+- a new user can explain the first two steps without outside help
 
 ### Days 15-21: Polish Deployment Clarity
 
