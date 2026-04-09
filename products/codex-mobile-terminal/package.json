@@ -6,6 +6,7 @@
     "server"
   ],
   "scripts": {
+    "postinstall": "bash ./scripts/ensure-node-pty-helper-exec.sh",
     "dev:web": "npm --workspace apps/web run dev",
     "build:web": "npm --workspace apps/web run build",
     "start:web": "npm --workspace apps/web run start",
