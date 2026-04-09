@@ -103,10 +103,17 @@ const server = http.createServer((request, response) => {
   }
 
   if (request.method === "GET" && url.pathname === "/api/console") {
-    json(response, 200, {
-      ok: true,
-      console: sessionManager.getConsoleSnapshot()
-    });
+    try {
+      json(response, 200, {
+        ok: true,
+        console: sessionManager.getConsoleSnapshot()
+      });
+    } catch (error) {
+      json(response, 503, {
+        ok: false,
+        error: error instanceof Error ? error.message : "terminal_unavailable"
+      });
+    }
     return;
   }
 
@@ -139,18 +146,25 @@ const server = http.createServer((request, response) => {
           return;
         }
 
-        if (sessionManager.isCodexTuiActive()) {
-          json(response, 409, {
-            ok: false,
-            error: "codex_tui_active_open_terminal"
-          });
-          return;
-        }
+        try {
+          if (sessionManager.isCodexTuiActive()) {
+            json(response, 409, {
+              ok: false,
+              error: "codex_tui_active_open_terminal"
+            });
+            return;
+          }
 
-        sessionManager.write(input);
-        json(response, 200, {
-          ok: true
-        });
+          sessionManager.write(input);
+          json(response, 200, {
+            ok: true
+          });
+        } catch (error) {
+          json(response, 503, {
+            ok: false,
+            error: error instanceof Error ? error.message : "terminal_unavailable"
+          });
+        }
       } catch {
         json(response, 400, {
           ok: false,
@@ -198,7 +212,18 @@ server.on("upgrade", (request, socket, head) => {
 });
 
 wss.on("connection", (ws) => {
-  sessionManager.attachClient(ws);
+  try {
+    sessionManager.attachClient(ws);
+  } catch (error) {
+    ws.send(
+      JSON.stringify({
+        type: "bridge-error",
+        message: error instanceof Error ? error.message : "terminal_unavailable"
+      })
+    );
+    ws.close();
+    return;
+  }
 
   ws.on("message", (raw) => {
     try {

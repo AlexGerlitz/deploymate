@@ -97,6 +97,7 @@ export class SessionManager {
     this.clients = new Set();
     this.outputBuffer = "";
     this.outputVersion = 0;
+    this.lastStartError = "";
   }
 
   ensureSession() {
@@ -104,21 +105,28 @@ export class SessionManager {
       return this.session;
     }
 
-    const proc = pty.spawn(DEFAULT_SHELL, ["-lc", getTmuxCommand()], {
-      name: "xterm-256color",
-      cols: 120,
-      rows: 32,
-      cwd: DEFAULT_WORKDIR,
-      env: {
-        ...process.env,
-        LANG: process.env.LANG || "C.UTF-8",
-        LC_ALL: process.env.LC_ALL || "C.UTF-8",
-        LC_CTYPE: process.env.LC_CTYPE || "C.UTF-8",
-        TERM: "xterm-256color",
-        COLORTERM: "truecolor",
-        CODEX_MOBILE_TERMINAL: "1"
-      }
-    });
+    let proc;
+    try {
+      proc = pty.spawn(DEFAULT_SHELL, ["-lc", getTmuxCommand()], {
+        name: "xterm-256color",
+        cols: 120,
+        rows: 32,
+        cwd: DEFAULT_WORKDIR,
+        env: {
+          ...process.env,
+          LANG: process.env.LANG || "C.UTF-8",
+          LC_ALL: process.env.LC_ALL || "C.UTF-8",
+          LC_CTYPE: process.env.LC_CTYPE || "C.UTF-8",
+          TERM: "xterm-256color",
+          COLORTERM: "truecolor",
+          CODEX_MOBILE_TERMINAL: "1"
+        }
+      });
+      this.lastStartError = "";
+    } catch (error) {
+      this.lastStartError = error instanceof Error ? error.message : "pty_spawn_failed";
+      throw new Error(`terminal_session_start_failed:${this.lastStartError}`);
+    }
 
     const session = {
       proc,
@@ -260,6 +268,7 @@ export class SessionManager {
       connectedClients: this.clients.size,
       active: Boolean(this.session),
       createdAt: this.session?.createdAt || null,
+      lastStartError: this.lastStartError || null,
       workdir: DEFAULT_WORKDIR,
       shell: DEFAULT_SHELL,
       tmuxSession: DEFAULT_SESSION_NAME
