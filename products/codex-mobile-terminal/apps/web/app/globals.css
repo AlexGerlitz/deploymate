@@ -39,7 +39,9 @@ body {
 }
 
 html:has(.terminal-shell--fullscreen),
-body:has(.terminal-shell--fullscreen) {
+body:has(.terminal-shell--fullscreen),
+html:has(.mobile-terminal-ios),
+body:has(.mobile-terminal-ios) {
   background: var(--terminal-bg);
   overscroll-behavior: none;
   width: 100%;
@@ -830,6 +832,134 @@ body:has(.terminal-shell--fullscreen) {
 .console-composer--terminal {
   position: sticky;
   bottom: 0;
+}
+
+.mobile-terminal-ios {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 10px;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 10px)
+    10px
+    calc(env(safe-area-inset-bottom, 0px) + 10px);
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+.mobile-terminal-ios__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mobile-terminal-ios__header h1 {
+  margin: 4px 0 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.mobile-terminal-ios__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mobile-terminal-ios__output-shell {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.mobile-terminal-ios__output {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+}
+
+.mobile-terminal-ios__jump {
+  justify-self: end;
+  min-height: 34px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--terminal-text);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.mobile-terminal-ios__footer {
+  display: grid;
+  gap: 8px;
+  padding-bottom: var(--ios-keyboard-inset, 0px);
+}
+
+.mobile-terminal-ios__toolbar {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mobile-terminal-ios__tool {
+  min-height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--terminal-text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mobile-terminal-ios__tool.is-active {
+  background: rgba(121, 192, 255, 0.24);
+  color: #d8ecff;
+}
+
+.mobile-terminal-ios__focus-strip {
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--terminal-text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.mobile-terminal-ios__hidden-input {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mobile-terminal-ios__notice {
+  min-height: 38px;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--terminal-text);
+  font-size: 0.82rem;
 }
 
 .console-topbar {

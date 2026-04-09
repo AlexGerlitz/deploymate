@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import MobileTerminalWorkspace from "./MobileTerminalWorkspace";
+import MobileTerminalIOS from "./mobile-ios/MobileTerminalIOS";
 import TerminalWorkspace from "./TerminalWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +41,7 @@ export default async function TerminalPage() {
 
   if (isMobileSafariLike) {
     return (
-      <MobileTerminalWorkspace bridgeWsUrl={bridgeWsUrl} sessionStatus={sessionStatus} />
+      <MobileTerminalIOS bridgeWsUrl={bridgeWsUrl} sessionStatus={sessionStatus} />
     );
   }
 

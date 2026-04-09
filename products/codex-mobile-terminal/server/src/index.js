@@ -186,6 +186,56 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/terminal/input") {
+    let body = "";
+
+    request.on("data", (chunk) => {
+      body += chunk.toString("utf8");
+      if (body.length > 20000) {
+        request.destroy(new Error("payload_too_large"));
+      }
+    });
+
+    request.on("error", () => {
+      json(response, 400, {
+        ok: false,
+        error: "invalid_request"
+      });
+    });
+
+    request.on("end", () => {
+      try {
+        const payload = body ? JSON.parse(body) : {};
+        const input = typeof payload.input === "string" ? payload.input : "";
+        if (!input) {
+          json(response, 400, {
+            ok: false,
+            error: "missing_input"
+          });
+          return;
+        }
+
+        try {
+          sessionManager.write(input);
+          json(response, 200, {
+            ok: true
+          });
+        } catch (error) {
+          json(response, 503, {
+            ok: false,
+            error: error instanceof Error ? error.message : "terminal_unavailable"
+          });
+        }
+      } catch {
+        json(response, 400, {
+          ok: false,
+          error: "invalid_json"
+        });
+      }
+    });
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/session/reset") {
     json(response, 200, {
       ok: true,
