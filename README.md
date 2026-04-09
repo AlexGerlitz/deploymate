@@ -143,6 +143,12 @@ Recommended reviewer order:
 
 ## Feature Highlights
 
+### Web Terminal sidecar
+
+- a separate operator-side `Web Terminal` exists for direct server work with Codex and tmux
+- the reference location and maintenance rules live in [WEB-TERMINAL.md](/Users/alexgerlitz/deploymate/WEB-TERMINAL.md)
+- the current public entry is `lab.deploymatecloud.ru`
+
 ### Deployment operations
 
 - create, redeploy, inspect, and delete Docker deployments

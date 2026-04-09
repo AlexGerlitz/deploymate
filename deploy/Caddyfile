@@ -10,6 +10,18 @@
 	}
 }
 
+lab.deploymatecloud.ru {
+	encode gzip zstd
+
+	handle /ws* {
+		reverse_proxy codex-mobile-terminal-server:4020
+	}
+
+	handle {
+		reverse_proxy codex-mobile-terminal-web:3000
+	}
+}
+
 www.{$DOMAIN:localhost} {
 	redir https://{$DOMAIN:localhost}{uri} permanent
 }

@@ -2,6 +2,13 @@
 
 Updated: 2026-04-07
 
+## Web Terminal Pointer
+
+- Sidecar operator workspace name: `Web Terminal`
+- Local/server reference doc: [WEB-TERMINAL.md](/Users/alexgerlitz/deploymate/WEB-TERMINAL.md)
+- Live host today: `https://lab.deploymatecloud.ru`
+- Source project today: [products/codex-mobile-terminal](/Users/alexgerlitz/deploymate/products/codex-mobile-terminal)
+
 ## Current Product Goal
 
 - Главная цель сейчас: не просто наращивать deploy/control функции, а сделать путь понятным с первого прохода.

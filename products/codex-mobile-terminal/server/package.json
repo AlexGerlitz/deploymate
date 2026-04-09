@@ -1,0 +1,13 @@
+{
+  "name": "codex-mobile-terminal-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.3"
+  }
+}

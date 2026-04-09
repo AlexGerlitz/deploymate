@@ -1,0 +1,15 @@
+{
+  "name": "codex-mobile-terminal",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "server"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "start:web": "npm --workspace apps/web run start",
+    "dev:server": "npm --workspace server run dev",
+    "start:server": "npm --workspace server run start"
+  }
+}

@@ -1,0 +1,93 @@
+export EDITOR=vim
+export PAGER=less
+export PS1='cmt:\w\$ '
+export HISTCONTROL=ignorespace
+export LANG="${LANG:-C.UTF-8}"
+export LC_ALL="${LC_ALL:-C.UTF-8}"
+export TERM="${TERM:-xterm-256color}"
+
+CODEX_API_KEY_ENV_FILE="${HOME}/.config/codex-mobile-terminal/openai-api-key.env"
+if [ -f "${CODEX_API_KEY_ENV_FILE}" ]; then
+  # Load persisted API key for future shells without exposing it to the browser.
+  . "${CODEX_API_KEY_ENV_FILE}"
+fi
+
+run_codex() {
+  if [ -f "${CODEX_API_KEY_ENV_FILE}" ]; then
+    . "${CODEX_API_KEY_ENV_FILE}"
+  fi
+
+  command codex "$@"
+}
+
+codex_has_subcommand() {
+  case "${1:-}" in
+    exec|review|login|logout|mcp|mcp-server|app-server|completion|sandbox|debug|apply|resume|fork|cloud|features|help)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+codex() {
+  if codex_has_subcommand "${1:-}"; then
+    run_codex "$@"
+    return
+  fi
+
+  run_codex -m gpt-5.4 "$@"
+}
+
+codex-api-login() {
+  local api_key
+
+  printf 'Paste OpenAI API key and press Enter:\n'
+  IFS= read -r -s api_key
+  printf '\n'
+
+  if [ -z "${api_key}" ]; then
+    printf 'No API key entered.\n'
+    return 1
+  fi
+
+  OPENAI_API_KEY="${api_key}" printenv OPENAI_API_KEY | codex login --with-api-key
+  local status=$?
+  unset api_key OPENAI_API_KEY
+  return "${status}"
+}
+
+c53() {
+  run_codex -m gpt-5.3-codex "$@"
+}
+
+c54() {
+  run_codex -m gpt-5.4 "$@"
+}
+
+alias ll='ls -lah'
+alias la='ls -la'
+alias repo='cd /workspace'
+alias gs='git status -sb'
+alias gl='git log --oneline --decorate -n 12'
+alias gd='git diff'
+alias c='codex'
+alias cls='clear'
+alias ..='cd ..'
+alias ...='cd ../..'
+
+if [ -z "${WEB_TERMINAL_HINT_SHOWN:-}" ]; then
+  export WEB_TERMINAL_HINT_SHOWN=1
+  printf '\n'
+  printf 'Web Terminal\n'
+  printf 'workspace: /workspace\n'
+  printf 'session: %s\n' "${TERMINAL_TMUX_SESSION:-codex-mobile}"
+  printf 'codex: type c\n'
+  printf 'gpt-5.4: type c54\n'
+  printf 'gpt-5.3-codex: type c53\n'
+  printf 'api key login: press + -> API Key\n'
+  printf 'auth: Esc -> Sign in with Device Code\n'
+  printf 'api key fallback: printenv OPENAI_API_KEY | codex login --with-api-key\n'
+  printf 'tips: tap links, use browser Paste for input, tmux session persists\n'
+  printf '\n'
+fi

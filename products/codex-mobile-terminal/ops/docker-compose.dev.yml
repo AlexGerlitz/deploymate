@@ -1,0 +1,32 @@
+services:
+  terminal-server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    environment:
+      PORT: 4020
+      HOST: 0.0.0.0
+      WEB_TERMINAL_SESSION_SECRET: ${WEB_TERMINAL_SESSION_SECRET:-dev-web-terminal-session-secret}
+      TERMINAL_SHELL: ${TERMINAL_SHELL:-/bin/bash}
+      TERMINAL_TMUX_SESSION: ${TERMINAL_TMUX_SESSION:-codex-mobile}
+      TERMINAL_WORKDIR: ${TERMINAL_WORKDIR:-/workspace}
+    ports:
+      - "4020:4020"
+    volumes:
+      - ../../:/workspace
+
+  terminal-web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      WEB_TERMINAL_USERNAME: ${WEB_TERMINAL_USERNAME:-alexgerlitz}
+      WEB_TERMINAL_PASSWORD: ${WEB_TERMINAL_PASSWORD:-codex-mobile-dev}
+      WEB_TERMINAL_SESSION_SECRET: ${WEB_TERMINAL_SESSION_SECRET:-dev-web-terminal-session-secret}
+      WEB_TERMINAL_COOKIE_SECURE: ${WEB_TERMINAL_COOKIE_SECURE:-0}
+      TERMINAL_SERVER_HTTP_URL: ${TERMINAL_SERVER_HTTP_URL:-http://terminal-server:4020}
+      TERMINAL_SERVER_WS_URL: ${TERMINAL_SERVER_WS_URL:-ws://localhost:4020/ws}
+    depends_on:
+      - terminal-server
+    ports:
+      - "3032:3000"

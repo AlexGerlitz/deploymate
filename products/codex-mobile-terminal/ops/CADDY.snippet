@@ -1,0 +1,7 @@
+# Example route for Web Terminal.
+# Keep this sidecar separate from the main DeployMate UI until it is proven stable.
+
+terminal2.deploymatecloud.ru {
+	encode gzip zstd
+	reverse_proxy terminal-web:3000
+}
