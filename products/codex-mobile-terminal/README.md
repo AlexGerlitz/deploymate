@@ -67,6 +67,18 @@ Current required variables:
 - `TERMINAL_SERVER_HTTP_URL`
 - `TERMINAL_SERVER_WS_URL`
 
+Optional production VPN wrapper variables:
+
+- `WEB_TERMINAL_VPN_ENABLE`
+- `WEB_TERMINAL_VPN_BOOTSTRAP_SCRIPT`
+- `WEB_TERMINAL_VPN_TEARDOWN_SCRIPT`
+- `WEB_TERMINAL_VPN_NETWORK_TEST_HOST`
+
 See the Docker-based dev wiring in [ops/docker-compose.dev.yml](/Users/alexgerlitz/deploymate/products/codex-mobile-terminal/ops/docker-compose.dev.yml) and [ops/RUNBOOK.md](/Users/alexgerlitz/deploymate/products/codex-mobile-terminal/ops/RUNBOOK.md).
+
+For production VPN bootstrap, combine the root compose files:
+
+- [docker-compose.prod.yml](/Users/alexgerlitz/deploymate/docker-compose.prod.yml)
+- [docker-compose.prod.web-terminal-vpn.yml](/Users/alexgerlitz/deploymate/docker-compose.prod.web-terminal-vpn.yml)
 
 Docker builds use the project-root workspace lockfile, so the Docker build context must stay at the project root.

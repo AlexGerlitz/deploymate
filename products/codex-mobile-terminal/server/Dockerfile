@@ -9,14 +9,18 @@ RUN apt-get update \
       ca-certificates \
       curl \
       git \
+      iproute2 \
+      iptables \
       jq \
       less \
+      openvpn \
       openssh-client \
       python3 \
       make \
       g++ \
       ripgrep \
       tmux \
+      wireguard-tools \
     && npm install -g @openai/codex \
     && mv /usr/local/bin/codex /usr/local/bin/codex-real \
     && rm -rf /var/lib/apt/lists/*
@@ -29,8 +33,9 @@ COPY server/src ./server/src
 COPY server/bashrc /root/.bashrc
 COPY server/tmux.conf /root/.tmux.conf
 COPY server/codex-wrapper.sh /usr/local/bin/codex
+COPY server/start-server.sh /usr/local/bin/start-web-terminal-server
 
-RUN chmod +x /usr/local/bin/codex
+RUN chmod +x /usr/local/bin/codex /usr/local/bin/start-web-terminal-server
 
 ENV PORT=4020
 ENV HOST=0.0.0.0
@@ -42,4 +47,4 @@ WORKDIR /app/server
 
 EXPOSE 4020
 
-CMD ["npm", "run", "start"]
+ENTRYPOINT ["/usr/local/bin/start-web-terminal-server"]

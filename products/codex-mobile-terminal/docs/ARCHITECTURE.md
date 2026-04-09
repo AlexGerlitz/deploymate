@@ -28,6 +28,7 @@ The server owns:
 - tmux attach or create
 - resize events
 - safe helper actions
+- optional VPN bootstrap for private-network terminal access
 
 The browser never talks to tmux or shell processes directly.
 
@@ -51,3 +52,15 @@ Planned server-side paths:
 - app config
 
 Exact paths will be fixed during deploy wiring.
+
+## VPN Wrapper
+
+Production deploys may attach the terminal bridge to a private network before the
+PTY runtime starts.
+
+The bridge supports:
+
+- optional bootstrap hook before Node starts
+- optional teardown hook on container exit
+- dedicated `/vpn` mount for private config and helper scripts
+- container capabilities for `/dev/net/tun` and `NET_ADMIN`

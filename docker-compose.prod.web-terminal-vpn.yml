@@ -1,0 +1,13 @@
+services:
+  codex-mobile-terminal-server:
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      WEB_TERMINAL_VPN_ENABLE: ${WEB_TERMINAL_VPN_ENABLE:-0}
+      WEB_TERMINAL_VPN_BOOTSTRAP_SCRIPT: ${WEB_TERMINAL_VPN_BOOTSTRAP_SCRIPT:-/vpn/bootstrap.sh}
+      WEB_TERMINAL_VPN_TEARDOWN_SCRIPT: ${WEB_TERMINAL_VPN_TEARDOWN_SCRIPT:-/vpn/teardown.sh}
+      WEB_TERMINAL_VPN_NETWORK_TEST_HOST: ${WEB_TERMINAL_VPN_NETWORK_TEST_HOST:-}
+    volumes:
+      - /opt/codex-mobile-terminal-data/vpn:/vpn

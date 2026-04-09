@@ -10,6 +10,7 @@ Current responsibilities:
 - tmux attach or create
 - resize handling
 - helper session status endpoint
+- optional VPN bootstrap before the terminal runtime starts
 
 Current endpoints:
 

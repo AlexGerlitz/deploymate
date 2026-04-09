@@ -39,3 +39,17 @@ Use `TERMINAL_SERVER_WS_URL` for the websocket bridge in local Docker mode.
 
 - do not point the new sidecar at the live terminal domain yet
 - keep server-side `.codex` persistence on its dedicated sidecar path
+
+## Production VPN Wrapper
+
+The bridge container can bootstrap a private-network tunnel before the terminal
+runtime starts.
+
+Expected production shape:
+
+- use the root override file [docker-compose.prod.web-terminal-vpn.yml](/Users/alexgerlitz/deploymate/docker-compose.prod.web-terminal-vpn.yml)
+- mount VPN assets into `/vpn`
+- set `WEB_TERMINAL_VPN_ENABLE=1`
+- provide an executable `/vpn/bootstrap.sh`
+- optionally provide `/vpn/teardown.sh`
+- optionally set `WEB_TERMINAL_VPN_NETWORK_TEST_HOST` for a post-bootstrap reachability check

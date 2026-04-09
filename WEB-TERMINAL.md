@@ -33,10 +33,13 @@ It is a maintenance tool for working with Codex, tmux, git, and the checked-out 
 - current live bridge service: `codex-mobile-terminal-server`
 - current live product shape: `Codex Mobile Console` as the main screen, raw terminal as advanced mode
 - current live runtime: DOM-first console + `xterm.js` fallback + websocket bridge + `tmux`
+- production network wrapper: optional VPN bootstrap inside the bridge container before PTY startup
 - terminal session: `tmux new-session -A -s codex-mobile`
 - mounted workspace inside container: `/workspace` -> `/opt/deploymate`
 - persistent Codex auth dir on server: `/opt/codex-mobile-terminal-data/root-dot-codex`
+- optional VPN assets dir on server: `/opt/codex-mobile-terminal-data/vpn`
 - reproducible local build config: [products/codex-mobile-terminal](/Users/alexgerlitz/deploymate/products/codex-mobile-terminal)
+- optional prod VPN override: [docker-compose.prod.web-terminal-vpn.yml](/Users/alexgerlitz/deploymate/docker-compose.prod.web-terminal-vpn.yml)
 
 ## iPhone Profile
 
