@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
+COPY scripts ./scripts
 RUN npm ci --workspace apps/web
 
 FROM public.ecr.aws/docker/library/node:22-alpine AS builder
