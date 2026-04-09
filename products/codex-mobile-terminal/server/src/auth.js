@@ -6,6 +6,26 @@ function getSignature(value, secret) {
   return createHmac("sha256", secret).update(value).digest("hex");
 }
 
+function normalizeCookieValue(value) {
+  let normalized = String(value || "").trim();
+
+  if (
+    normalized.length >= 2 &&
+    normalized.startsWith("\"") &&
+    normalized.endsWith("\"")
+  ) {
+    normalized = normalized.slice(1, -1);
+  }
+
+  try {
+    normalized = decodeURIComponent(normalized);
+  } catch {
+    // Keep the raw value when the client sends a non-standard cookie encoding.
+  }
+
+  return normalized;
+}
+
 function parseCookies(cookieHeader) {
   const cookies = new Map();
 
@@ -15,7 +35,10 @@ function parseCookies(cookieHeader) {
       continue;
     }
 
-    cookies.set(entry.slice(0, separator).trim(), decodeURIComponent(entry.slice(separator + 1).trim()));
+    cookies.set(
+      entry.slice(0, separator).trim(),
+      normalizeCookieValue(entry.slice(separator + 1))
+    );
   }
 
   return cookies;
