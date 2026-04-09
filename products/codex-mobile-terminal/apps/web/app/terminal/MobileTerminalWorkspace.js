@@ -122,6 +122,7 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
   const [status, setStatus] = useState("Connecting");
   const [notice, setNotice] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
+  const [sending, setSending] = useState(false);
   const outputRef = useRef(null);
   const inputRef = useRef(null);
   const socketRef = useRef(null);
@@ -158,6 +159,40 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
 
     output.scrollTop = output.scrollHeight;
   }, [lines, autoScroll]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refresh() {
+      try {
+        const response = await fetch("/api/console", {
+          cache: "no-store"
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "console_unavailable");
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setLines(payload.console.lines || []);
+      } catch (error) {
+        if (!cancelled) {
+          setNotice(error instanceof Error ? error.message : "Console unavailable");
+        }
+      }
+    }
+
+    const timer = window.setInterval(refresh, 1500);
+    refresh();
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,27 +279,43 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
     };
   }, [bridgeWsUrl]);
 
-  function sendRaw(input) {
-    if (!input) {
+  async function sendInput(input, successNotice = "") {
+    if (!input || sending) {
       return;
     }
 
-    if (socketRef.current?.readyState !== WebSocket.OPEN) {
-      setNotice("Connection is recovering. Try again in a moment.");
-      return;
+    setSending(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/console/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8"
+        },
+        body: JSON.stringify({ input })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "send_failed");
+      }
+      if (successNotice) {
+        setNotice(successNotice);
+      }
+      inputRef.current?.focus();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Send failed");
+    } finally {
+      setSending(false);
     }
-
-    socketRef.current.send(JSON.stringify({ type: "input", data: input }));
-    inputRef.current?.focus();
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     if (!draft.trim()) {
       return;
     }
 
-    sendRaw(`${draft}\n`);
+    await sendInput(`${draft}\n`);
     setDraft("");
   }
 
@@ -324,7 +375,8 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
                 <button
                   className="console-action-button"
                   key={action.label}
-                  onClick={() => sendRaw(action.input)}
+                  disabled={sending}
+                  onClick={() => sendInput(action.input)}
                   type="button"
                 >
                   {action.label}
@@ -354,6 +406,7 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
       <form className="console-composer console-composer--terminal" onSubmit={handleSubmit}>
         <input
           className="console-input"
+          disabled={sending}
           enterKeyHint="send"
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Write to terminal"
@@ -362,8 +415,8 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
           type="text"
           value={draft}
         />
-        <button className="console-submit" type="submit">
-          Send
+        <button className="console-submit" disabled={sending} type="submit">
+          {sending ? "..." : "Send"}
         </button>
       </form>
 
