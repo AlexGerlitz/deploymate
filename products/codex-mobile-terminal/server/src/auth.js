@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const SESSION_COOKIE = "cmt_session";
 
@@ -45,36 +45,89 @@ function parseCookies(cookieHeader) {
   return cookies;
 }
 
-function isValidToken(token, secret) {
-  if (!token || !secret) {
-    return false;
+function inspectToken(token, secret) {
+  const normalized = normalizeCookieValue(token);
+
+  if (!normalized || !secret) {
+    return { ok: false, reason: "missing" };
   }
 
-  const separator = token.lastIndexOf(".");
+  const separator = normalized.lastIndexOf(".");
   if (separator <= 0) {
-    return false;
+    return {
+      ok: false,
+      reason: "missing_separator",
+      length: normalized.length,
+      digest: createHash("sha256").update(normalized).digest("hex").slice(0, 12)
+    };
   }
 
-  const payload = token.slice(0, separator);
-  const signature = token.slice(separator + 1);
+  const payload = normalized.slice(0, separator);
+  const signature = normalized.slice(separator + 1);
   const expected = getSignature(payload, secret);
 
   const actualBuffer = Buffer.from(signature, "utf8");
   const expectedBuffer = Buffer.from(expected, "utf8");
   if (actualBuffer.length !== expectedBuffer.length) {
-    return false;
+    return {
+      ok: false,
+      reason: "signature_length_mismatch",
+      length: normalized.length,
+      digest: createHash("sha256").update(normalized).digest("hex").slice(0, 12)
+    };
   }
 
   if (!timingSafeEqual(actualBuffer, expectedBuffer)) {
-    return false;
+    return {
+      ok: false,
+      reason: "signature_mismatch",
+      length: normalized.length,
+      digest: createHash("sha256").update(normalized).digest("hex").slice(0, 12)
+    };
   }
 
   try {
     const decoded = Buffer.from(payload, "base64url").toString("utf8");
-    return decoded.includes(":");
+    if (!decoded.includes(":")) {
+      return {
+        ok: false,
+        reason: "payload_invalid",
+        length: normalized.length,
+        digest: createHash("sha256").update(normalized).digest("hex").slice(0, 12)
+      };
+    }
+
+    return {
+      ok: true,
+      reason: "ok",
+      length: normalized.length,
+      digest: createHash("sha256").update(normalized).digest("hex").slice(0, 12)
+    };
   } catch {
-    return false;
+    return {
+      ok: false,
+      reason: "payload_decode_failed",
+      length: normalized.length,
+      digest: createHash("sha256").update(normalized).digest("hex").slice(0, 12)
+    };
   }
+}
+
+function isValidToken(token, secret) {
+  return inspectToken(token, secret).ok;
+}
+
+export function getCookieDebugInfo(cookieHeader) {
+  const secret = process.env.WEB_TERMINAL_SESSION_SECRET || "";
+  const cookies = parseCookies(cookieHeader);
+  const names = [...cookies.keys()];
+  const tokens = cookies.get(SESSION_COOKIE) || [];
+
+  return {
+    cookieNames: names,
+    sessionCookieCount: tokens.length,
+    sessionCookieDebug: tokens.map((token) => inspectToken(token, secret))
+  };
 }
 
 export function isAuthorizedCookie(cookieHeader) {

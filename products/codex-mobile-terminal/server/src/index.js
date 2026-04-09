@@ -1,6 +1,6 @@
 import http from "node:http";
 import { WebSocketServer } from "ws";
-import { isAuthorizedCookie } from "./auth.js";
+import { getCookieDebugInfo, isAuthorizedCookie } from "./auth.js";
 import { SessionManager } from "./session-manager.js";
 
 const PORT = Number(process.env.PORT || 4020);
@@ -223,7 +223,8 @@ server.on("upgrade", (request, socket, head) => {
       path: url.pathname,
       remoteAddress,
       userAgent,
-      hasCookie: Boolean(request.headers.cookie)
+      hasCookie: Boolean(request.headers.cookie),
+      ...getCookieDebugInfo(request.headers.cookie || "")
     });
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();
