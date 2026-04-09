@@ -27,6 +27,7 @@ RUN apt-get update \
 
 COPY package.json package-lock.json ./
 COPY server/package.json server/package.json
+COPY scripts ./scripts
 RUN npm ci --workspace server
 
 COPY server/src ./server/src
