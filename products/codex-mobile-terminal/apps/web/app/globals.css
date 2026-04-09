@@ -285,10 +285,15 @@ body:has(.terminal-shell--fullscreen) {
 
 .terminal-frame--fullscreen {
   position: absolute;
-  inset: 0;
+  inset: 0 0 var(--terminal-dock-height) 0;
   width: 100%;
-  height: 100%;
   overflow: hidden;
+  transition: inset 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.terminal-shell--fullscreen[data-keyboard="open"] .terminal-frame--fullscreen,
+.terminal-shell--fullscreen[data-composer="open"] .terminal-frame--fullscreen {
+  inset: 0 0 calc(var(--keyboard-offset) + 64px) 0;
 }
 
 .terminal-auth-overlay {
@@ -435,10 +440,11 @@ body:has(.terminal-shell--fullscreen) {
 .terminal-canvas {
   height: 100%;
   width: 100%;
+  box-sizing: border-box;
   padding:
     calc(env(safe-area-inset-top, 0px) + 34px)
     0
-    calc(var(--terminal-dock-height) + 8px)
+    8px
     0;
   transition: padding-bottom 260ms cubic-bezier(0.22, 1, 0.36, 1);
   overflow: hidden;
@@ -446,7 +452,7 @@ body:has(.terminal-shell--fullscreen) {
 
 .terminal-shell--fullscreen[data-keyboard="open"] .terminal-canvas,
 .terminal-shell--fullscreen[data-composer="open"] .terminal-canvas {
-  padding-bottom: calc(var(--keyboard-offset) + 76px);
+  padding-bottom: 8px;
 }
 
 .terminal-canvas .xterm {
@@ -476,7 +482,9 @@ body:has(.terminal-shell--fullscreen) {
   max-width: 100vw;
   z-index: 5;
   padding: 6px 8px var(--terminal-safe-bottom);
-  background: linear-gradient(180deg, rgba(11, 14, 18, 0) 0%, rgba(11, 14, 18, 0.96) 28%);
+  background: rgba(11, 14, 18, 0.98);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -18px 36px rgba(0, 0, 0, 0.34);
   transform: translateY(0);
   transition:
     transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -492,9 +500,9 @@ body:has(.terminal-shell--fullscreen) {
 
 .terminal-shell--fullscreen[data-composer="open"] .terminal-dock,
 .terminal-shell--fullscreen[data-keyboard="open"] .terminal-dock {
-  padding-top: 0;
-  background: transparent;
-  pointer-events: none;
+  padding-top: 6px;
+  background: rgba(11, 14, 18, 0.98);
+  pointer-events: auto;
 }
 
 .terminal-shell--fullscreen[data-composer="open"] .terminal-dock > *,
@@ -533,10 +541,6 @@ body:has(.terminal-shell--fullscreen) {
   gap: 8px;
   padding-bottom: 4px;
   background: rgba(20, 26, 32, 0.94);
-}
-
-.terminal-shell--fullscreen[data-keyboard="open"] .terminal-dock {
-  background: linear-gradient(180deg, rgba(11, 14, 18, 0.1) 0%, rgba(11, 14, 18, 0.98) 20%);
 }
 
 .terminal-controls-panel {
@@ -1092,12 +1096,12 @@ body:has(.terminal-shell--fullscreen) {
 
 @media (max-width: 560px) {
   .terminal-canvas {
-    padding-bottom: calc(var(--terminal-dock-height) + 6px);
+    padding-bottom: 6px;
   }
 
   .terminal-shell--fullscreen[data-keyboard="open"] .terminal-canvas,
   .terminal-shell--fullscreen[data-composer="open"] .terminal-canvas {
-    padding-bottom: calc(var(--keyboard-offset) + 68px);
+    padding-bottom: 6px;
   }
 
   .terminal-canvas .xterm {
