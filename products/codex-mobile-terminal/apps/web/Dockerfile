@@ -37,7 +37,6 @@ COPY --from=builder /app/apps/web/.next ./apps/web/.next
 COPY --from=builder /app/apps/web/app ./apps/web/app
 COPY --from=builder /app/apps/web/middleware.js ./apps/web/middleware.js
 COPY --from=builder /app/apps/web/next.config.mjs ./apps/web/next.config.mjs
-COPY --from=builder /app/apps/web/public ./apps/web/public
 
 WORKDIR /app/apps/web
 
