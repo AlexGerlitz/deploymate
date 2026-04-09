@@ -35,6 +35,7 @@ export default function TerminalWorkspace({ bridgeWsUrl, sessionStatus }) {
   const [inputMode, setInputMode] = useState("command");
   const [inputFocused, setInputFocused] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [helperOpen, setHelperOpen] = useState(false);
   const [readableOutput, setReadableOutput] = useState({
     links: [],
     lines: []
@@ -284,6 +285,14 @@ export default function TerminalWorkspace({ bridgeWsUrl, sessionStatus }) {
     readableOutput.links.find((link) => /auth\.openai\.com\/codex\/device/i.test(link)) ||
     readableOutput.links[0] ||
     "";
+  const hasHelperContent =
+    Boolean(notice) ||
+    !connectionState.connected ||
+    Boolean(connectionState.queued) ||
+    readableOutput.links.length > 0 ||
+    readableOutput.lines.length > 0 ||
+    Boolean(latestLoginLink) ||
+    Boolean(latestDeviceCode);
 
   return (
     <main
@@ -302,6 +311,121 @@ export default function TerminalWorkspace({ bridgeWsUrl, sessionStatus }) {
           />
         </div>
       </section>
+
+      {helperOpen ? (
+        <section className="terminal-helper-sheet" role="dialog" aria-modal="true">
+          <div className="terminal-helper-sheet__header">
+            <span className="terminal-readable-title">Session Helper</span>
+            <button
+              className="terminal-helper-chip"
+              onClick={() => setHelperOpen(false)}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
+
+          {notice ? <div className="terminal-notice">{notice}</div> : null}
+
+          {!connectionState.connected || connectionState.queued ? (
+            <div className="terminal-notice">
+              {connectionState.connected
+                ? `Connected. ${connectionState.queued} queued input item(s) waiting to flush.`
+                : `Bridge state: ${connectionState.status}. ${
+                    connectionState.queued
+                      ? `${connectionState.queued} input item(s) queued for reconnect.`
+                      : "New input may queue until reconnect."
+                  }`}
+            </div>
+          ) : null}
+
+          {readableOutput.links.length || readableOutput.lines.length ? (
+            <section className="terminal-readable-panel">
+              <div className="terminal-readable-header">
+                <span className="terminal-readable-title">Recent terminal output</span>
+                {readableOutput.lines.length ? (
+                  <button
+                    className="terminal-helper-chip"
+                    onClick={() => copyText(readableOutput.lines.join("\n"), "Recent output copied")}
+                    type="button"
+                  >
+                    Copy Output
+                  </button>
+                ) : null}
+              </div>
+
+              {readableOutput.links.length ? (
+                <div className="terminal-readable-links">
+                  {readableOutput.links.map((link) => (
+                    <div className="terminal-readable-link-row" key={link}>
+                      <a
+                        className="terminal-helper-link"
+                        href={link}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {link}
+                      </a>
+                      <button
+                        className="terminal-helper-chip"
+                        onClick={() => copyText(link, "Login link copied")}
+                        type="button"
+                      >
+                        Copy Link
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {readableOutput.lines.length ? (
+                <pre className="terminal-readable-output">
+                  {readableOutput.lines.join("\n")}
+                </pre>
+              ) : null}
+            </section>
+          ) : null}
+
+          {latestLoginLink || latestDeviceCode ? (
+            <section className="terminal-readable-panel">
+              <div className="terminal-readable-header">
+                <span className="terminal-readable-title">ChatGPT Login Helper</span>
+              </div>
+              {latestLoginLink ? (
+                <div className="terminal-readable-link-row">
+                  <a
+                    className="terminal-helper-link"
+                    href={latestLoginLink}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {latestLoginLink}
+                  </a>
+                  <button
+                    className="terminal-helper-chip"
+                    onClick={() => copyText(latestLoginLink, "Login link copied")}
+                    type="button"
+                  >
+                    Copy Link
+                  </button>
+                </div>
+              ) : null}
+              {latestDeviceCode ? (
+                <div className="terminal-readable-link-row">
+                  <span className="terminal-readable-title">{latestDeviceCode}</span>
+                  <button
+                    className="terminal-helper-chip"
+                    onClick={() => copyText(latestDeviceCode, "Device code copied")}
+                    type="button"
+                  >
+                    Copy Code
+                  </button>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="terminal-dock" ref={dockRef}>
         {controlsOpen ? (
@@ -383,106 +507,6 @@ export default function TerminalWorkspace({ bridgeWsUrl, sessionStatus }) {
           </form>
         ) : null}
 
-        {notice ? <div className="terminal-notice">{notice}</div> : null}
-
-        {!connectionState.connected || connectionState.queued ? (
-          <div className="terminal-notice">
-            {connectionState.connected
-              ? `Connected. ${connectionState.queued} queued input item(s) waiting to flush.`
-              : `Bridge state: ${connectionState.status}. ${
-                  connectionState.queued
-                    ? `${connectionState.queued} input item(s) queued for reconnect.`
-                    : "New input may queue until reconnect."
-                }`}
-          </div>
-        ) : null}
-
-        {readableOutput.links.length || readableOutput.lines.length ? (
-          <section className="terminal-readable-panel">
-            <div className="terminal-readable-header">
-              <span className="terminal-readable-title">Recent terminal output</span>
-              {readableOutput.lines.length ? (
-                <button
-                  className="terminal-helper-chip"
-                  onClick={() => copyText(readableOutput.lines.join("\n"), "Recent output copied")}
-                  type="button"
-                >
-                  Copy Output
-                </button>
-              ) : null}
-            </div>
-
-            {readableOutput.links.length ? (
-              <div className="terminal-readable-links">
-                {readableOutput.links.map((link) => (
-                  <div className="terminal-readable-link-row" key={link}>
-                    <a
-                      className="terminal-helper-link"
-                      href={link}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      {link}
-                    </a>
-                    <button
-                      className="terminal-helper-chip"
-                      onClick={() => copyText(link, "Login link copied")}
-                      type="button"
-                    >
-                      Copy Link
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {readableOutput.lines.length ? (
-              <pre className="terminal-readable-output">
-                {readableOutput.lines.join("\n")}
-              </pre>
-            ) : null}
-          </section>
-        ) : null}
-
-        {latestLoginLink || latestDeviceCode ? (
-          <section className="terminal-readable-panel">
-            <div className="terminal-readable-header">
-              <span className="terminal-readable-title">ChatGPT Login Helper</span>
-            </div>
-            {latestLoginLink ? (
-              <div className="terminal-readable-link-row">
-                <a
-                  className="terminal-helper-link"
-                  href={latestLoginLink}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {latestLoginLink}
-                </a>
-                <button
-                  className="terminal-helper-chip"
-                  onClick={() => copyText(latestLoginLink, "Login link copied")}
-                  type="button"
-                >
-                  Copy Link
-                </button>
-              </div>
-            ) : null}
-            {latestDeviceCode ? (
-              <div className="terminal-readable-link-row">
-                <span className="terminal-readable-title">{latestDeviceCode}</span>
-                <button
-                  className="terminal-helper-chip"
-                  onClick={() => copyText(latestDeviceCode, "Device code copied")}
-                  type="button"
-                >
-                  Copy Code
-                </button>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
         {controlsOpen ? (
           <div className="terminal-helper-links">
             <button
@@ -509,15 +533,17 @@ export default function TerminalWorkspace({ bridgeWsUrl, sessionStatus }) {
               onClick={triggerBrowserLogin}
               type="button"
             >
-              {browserLoginLoading ? "Starting Login..." : "Login"}
-            </button>
-            <button
-              className="terminal-helper-chip"
-              onClick={triggerBrowserLogin}
-              type="button"
-            >
               {browserLoginLoading ? "Preparing..." : "Browser Login"}
             </button>
+            {hasHelperContent ? (
+              <button
+                className="terminal-helper-chip"
+                onClick={() => setHelperOpen((value) => !value)}
+                type="button"
+              >
+                {helperOpen ? "Hide Helper" : "Show Helper"}
+              </button>
+            ) : null}
             <Link className="terminal-helper-link" href="/console">
               Console
             </Link>

@@ -481,6 +481,39 @@ body:has(.terminal-shell--fullscreen) {
   touch-action: manipulation;
 }
 
+.terminal-helper-sheet {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  top: calc(env(safe-area-inset-top, 0px) + 44px);
+  bottom: calc(var(--terminal-dock-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 6;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(20, 26, 32, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(16px);
+}
+
+.terminal-helper-sheet__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 4px;
+  background: rgba(20, 26, 32, 0.94);
+}
+
 .terminal-shell--fullscreen[data-keyboard="open"] .terminal-dock {
   background: linear-gradient(180deg, rgba(11, 14, 18, 0.1) 0%, rgba(11, 14, 18, 0.98) 20%);
 }
@@ -613,7 +646,6 @@ body:has(.terminal-shell--fullscreen) {
 }
 
 .terminal-readable-panel {
-  margin-top: 6px;
   border-radius: 14px;
   padding: 10px;
   background: rgba(20, 26, 32, 0.92);
@@ -655,6 +687,7 @@ body:has(.terminal-shell--fullscreen) {
 .terminal-readable-output {
   margin: 10px 0 0;
   padding: 10px;
+  max-height: min(38vh, 280px);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   color: #eef4f7;
@@ -662,6 +695,8 @@ body:has(.terminal-shell--fullscreen) {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   user-select: text;
   -webkit-user-select: text;
 }
@@ -1041,6 +1076,15 @@ body:has(.terminal-shell--fullscreen) {
 
   .terminal-compose-sheet {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .terminal-helper-sheet {
+    left: 6px;
+    right: 6px;
+    top: calc(env(safe-area-inset-top, 0px) + 38px);
+    bottom: calc(var(--terminal-dock-height) + env(safe-area-inset-bottom, 0px) + 8px);
+    padding: 8px;
+    border-radius: 16px;
   }
 
   .console-shell {
