@@ -8,6 +8,17 @@ const HOST = process.env.HOST || "0.0.0.0";
 
 const sessionManager = new SessionManager();
 
+function wsLog(event, details = {}) {
+  console.log(
+    JSON.stringify({
+      scope: "web-terminal-ws",
+      event,
+      ts: new Date().toISOString(),
+      ...details
+    })
+  );
+}
+
 function json(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -193,25 +204,48 @@ const wss = new WebSocketServer({ noServer: true });
 
 server.on("upgrade", (request, socket, head) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+  const remoteAddress = socket.remoteAddress || "";
+  const userAgent = request.headers["user-agent"] || "";
 
   if (url.pathname !== "/ws") {
+    wsLog("reject-path", {
+      path: url.pathname,
+      remoteAddress,
+      userAgent
+    });
     socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
     socket.destroy();
     return;
   }
 
   if (!isAuthorizedCookie(request.headers.cookie || "")) {
+    wsLog("reject-auth", {
+      path: url.pathname,
+      remoteAddress,
+      userAgent,
+      hasCookie: Boolean(request.headers.cookie)
+    });
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();
     return;
   }
 
   wss.handleUpgrade(request, socket, head, (ws) => {
+    ws._meta = {
+      remoteAddress,
+      userAgent
+    };
     wss.emit("connection", ws, request);
   });
 });
 
 wss.on("connection", (ws) => {
+  wsLog("open", {
+    remoteAddress: ws._meta?.remoteAddress || "",
+    userAgent: ws._meta?.userAgent || "",
+    clients: sessionManager.getStatus().connectedClients + 1
+  });
+
   try {
     sessionManager.attachClient(ws);
   } catch (error) {
@@ -259,7 +293,15 @@ wss.on("connection", (ws) => {
     }
   });
 
-  ws.on("close", () => {
+  ws.on("close", (code, reasonBuffer) => {
+    const reason =
+      typeof reasonBuffer?.toString === "function" ? reasonBuffer.toString("utf8") : "";
+    wsLog("close", {
+      remoteAddress: ws._meta?.remoteAddress || "",
+      userAgent: ws._meta?.userAgent || "",
+      code,
+      reason
+    });
     sessionManager.detachClient(ws);
   });
 });
