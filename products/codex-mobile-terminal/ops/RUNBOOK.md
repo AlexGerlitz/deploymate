@@ -45,6 +45,10 @@ Use `TERMINAL_SERVER_WS_URL` for the websocket bridge in local Docker mode.
 The bridge container can bootstrap a private-network tunnel before the terminal
 runtime starts.
 
+The current production profile may also route bridge traffic through a local HTTP
+proxy bridge, for example `172.18.0.1:8118`, using the `WEB_TERMINAL_*_PROXY`
+variables from the root VPN override compose file.
+
 Expected production shape:
 
 - use the root override file [docker-compose.prod.web-terminal-vpn.yml](/Users/alexgerlitz/deploymate/docker-compose.prod.web-terminal-vpn.yml)

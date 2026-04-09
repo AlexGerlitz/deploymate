@@ -73,6 +73,10 @@ Optional production VPN wrapper variables:
 - `WEB_TERMINAL_VPN_BOOTSTRAP_SCRIPT`
 - `WEB_TERMINAL_VPN_TEARDOWN_SCRIPT`
 - `WEB_TERMINAL_VPN_NETWORK_TEST_HOST`
+- `WEB_TERMINAL_ALL_PROXY`
+- `WEB_TERMINAL_HTTP_PROXY`
+- `WEB_TERMINAL_HTTPS_PROXY`
+- `WEB_TERMINAL_NO_PROXY`
 
 See the Docker-based dev wiring in [ops/docker-compose.dev.yml](/Users/alexgerlitz/deploymate/products/codex-mobile-terminal/ops/docker-compose.dev.yml) and [ops/RUNBOOK.md](/Users/alexgerlitz/deploymate/products/codex-mobile-terminal/ops/RUNBOOK.md).
 
