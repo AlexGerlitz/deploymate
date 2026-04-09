@@ -129,6 +129,10 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
   const reconnectTimerRef = useRef(null);
 
   const blocks = useMemo(() => buildBlocks(lines), [lines]);
+  const codexTuiActive = useMemo(() => {
+    const recent = lines.slice(-80).join("\n");
+    return /OpenAI Codex \(v/i.test(recent) || /Would you like to run the following command\?/i.test(recent);
+  }, [lines]);
 
   useEffect(() => {
     const output = outputRef.current;
@@ -279,8 +283,26 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
     };
   }, [bridgeWsUrl]);
 
+  function sendViaSocket(input) {
+    if (!input) {
+      return false;
+    }
+
+    if (socketRef.current?.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    socketRef.current.send(JSON.stringify({ type: "input", data: input }));
+    inputRef.current?.focus();
+    return true;
+  }
+
   async function sendInput(input, successNotice = "") {
     if (!input || sending) {
+      return;
+    }
+
+    if (codexTuiActive && sendViaSocket(input)) {
       return;
     }
 
@@ -296,6 +318,9 @@ export default function MobileTerminalWorkspace({ bridgeWsUrl, sessionStatus }) 
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
+        if (payload?.error === "codex_tui_active_open_terminal" && sendViaSocket(input)) {
+          return;
+        }
         throw new Error(payload.error || "send_failed");
       }
       if (successNotice) {
