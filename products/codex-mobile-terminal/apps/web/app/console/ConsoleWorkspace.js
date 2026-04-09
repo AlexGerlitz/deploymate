@@ -142,6 +142,15 @@ function detectCodexTui(lines) {
   return /OpenAI Codex \(v/i.test(recent) || /model:\s+gpt-/i.test(recent);
 }
 
+function formatSessionStartTime(value) {
+  if (!value) {
+    return "Now";
+  }
+
+  const match = value.match(/T(\d{2}:\d{2}:\d{2})/);
+  return match ? match[1] : "Now";
+}
+
 export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionStatus }) {
   const [lines, setLines] = useState(initialConsole?.lines || []);
   const [version, setVersion] = useState(initialConsole?.version || 0);
@@ -438,7 +447,7 @@ export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionS
           Model: {sessionSummary.modelHint || "GPT-5.4 ready"}
         </span>
         <span className="console-meta-chip">
-          Started: {createdAt ? new Date(createdAt).toLocaleTimeString() : "Now"}
+          Started: {formatSessionStartTime(createdAt)}
         </span>
       </section>
 
