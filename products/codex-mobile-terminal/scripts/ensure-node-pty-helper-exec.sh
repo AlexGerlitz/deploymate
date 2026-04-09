@@ -1,13 +1,13 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-set -euo pipefail
+set -eu
 
 helper="node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper"
 
-if [[ "$(uname -s)" != "Darwin" ]]; then
+if [ "$(uname -s)" != "Darwin" ]; then
   exit 0
 fi
 
-if [[ -f "$helper" ]]; then
+if [ -f "$helper" ]; then
   chmod +x "$helper"
 fi
