@@ -35,22 +35,21 @@ function parseCookies(cookieHeader) {
       continue;
     }
 
-    cookies.set(
-      entry.slice(0, separator).trim(),
-      normalizeCookieValue(entry.slice(separator + 1))
-    );
+    const name = entry.slice(0, separator).trim();
+    const value = normalizeCookieValue(entry.slice(separator + 1));
+    const existing = cookies.get(name) || [];
+    existing.push(value);
+    cookies.set(name, existing);
   }
 
   return cookies;
 }
 
-export function isAuthorizedCookie(cookieHeader) {
-  const secret = process.env.WEB_TERMINAL_SESSION_SECRET || "";
-  if (!secret) {
+function isValidToken(token, secret) {
+  if (!token || !secret) {
     return false;
   }
 
-  const token = parseCookies(cookieHeader).get(SESSION_COOKIE) || "";
   const separator = token.lastIndexOf(".");
   if (separator <= 0) {
     return false;
@@ -76,4 +75,14 @@ export function isAuthorizedCookie(cookieHeader) {
   } catch {
     return false;
   }
+}
+
+export function isAuthorizedCookie(cookieHeader) {
+  const secret = process.env.WEB_TERMINAL_SESSION_SECRET || "";
+  if (!secret) {
+    return false;
+  }
+
+  const tokens = parseCookies(cookieHeader).get(SESSION_COOKIE) || [];
+  return tokens.some((token) => isValidToken(token, secret));
 }
