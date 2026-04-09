@@ -270,6 +270,8 @@ body:has(.terminal-shell--fullscreen) {
 .terminal-shell--fullscreen {
   position: fixed;
   inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   width: 100vw;
   height: 100svh;
   height: 100dvh;
@@ -284,16 +286,10 @@ body:has(.terminal-shell--fullscreen) {
 }
 
 .terminal-frame--fullscreen {
-  position: absolute;
-  inset: 0 0 var(--terminal-dock-height) 0;
+  position: relative;
+  min-height: 0;
   width: 100%;
   overflow: hidden;
-  transition: inset 260ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.terminal-shell--fullscreen[data-keyboard="open"] .terminal-frame--fullscreen,
-.terminal-shell--fullscreen[data-composer="open"] .terminal-frame--fullscreen {
-  inset: 0 0 calc(var(--keyboard-offset) + 64px) 0;
 }
 
 .terminal-auth-overlay {
@@ -469,15 +465,18 @@ body:has(.terminal-shell--fullscreen) {
 }
 
 .terminal-canvas .xterm-screen,
+.terminal-canvas .xterm-helpers,
+.terminal-canvas .xterm-helper-textarea {
+  pointer-events: none !important;
+}
+
+.terminal-canvas .xterm-screen,
 .terminal-canvas .xterm-rows {
   max-width: 100% !important;
 }
 
 .terminal-dock {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   width: 100%;
   max-width: 100vw;
   z-index: 5;
@@ -511,7 +510,7 @@ body:has(.terminal-shell--fullscreen) {
 }
 
 .terminal-helper-sheet {
-  position: fixed;
+  position: absolute;
   left: 8px;
   right: 8px;
   top: calc(env(safe-area-inset-top, 0px) + 44px);
@@ -601,7 +600,7 @@ body:has(.terminal-shell--fullscreen) {
 }
 
 .terminal-compose-sheet {
-  position: fixed;
+  position: absolute;
   left: 8px;
   right: 8px;
   bottom: calc(var(--keyboard-offset) + env(safe-area-inset-bottom, 0px) + 8px);

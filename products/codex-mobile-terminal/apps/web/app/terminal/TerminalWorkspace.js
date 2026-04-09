@@ -54,25 +54,19 @@ export default function TerminalWorkspace({ bridgeWsUrl, sessionStatus }) {
       htmlOverflow: html.style.overflow,
       htmlHeight: html.style.height,
       bodyOverflow: body.style.overflow,
-      bodyHeight: body.style.height,
-      bodyPosition: body.style.position,
-      bodyWidth: body.style.width
+      bodyHeight: body.style.height
     };
 
     html.style.overflow = "hidden";
     html.style.height = "100%";
     body.style.overflow = "hidden";
     body.style.height = "100%";
-    body.style.position = "fixed";
-    body.style.width = "100%";
 
     return () => {
       html.style.overflow = previous.htmlOverflow;
       html.style.height = previous.htmlHeight;
       body.style.overflow = previous.bodyOverflow;
       body.style.height = previous.bodyHeight;
-      body.style.position = previous.bodyPosition;
-      body.style.width = previous.bodyWidth;
     };
   }, []);
 
@@ -102,6 +96,7 @@ export default function TerminalWorkspace({ bridgeWsUrl, sessionStatus }) {
 
       shell.dataset.keyboard = isKeyboardOpen ? "open" : "closed";
       shell.dataset.composer = composerOpen ? "open" : "closed";
+      shell.style.height = `${Math.round(viewport.height)}px`;
       shell.style.setProperty("--keyboard-offset", `${Math.max(0, keyboardHeight)}px`);
       shell.style.setProperty("--terminal-safe-bottom", "calc(env(safe-area-inset-bottom, 0px) + 8px)");
       setKeyboardOpen(isKeyboardOpen);
