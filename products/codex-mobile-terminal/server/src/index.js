@@ -240,6 +240,15 @@ wss.on("connection", (ws) => {
       ) {
         sessionManager.resize(Number(message.cols), Number(message.rows));
       }
+
+      if (message.type === "ping") {
+        ws.send(
+          JSON.stringify({
+            type: "pong",
+            ts: Date.now()
+          })
+        );
+      }
     } catch (error) {
       ws.send(
         JSON.stringify({

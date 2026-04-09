@@ -35,6 +35,9 @@ function deriveBridgeWsUrl(explicitUrl) {
   return `${protocol}//${window.location.host}/ws`;
 }
 
+const HEARTBEAT_INTERVAL_MS = 15000;
+const HEARTBEAT_TIMEOUT_MS = 45000;
+
 const TerminalSurface = forwardRef(function TerminalSurface(
   { bridgeWsUrl, onReadableOutputChange, onConnectionStateChange },
   ref
@@ -43,6 +46,8 @@ const TerminalSurface = forwardRef(function TerminalSurface(
   const xtermRef = useRef(null);
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
+  const heartbeatIntervalRef = useRef(null);
+  const heartbeatTimeoutRef = useRef(null);
   const isResettingRef = useRef(false);
   const shouldRefocusTerminalRef = useRef(false);
   const lastResizeRef = useRef({ cols: 0, rows: 0 });
@@ -264,6 +269,40 @@ const TerminalSurface = forwardRef(function TerminalSurface(
       }, delay);
     };
 
+    const clearHeartbeat = () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+
+      if (heartbeatTimeoutRef.current) {
+        clearTimeout(heartbeatTimeoutRef.current);
+        heartbeatTimeoutRef.current = null;
+      }
+    };
+
+    const markHeartbeat = () => {
+      if (heartbeatTimeoutRef.current) {
+        clearTimeout(heartbeatTimeoutRef.current);
+      }
+
+      heartbeatTimeoutRef.current = window.setTimeout(() => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.close();
+        }
+      }, HEARTBEAT_TIMEOUT_MS);
+    };
+
+    const startHeartbeat = () => {
+      clearHeartbeat();
+      markHeartbeat();
+      heartbeatIntervalRef.current = window.setInterval(() => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ type: "ping", ts: Date.now() }));
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+    };
+
     const stopMomentum = () => {
       if (touchStateRef.current.momentumFrame) {
         cancelAnimationFrame(touchStateRef.current.momentumFrame);
@@ -434,6 +473,7 @@ const TerminalSurface = forwardRef(function TerminalSurface(
         setStatus("Connected");
         setStatusTone("ok");
         publishConnectionState("Connected", true, pendingInputQueueRef.current.length);
+        startHeartbeat();
         if (shouldRefocusTerminalRef.current) {
           term.focus();
           shouldRefocusTerminalRef.current = false;
@@ -452,6 +492,11 @@ const TerminalSurface = forwardRef(function TerminalSurface(
       ws.addEventListener("message", (event) => {
         try {
           const message = JSON.parse(event.data);
+          markHeartbeat();
+
+          if (message.type === "pong") {
+            return;
+          }
 
           if (message.type === "output" && typeof message.data === "string") {
             term.write(message.data);
@@ -495,6 +540,7 @@ const TerminalSurface = forwardRef(function TerminalSurface(
       });
 
       ws.addEventListener("close", () => {
+        clearHeartbeat();
         const resetFlow = isResettingRef.current;
         setStatus(resetFlow ? "Restarting" : "Reconnecting");
         setStatusTone("muted");
@@ -508,6 +554,7 @@ const TerminalSurface = forwardRef(function TerminalSurface(
       });
 
       ws.addEventListener("error", () => {
+        clearHeartbeat();
         setStatus("Connection failed");
         setStatusTone("warn");
         publishConnectionState("Connection failed", false, pendingInputQueueRef.current.length);
@@ -523,6 +570,7 @@ const TerminalSurface = forwardRef(function TerminalSurface(
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
+      clearHeartbeat();
       if (resizeFrame) {
         cancelAnimationFrame(resizeFrame);
       }
