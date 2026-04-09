@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import MobileTerminalWorkspace from "./MobileTerminalWorkspace";
 import TerminalWorkspace from "./TerminalWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -32,10 +34,16 @@ async function getSessionStatus() {
 }
 
 export default async function TerminalPage() {
+  const userAgent = (await headers()).get("user-agent") || "";
+  const isMobileSafariLike = /iphone|ipad|ipod|android/i.test(userAgent);
   const sessionStatus = await getSessionStatus();
   const bridgeWsUrl = process.env.TERMINAL_SERVER_WS_URL || "";
 
-  return (
-    <TerminalWorkspace bridgeWsUrl={bridgeWsUrl} sessionStatus={sessionStatus} />
-  );
+  if (isMobileSafariLike) {
+    return (
+      <MobileTerminalWorkspace bridgeWsUrl={bridgeWsUrl} sessionStatus={sessionStatus} />
+    );
+  }
+
+  return <TerminalWorkspace bridgeWsUrl={bridgeWsUrl} sessionStatus={sessionStatus} />;
 }

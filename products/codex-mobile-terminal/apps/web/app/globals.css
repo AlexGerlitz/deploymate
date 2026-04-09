@@ -792,6 +792,46 @@ body:has(.terminal-shell--fullscreen) {
   gap: 12px;
 }
 
+.console-shell--terminal {
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+
+.console-shell--terminal .console-topbar h1,
+.console-shell--terminal .console-eyebrow,
+.console-shell--terminal .console-empty,
+.console-shell--terminal .console-line--body,
+.console-shell--terminal .console-line--muted {
+  color: var(--terminal-text);
+}
+
+.console-shell--terminal .console-meta-chip,
+.console-shell--terminal .console-output-card,
+.console-shell--terminal .console-composer,
+.console-shell--terminal .console-notice,
+.console-shell--terminal .console-action-button,
+.console-shell--terminal .console-link-button {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--terminal-text);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.console-shell--terminal .console-output {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.console-output--terminal {
+  padding-bottom: 18px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.console-composer--terminal {
+  position: sticky;
+  bottom: 0;
+}
+
 .console-topbar {
   display: flex;
   align-items: flex-start;
