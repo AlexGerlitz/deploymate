@@ -151,7 +151,12 @@ function formatSessionStartTime(value) {
   return match ? match[1] : "Now";
 }
 
-export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionStatus }) {
+export default function ConsoleWorkspace({
+  bridgeWsUrl,
+  initialConsole,
+  mobileSafeMode = false,
+  sessionStatus
+}) {
   const [lines, setLines] = useState(initialConsole?.lines || []);
   const [version, setVersion] = useState(initialConsole?.version || 0);
   const [active, setActive] = useState(initialConsole?.active || false);
@@ -162,7 +167,7 @@ export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionS
   const [loading, setLoading] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [connectionState, setConnectionState] = useState(
-    initialConsole?.active ? "live" : "connecting"
+    mobileSafeMode ? "polling" : initialConsole?.active ? "live" : "connecting"
   );
   const outputRef = useRef(null);
   const inputRef = useRef(null);
@@ -241,7 +246,7 @@ export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionS
         setActive(Boolean(payload.console.active));
         setCreatedAt(payload.console.createdAt || null);
         if (payload.console.active) {
-          setConnectionState("live");
+          setConnectionState(mobileSafeMode ? "polling" : "live");
         }
       } catch (error) {
         if (!cancelled) {
@@ -265,6 +270,10 @@ export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionS
   }, []);
 
   useEffect(() => {
+    if (mobileSafeMode) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     function queueReconnect() {
@@ -348,7 +357,7 @@ export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionS
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, []);
+  }, [bridgeWsUrl, mobileSafeMode]);
 
   async function sendInput(input, successNotice = "") {
     if (!input || sending || codexTuiActive) {
@@ -429,7 +438,9 @@ export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionS
                   : ""
             }`}
           >
-            {connectionState === "live"
+            {connectionState === "polling"
+              ? "Polling"
+              : connectionState === "live"
               ? "Live"
               : connectionState === "reconnecting"
                 ? "Reconnecting"
@@ -450,6 +461,16 @@ export default function ConsoleWorkspace({ bridgeWsUrl, initialConsole, sessionS
           Started: {formatSessionStartTime(createdAt)}
         </span>
       </section>
+
+      {mobileSafeMode ? (
+        <section className="console-mode-banner">
+          <strong>Mobile-safe mode is active.</strong>
+          <span>
+            iPhone uses polling here instead of a live terminal socket, so commands stay
+            stable even when Safari drops websocket sessions.
+          </span>
+        </section>
+      ) : null}
 
       {codexTuiActive ? (
         <section className="console-mode-banner">
