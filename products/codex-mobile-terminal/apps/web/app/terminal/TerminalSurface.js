@@ -60,6 +60,7 @@ const TerminalSurface = forwardRef(function TerminalSurface(
     velocity: 0,
     momentumFrame: 0
   });
+  const initialViewportSettledRef = useRef(false);
   const [status, setStatus] = useState("Connecting");
   const [statusTone, setStatusTone] = useState("muted");
   const plainTextBufferRef = useRef("");
@@ -430,6 +431,9 @@ const TerminalSurface = forwardRef(function TerminalSurface(
       terminal.loadAddon(fitAddon);
       terminal.open(terminalRef.current);
       viewport = terminalRef.current.querySelector(".xterm-viewport");
+      if (viewport) {
+        viewport.scrollTop = 0;
+      }
       scheduleSyncSize();
 
       xtermRef.current = terminal;
@@ -501,11 +505,18 @@ const TerminalSurface = forwardRef(function TerminalSurface(
           if (message.type === "output" && typeof message.data === "string") {
             term.write(message.data);
             recordPlainText(message.data);
+            if (viewport && !initialViewportSettledRef.current) {
+              viewport.scrollTop = 0;
+            }
           }
 
           if (message.type === "session-ready") {
             setStatus("Connected");
             setStatusTone("ok");
+            if (viewport && !initialViewportSettledRef.current) {
+              viewport.scrollTop = 0;
+              initialViewportSettledRef.current = true;
+            }
             if (isResettingRef.current) {
               term.writeln("\r\n[bridge] session restarted.");
               isResettingRef.current = false;

@@ -462,6 +462,8 @@ export default function TerminalWorkspace({ bridgeWsUrl, sessionStatus }) {
           <button
             className="terminal-type-button"
             onClick={() => {
+              setControlsOpen(false);
+              setHelperOpen(false);
               setComposerOpen(true);
               setTimeout(() => composerRef.current?.focus(), 10);
             }}
