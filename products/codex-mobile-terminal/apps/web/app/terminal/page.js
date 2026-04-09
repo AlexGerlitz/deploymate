@@ -1,12 +1,6 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import TerminalWorkspace from "./TerminalWorkspace";
 
 export const dynamic = "force-dynamic";
-
-function isMobileSafeUserAgent(userAgent) {
-  return /iPhone|iPad|iPod/i.test(userAgent || "");
-}
 
 async function getSessionStatus() {
   const configuredApi = process.env.TERMINAL_SERVER_HTTP_URL;
@@ -38,11 +32,6 @@ async function getSessionStatus() {
 }
 
 export default async function TerminalPage() {
-  const userAgent = (await headers()).get("user-agent") || "";
-  if (isMobileSafeUserAgent(userAgent)) {
-    redirect("/console?mobile=1");
-  }
-
   const sessionStatus = await getSessionStatus();
   const bridgeWsUrl = process.env.TERMINAL_SERVER_WS_URL || "";
 

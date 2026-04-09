@@ -1,11 +1,6 @@
-import { headers } from "next/headers";
 import ConsoleWorkspace from "./ConsoleWorkspace";
 
 export const dynamic = "force-dynamic";
-
-function isMobileSafeUserAgent(userAgent) {
-  return /iPhone|iPad|iPod/i.test(userAgent || "");
-}
 
 async function getSessionStatus() {
   const configuredApi = process.env.TERMINAL_SERVER_HTTP_URL;
@@ -78,8 +73,6 @@ async function getConsoleSnapshot() {
 }
 
 export default async function ConsolePage() {
-  const userAgent = (await headers()).get("user-agent") || "";
-  const mobileSafeMode = isMobileSafeUserAgent(userAgent);
   const [sessionStatus, consoleStatus] = await Promise.all([
     getSessionStatus(),
     getConsoleSnapshot()
@@ -90,7 +83,6 @@ export default async function ConsolePage() {
     <ConsoleWorkspace
       bridgeWsUrl={bridgeWsUrl}
       initialConsole={consoleStatus.console}
-      mobileSafeMode={mobileSafeMode}
       sessionStatus={sessionStatus}
     />
   );

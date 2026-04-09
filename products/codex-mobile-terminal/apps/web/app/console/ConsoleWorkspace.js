@@ -154,7 +154,6 @@ function formatSessionStartTime(value) {
 export default function ConsoleWorkspace({
   bridgeWsUrl,
   initialConsole,
-  mobileSafeMode = false,
   sessionStatus
 }) {
   const [lines, setLines] = useState(initialConsole?.lines || []);
@@ -167,7 +166,7 @@ export default function ConsoleWorkspace({
   const [loading, setLoading] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [connectionState, setConnectionState] = useState(
-    mobileSafeMode ? "polling" : initialConsole?.active ? "live" : "connecting"
+    initialConsole?.active ? "live" : "connecting"
   );
   const outputRef = useRef(null);
   const inputRef = useRef(null);
@@ -246,7 +245,7 @@ export default function ConsoleWorkspace({
         setActive(Boolean(payload.console.active));
         setCreatedAt(payload.console.createdAt || null);
         if (payload.console.active) {
-          setConnectionState(mobileSafeMode ? "polling" : "live");
+          setConnectionState("live");
         }
       } catch (error) {
         if (!cancelled) {
@@ -270,10 +269,6 @@ export default function ConsoleWorkspace({
   }, []);
 
   useEffect(() => {
-    if (mobileSafeMode) {
-      return undefined;
-    }
-
     let cancelled = false;
 
     function queueReconnect() {
@@ -357,7 +352,7 @@ export default function ConsoleWorkspace({
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [bridgeWsUrl, mobileSafeMode]);
+  }, [bridgeWsUrl]);
 
   async function sendInput(input, successNotice = "") {
     if (!input || sending || codexTuiActive) {
@@ -438,9 +433,7 @@ export default function ConsoleWorkspace({
                   : ""
             }`}
           >
-            {connectionState === "polling"
-              ? "Polling"
-              : connectionState === "live"
+            {connectionState === "live"
               ? "Live"
               : connectionState === "reconnecting"
                 ? "Reconnecting"
@@ -461,16 +454,6 @@ export default function ConsoleWorkspace({
           Started: {formatSessionStartTime(createdAt)}
         </span>
       </section>
-
-      {mobileSafeMode ? (
-        <section className="console-mode-banner">
-          <strong>Mobile-safe mode is active.</strong>
-          <span>
-            iPhone uses polling here instead of a live terminal socket, so commands stay
-            stable even when Safari drops websocket sessions.
-          </span>
-        </section>
-      ) : null}
 
       {codexTuiActive ? (
         <section className="console-mode-banner">
