@@ -524,9 +524,12 @@ PRs are not just ceremony here:
 
 - scripted preflight in [scripts/preflight.sh](scripts/preflight.sh)
 - runtime capability contract audit in [scripts/runtime_capability_audit.sh](scripts/runtime_capability_audit.sh)
+- production env security audit in [scripts/production_env_audit.sh](scripts/production_env_audit.sh)
+- dedicated CI/manual workflow contract gate in [scripts/production_contract_gate.sh](scripts/production_contract_gate.sh)
 - scripted local release gate in [scripts/release_workflow.sh](scripts/release_workflow.sh)
 - scripted remote release helper in [scripts/remote_release.sh](scripts/remote_release.sh), with branch plus exact commit deployment support
 - GitHub Actions CI runs the same local release gate on `develop` pushes and pull requests
+- GitHub Actions CI now also runs a dedicated production-contract job on every PR and push, even when the normal deploy surface resolves to `skip`
 - GitHub Actions staging workflow can auto-promote successful `develop` builds into a staging environment
 - GitHub Actions manual release workflow can run the remote release helper against a configured host
 - GitHub Actions staging and production releases now pin the exact checked-out commit SHA during remote deploy instead of relying on branch drift alone
@@ -546,6 +549,7 @@ PRs are not just ceremony here:
 - backend local Docker execution is now explicit opt-in; remote-only is the default runtime posture
 - operations overview now exposes backend runtime capability posture, including local Docker, SSH trust mode, and credential-key readiness
 - preflight and security audit now check that production frontend and backend local-runtime flags stay aligned
+- preflight and remote release now also fail on insecure production env overrides such as memory-backed auth throttling, non-strict SSH trust, placeholder admin passwords, or missing pinned `known_hosts`
 - the local release gate now runs auth, admin, admin-interactions, ops, restore, runtime, servers, and templates frontend smokes before build
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)
@@ -616,6 +620,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 DEPLOYMATE_BASE_URL=https://your-domain DEPLOYMATE_ADMIN_USERNAME=admin DEPLOYMATE_ADMIN_PASSWORD='<secret>' bash scripts/post_deploy_smoke.sh
 ```
 
+`./scripts/preflight.sh` now includes both the runtime capability audit and the production env security audit. `bash scripts/remote_release.sh ...` now runs the same checks on the target host before it calls `docker compose up`. The GitHub CI and manual release workflows also run `bash scripts/production_contract_gate.sh` before they touch a remote host.
+
 Or use the single remote helper for prod-like or staging-like deploys:
 
 ```bash
@@ -641,11 +647,15 @@ Current strengths:
 - server SSH credentials are encrypted at rest when persisted by the application
 - admin audit trail exists for user and upgrade actions
 - restore flow is dry-run only
-- SSH host key checking now defaults to `accept-new` instead of `no`
+- SSH host key checking now defaults to strict pinned verification
 - SSH host key behavior is configurable through environment variables
+- strict SSH mode fails fast unless a real non-empty `known_hosts` file is configured
+- bootstrap `admin/admin` is refused unless local-only insecure bootstrap is explicitly acknowledged
+- auth throttling can use shared database-backed state across workers and restarts
 - production now defaults to a remote-only profile without Docker socket access in the backend
 - the production frontend can be built with local deployment controls disabled to match the backend capability boundary
 - production checks now fail if `.env.production` leaves backend local-runtime policy and frontend deployment controls out of sync
+- production checks now also fail on insecure env overrides before release or remote rebuild starts
 
 Current tradeoffs:
 
@@ -675,7 +685,7 @@ Next likely improvements:
 
 1. move server credentials to external secret management
 2. split local Docker execution into a narrower executor boundary
-3. move from `accept-new` to a stricter pinned known-host workflow
+3. add first-class known-host management and fingerprint review inside the product
 4. deepen automated smoke coverage around deployment runtime flows
 
 Longer-term direction: see [ROADMAP.md](ROADMAP.md).

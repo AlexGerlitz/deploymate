@@ -14,6 +14,7 @@ automation_backend_fast_safety_tests_lines() {
   cat <<'EOF'
 backend.tests.test_auth_security
 backend.tests.test_ops_api_flow
+backend.tests.test_production_env_audit
 backend.tests.test_restore_dry_run
 backend.tests.test_server_credentials_policy
 EOF
@@ -93,6 +94,11 @@ automation_backend_test_targets_for_path() {
       printf '%s\n' backend.tests.test_server_credentials
       printf '%s\n' backend.tests.test_server_credentials_policy
       ;;
+    docker-compose.prod.yml|.env.production.example|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/preflight.sh|scripts/remote_release.sh)
+      printf '%s\n' backend.tests.test_auth_security
+      printf '%s\n' backend.tests.test_deployment_ssh_options
+      printf '%s\n' backend.tests.test_production_env_audit
+      ;;
     backend/app/db.py|backend/app/main.py|backend/app/schemas.py)
       cat <<'EOF'
 backend.tests.test_admin_api_flow
@@ -102,6 +108,7 @@ backend.tests.test_deployment_api_flow
 backend.tests.test_deployment_routes
 backend.tests.test_local_runtime_policy
 backend.tests.test_ops_api_flow
+backend.tests.test_production_env_audit
 backend.tests.test_restore_dry_run
 backend.tests.test_server_api_flow
 backend.tests.test_server_credentials
@@ -123,7 +130,7 @@ automation_frontend_fast_scope_for_path() {
     frontend/*)
       printf 'frontend\n'
       ;;
-    frontend/Dockerfile|docker-compose.yml|docker-compose.prod.yml|deploy/*|infra/*|scripts/release_workflow.sh|scripts/preflight.sh|scripts/remote_release.sh|scripts/post_deploy_smoke.sh)
+    frontend/Dockerfile|docker-compose.yml|docker-compose.prod.yml|deploy/*|infra/*|scripts/release_workflow.sh|scripts/preflight.sh|scripts/remote_release.sh|scripts/post_deploy_smoke.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh)
       printf 'frontend_delivery_contract\n'
       ;;
     .github/*|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|NOTICE|COMMERCIAL-LICENSE.md|docs/*|backend/*)
@@ -141,7 +148,7 @@ automation_backend_fast_scope_for_path() {
     backend/*)
       printf 'backend\n'
       ;;
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh|scripts/post_deploy_smoke.sh)
+    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh|scripts/post_deploy_smoke.sh)
       printf 'backend_release_contract\n'
       ;;
     .github/*|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|NOTICE|COMMERCIAL-LICENSE.md|docs/*|frontend/*)
@@ -156,7 +163,7 @@ automation_backend_fast_scope_for_path() {
 automation_runtime_audit_scope_for_path() {
   local path="$1"
   case "$path" in
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|backend/app/services/runtime_executors.py|scripts/runtime_capability_audit.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh)
+    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|backend/app/services/runtime_executors.py|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh)
       printf 'runtime_contract\n'
       ;;
     *)
@@ -177,7 +184,7 @@ automation_backend_syntax_scope_for_path() {
     backend/*)
       printf 'backend_non_python\n'
       ;;
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|deploy/*|infra/*|scripts/preflight.sh|scripts/release_workflow.sh|scripts/dev_verify_changed.sh)
+    docker-compose.yml|docker-compose.prod.yml|.env.production.example|deploy/*|infra/*|scripts/preflight.sh|scripts/release_workflow.sh|scripts/dev_verify_changed.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh)
       printf 'backend_release_contract\n'
       ;;
     *)
@@ -189,13 +196,13 @@ automation_backend_syntax_scope_for_path() {
 automation_security_scope_for_path() {
   local path="$1"
   case "$path" in
-    .github/*|RUNBOOK.md|SAFE-RELEASE.md|scripts/release_workflow.sh|scripts/release_workflow_audit.sh|scripts/remote_release.sh|scripts/preflight.sh|scripts/security_audit.sh|scripts/dev_fast_check.sh|scripts/dev_verify_changed.sh|scripts/derive_local_fast_context.sh)
+    .github/*|RUNBOOK.md|SAFE-RELEASE.md|scripts/release_workflow.sh|scripts/release_workflow_audit.sh|scripts/remote_release.sh|scripts/preflight.sh|scripts/security_audit.sh|scripts/production_contract_gate.sh|scripts/dev_fast_check.sh|scripts/dev_verify_changed.sh|scripts/derive_local_fast_context.sh)
       printf 'release_workflow_contract\n'
       ;;
     backend/app/db.py|backend/app/routes/servers.py|backend/app/routes/ops.py|backend/app/services/server_credentials.py|backend/app/services/runtime_executors.py|backend/tests/test_server_credentials.py|backend/tests/test_server_credentials_policy.py|scripts/server_credentials_audit.sh)
       printf 'server_credentials_contract\n'
       ;;
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/local_runtime_audit.sh|scripts/post_deploy_smoke.sh)
+    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/post_deploy_smoke.sh)
       printf 'runtime_or_deploy_contract\n'
       ;;
     backend/app/services/runtime_executors.py|backend/app/routes/deployments.py|backend/app/routes/servers.py|backend/app/routes/ops.py|backend/tests/test_deployment_ssh_options.py)

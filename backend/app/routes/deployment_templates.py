@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.db import (
     delete_deployment_template_record,
@@ -18,7 +18,7 @@ from app.schemas import (
     DeploymentTemplateDuplicateRequest,
     DeploymentTemplateResponse,
 )
-from app.services.auth import require_auth
+from app.services.auth import ensure_remote_server_access_allowed, require_auth, user_is_admin
 from app.services.deployment_templates import (
     build_template_record as _service_build_template_record,
     create_template as _service_create_template,
@@ -59,10 +59,30 @@ def _build_template_record(
     )
 
 
-def _validate_template_payload(payload: DeploymentTemplateCreateRequest) -> None:
+def _template_visible_to_user(template: dict, user: dict) -> bool:
+    return user_is_admin(user) or template.get("owner_user_id") == user["id"]
+
+
+def _list_user_templates(user: dict) -> list[dict]:
+    templates = list_deployment_templates()
+    if user_is_admin(user):
+        return templates
+    return [item for item in templates if _template_visible_to_user(item, user)]
+
+
+def _get_user_template_or_404(template_id: str, user: dict) -> dict:
+    template = get_deployment_template_or_404(template_id)
+    if _template_visible_to_user(template, user):
+        return template
+    raise HTTPException(status_code=404, detail="Deployment template not found.")
+
+
+def _validate_template_payload_for_user(payload: DeploymentTemplateCreateRequest, user: dict) -> None:
     _service_validate_template_payload(
         payload,
+        user,
         get_server_or_404_fn=get_server_or_404,
+        ensure_remote_server_access_allowed_fn=ensure_remote_server_access_allowed,
         ensure_runtime_target_allowed_fn=ensure_runtime_target_allowed,
     )
 
@@ -71,21 +91,24 @@ def _validate_template_payload(payload: DeploymentTemplateCreateRequest) -> None
 def list_templates(
     state: str = Query(default="all", pattern="^(all|unused|recent|popular)$"),
     q: str = Query(default=""),
+    user=Depends(require_auth),
 ) -> List[DeploymentTemplateResponse]:
     return _service_list_templates(
         state=state,
         q=q,
-        list_deployment_templates_fn=list_deployment_templates,
+        list_deployment_templates_fn=lambda: _list_user_templates(user),
     )
 
 
 @router.post("/deployment-templates", response_model=DeploymentTemplateResponse)
 def create_template(
     payload: DeploymentTemplateCreateRequest,
+    user=Depends(require_auth),
 ) -> DeploymentTemplateResponse:
     return _service_create_template(
         payload,
-        validate_template_payload_fn=_validate_template_payload,
+        user,
+        validate_template_payload_fn=_validate_template_payload_for_user,
         insert_deployment_template_fn=insert_deployment_template,
         get_deployment_template_or_404_fn=get_deployment_template_or_404,
     )
@@ -98,12 +121,14 @@ def create_template(
 def update_template_endpoint(
     template_id: str,
     payload: DeploymentTemplateCreateRequest,
+    user=Depends(require_auth),
 ) -> DeploymentTemplateResponse:
     return _service_update_template(
         template_id,
         payload,
-        get_deployment_template_or_404_fn=get_deployment_template_or_404,
-        validate_template_payload_fn=_validate_template_payload,
+        user,
+        get_deployment_template_or_404_fn=lambda current_id: _get_user_template_or_404(current_id, user),
+        validate_template_payload_fn=_validate_template_payload_for_user,
         update_deployment_template_fn=update_deployment_template,
     )
 
@@ -115,11 +140,13 @@ def update_template_endpoint(
 def duplicate_template(
     template_id: str,
     payload: DeploymentTemplateDuplicateRequest | None = None,
+    user=Depends(require_auth),
 ) -> DeploymentTemplateResponse:
     return _service_duplicate_template(
         template_id,
+        user,
         payload,
-        get_deployment_template_or_404_fn=get_deployment_template_or_404,
+        get_deployment_template_or_404_fn=lambda current_id: _get_user_template_or_404(current_id, user),
         insert_deployment_template_fn=insert_deployment_template,
     )
 
@@ -140,7 +167,7 @@ def deploy_from_template(
     return _service_deploy_from_template(
         template_id,
         user,
-        get_deployment_template_or_404_fn=get_deployment_template_or_404,
+        get_deployment_template_or_404_fn=lambda current_id: _get_user_template_or_404(current_id, user),
         create_deployment_fn=create_deployment_adapter,
         mark_deployment_template_used_fn=mark_deployment_template_used,
     )
@@ -150,9 +177,9 @@ def deploy_from_template(
     "/deployment-templates/{template_id}",
     response_model=DeploymentTemplateResponse,
 )
-def delete_template(template_id: str) -> DeploymentTemplateResponse:
+def delete_template(template_id: str, user=Depends(require_auth)) -> DeploymentTemplateResponse:
     return _service_delete_template(
         template_id,
-        get_deployment_template_or_404_fn=get_deployment_template_or_404,
+        get_deployment_template_or_404_fn=lambda current_id: _get_user_template_or_404(current_id, user),
         delete_deployment_template_record_fn=delete_deployment_template_record,
     )

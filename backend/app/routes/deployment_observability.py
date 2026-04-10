@@ -9,7 +9,7 @@ from app.schemas import (
     DeploymentLogsResponse,
     NotificationResponse,
 )
-from app.services.auth import require_auth
+from app.services.auth import require_auth, user_is_admin
 from app.services.deployment_observability import (
     build_activity_summary as _service_build_activity_summary,
     build_deployment_diagnostics as _service_build_deployment_diagnostics,
@@ -62,9 +62,20 @@ def _build_deployment_diagnostics(deployment: dict) -> DeploymentDiagnosticsResp
     )
 
 
+def _deployment_visible_to_user(deployment: dict, user: dict) -> bool:
+    return user_is_admin(user) or deployment.get("owner_user_id") == user["id"]
+
+
+def _get_user_deployment_or_404(deployment_id: str, user: dict) -> dict:
+    deployment = get_deployment_record_or_404(deployment_id)
+    if _deployment_visible_to_user(deployment, user):
+        return deployment
+    raise HTTPException(status_code=404, detail="Deployment not found.")
+
+
 @router.get("/deployments/{deployment_id}/activity", response_model=List[NotificationResponse])
-def get_deployment_activity(deployment_id: str) -> List[NotificationResponse]:
-    get_deployment_record_or_404(deployment_id)
+def get_deployment_activity(deployment_id: str, user=Depends(require_auth)) -> List[NotificationResponse]:
+    _get_user_deployment_or_404(deployment_id, user)
     activity = list_deployment_activity(deployment_id)
     return [
         NotificationResponse(**item, category=_infer_activity_category(item.get("title"), item.get("message")))
@@ -76,14 +87,17 @@ def get_deployment_activity(deployment_id: str) -> List[NotificationResponse]:
     "/deployments/{deployment_id}/diagnostics",
     response_model=DeploymentDiagnosticsResponse,
 )
-def get_deployment_diagnostics(deployment_id: str) -> DeploymentDiagnosticsResponse:
-    deployment = get_deployment_record_or_404(deployment_id)
+def get_deployment_diagnostics(
+    deployment_id: str,
+    user=Depends(require_auth),
+) -> DeploymentDiagnosticsResponse:
+    deployment = _get_user_deployment_or_404(deployment_id, user)
     return _build_deployment_diagnostics(deployment)
 
 
 @router.get("/deployments/{deployment_id}/logs", response_model=DeploymentLogsResponse)
-def get_deployment_logs(deployment_id: str) -> DeploymentLogsResponse:
-    deployment = get_deployment_record_or_404(deployment_id)
+def get_deployment_logs(deployment_id: str, user=Depends(require_auth)) -> DeploymentLogsResponse:
+    deployment = _get_user_deployment_or_404(deployment_id, user)
     container_name = deployment["container_name"]
 
     if deployment.get("status") != "running" or not deployment.get("container_id"):
@@ -135,6 +149,6 @@ def get_deployment_logs(deployment_id: str) -> DeploymentLogsResponse:
 
 
 @router.get("/deployments/{deployment_id}/health", response_model=DeploymentHealthResponse)
-def get_deployment_health(deployment_id: str) -> DeploymentHealthResponse:
-    deployment = get_deployment_record_or_404(deployment_id)
+def get_deployment_health(deployment_id: str, user=Depends(require_auth)) -> DeploymentHealthResponse:
+    deployment = _get_user_deployment_or_404(deployment_id, user)
     return _build_deployment_health_response(deployment)

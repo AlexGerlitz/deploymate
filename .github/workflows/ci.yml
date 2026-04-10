@@ -67,6 +67,40 @@ jobs:
             echo "- Should deploy: \`${{ steps.detect.outputs.should_deploy }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  production-contract:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Run production contract gate
+        run: bash scripts/production_contract_gate.sh
+        env:
+          BACKEND_PYTHON: python
+
+      - name: Write production contract summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Production Contract"
+            echo
+            echo "- Event: \`${{ github.event_name }}\`"
+            echo "- Ref: \`${{ github.ref_name }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Base ref: \`${{ needs.detect-changes.outputs.base_ref }}\`"
+            echo "- Surface: \`${{ needs.detect-changes.outputs.surface }}\`"
+            echo "- Reason: ${{ needs.detect-changes.outputs.reason }}"
+            echo "- Checks: \`release_workflow_audit + runtime_capability_audit + production_env_audit + shell syntax + test_production_env_audit\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release-gate:
     needs: detect-changes
     if: needs.detect-changes.outputs.should_deploy == '1'
@@ -144,11 +178,13 @@ jobs:
   staging-release:
     needs:
       - detect-changes
+      - production-contract
       - release-gate
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/develop' &&
       needs.detect-changes.outputs.should_deploy == '1' &&
+      needs.production-contract.result == 'success' &&
       needs.release-gate.result == 'success'
     runs-on: ubuntu-latest
     environment: staging

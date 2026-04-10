@@ -46,6 +46,14 @@ def _server_record(**overrides):
     return record
 
 
+def _admin_user():
+    return {
+        "id": "admin-1",
+        "username": "admin",
+        "role": "admin",
+    }
+
+
 class DeploymentRouteTests(unittest.TestCase):
     def test_redeploy_success_updates_record_and_emits_success_events(self):
         payload = DeploymentCreateRequest(
@@ -83,7 +91,7 @@ class DeploymentRouteTests(unittest.TestCase):
                                         ) as run_container:
                                             with patch("app.routes.deployments.create_notification") as notify:
                                                 with patch("app.routes.deployments.create_activity_event") as activity:
-                                                    response = redeploy_deployment("dep-1", payload)
+                                                    response = redeploy_deployment("dep-1", payload, user=_admin_user())
 
         self.assertEqual(response.container_name, "demo-v2")
         self.assertEqual(response.container_id, "container-2")
@@ -159,7 +167,7 @@ class DeploymentRouteTests(unittest.TestCase):
                                 ):
                                     with patch("app.routes.deployments.create_notification") as notify:
                                         with patch("app.routes.deployments.create_activity_event") as activity:
-                                            response = redeploy_deployment("dep-1", payload)
+                                            response = redeploy_deployment("dep-1", payload, user=_admin_user())
 
         self.assertEqual(response.status, "failed")
         self.assertEqual(response.error, "port 8080 is already allocated")
@@ -205,7 +213,7 @@ class DeploymentRouteTests(unittest.TestCase):
                         with patch("app.routes.deployments.create_notification") as notify:
                             with patch("app.routes.deployments.create_activity_event") as activity:
                                 with self.assertRaises(HTTPException) as context:
-                                    delete_deployment("dep-1")
+                                    delete_deployment("dep-1", user=_admin_user())
 
         self.assertEqual(context.exception.status_code, 500)
         self.assertEqual(context.exception.detail, "No such container: demo-app")

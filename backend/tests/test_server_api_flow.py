@@ -126,6 +126,21 @@ class ServerApiFlowTests(unittest.TestCase):
         self.assertEqual(start_port, 38080)
         return [38080, 38081]
 
+    def test_create_server_requires_ssh_key_for_ssh_key_auth(self):
+        response = self.client.post(
+            "/servers",
+            json={
+                "name": "smoke-vps",
+                "host": "203.0.113.10",
+                "port": 22,
+                "username": "deploy",
+                "auth_type": "ssh_key",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "ssh_key is required for auth_type=ssh_key.")
+
     def test_full_server_http_flow(self):
         create_response = self.client.post(
             "/servers",

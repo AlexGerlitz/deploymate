@@ -353,6 +353,18 @@ This audit checks:
 
 If `.env.production` sets `DEPLOYMATE_LOCAL_DOCKER_ENABLED=false`, then `NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED` must be `0`. If backend local runtime is explicitly enabled, the frontend flag must be `1`.
 
+To verify that production env security defaults still match the hardened contract:
+
+```bash
+bash scripts/production_env_audit.sh --env-file .env.production
+```
+
+On the deployment host, run the stricter form before `docker compose up` so the pinned `known_hosts` file must already exist and be non-empty:
+
+```bash
+bash scripts/production_env_audit.sh --env-file .env.production --require-runtime-files
+```
+
 ## Frontend-only deploy
 
 Local:
@@ -375,6 +387,7 @@ cd /opt/deploymate
 git fetch origin
 git switch develop
 git pull --ff-only origin develop
+bash scripts/production_env_audit.sh --env-file .env.production --require-runtime-files
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps frontend
 docker compose -f docker-compose.prod.yml --env-file .env.production ps frontend
 curl -I https://your-domain/app
@@ -415,6 +428,7 @@ grep '^DEPLOYMATE_SERVER_CREDENTIALS_KEY=' .env.production
 git fetch origin
 git switch develop
 git pull --ff-only origin develop
+bash scripts/production_env_audit.sh --env-file .env.production --require-runtime-files
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps backend
 docker compose -f docker-compose.prod.yml --env-file .env.production ps backend
 curl -I https://your-domain/api/health
@@ -458,6 +472,7 @@ cd /opt/deploymate
 git fetch origin
 git switch develop
 git pull --ff-only origin develop
+bash scripts/production_env_audit.sh --env-file .env.production --require-runtime-files
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 docker compose -f docker-compose.prod.yml --env-file .env.production ps
 curl -I https://your-domain
@@ -475,6 +490,8 @@ bash scripts/remote_release.sh \
   --admin-username admin \
   --admin-password '<secret>'
 ```
+
+`scripts/remote_release.sh` now runs both `runtime_capability_audit.sh --env-file <remote-env>` and `production_env_audit.sh --env-file <remote-env> --require-runtime-files` on the target host before it rebuilds the stack.
 
 ## Post-deploy smoke
 

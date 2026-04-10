@@ -16,6 +16,7 @@ from app.schemas import (
 def build_template_record(
     template_id: str,
     payload: DeploymentTemplateCreateRequest,
+    owner_user_id: str | None = None,
     created_at: datetime | None = None,
     updated_at: datetime | None = None,
     last_used_at: datetime | None = None,
@@ -31,6 +32,7 @@ def build_template_record(
         "internal_port": payload.internal_port,
         "external_port": payload.external_port,
         "server_id": payload.server_id,
+        "owner_user_id": owner_user_id,
         "env": json.dumps(payload.env),
         "created_at": created,
         "updated_at": updated,
@@ -41,8 +43,10 @@ def build_template_record(
 
 def validate_template_payload(
     payload: DeploymentTemplateCreateRequest,
+    user,
     *,
     get_server_or_404_fn,
+    ensure_remote_server_access_allowed_fn,
     ensure_runtime_target_allowed_fn,
 ) -> None:
     if (payload.internal_port is None) != (payload.external_port is None):
@@ -52,7 +56,8 @@ def validate_template_payload(
         )
 
     if payload.server_id:
-        get_server_or_404_fn(payload.server_id)
+        server = get_server_or_404_fn(payload.server_id)
+        ensure_remote_server_access_allowed_fn(user, server)
         return
 
     ensure_runtime_target_allowed_fn(None)
@@ -115,14 +120,15 @@ def list_templates(
 
 def create_template(
     payload: DeploymentTemplateCreateRequest,
+    user,
     *,
     validate_template_payload_fn,
     insert_deployment_template_fn,
     get_deployment_template_or_404_fn,
 ) -> DeploymentTemplateResponse:
-    validate_template_payload_fn(payload)
+    validate_template_payload_fn(payload, user)
     template_id = str(uuid.uuid4())
-    template_record = build_template_record(template_id, payload)
+    template_record = build_template_record(template_id, payload, owner_user_id=user["id"])
     insert_deployment_template_fn(template_record)
     saved_template = get_deployment_template_or_404_fn(template_id)
     return DeploymentTemplateResponse(**saved_template)
@@ -131,13 +137,14 @@ def create_template(
 def update_template(
     template_id: str,
     payload: DeploymentTemplateCreateRequest,
+    user,
     *,
     get_deployment_template_or_404_fn,
     validate_template_payload_fn,
     update_deployment_template_fn,
 ) -> DeploymentTemplateResponse:
     existing_template = get_deployment_template_or_404_fn(template_id)
-    validate_template_payload_fn(payload)
+    validate_template_payload_fn(payload, user)
     update_deployment_template_fn(
         template_id,
         {
@@ -159,6 +166,7 @@ def update_template(
 
 def duplicate_template(
     template_id: str,
+    user,
     payload: DeploymentTemplateDuplicateRequest | None = None,
     *,
     get_deployment_template_or_404_fn,
@@ -179,6 +187,7 @@ def duplicate_template(
         "internal_port": template.get("internal_port"),
         "external_port": template.get("external_port"),
         "server_id": template.get("server_id"),
+        "owner_user_id": user["id"],
         "env": json.dumps(template.get("env") or {}),
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),

@@ -1,7 +1,6 @@
 import hashlib
 import os
 import secrets
-import time
 from collections import deque
 from datetime import datetime, timezone
 from typing import Optional
@@ -9,10 +8,15 @@ from typing import Optional
 from fastapi import Cookie, Depends, HTTPException
 
 from app.db import (
+    clear_auth_rate_limit_events,
     count_all_deployments,
     count_all_servers,
+    count_deployments_for_owner_user,
+    count_recent_auth_rate_limit_events,
     delete_session,
     get_session_user_by_token,
+    record_auth_rate_limit_event,
+    reset_auth_rate_limit_events,
 )
 
 
@@ -124,6 +128,18 @@ def build_auth_rate_limit_key(action: str, *parts: str | None) -> str:
 
 def reset_auth_rate_limit_state() -> None:
     _AUTH_RATE_LIMIT_BUCKETS.clear()
+    if get_auth_rate_limit_backend() == "database":
+        try:
+            reset_auth_rate_limit_events()
+        except HTTPException:
+            pass
+
+
+def get_auth_rate_limit_backend() -> str:
+    backend = os.getenv("DEPLOYMATE_AUTH_RATE_LIMIT_BACKEND", "database").strip().lower()
+    if backend in {"database", "memory"}:
+        return backend
+    return "database"
 
 
 def _get_auth_rate_limit_bucket(action: str, *parts: str | None) -> deque[float]:
@@ -139,11 +155,16 @@ def _prune_auth_rate_limit_bucket(bucket: deque[float], window_seconds: int, now
 
 def enforce_auth_rate_limit(action: str, *parts: str | None) -> None:
     max_attempts, window_seconds = get_auth_rate_limit_config()
-    bucket = _get_auth_rate_limit_bucket(action, *parts)
-    now = time.monotonic()
-    _prune_auth_rate_limit_bucket(bucket, window_seconds, now)
+    if get_auth_rate_limit_backend() == "memory":
+        bucket = _get_auth_rate_limit_bucket(action, *parts)
+        now = datetime.now(timezone.utc).timestamp()
+        _prune_auth_rate_limit_bucket(bucket, window_seconds, now)
+        count = len(bucket)
+    else:
+        bucket_key = build_auth_rate_limit_key(action, *parts)
+        count = count_recent_auth_rate_limit_events(bucket_key, window_seconds)
 
-    if len(bucket) >= max_attempts:
+    if count >= max_attempts:
         raise HTTPException(
             status_code=429,
             detail="Too many authentication attempts. Please wait a minute and try again.",
@@ -151,16 +172,23 @@ def enforce_auth_rate_limit(action: str, *parts: str | None) -> None:
 
 
 def record_auth_rate_limit_failure(action: str, *parts: str | None) -> None:
-    _, window_seconds = get_auth_rate_limit_config()
-    bucket = _get_auth_rate_limit_bucket(action, *parts)
-    now = time.monotonic()
-    _prune_auth_rate_limit_bucket(bucket, window_seconds, now)
-    bucket.append(now)
+    if get_auth_rate_limit_backend() == "memory":
+        _, window_seconds = get_auth_rate_limit_config()
+        bucket = _get_auth_rate_limit_bucket(action, *parts)
+        now = datetime.now(timezone.utc).timestamp()
+        _prune_auth_rate_limit_bucket(bucket, window_seconds, now)
+        bucket.append(now)
+        return
+
+    bucket_key = build_auth_rate_limit_key(action, *parts)
+    record_auth_rate_limit_event(bucket_key)
 
 
 def clear_auth_rate_limit(action: str, *parts: str | None) -> None:
     bucket_key = build_auth_rate_limit_key(action, *parts)
     _AUTH_RATE_LIMIT_BUCKETS.pop(bucket_key, None)
+    if get_auth_rate_limit_backend() == "database":
+        clear_auth_rate_limit_events(bucket_key)
 
 
 def get_current_user(
@@ -206,10 +234,21 @@ def get_plan_limits(plan: str) -> dict[str, int]:
     return PLAN_LIMITS.get(plan, PLAN_LIMITS["trial"]).copy()
 
 
-def get_plan_usage() -> dict[str, int]:
+def get_plan_usage(user: dict | None = None) -> dict[str, int]:
+    if not user:
+        return {
+            "servers": count_all_servers(),
+            "deployments": count_all_deployments(),
+        }
+
+    deployments = (
+        count_all_deployments()
+        if user_is_admin(user)
+        else count_deployments_for_owner_user(user["id"])
+    )
     return {
-        "servers": count_all_servers(),
-        "deployments": count_all_deployments(),
+        "servers": count_all_servers() if user_is_admin(user) else 0,
+        "deployments": deployments,
     }
 
 
@@ -220,14 +259,32 @@ def build_user_response_payload(user: dict) -> dict:
         "role": user.get("role", "member"),
         "is_admin": user.get("role") == "admin",
         "limits": get_plan_limits(user.get("plan", "trial")),
-        "usage": get_plan_usage(),
+        "usage": get_plan_usage(user),
     }
+
+
+def user_is_admin(user: dict | None) -> bool:
+    return bool(user and user.get("role") == "admin")
+
+
+def ensure_remote_server_access_allowed(user: dict, server: dict | None) -> None:
+    if server is None:
+        return
+    if user_is_admin(user):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            "Remote server targets are admin-only until DeployMate has an explicit "
+            "sharing model for server access."
+        ),
+    )
 
 
 def enforce_plan_limit(user: dict, resource: str) -> None:
     plan = user.get("plan", "trial")
     limits = get_plan_limits(plan)
-    usage = get_plan_usage()
+    usage = get_plan_usage(user)
 
     if resource == "servers" and usage["servers"] >= limits["max_servers"]:
         raise HTTPException(
@@ -251,6 +308,6 @@ def enforce_plan_limit(user: dict, resource: str) -> None:
 
 
 def require_admin(user=Depends(get_current_user)):
-    if user.get("role") != "admin":
+    if not user_is_admin(user):
         raise HTTPException(status_code=403, detail="Admin access required.")
     return user

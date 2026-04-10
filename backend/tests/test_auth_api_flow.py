@@ -1,3 +1,4 @@
+import os
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
@@ -28,6 +29,7 @@ class AuthApiFlowTests(unittest.TestCase):
 
         self.patchers = [
             patch("app.main.init_db", return_value=None),
+            patch.dict(os.environ, {"DEPLOYMATE_AUTH_RATE_LIMIT_BACKEND": "memory"}, clear=False),
             patch("app.routes.auth.public_signup_enabled", return_value=True),
             patch("app.routes.auth.get_user_by_username", side_effect=self._get_user_by_username),
             patch("app.routes.auth.get_user_by_id", side_effect=self._get_user_by_id),

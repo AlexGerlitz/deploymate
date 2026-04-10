@@ -218,6 +218,26 @@ class OpsApiFlowTests(unittest.TestCase):
         degraded_titles = [item["title"] for item in payload["attention_items"]]
         self.assertIn("Activity data is temporarily unavailable", degraded_titles)
 
+    def test_ops_overview_flags_strict_ssh_when_known_hosts_are_missing(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_known_hosts_path = os.path.join(temp_dir, "missing-known_hosts")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "DEPLOYMATE_LOCAL_DOCKER_ENABLED": "false",
+                    "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "yes",
+                    "DEPLOYMATE_SSH_KNOWN_HOSTS_FILE": missing_known_hosts_path,
+                },
+                clear=False,
+            ):
+                response = self.client.get("/ops/overview?notifications_limit=100")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        titles = [item["title"] for item in payload["attention_items"]]
+        self.assertIn("Strict SSH trust is enabled but not ready", titles)
+
     def test_ops_export_returns_503_when_source_loader_fails(self):
         with patch("app.routes.ops.list_servers", side_effect=RuntimeError("db unavailable")):
             response = self.client.get("/ops/exports/servers?format=json")

@@ -33,7 +33,10 @@ class TemplateApiFlowTests(unittest.TestCase):
             patch("app.routes.deployment_templates.delete_deployment_template_record", side_effect=self._delete_template),
             patch("app.routes.deployment_templates.mark_deployment_template_used", side_effect=self._mark_template_used),
             patch("app.routes.deployment_templates.get_server_or_404", side_effect=self._get_server_or_404),
-            patch("app.routes.deployment_templates._validate_template_payload", side_effect=self._validate_template_payload),
+            patch(
+                "app.routes.deployment_templates._validate_template_payload_for_user",
+                side_effect=self._validate_template_payload,
+            ),
             patch("app.routes.deployment_templates._create_deployment", side_effect=self._create_deployment),
         ]
 
@@ -131,7 +134,8 @@ class TemplateApiFlowTests(unittest.TestCase):
     def _get_server_or_404(self, server_id):
         raise AssertionError(f"Unexpected server lookup for template flow: {server_id}")
 
-    def _validate_template_payload(self, payload):
+    def _validate_template_payload(self, payload, user):
+        self.assertEqual(user["id"], self.user["id"])
         return None
 
     def test_full_template_http_flow(self):

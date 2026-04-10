@@ -73,7 +73,7 @@ function buildAttentionItems(deployment, health, diagnostics) {
   return items;
 }
 
-function buildRuntimeSummaryText(deployment, health, diagnostics, activity) {
+function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canAccessServers) {
   if (!deployment) {
     return "";
   }
@@ -84,9 +84,11 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity) {
     `Image: ${deployment.image || "n/a"}`,
     `Container: ${deployment.container_name || "n/a"}`,
     `Server: ${
-      deployment.server_name && deployment.server_host
+      canAccessServers && deployment.server_name && deployment.server_host
         ? `${deployment.server_name} (${deployment.server_host})`
-        : "Local"
+        : deployment.server_id
+          ? "Managed by an admin"
+          : "Local"
     }`,
     `URL: ${buildDeploymentUrl(deployment) || "n/a"}`,
     `Ports: ${deployment.internal_port || "-"} -> ${deployment.external_port || "-"}`,
@@ -95,7 +97,13 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity) {
         ? ` in ${health.response_time_ms} ms`
         : ""
     }`,
-    `Diagnostics target: ${diagnostics?.server_target || "n/a"}`,
+    `Diagnostics target: ${
+      canAccessServers
+        ? diagnostics?.server_target || "n/a"
+        : deployment.server_id
+          ? "Managed by an admin"
+          : "n/a"
+    }`,
     `Activity events: ${Array.isArray(activity) ? activity.length : 0}`,
   ];
 
@@ -126,7 +134,7 @@ function buildRecommendedNextStep(deployment, health, diagnostics, attentionItem
   return "Keep the current rollout stable, and only redeploy when you are ready to change image, ports, or env vars deliberately.";
 }
 
-function buildPlainLanguageSummary(deployment, health, diagnostics, attentionItems, activity) {
+function buildPlainLanguageSummary(deployment, health, diagnostics, attentionItems, activity, canAccessServers) {
   if (!deployment) {
     return "";
   }
@@ -150,9 +158,13 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
           .map((item) => item.label)
           .join(", ")}.`
       : "There are no active runtime warnings right now.",
-    diagnostics?.server_target
-      ? `The deployment is tied to ${diagnostics.server_target} for diagnostics and runtime review.`
-      : "No diagnostics target is available yet.",
+    canAccessServers
+      ? diagnostics?.server_target
+        ? `The deployment is tied to ${diagnostics.server_target} for diagnostics and runtime review.`
+        : "No diagnostics target is available yet."
+      : deployment.server_id
+        ? "The deployment runs on an admin-managed server target."
+        : "No diagnostics target is available yet.",
     latestEvent?.title
       ? `The most recent recorded activity was "${latestEvent.title}" at ${formatDate(latestEvent.created_at)}.`
       : "No recent activity has been recorded for this deployment yet.",
@@ -169,6 +181,7 @@ function buildIncidentSnapshotPayload(
   activity,
   attentionItems,
   suggestedPorts,
+  canAccessServers,
 ) {
   if (!deployment) {
     return null;
@@ -185,12 +198,14 @@ function buildIncidentSnapshotPayload(
       diagnostics,
       attentionItems,
       activity,
+      canAccessServers,
     ),
     runtime_summary: buildRuntimeSummaryText(
       deployment,
       health,
       diagnostics,
       activity,
+      canAccessServers,
     ),
     attention_items: attentionItems,
     suggested_ports: suggestedPorts,
@@ -345,6 +360,7 @@ function buildRedeployImpactSummary({
   diagnostics,
   deploymentUrl,
   changeRows,
+  canAccessServers,
 }) {
   if (!deployment) {
     return "";
@@ -355,8 +371,12 @@ function buildRedeployImpactSummary({
     `Current container: ${deployment.container_name || "N/A"}`,
     `Current status: ${deployment.status || "unknown"}`,
     `Target: ${
-      diagnostics?.server_target ||
-      (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
+      canAccessServers
+        ? diagnostics?.server_target ||
+          (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
+        : deployment.server_id
+          ? "Managed by an admin"
+          : "Local Docker target"
     }`,
     deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
     "",
@@ -566,6 +586,7 @@ export default function DeploymentDetailsPage({ params }) {
     external_port: "",
   });
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
+  const canAccessServers = Boolean(currentUser?.is_admin);
   const deploymentUrl = buildDeploymentUrl(deployment);
   const attentionItems = buildAttentionItems(deployment, health, diagnostics);
   const runtimeSummaryText = buildRuntimeSummaryText(
@@ -573,6 +594,7 @@ export default function DeploymentDetailsPage({ params }) {
     health,
     diagnostics,
     activity,
+    canAccessServers,
   );
   const plainLanguageSummary = buildPlainLanguageSummary(
     deployment,
@@ -580,6 +602,7 @@ export default function DeploymentDetailsPage({ params }) {
     diagnostics,
     attentionItems,
     activity,
+    canAccessServers,
   );
   const incidentSnapshot = buildIncidentSnapshotPayload(
     deployment,
@@ -588,6 +611,7 @@ export default function DeploymentDetailsPage({ params }) {
     activity,
     attentionItems,
     suggestedPorts,
+    canAccessServers,
   );
   const filteredActivity = [...activity]
     .filter((item) => {
@@ -639,7 +663,14 @@ export default function DeploymentDetailsPage({ params }) {
     ? [
         `Deployment record: ${deployment.id}`,
         `Container: ${deployment.container_name || "N/A"}`,
-        `Target: ${diagnostics?.server_target || (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")}`,
+        `Target: ${
+          canAccessServers
+            ? diagnostics?.server_target ||
+              (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
+            : deployment.server_id
+              ? "Managed by an admin"
+              : "Local Docker target"
+        }`,
         deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
         "",
         "This action will try to remove the running container and then delete the saved deployment record.",
@@ -713,6 +744,7 @@ export default function DeploymentDetailsPage({ params }) {
     diagnostics,
     deploymentUrl,
     changeRows: redeployChangeRows,
+    canAccessServers,
   });
 
   async function loadDeploymentDiagnostics() {
@@ -2051,9 +2083,11 @@ export default function DeploymentDetailsPage({ params }) {
               <div className="row">
                 <span className="label">Server</span>
                 <span>
-                  {deployment.server_name
+                  {canAccessServers && deployment.server_name
                     ? `${deployment.server_name} (${deployment.server_host})`
-                    : "Local"}
+                    : deployment.server_id
+                      ? "Managed by an admin"
+                      : "Local"}
                 </span>
               </div>
               <div className="row">
@@ -2218,8 +2252,14 @@ export default function DeploymentDetailsPage({ params }) {
               <div className="row">
                 <span className="label">Diagnostics target</span>
                 <span className="valueWithActions">
-                  <span>{diagnostics?.server_target || "N/A"}</span>
-                  {diagnostics?.server_target ? (
+                  <span>
+                    {canAccessServers
+                      ? diagnostics?.server_target || "N/A"
+                      : deployment.server_id
+                        ? "Managed by an admin"
+                        : "N/A"}
+                  </span>
+                  {canAccessServers && diagnostics?.server_target ? (
                     <button
                       type="button"
                       className="smallButton"
@@ -2295,7 +2335,13 @@ export default function DeploymentDetailsPage({ params }) {
                   </div>
                   <div className="row">
                     <span className="label">Server target</span>
-                    <span>{diagnostics.server_target || "N/A"}</span>
+                    <span>
+                      {canAccessServers
+                        ? diagnostics.server_target || "N/A"
+                        : deployment.server_id
+                          ? "Managed by an admin"
+                          : "N/A"}
+                    </span>
                   </div>
                   <div className="row">
                     <span className="label">Activity summary</span>

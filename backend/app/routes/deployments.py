@@ -42,7 +42,12 @@ from app.services.deployment_observability import (
     inspect_container_state,
     probe_http_endpoint,
 )
-from app.services.auth import enforce_plan_limit, require_auth
+from app.services.auth import (
+    enforce_plan_limit,
+    ensure_remote_server_access_allowed,
+    require_auth,
+    user_is_admin,
+)
 
 
 router = APIRouter(dependencies=[Depends(require_auth)])
@@ -61,6 +66,7 @@ def _create_deployment(
         user,
         enforce_plan_limit_fn=enforce_plan_limit,
         get_server_or_404_fn=get_server_or_404,
+        ensure_remote_server_access_allowed_fn=ensure_remote_server_access_allowed,
         ensure_runtime_target_allowed_fn=ensure_runtime_target_allowed,
         ensure_docker_is_available_fn=ensure_docker_is_available,
         ensure_external_port_is_available_fn=ensure_external_port_is_available,
@@ -111,13 +117,32 @@ def _build_deployment_diagnostics(deployment: dict):
     )
 
 
+def _deployment_visible_to_user(deployment: dict, user: dict) -> bool:
+    return user_is_admin(user) or deployment.get("owner_user_id") == user["id"]
+
+
+def _list_user_deployments(user: dict) -> list[dict]:
+    deployments = list_deployment_records()
+    if user_is_admin(user):
+        return deployments
+    return [item for item in deployments if _deployment_visible_to_user(item, user)]
+
+
+def _get_user_deployment_or_404(deployment_id: str, user: dict) -> dict:
+    deployment = get_deployment_record_or_404(deployment_id)
+    if _deployment_visible_to_user(deployment, user):
+        return deployment
+    raise HTTPException(status_code=404, detail="Deployment not found.")
+
+
 @router.get("/deployments", response_model=List[DeploymentResponse])
 def list_deployments(
     status: str = Query(default="all", pattern="^(all|running|failed|pending)$"),
     q: str = Query(default=""),
     server_id: str = Query(default=""),
+    user=Depends(require_auth),
 ) -> List[DeploymentResponse]:
-    deployments = list_deployment_records()
+    deployments = _list_user_deployments(user)
     normalized_query = q.strip().lower()
     normalized_server_id = server_id.strip()
     filtered = []
@@ -157,11 +182,12 @@ def create_deployment_endpoint(
 def redeploy_deployment(
     deployment_id: str,
     payload: DeploymentCreateRequest,
+    user=Depends(require_auth),
 ) -> DeploymentResponse:
     return _service_redeploy_deployment(
         deployment_id,
         payload,
-        get_deployment_record_or_404_fn=get_deployment_record_or_404,
+        get_deployment_record_or_404_fn=lambda current_id: _get_user_deployment_or_404(current_id, user),
         get_server_or_404_fn=get_server_or_404,
         ensure_runtime_target_allowed_fn=ensure_runtime_target_allowed,
         ensure_docker_is_available_fn=ensure_docker_is_available,
@@ -177,16 +203,16 @@ def redeploy_deployment(
 
 
 @router.get("/deployments/{deployment_id}", response_model=DeploymentResponse)
-def get_deployment(deployment_id: str) -> DeploymentResponse:
-    deployment = get_deployment_record_or_404(deployment_id)
+def get_deployment(deployment_id: str, user=Depends(require_auth)) -> DeploymentResponse:
+    deployment = _get_user_deployment_or_404(deployment_id, user)
     return DeploymentResponse(**deployment)
 
 
 @router.delete("/deployments/{deployment_id}", response_model=DeploymentDeleteResponse)
-def delete_deployment(deployment_id: str) -> DeploymentDeleteResponse:
+def delete_deployment(deployment_id: str, user=Depends(require_auth)) -> DeploymentDeleteResponse:
     return _service_delete_deployment(
         deployment_id,
-        get_deployment_record_or_404_fn=get_deployment_record_or_404,
+        get_deployment_record_or_404_fn=lambda current_id: _get_user_deployment_or_404(current_id, user),
         get_server_or_404_fn=get_server_or_404,
         ensure_docker_is_available_fn=ensure_docker_is_available,
         remove_container_if_exists_fn=remove_container_if_exists,

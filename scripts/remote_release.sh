@@ -169,22 +169,26 @@ fi
 echo "[remote-release] remote repo: $DEPLOY_REPO_DIR"
 echo "[remote-release] remote env file: $DEPLOY_ENV_FILE"
 
+quoted_env_file="$(printf '%q' "$DEPLOY_ENV_FILE")"
+
 case "$DEPLOY_SURFACE" in
   frontend)
-    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $DEPLOY_ENV_FILE up -d --build --no-deps frontend && docker compose -f docker-compose.prod.yml --env-file $DEPLOY_ENV_FILE ps frontend"
+    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $quoted_env_file up -d --build --no-deps frontend && docker compose -f docker-compose.prod.yml --env-file $quoted_env_file ps frontend"
     ;;
   backend)
-    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $DEPLOY_ENV_FILE up -d --build --no-deps backend && docker compose -f docker-compose.prod.yml --env-file $DEPLOY_ENV_FILE ps backend"
+    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $quoted_env_file up -d --build --no-deps backend && docker compose -f docker-compose.prod.yml --env-file $quoted_env_file ps backend"
     ;;
   full)
-    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $DEPLOY_ENV_FILE up -d --build && docker compose -f docker-compose.prod.yml --env-file $DEPLOY_ENV_FILE ps"
+    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $quoted_env_file up -d --build && docker compose -f docker-compose.prod.yml --env-file $quoted_env_file ps"
     ;;
 esac
 
+REMOTE_AUDIT_CMD="bash scripts/runtime_capability_audit.sh --env-file $quoted_env_file && bash scripts/production_env_audit.sh --env-file $quoted_env_file --require-runtime-files"
+
 if [ -n "$DEPLOY_REF" ]; then
-  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && git switch $DEPLOY_BRANCH && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_COMPOSE_CMD"
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && git switch $DEPLOY_BRANCH && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
 else
-  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && git switch $DEPLOY_BRANCH && git merge --ff-only origin/$DEPLOY_BRANCH && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_COMPOSE_CMD"
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && git switch $DEPLOY_BRANCH && git merge --ff-only origin/$DEPLOY_BRANCH && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
 fi
 
 echo "[remote-release] remote deploy"

@@ -26,6 +26,8 @@ import {
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const localDeploymentsEnabled =
+  process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
 
 export default function HomePage() {
   const router = useRouter();
@@ -59,54 +61,101 @@ export default function HomePage() {
       notifications,
       templates,
     });
+  const canAccessServers = Boolean(currentUser?.is_admin);
   const degradedOpsAttentionItems = opsSnapshot.attention_items.filter((item) =>
     item.title.includes("temporarily unavailable"),
   );
   const overviewPrimaryPath = buildOverviewPrimaryPath({
-    isAdmin: Boolean(currentUser?.is_admin),
+    isAdmin: canAccessServers,
+    localDeploymentsEnabled,
     deploymentsTotal: opsSnapshot.deployments.total,
     failedDeployments: opsSnapshot.deployments.failed,
     serversTotal: opsSnapshot.servers.total,
   });
-  const beginnerStatusSummary = servers.length === 0
-    ? "No server connected yet. Start with Step 1."
-    : deployments.length === 0
-      ? `${servers.length} server target${servers.length === 1 ? "" : "s"} connected. No deployments yet.`
-      : `${opsSnapshot.deployments.running} running · ${opsSnapshot.deployments.failed} failed · ${servers.length} server target${servers.length === 1 ? "" : "s"} saved.`;
+  const memberServerCopy = canAccessServers
+    ? null
+    : localDeploymentsEnabled
+      ? {
+          headline: "Server inventory stays with admins",
+          support:
+            "Members can keep working in the deployment workflow without touching saved server targets.",
+          stepTitle: "Continue in the deployment workflow",
+          stepDetail:
+            "Use the rollout workspace for local deployments and template reuse while admins handle the saved server list.",
+          stepAction: "Open deployment workflow",
+        }
+      : {
+          headline: "Server target is managed by an admin",
+          support:
+            "Members do not manage saved server targets here. Ask an admin to confirm the remote target, then return to Deployment Workflow.",
+          stepTitle: "Confirm the server target",
+          stepDetail:
+            "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
+          stepAction: "Open deployment workflow",
+        };
+  const beginnerStatusSummary = canAccessServers
+    ? servers.length === 0
+      ? "No server connected yet. Start with Step 1."
+      : deployments.length === 0
+        ? `${servers.length} server target${servers.length === 1 ? "" : "s"} connected. No deployments yet.`
+        : `${opsSnapshot.deployments.running} running · ${opsSnapshot.deployments.failed} failed · ${servers.length} server target${servers.length === 1 ? "" : "s"} saved.`
+    : localDeploymentsEnabled
+      ? "Server inventory is admin-managed. Use the deployment workflow to continue."
+      : "Server target is admin-managed. Return to the deployment workflow once it is confirmed.";
   const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
     ? "Next best step: connect and verify one server."
     : overviewPrimaryPath.reason === "incident"
       ? "Next best step: open live deployments and review the problem first."
+      : memberServerCopy
+        ? memberServerCopy.support
+        : deployments.length === 0
+          ? "Next best step: choose which app to run on that server."
+          : "Next best step: open your app list and continue from one running service.";
+  const heroHeadline = canAccessServers
+    ? servers.length === 0
+      ? "Connect one server, choose what to run, and check that it works."
       : deployments.length === 0
-        ? "Next best step: choose which app to run on that server."
-        : "Next best step: open your app list and continue from one running service.";
-  const heroHeadline = servers.length === 0
-    ? "Connect one server, choose what to run, and check that it works."
-    : deployments.length === 0
-      ? "Your server is ready. Next choose which app to run and start it."
-      : "Your app workspace is live. Review what is running, then deploy the next change.";
-  const heroSupportText = servers.length === 0
-    ? "DeployMate gives you one clear path: connect a server first, then deploy one app."
-    : deployments.length === 0
-      ? "You are already past Step 1. The next move is choosing the app you want to run on that server."
-      : "Open the app workspace for the next action. Keep admin and reports secondary until the runtime story is clear.";
-  const explanationTitle = servers.length === 0
-    ? "What happens after you connect a server"
-    : "What happens next";
-  const explanationBody = servers.length === 0
-    ? "After Step 1, choose the app you want to run, start it, and then check whether it is healthy."
-    : deployments.length === 0
-      ? "After Step 1, choose what app to run, start the first app, and then review status."
-      : "Open the app workspace to review status first, then make the next change deliberately.";
+        ? "Your server is ready. Next choose which app to run and start it."
+        : "Your app workspace is live. Review what is running, then deploy the next change."
+    : localDeploymentsEnabled
+      ? "Keep working in the deployment workflow while admins own saved servers."
+      : "Your deployment target is admin-managed. Confirm it with an admin, then continue.";
+  const heroSupportText = canAccessServers
+    ? servers.length === 0
+      ? "DeployMate gives you one clear path: connect a server first, then deploy one app."
+      : deployments.length === 0
+        ? "You are already past Step 1. The next move is choosing the app you want to run on that server."
+        : "Open the app workspace for the next action. Keep admin and reports secondary until the runtime story is clear."
+    : localDeploymentsEnabled
+      ? "Members can stay in the deployment workflow while server inventory remains with admins."
+      : "Members do not manage saved server targets here. Ask an admin to confirm the target, then return to the workflow.";
+  const explanationTitle = canAccessServers
+    ? servers.length === 0
+      ? "What happens after you connect a server"
+      : "What happens next"
+    : localDeploymentsEnabled
+      ? "What happens when server inventory is admin-managed"
+      : "What happens after an admin confirms the target";
+  const explanationBody = canAccessServers
+    ? servers.length === 0
+      ? "After Step 1, choose the app you want to run, start it, and then check whether it is healthy."
+      : deployments.length === 0
+        ? "After Step 1, choose what app to run, start the first app, and then review status."
+        : "Open the app workspace to review status first, then make the next change deliberately."
+    : localDeploymentsEnabled
+      ? "Continue in Deployment Workflow for local rollouts and template reuse while admins keep the saved server list up to date."
+      : "Once an admin confirms the saved server target, use Deployment Workflow to create or review the rollout.";
   const beginnerSteps = [
     {
       key: "step-1",
       step: "Step 1",
-      title: "Connect a server",
-      detail: "Add one server and check that DeployMate can reach it over SSH.",
-      href: "/app/server-review",
-      actionLabel: "Open server setup",
-      primary: overviewPrimaryPath.reason === "server-setup",
+      title: canAccessServers ? "Connect a server" : memberServerCopy?.stepTitle || "Continue in deployment workflow",
+      detail: canAccessServers
+        ? "Add one server and check that DeployMate can reach it over SSH."
+        : memberServerCopy?.stepDetail || "Use the deployment workflow for the next rollout step.",
+      href: canAccessServers ? "/app/server-review" : "/app/deployment-workflow",
+      actionLabel: canAccessServers ? "Open server setup" : memberServerCopy?.stepAction || "Open deployment workflow",
+      primary: overviewPrimaryPath.reason === "server-setup" && canAccessServers,
     },
     {
       key: "step-2",
@@ -527,7 +576,11 @@ export default function HomePage() {
                     <h3>{card.title}</h3>
                     <p>
                       {card.step === "Step 1"
-                        ? "Add one server."
+                        ? canAccessServers
+                          ? "Add one server."
+                          : localDeploymentsEnabled
+                            ? "Use the deployment workflow while admins manage saved servers."
+                            : "Ask an admin to confirm the target."
                         : card.step === "Step 2"
                           ? "Choose one app."
                           : "Check whether it works."}
@@ -550,11 +603,23 @@ export default function HomePage() {
                 <div className="workspaceGlanceList">
                   <div className="workspaceStatusCard workspaceGlanceItem">
                     <span>Step 1</span>
-                    <strong>{servers.length === 0 ? "Connect server" : "Server ready"}</strong>
+                    <strong>
+                      {canAccessServers
+                        ? servers.length === 0
+                          ? "Connect server"
+                          : "Server ready"
+                        : localDeploymentsEnabled
+                          ? "Server inventory managed"
+                          : "Server target managed"}
+                    </strong>
                     <p>
-                      {servers.length === 0
-                        ? "Add one server target so DeployMate can reach your machine."
-                        : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved for rollout.`}
+                      {canAccessServers
+                        ? servers.length === 0
+                          ? "Add one server target so DeployMate can reach your machine."
+                          : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved for rollout.`
+                        : localDeploymentsEnabled
+                          ? "Members can keep rolling out without touching the saved server list."
+                          : "Ask an admin to confirm the target before you create a remote deployment."}
                     </p>
                   </div>
                   <div className="workspaceStatusCard workspaceGlanceItem">
@@ -652,7 +717,11 @@ export default function HomePage() {
 
         <AdminDisclosureSection
           title="Workspace signals and reports"
-          subtitle="Operational totals, attention items, and exportable summaries stay here when you want the broad picture without leaving the overview."
+          subtitle={
+            canAccessServers
+              ? "Operational totals, attention items, and exportable summaries stay here when you want the broad picture without leaving the overview."
+              : "Operational totals and attention items stay here while server inventory remains admin-managed."
+          }
           badge={workspaceSignalsBadge}
           testId="ops-overview-disclosure"
         >
@@ -668,7 +737,11 @@ export default function HomePage() {
 
             <AdminDisclosureSection
               title="Exports and reports"
-              subtitle="Copy the current summary or export deployment, server, template, and activity data when you need a handoff or audit artifact."
+              subtitle={
+                canAccessServers
+                  ? "Copy the current summary or export deployment, server, template, and activity data when you need a handoff or audit artifact."
+                  : "Copy the current summary or export deployment, template, and activity data when you need a handoff or audit artifact."
+              }
               badge="Reports"
               testId="ops-overview-exports-disclosure"
             >
@@ -691,18 +764,20 @@ export default function HomePage() {
                 >
                   Export deployments CSV
                 </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleDownloadRemoteExport(
-                      "deploymate-servers.csv",
-                      `${apiBaseUrl}/ops/exports/servers?format=csv`,
-                    )
-                  }
-                  data-testid="ops-export-servers-button"
-                >
-                  Export servers CSV
-                </button>
+                {canAccessServers ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleDownloadRemoteExport(
+                        "deploymate-servers.csv",
+                        `${apiBaseUrl}/ops/exports/servers?format=csv`,
+                      )
+                    }
+                    data-testid="ops-export-servers-button"
+                  >
+                    Export servers CSV
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() =>
@@ -749,11 +824,17 @@ export default function HomePage() {
               </div>
               <div className="overviewCard" data-testid="ops-overview-servers-card">
                 <span className="overviewLabel">Servers</span>
-                <strong className="overviewValue">{opsSnapshot.servers.total}</strong>
+                <strong className="overviewValue">{canAccessServers ? opsSnapshot.servers.total : "Managed"}</strong>
                 <div className="overviewMeta">
-                  <span>Password auth {opsSnapshot.servers.password_auth}</span>
-                  <span>SSH key auth {opsSnapshot.servers.ssh_key_auth}</span>
-                  <span>Unused {opsSnapshot.servers.unused}</span>
+                  {canAccessServers ? (
+                    <>
+                      <span>Password auth {opsSnapshot.servers.password_auth}</span>
+                      <span>SSH key auth {opsSnapshot.servers.ssh_key_auth}</span>
+                      <span>Unused {opsSnapshot.servers.unused}</span>
+                    </>
+                  ) : (
+                    <span>Server inventory stays with admins.</span>
+                  )}
                 </div>
               </div>
               <div className="overviewCard" data-testid="ops-overview-activity-card">

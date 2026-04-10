@@ -40,7 +40,7 @@ Do not bundle unrelated UI, API, and deployment changes unless a full stack rele
 ```
 
 If preflight fails, stop there.
-This now includes the runtime capability contract audit so frontend local-deploy controls cannot drift away from backend runtime policy unnoticed.
+This now includes the runtime capability contract audit and the production env audit, so frontend local-deploy controls cannot drift away from backend runtime policy and insecure production env overrides get caught before deploy.
 
 For a single local gate that also runs the frontend smokes and backend test suite:
 
@@ -73,6 +73,8 @@ bash scripts/remote_release.sh \
   --admin-username admin \
   --admin-password '<secret>'
 ```
+
+That remote helper now validates the target host env file and pinned `known_hosts` file before it runs `docker compose up`.
 
 For teams that want a guarded click-to-release path, the repository also includes `.github/workflows/release.yml`, a manual GitHub Actions workflow that runs the same remote helper with repository secrets and an environment gate.
 

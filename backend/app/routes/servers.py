@@ -37,7 +37,7 @@ def create_server(payload: ServerCreateRequest, user=Depends(require_admin)) -> 
             detail="New server targets must use ssh_key authentication.",
         )
 
-    next_ssh_key = payload.ssh_key or existing_server.get("ssh_key")
+    next_ssh_key = payload.ssh_key
 
     if payload.auth_type == "ssh_key" and not next_ssh_key:
         raise HTTPException(status_code=400, detail="ssh_key is required for auth_type=ssh_key.")

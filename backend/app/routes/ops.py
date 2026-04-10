@@ -18,7 +18,7 @@ from app.schemas import (
     OpsTemplatesSummary,
     OpsUserSummary,
 )
-from app.services.auth import require_auth
+from app.services.auth import require_auth, user_is_admin
 from app.services.deployments import local_docker_runtime_enabled
 from app.services.server_credentials import SERVER_CREDENTIALS_KEY_ENV
 
@@ -82,7 +82,9 @@ def _is_recent_date(value: str | None, days: int = 7) -> bool:
 
 
 def _build_runtime_capabilities_summary() -> OpsRuntimeCapabilitiesSummary:
-    ssh_mode = os.getenv("DEPLOYMATE_SSH_HOST_KEY_CHECKING", "accept-new").strip().lower() or "accept-new"
+    ssh_mode = os.getenv("DEPLOYMATE_SSH_HOST_KEY_CHECKING", "yes").strip().lower() or "yes"
+    if ssh_mode not in {"yes", "accept-new", "no"}:
+        ssh_mode = "yes"
     known_hosts_path = os.getenv("DEPLOYMATE_SSH_KNOWN_HOSTS_FILE", "").strip()
     strict_known_hosts_configured = False
     if ssh_mode == "yes" and known_hosts_path and os.path.isfile(known_hosts_path):
@@ -109,25 +111,62 @@ def _sanitize_server_export(item: dict) -> dict:
     }
 
 
+def _visible_deployments_for_user(user: dict) -> list[dict]:
+    deployments = list_deployment_records()
+    if user_is_admin(user):
+        return deployments
+    return [item for item in deployments if item.get("owner_user_id") == user["id"]]
+
+
+def _visible_templates_for_user(user: dict) -> list[dict]:
+    templates = list_deployment_templates()
+    if user_is_admin(user):
+        return templates
+    return [item for item in templates if item.get("owner_user_id") == user["id"]]
+
+
+def _visible_notifications_for_user(
+    user: dict,
+    *,
+    deployments: list[dict] | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    notifications = list_notifications(limit=max(limit, 1000))
+    if user_is_admin(user):
+        return notifications[:limit]
+
+    visible_deployment_ids = {
+        item["id"] for item in (deployments or _visible_deployments_for_user(user))
+    }
+    filtered = [
+        item for item in notifications if item.get("deployment_id") in visible_deployment_ids
+    ]
+    return filtered[:limit]
+
+
 def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOverviewResponse:
     attention_items: list[OpsAttentionItem] = []
     deployments = _collection_or_empty(
-        lambda: list_deployment_records(),
+        lambda: _visible_deployments_for_user(user),
         degraded_label="Deployments",
         attention_items=attention_items,
     )
     servers = _collection_or_empty(
-        lambda: list_servers(),
+        lambda: list_servers() if user_is_admin(user) else [],
         degraded_label="Servers",
         attention_items=attention_items,
     )
     templates = _collection_or_empty(
-        lambda: list_deployment_templates(),
+        lambda: _visible_templates_for_user(user),
         degraded_label="Templates",
         attention_items=attention_items,
     )
     notifications = _collection_or_empty(
-        lambda: list_notifications(limit=notifications_limit),
+        lambda: _visible_notifications_for_user(
+            user,
+            deployments=deployments,
+            limit=notifications_limit,
+        ),
         degraded_label="Activity",
         attention_items=attention_items,
     )
@@ -191,8 +230,12 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
         attention_items.append(
             OpsAttentionItem(
                 level="info",
-                title="No saved servers",
-                detail="Only local deploys are available until a VPS target is added.",
+                title="No saved servers" if user_is_admin(user) else "No admin server access",
+                detail=(
+                    "Only local deploys are available until a VPS target is added."
+                    if user_is_admin(user)
+                    else "Remote server inventory stays admin-only until sharing rules exist."
+                ),
             )
         )
 
@@ -228,7 +271,18 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
             OpsAttentionItem(
                 level="warn",
                 title="SSH host trust is not pinned",
-                detail="Switch to strict known-host verification for stronger remote target trust.",
+                detail="Switch back to strict known-host verification for stronger remote target trust.",
+            )
+        )
+
+    if capabilities.ssh_host_key_checking == "yes" and not capabilities.strict_known_hosts_configured:
+        attention_items.append(
+            OpsAttentionItem(
+                level="error",
+                title="Strict SSH trust is enabled but not ready",
+                detail=(
+                    "Prepare a non-empty known_hosts file before running remote server checks or deployments."
+                ),
             )
         )
 
@@ -306,8 +360,11 @@ def get_ops_overview(
 
 
 @router.get("/exports/deployments")
-def export_deployments(format: str = Query(default="json", pattern="^(json|csv)$")):
-    items = _collection_or_503(lambda: list_deployment_records(), label="Deployments")
+def export_deployments(
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    user=Depends(require_auth),
+):
+    items = _collection_or_503(lambda: _visible_deployments_for_user(user), label="Deployments")
     if format == "csv":
         return _csv_response(
             "deploymate-deployments.csv",
@@ -331,7 +388,15 @@ def export_deployments(format: str = Query(default="json", pattern="^(json|csv)$
 
 
 @router.get("/exports/servers")
-def export_servers(format: str = Query(default="json", pattern="^(json|csv)$")):
+def export_servers(
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    user=Depends(require_auth),
+):
+    if not user_is_admin(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Remote server inventory is admin-only.",
+        )
     items = [
         _sanitize_server_export(item)
         for item in _collection_or_503(lambda: list_servers(), label="Servers")
@@ -346,8 +411,11 @@ def export_servers(format: str = Query(default="json", pattern="^(json|csv)$")):
 
 
 @router.get("/exports/templates")
-def export_templates(format: str = Query(default="json", pattern="^(json|csv)$")):
-    items = _collection_or_503(lambda: list_deployment_templates(), label="Templates")
+def export_templates(
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    user=Depends(require_auth),
+):
+    items = _collection_or_503(lambda: _visible_templates_for_user(user), label="Templates")
     if format == "csv":
         return _csv_response(
             "deploymate-templates.csv",
@@ -375,9 +443,10 @@ def export_templates(format: str = Query(default="json", pattern="^(json|csv)$")
 def export_activity(
     format: str = Query(default="json", pattern="^(json|csv)$"),
     limit: int = Query(default=200, ge=1, le=1000),
+    user=Depends(require_auth),
 ):
     items = _collection_or_503(
-        lambda: list_notifications(limit=limit),
+        lambda: _visible_notifications_for_user(user, limit=limit),
         label="Activity",
     )
     normalized = [

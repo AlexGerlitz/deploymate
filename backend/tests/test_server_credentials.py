@@ -36,7 +36,14 @@ class ServerCredentialTests(unittest.TestCase):
             "host": "example.com",
         }
 
-        with patch.dict(os.environ, {SERVER_CREDENTIALS_KEY_ENV: key}, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                SERVER_CREDENTIALS_KEY_ENV: key,
+                "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "accept-new",
+            },
+            clear=False,
+        ):
             server["password"] = encrypt_server_credential("s3cr3t")
             with patch("app.services.runtime_executors.which", return_value="/usr/bin/sshpass"):
                 with patch("app.services.runtime_executors.subprocess.run") as mock_run:
@@ -58,10 +65,17 @@ class ServerCredentialTests(unittest.TestCase):
             "host": "example.com",
         }
 
-        with patch.dict(os.environ, {SERVER_CREDENTIALS_KEY_ENV: key}, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                SERVER_CREDENTIALS_KEY_ENV: key,
+                "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "accept-new",
+            },
+            clear=False,
+        ):
             server["ssh_key"] = encrypt_server_credential("PRIVATE-KEY")
 
-            def _fake_run(command, capture_output, text, check):
+            def _fake_run(command, capture_output, text, check, timeout):
                 key_path = command[command.index("-i") + 1]
                 with open(key_path, "r", encoding="utf-8") as handle:
                     self.assertEqual(handle.read(), "PRIVATE-KEY")

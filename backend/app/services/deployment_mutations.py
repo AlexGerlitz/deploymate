@@ -78,6 +78,7 @@ def create_deployment(
     *,
     enforce_plan_limit_fn,
     get_server_or_404_fn,
+    ensure_remote_server_access_allowed_fn,
     ensure_runtime_target_allowed_fn,
     ensure_docker_is_available_fn,
     ensure_external_port_is_available_fn,
@@ -91,6 +92,7 @@ def create_deployment(
 ) -> DeploymentResponse:
     enforce_plan_limit_fn(user, "deployments")
     server = get_server_or_404_fn(payload.server_id) if payload.server_id else None
+    ensure_remote_server_access_allowed_fn(user, server)
     ensure_runtime_target_allowed_fn(server)
     ensure_docker_is_available_fn(server)
     ensure_external_port_is_available_fn(payload.external_port, server)
@@ -111,6 +113,7 @@ def create_deployment(
         "image": payload.image,
         "container_name": container_name,
         "container_id": None,
+        "owner_user_id": user["id"],
         "created_at": datetime.now(timezone.utc),
         "error": None,
         "internal_port": payload.internal_port,

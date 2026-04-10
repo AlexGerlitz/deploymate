@@ -172,30 +172,6 @@ else:
 PY
 }
 
-json_query() {
-  local file="$1"
-  local expression="$2"
-
-  python3 - "$file" "$expression" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-expression = sys.argv[2]
-
-with open(path, "r", encoding="utf-8") as fh:
-    data = json.load(fh)
-
-value = eval(expression, {"__builtins__": {}}, {"data": data, "len": len})
-if isinstance(value, bool):
-    print("true" if value else "false")
-elif value is None:
-    print("null")
-else:
-    print(value)
-PY
-}
-
 ensure_runtime_server_id() {
   if [ -n "$RUNTIME_SERVER_ID" ]; then
     return 0

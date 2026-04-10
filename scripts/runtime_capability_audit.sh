@@ -6,6 +6,42 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT_DIR/scripts/audit_cache.sh"
 cd "$ROOT_DIR"
 
+ENV_FILE="${DEPLOYMATE_RUNTIME_AUDIT_ENV_FILE:-.env.production}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bash scripts/runtime_capability_audit.sh [--env-file <path>]
+
+Options:
+  --env-file <path>   Production env file to validate. Default: .env.production
+  -h, --help          Show this help
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "[runtime-capability-audit] unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$ENV_FILE" ]; then
+  echo "[runtime-capability-audit] --env-file requires a non-empty path" >&2
+  exit 1
+fi
+
 if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" != "1" ]; then
   echo "[runtime-capability-audit] skipped for this local diff"
   exit 0
@@ -27,12 +63,14 @@ runtime_capability_files=(
   ".env.production.example"
 )
 
-if [ -f ".env.production" ]; then
-  runtime_capability_files+=(".env.production")
+if [ -f "$ENV_FILE" ]; then
+  runtime_capability_files+=("$ENV_FILE")
 fi
 
-runtime_capability_fingerprint="$(audit_cache_fingerprint_files \
+runtime_capability_metadata="$(printf 'env_file=%s\n' "$ENV_FILE")"
+runtime_capability_fingerprint="$(audit_cache_fingerprint_inputs \
   "runtime-capability-audit" \
+  "$runtime_capability_metadata" \
   "${runtime_capability_files[@]}")"
 
 if audit_cache_persistent_has "runtime_capability_audit" "$runtime_capability_fingerprint"; then
@@ -132,34 +170,34 @@ fi
 
 echo "[runtime-capability-audit] checking production env alignment"
 
-if [ ! -f ".env.production" ]; then
-  echo "[runtime-capability-audit] no .env.production file found; static contract checks only"
+if [ ! -f "$ENV_FILE" ]; then
+  echo "[runtime-capability-audit] no $ENV_FILE file found; static contract checks only"
   echo "[runtime-capability-audit] ok"
   audit_cache_persistent_mark "runtime_capability_audit" "$runtime_capability_fingerprint"
   audit_cache_mark runtime_capability_audit
   exit 0
 fi
 
-backend_value="$(read_env_value ".env.production" "DEPLOYMATE_LOCAL_DOCKER_ENABLED" || true)"
-frontend_value="$(read_env_value ".env.production" "NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED" || true)"
+backend_value="$(read_env_value "$ENV_FILE" "DEPLOYMATE_LOCAL_DOCKER_ENABLED" || true)"
+frontend_value="$(read_env_value "$ENV_FILE" "NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED" || true)"
 
 if [ -z "$backend_value" ]; then
-  fail ".env.production is missing DEPLOYMATE_LOCAL_DOCKER_ENABLED"
+  fail "$ENV_FILE is missing DEPLOYMATE_LOCAL_DOCKER_ENABLED"
 fi
 
 if [ -z "$frontend_value" ]; then
-  fail ".env.production is missing NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED"
+  fail "$ENV_FILE is missing NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED"
 fi
 
 case "$backend_value" in
   true)
-    [ "$frontend_value" = "1" ] || fail ".env.production has DEPLOYMATE_LOCAL_DOCKER_ENABLED=true but NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=$frontend_value"
+    [ "$frontend_value" = "1" ] || fail "$ENV_FILE has DEPLOYMATE_LOCAL_DOCKER_ENABLED=true but NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=$frontend_value"
     ;;
   false)
-    [ "$frontend_value" = "0" ] || fail ".env.production has DEPLOYMATE_LOCAL_DOCKER_ENABLED=false but NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=$frontend_value"
+    [ "$frontend_value" = "0" ] || fail "$ENV_FILE has DEPLOYMATE_LOCAL_DOCKER_ENABLED=false but NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=$frontend_value"
     ;;
   *)
-    fail ".env.production has unsupported DEPLOYMATE_LOCAL_DOCKER_ENABLED=$backend_value"
+    fail "$ENV_FILE has unsupported DEPLOYMATE_LOCAL_DOCKER_ENABLED=$backend_value"
     ;;
 esac
 

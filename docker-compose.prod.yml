@@ -37,8 +37,11 @@ services:
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
       DEPLOYMATE_LOCAL_DOCKER_ENABLED: ${DEPLOYMATE_LOCAL_DOCKER_ENABLED:-false}
       DEPLOYMATE_PUBLIC_SIGNUP_ENABLED: ${DEPLOYMATE_PUBLIC_SIGNUP_ENABLED:-true}
-      DEPLOYMATE_SSH_HOST_KEY_CHECKING: ${DEPLOYMATE_SSH_HOST_KEY_CHECKING:-accept-new}
-      DEPLOYMATE_SSH_KNOWN_HOSTS_FILE: ${DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:-/tmp/deploymate_known_hosts}
+      DEPLOYMATE_AUTH_RATE_LIMIT_BACKEND: ${DEPLOYMATE_AUTH_RATE_LIMIT_BACKEND:-database}
+      DEPLOYMATE_SSH_HOST_KEY_CHECKING: ${DEPLOYMATE_SSH_HOST_KEY_CHECKING:-yes}
+      DEPLOYMATE_SSH_KNOWN_HOSTS_FILE: ${DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:-/opt/deploymate/.secrets/deploymate_known_hosts}
+    volumes:
+      - ${DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:-/opt/deploymate/.secrets/deploymate_known_hosts}:${DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:-/opt/deploymate/.secrets/deploymate_known_hosts}:ro
     depends_on:
       postgres:
         condition: service_healthy

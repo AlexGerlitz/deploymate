@@ -3,7 +3,7 @@ import hashlib
 import json
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import psycopg
@@ -86,6 +86,19 @@ def init_db() -> None:
     );
     """
 
+    create_auth_rate_limit_events_table_sql = """
+    CREATE TABLE IF NOT EXISTS auth_rate_limit_events (
+        id UUID PRIMARY KEY,
+        bucket_key TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL
+    );
+    """
+
+    create_auth_rate_limit_events_bucket_index_sql = """
+    CREATE INDEX IF NOT EXISTS auth_rate_limit_events_bucket_created_at_idx
+    ON auth_rate_limit_events (bucket_key, created_at DESC);
+    """
+
     create_servers_table_sql = """
     CREATE TABLE IF NOT EXISTS servers (
         id UUID PRIMARY KEY,
@@ -107,6 +120,7 @@ def init_db() -> None:
         image TEXT NOT NULL,
         container_name TEXT NOT NULL,
         container_id TEXT NULL,
+        owner_user_id UUID NULL,
         created_at TIMESTAMPTZ NOT NULL,
         error TEXT NULL,
         internal_port INTEGER NULL,
@@ -122,6 +136,11 @@ def init_db() -> None:
     alter_deployments_add_env_sql = """
     ALTER TABLE deployments
     ADD COLUMN IF NOT EXISTS env TEXT NOT NULL DEFAULT '{}';
+    """
+
+    alter_deployments_add_owner_user_id_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS owner_user_id UUID NULL;
     """
 
     create_notifications_table_sql = """
@@ -221,6 +240,7 @@ def init_db() -> None:
         internal_port INTEGER NULL,
         external_port INTEGER NULL,
         server_id UUID NULL,
+        owner_user_id UUID NULL,
         env TEXT NOT NULL DEFAULT '{}',
         created_at TIMESTAMPTZ NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL,
@@ -244,6 +264,11 @@ def init_db() -> None:
     ADD COLUMN IF NOT EXISTS use_count INTEGER NOT NULL DEFAULT 0;
     """
 
+    alter_templates_add_owner_user_id_sql = """
+    ALTER TABLE deployment_templates
+    ADD COLUMN IF NOT EXISTS owner_user_id UUID NULL;
+    """
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(create_users_table_sql)
@@ -251,10 +276,13 @@ def init_db() -> None:
             cur.execute(alter_users_add_plan_sql)
             cur.execute(alter_users_add_role_sql)
             cur.execute(create_sessions_table_sql)
+            cur.execute(create_auth_rate_limit_events_table_sql)
+            cur.execute(create_auth_rate_limit_events_bucket_index_sql)
             cur.execute(create_servers_table_sql)
             cur.execute(create_deployments_table_sql)
             cur.execute(alter_deployments_add_server_id_sql)
             cur.execute(alter_deployments_add_env_sql)
+            cur.execute(alter_deployments_add_owner_user_id_sql)
             cur.execute(create_notifications_table_sql)
             cur.execute(drop_notifications_fk_sql)
             cur.execute(create_deployment_activity_table_sql)
@@ -270,8 +298,10 @@ def init_db() -> None:
             cur.execute(alter_templates_add_updated_at_sql)
             cur.execute(alter_templates_add_last_used_at_sql)
             cur.execute(alter_templates_add_use_count_sql)
+            cur.execute(alter_templates_add_owner_user_id_sql)
             _assert_server_credentials_policy(cur)
             _migrate_server_credentials_in_place(cur)
+            _cleanup_orphaned_runtime_records(cur)
         conn.commit()
 
     ensure_default_user()
@@ -305,6 +335,7 @@ def insert_deployment_record(deployment_record: dict[str, Any]) -> None:
         image,
         container_name,
         container_id,
+        owner_user_id,
         created_at,
         error,
         internal_port,
@@ -313,7 +344,7 @@ def insert_deployment_record(deployment_record: dict[str, Any]) -> None:
         env
     )
     VALUES (%(id)s, %(status)s, %(image)s, %(container_name)s, %(container_id)s,
-            %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(server_id)s, %(env)s);
+            %(owner_user_id)s, %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(server_id)s, %(env)s);
     """
 
     with get_db_connection() as conn:
@@ -384,6 +415,7 @@ def get_deployment_record_or_404(deployment_id: str) -> dict[str, Any]:
         d.image,
         d.container_name,
         d.container_id,
+        d.owner_user_id,
         d.created_at,
         d.error,
         d.internal_port,
@@ -416,6 +448,7 @@ def list_deployment_records() -> list[dict[str, Any]]:
         d.image,
         d.container_name,
         d.container_id,
+        d.owner_user_id,
         d.created_at,
         d.error,
         d.internal_port,
@@ -437,6 +470,16 @@ def list_deployment_records() -> list[dict[str, Any]]:
 
 
 def delete_deployment_record(deployment_id: str) -> None:
+    delete_notifications_sql = """
+    DELETE FROM notifications
+    WHERE deployment_id = %s;
+    """
+
+    delete_activity_sql = """
+    DELETE FROM deployment_activity
+    WHERE deployment_id = %s;
+    """
+
     delete_sql = """
     DELETE FROM deployments
     WHERE id = %s;
@@ -444,6 +487,8 @@ def delete_deployment_record(deployment_id: str) -> None:
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            cur.execute(delete_notifications_sql, (deployment_id,))
+            cur.execute(delete_activity_sql, (deployment_id,))
             cur.execute(delete_sql, (deployment_id,))
         conn.commit()
 
@@ -458,6 +503,7 @@ def insert_deployment_template(template_record: dict[str, Any]) -> None:
         internal_port,
         external_port,
         server_id,
+        owner_user_id,
         env,
         created_at,
         updated_at,
@@ -472,6 +518,7 @@ def insert_deployment_template(template_record: dict[str, Any]) -> None:
         %(internal_port)s,
         %(external_port)s,
         %(server_id)s,
+        %(owner_user_id)s,
         %(env)s,
         %(created_at)s,
         %(updated_at)s,
@@ -496,6 +543,7 @@ def list_deployment_templates() -> list[dict[str, Any]]:
         t.internal_port,
         t.external_port,
         t.server_id,
+        t.owner_user_id,
         t.env,
         t.created_at,
         t.updated_at,
@@ -525,6 +573,7 @@ def get_deployment_template_or_404(template_id: str) -> dict[str, Any]:
         t.internal_port,
         t.external_port,
         t.server_id,
+        t.owner_user_id,
         t.env,
         t.created_at,
         t.updated_at,
@@ -827,12 +876,43 @@ def create_notification(
 def ensure_default_user() -> None:
     username = os.getenv("DEPLOYMATE_ADMIN_USERNAME", "admin")
     password = os.getenv("DEPLOYMATE_ADMIN_PASSWORD", "admin")
+    insecure_default_requested = username == "admin" and password == "admin"
+    insecure_default_allowed = os.getenv(
+        "DEPLOYMATE_ALLOW_INSECURE_DEFAULT_ADMIN",
+        "false",
+    ).strip().lower() in {"1", "true", "yes", "on"}
     existing_user = get_user_by_username(username)
     if existing_user:
         set_user_role(existing_user["id"], "admin")
-        if username == "admin" and password == "admin" and _verify_password("admin", existing_user["password_hash"]):
-            set_user_must_change_password(existing_user["id"], True)
+        existing_user_has_default_admin_password = (
+            existing_user["username"] == "admin"
+            and _verify_password("admin", existing_user["password_hash"])
+        )
+        if existing_user_has_default_admin_password:
+            if insecure_default_requested:
+                if not insecure_default_allowed:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            "DeployMate refuses to start with the bootstrap admin/admin credentials. "
+                            "Set DEPLOYMATE_ADMIN_PASSWORD to a real secret or acknowledge local-only "
+                            "bootstrap with DEPLOYMATE_ALLOW_INSECURE_DEFAULT_ADMIN=true."
+                        ),
+                    )
+                set_user_must_change_password(existing_user["id"], True)
+            else:
+                update_user_password(existing_user["id"], password)
         return
+
+    if insecure_default_requested and not insecure_default_allowed:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "DeployMate refuses to create the bootstrap admin/admin account. "
+                "Set DEPLOYMATE_ADMIN_PASSWORD to a real secret or acknowledge local-only "
+                "bootstrap with DEPLOYMATE_ALLOW_INSECURE_DEFAULT_ADMIN=true."
+            ),
+        )
 
     user_record = {
         "id": str(uuid.uuid4()),
@@ -840,19 +920,11 @@ def ensure_default_user() -> None:
         "password_hash": _hash_password(password),
         "plan": "trial",
         "role": "admin",
-        "must_change_password": username == "admin" and password == "admin",
+        "must_change_password": insecure_default_requested,
         "created_at": datetime.now(timezone.utc),
     }
 
-    insert_sql = """
-    INSERT INTO users (id, username, password_hash, plan, role, must_change_password, created_at)
-    VALUES (%(id)s, %(username)s, %(password_hash)s, %(plan)s, %(role)s, %(must_change_password)s, %(created_at)s);
-    """
-
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(insert_sql, user_record)
-        conn.commit()
+    insert_user(user_record)
 
 
 def get_user_by_username(username: str) -> dict[str, Any] | None:
@@ -1022,6 +1094,74 @@ def create_session(token: str, user_id: str) -> None:
         conn.commit()
 
 
+def record_auth_rate_limit_event(bucket_key: str, created_at: datetime | None = None) -> None:
+    event_record = {
+        "id": str(uuid.uuid4()),
+        "bucket_key": bucket_key,
+        "created_at": created_at or datetime.now(timezone.utc),
+    }
+
+    insert_sql = """
+    INSERT INTO auth_rate_limit_events (id, bucket_key, created_at)
+    VALUES (%(id)s, %(bucket_key)s, %(created_at)s);
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(insert_sql, event_record)
+        conn.commit()
+
+
+def count_recent_auth_rate_limit_events(
+    bucket_key: str,
+    window_seconds: int,
+    now: datetime | None = None,
+) -> int:
+    current_time = now or datetime.now(timezone.utc)
+    threshold = current_time - timedelta(seconds=window_seconds)
+    prune_sql = """
+    DELETE FROM auth_rate_limit_events
+    WHERE created_at < %s;
+    """
+    count_sql = """
+    SELECT COUNT(*)
+    FROM auth_rate_limit_events
+    WHERE bucket_key = %s
+      AND created_at >= %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(prune_sql, (threshold,))
+            cur.execute(count_sql, (bucket_key, threshold))
+            row = cur.fetchone()
+        conn.commit()
+        return int(row[0]) if row else 0
+
+
+def clear_auth_rate_limit_events(bucket_key: str) -> None:
+    delete_sql = """
+    DELETE FROM auth_rate_limit_events
+    WHERE bucket_key = %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(delete_sql, (bucket_key,))
+        conn.commit()
+
+
+def reset_auth_rate_limit_events() -> None:
+    delete_sql = """
+    DELETE FROM auth_rate_limit_events;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(delete_sql)
+        conn.commit()
+
+
 def get_session_user_by_token(token: str) -> dict[str, Any] | None:
     select_sql = """
     SELECT u.id, u.username, u.plan, u.role, u.must_change_password, u.created_at,
@@ -1074,6 +1214,43 @@ def count_all_deployments() -> int:
             cur.execute(select_sql)
             row = cur.fetchone()
             return int(row[0]) if row else 0
+
+
+def count_deployments_for_owner_user(user_id: str) -> int:
+    select_sql = """
+    SELECT COUNT(*)
+    FROM deployments
+    WHERE owner_user_id = %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(select_sql, (user_id,))
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
+
+
+def _cleanup_orphaned_runtime_records(cur: psycopg.Cursor[Any]) -> None:
+    cur.execute(
+        """
+        DELETE FROM notifications n
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM deployments d
+            WHERE d.id = n.deployment_id
+        );
+        """
+    )
+    cur.execute(
+        """
+        DELETE FROM deployment_activity a
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM deployments d
+            WHERE d.id = a.deployment_id
+        );
+        """
+    )
 
 
 def insert_upgrade_request(request_record: dict[str, Any]) -> None:

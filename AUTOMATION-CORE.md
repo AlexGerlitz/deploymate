@@ -15,6 +15,8 @@ These files are the portable part:
 - `scripts/dev_verify_changed.sh`
 - `scripts/preflight.sh`
 - `scripts/release_workflow.sh`
+- `scripts/production_env_audit.sh`
+- `scripts/production_contract_gate.sh`
 - `scripts/frontend_smoke_shared.sh`
 - `scripts/lib/project_automation.sh`
 - `scripts/lib/project_automation_targets.sh`
@@ -155,4 +157,6 @@ These parts are now explicitly adapter-driven:
 - frontend fast smoke target rules
 - backend test target rules
 - security/runtime scope rules
+- production env contract audit rules
+- CI/manual workflow production contract gate
 - frontend smoke assertions for auth, ops, runtime, admin, admin-interactions, restore, servers, and templates

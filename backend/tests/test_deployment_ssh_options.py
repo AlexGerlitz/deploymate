@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from subprocess import TimeoutExpired
 from unittest.mock import patch
 
 from fastapi import HTTPException
@@ -51,10 +52,30 @@ class DeploymentSshOptionsTests(unittest.TestCase):
         executor = get_runtime_executor({"host": "example.com"})
         self.assertIsInstance(executor, RemoteRuntimeExecutor)
 
-    def test_default_ssh_mode_is_accept_new(self):
+    def test_default_ssh_mode_is_strict(self):
         server = {"port": 22}
 
-        with patch.dict(os.environ, {}, clear=False):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            known_hosts = os.path.join(temp_dir, "known_hosts")
+            with open(known_hosts, "w", encoding="utf-8") as handle:
+                handle.write("example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey\n")
+            with patch.dict(
+                os.environ,
+                {
+                    "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "yes",
+                    "DEPLOYMATE_SSH_KNOWN_HOSTS_FILE": known_hosts,
+                },
+                clear=False,
+            ):
+                command = _build_ssh_base_command(server)
+
+        self.assertIn("StrictHostKeyChecking=yes", command)
+        self.assertTrue(any(item.startswith("UserKnownHostsFile=") for item in command))
+
+    def test_accept_new_mode_requires_explicit_opt_in(self):
+        server = {"port": 22}
+
+        with patch.dict(os.environ, {"DEPLOYMATE_SSH_HOST_KEY_CHECKING": "accept-new"}, clear=False):
             command = _build_ssh_base_command(server)
 
         self.assertIn("StrictHostKeyChecking=accept-new", command)
@@ -131,6 +152,55 @@ class DeploymentSshOptionsTests(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 500)
         self.assertIn("is empty", context.exception.detail)
+
+    def test_local_runtime_executor_maps_timeout_to_http_504(self):
+        with (
+            patch.dict(os.environ, {"DEPLOYMATE_RUNTIME_COMMAND_TIMEOUT_SECONDS": "7"}, clear=False),
+            patch("app.services.runtime_executors.ensure_local_docker_runtime_enabled", return_value=None),
+            patch(
+                "app.services.runtime_executors.subprocess.run",
+                side_effect=TimeoutExpired(cmd=["docker", "ps"], timeout=7),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as context:
+                LocalRuntimeExecutor().run(["docker", "ps"])
+
+        self.assertEqual(context.exception.status_code, 504)
+        self.assertEqual(context.exception.detail, "docker timed out after 7 seconds.")
+
+    def test_remote_runtime_executor_maps_timeout_to_http_504(self):
+        server = {
+            "auth_type": "password",
+            "password": "ENCRYPTED-PASSWORD",
+            "username": "deploy",
+            "host": "example.com",
+            "port": 22,
+        }
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "DEPLOYMATE_RUNTIME_COMMAND_TIMEOUT_SECONDS": "11",
+                    "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "no",
+                },
+                clear=False,
+            ),
+            patch("app.services.runtime_executors.decrypt_server_credential", side_effect=["secret-pass", None]),
+            patch("app.services.runtime_executors.which", return_value="/usr/bin/sshpass"),
+            patch(
+                "app.services.runtime_executors.subprocess.run",
+                side_effect=TimeoutExpired(cmd=["ssh"], timeout=11),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as context:
+                RemoteRuntimeExecutor(server).run(["docker", "ps"])
+
+        self.assertEqual(context.exception.status_code, 504)
+        self.assertEqual(
+            context.exception.detail,
+            "SSH command for example.com:22 timed out after 11 seconds.",
+        )
 
 
 if __name__ == "__main__":

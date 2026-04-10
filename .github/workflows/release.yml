@@ -39,6 +39,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Run production contract gate
+        run: bash scripts/production_contract_gate.sh
+        env:
+          BACKEND_PYTHON: python
+
       - name: Run remote release
         id: remote_release
         uses: ./.github/actions/remote-release

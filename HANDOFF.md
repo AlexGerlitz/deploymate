@@ -18,6 +18,19 @@ Updated: 2026-04-07
   - понять, что делать дальше без длинного скролла и лишнего жаргона
 - Для быстрой ресинхронизации Codex теперь использовать короткие команды из [CODEX-PROTOCOL.md](CODEX-PROTOCOL.md).
 
+## Current Security Boundary
+
+- Новый жёсткий проектный принцип: runtime-данные не могут быть "по умолчанию общими" просто потому, что пользователь уже вошёл в систему.
+- Базовая безопасная модель на текущем этапе:
+  - `admin` видит весь продуктовый runtime и admin depth
+  - `member` видит только свои deployments/templates/activity/notifications
+  - remote server inventory и remote server execution остаются `admin-only`, пока у проекта нет явной sharing/ownership модели для серверов
+- Дополнительные жёсткие guardrails теперь тоже часть текущей boundary:
+  - auth throttling должен жить в shared state, а не в памяти одного процесса
+  - bootstrap `admin/admin` не допускается без явного local-only override
+  - SSH host trust по умолчанию должен быть strict/pinned, а не `accept-new`
+- Любой новый runtime surface дальше нужно оценивать не только по clarity, но и по ownership boundary: кто именно может это видеть, экспортировать и менять.
+
 ## Current Build Reality
 
 - `/app` сейчас работает как обзорный входной экран.

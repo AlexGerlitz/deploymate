@@ -149,7 +149,7 @@ class OpsUserSummary(BaseModel):
 
 class OpsRuntimeCapabilitiesSummary(BaseModel):
     local_docker_enabled: bool = False
-    ssh_host_key_checking: str = "accept-new"
+    ssh_host_key_checking: str = "yes"
     strict_known_hosts_configured: bool = False
     server_credentials_key_configured: bool = False
     remote_only_recommended: bool = True

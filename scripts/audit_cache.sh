@@ -221,7 +221,7 @@ audit_cache_print_family_summary() {
       if (key ~ /^release_workflow_audit$/ || key ~ /^release_workflow_contract_/) {
         return "release_contract"
       }
-      if (key ~ /^runtime_capability_audit/ || key ~ /^local_runtime_audit/) {
+      if (key ~ /^runtime_capability_audit/ || key ~ /^production_env_audit/ || key ~ /^local_runtime_audit/) {
         return "runtime"
       }
       return ""
@@ -271,7 +271,7 @@ audit_cache_print_family_hint() {
       if (key ~ /^release_workflow_audit$/ || key ~ /^release_workflow_contract_/) {
         return "release_contract"
       }
-      if (key ~ /^runtime_capability_audit/ || key ~ /^local_runtime_audit/) {
+      if (key ~ /^runtime_capability_audit/ || key ~ /^production_env_audit/ || key ~ /^local_runtime_audit/) {
         return "runtime"
       }
       return ""

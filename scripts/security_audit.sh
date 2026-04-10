@@ -90,6 +90,7 @@ security_phase_files=(
   "scripts/server_credentials_audit.sh"
   "scripts/local_runtime_audit.sh"
   "scripts/runtime_capability_audit.sh"
+  "scripts/production_env_audit.sh"
   "scripts/audit_cache.sh"
   "scripts/project_automation_targets.sh"
   "scripts/project_automation_config.sh"
@@ -169,7 +170,7 @@ if [ "${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}" = "skip" ]; then
 else
   for file in "${FILTERED_FILES[@]}"; do
     case "$file" in
-      docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/local_runtime_audit.sh|scripts/post_deploy_smoke.sh|backend/app/routes/deployments.py|backend/app/routes/ops.py|backend/app/routes/servers.py|backend/app/services/runtime_executors.py|backend/tests/test_deployment_ssh_options.py)
+      docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/local_runtime_audit.sh|scripts/post_deploy_smoke.sh|backend/app/routes/deployments.py|backend/app/routes/ops.py|backend/app/routes/servers.py|backend/app/services/runtime_executors.py|backend/tests/test_deployment_ssh_options.py)
         RUNTIME_FILES+=("$file")
         ;;
     esac
@@ -268,6 +269,15 @@ if [ -f "scripts/runtime_capability_audit.sh" ]; then
     bash scripts/runtime_capability_audit.sh
   else
     echo "[security-audit] runtime capability audit skipped for this local diff"
+  fi
+fi
+
+if [ -f "scripts/production_env_audit.sh" ]; then
+  if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" = "1" ]; then
+    echo "[security-audit] production env audit"
+    bash scripts/production_env_audit.sh
+  else
+    echo "[security-audit] production env audit skipped for this local diff"
   fi
 fi
 

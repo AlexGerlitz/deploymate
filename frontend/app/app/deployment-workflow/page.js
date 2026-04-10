@@ -90,6 +90,8 @@ function DeploymentWorkflowPageContent() {
   });
   const [templateName, setTemplateName] = useState("");
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
+  const canAccessServers = Boolean(currentUser?.is_admin);
+  const serverAccessBlocked = !canAccessServers && !localDeploymentsEnabled;
 
   const deploymentLimitReached =
     currentUser &&
@@ -173,14 +175,16 @@ function DeploymentWorkflowPageContent() {
     ? filteredTemplates.filter((template) => template.id !== primaryTemplate.id)
     : [];
   const workflowState = buildDeploymentWorkflowState({
-    isAdmin: Boolean(currentUser?.is_admin),
+    isAdmin: canAccessServers,
     localDeploymentsEnabled,
     deploymentsTotal: deployments.length,
     failedDeployments: failedDeploymentCount,
     serversTotal: servers.length,
   });
   const workflowPriority =
-    workflowState.mode === "prerequisite"
+    serverAccessBlocked
+      ? "Server inventory is managed by an admin for this workspace. Continue in the deployment workflow and ask an admin to confirm the target."
+      : workflowState.mode === "prerequisite"
       ? "Remote rollout path needs one server target before deployment creation."
       : workflowState.mode === "live"
         ? "Failed rollout needs review before the next deploy."
@@ -188,12 +192,20 @@ function DeploymentWorkflowPageContent() {
           ? "Template-driven rollout path is ready."
           : "Create the next deployment from one guided workspace.";
   const workflowPrimaryMode = workflowState.mode === "live" ? "live" : "create";
-  const workflowPrimaryAction = {
-    title: workflowState.title,
-    detail: workflowState.detail,
-    href: workflowState.href,
-    actionLabel: workflowState.actionLabel,
-  };
+  const workflowPrimaryAction = serverAccessBlocked
+    ? {
+        title: "Server target is admin-managed",
+        detail:
+          "Members cannot pick saved server targets here. Ask an admin to confirm the target, then come back to the deployment workflow.",
+        href: "/app",
+        actionLabel: "Back to overview",
+      }
+    : {
+        title: workflowState.title,
+        detail: workflowState.detail,
+        href: workflowState.href,
+        actionLabel: workflowState.actionLabel,
+      };
   const primaryRuntimeDeployment =
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     filteredDeployments[0] ||
@@ -660,7 +672,11 @@ function DeploymentWorkflowPageContent() {
   }
 
   function validateTemplateDraft(draft, options = {}) {
-    const { forDeployment = false, ignoreTemplateId = "" } = options;
+    const {
+      forDeployment = false,
+      ignoreTemplateId = "",
+      canAccessServers: hasServerAccess = true,
+    } = options;
     const errors = [];
     const warnings = [];
     const internalPort = draft.internal_port.trim();
@@ -676,7 +692,11 @@ function DeploymentWorkflowPageContent() {
     }
 
     if (!localDeploymentsEnabled && !draft.server_id) {
-      errors.push("This environment is remote-only. Choose a saved server target.");
+      errors.push(
+        hasServerAccess
+          ? "This environment is remote-only. Choose a saved server target."
+          : "Server targets are managed by an admin for this workspace.",
+      );
     }
 
     errors.push(...envIssues);
@@ -808,7 +828,7 @@ function DeploymentWorkflowPageContent() {
     setCreatedDeployment(null);
 
     const draft = buildCurrentDraft();
-    const preflight = validateTemplateDraft(draft, { forDeployment: true });
+    const preflight = validateTemplateDraft(draft, { forDeployment: true, canAccessServers });
 
     if (preflight.errors.length > 0) {
       setSubmitError(preflight.errors[0]);
@@ -895,6 +915,7 @@ function DeploymentWorkflowPageContent() {
     const draft = buildCurrentDraft();
     const preflight = validateTemplateDraft(draft, {
       ignoreTemplateId: editingTemplateId,
+      canAccessServers,
     });
 
     if (!draft.template_name) {
@@ -1102,6 +1123,7 @@ function DeploymentWorkflowPageContent() {
       ? validateTemplateDraft(draft, {
           forDeployment: true,
           ignoreTemplateId: templateId,
+          canAccessServers,
         })
       : { errors: [], warnings: [] };
 
@@ -1154,7 +1176,7 @@ function DeploymentWorkflowPageContent() {
 
   async function handleCopyNextStep() {
     try {
-      await copyTextToClipboard(workflowNextStep.nextStep);
+      await copyTextToClipboard(memberWorkflowNextStep.nextStep);
       setWorkflowMessage("Deployment workflow next-step summary copied.");
     } catch {
       setTemplateDeployError("Failed to copy the deployment workflow next step.");
@@ -1164,6 +1186,7 @@ function DeploymentWorkflowPageContent() {
   const currentDraft = buildCurrentDraft();
   const templateFormPreflight = validateTemplateDraft(currentDraft, {
     ignoreTemplateId: editingTemplateId,
+    canAccessServers,
   });
   const createDeploymentBlocked =
     submitting ||
@@ -1180,6 +1203,16 @@ function DeploymentWorkflowPageContent() {
     templateName,
     templateFormPreflight,
   });
+  const memberWorkflowNextStep = serverAccessBlocked
+    ? {
+        focus: "Server target is admin-managed",
+        nextStep:
+          "Ask an admin to confirm the saved server target before you create a remote deployment here.",
+        primaryAction: "Back to overview",
+        secondaryAction: "Copy next step",
+        tone: "warn",
+      }
+    : workflowNextStep;
   const previewDiffRows = buildTemplateDiff(primaryTemplate, currentDraft, servers);
 
   if (!authChecked) {
@@ -1229,12 +1262,15 @@ function DeploymentWorkflowPageContent() {
               </p>
             </div>
             <div className="buttonRow">
-              <Link href="/app/server-review" className="linkButton">
-                Back to server step
-              </Link>
-              <Link href="/app" className="linkButton">
-                Overview
-              </Link>
+              {canAccessServers ? (
+                <Link href="/app/server-review" className="linkButton">
+                  Back to server step
+                </Link>
+              ) : (
+                <Link href="/app" className="linkButton">
+                  Overview
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => refreshWorkspace()}
@@ -1281,7 +1317,7 @@ function DeploymentWorkflowPageContent() {
             Smoke mode uses fixture data for deployment workflow surfaces.
           </div>
         ) : null}
-        {workflowState.mode === "prerequisite" ? (
+        {workflowState.mode === "prerequisite" && canAccessServers ? (
           <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-prerequisite-card">
             <div className="sectionHeader workspaceGuideHeader">
               <div>
@@ -1317,6 +1353,42 @@ function DeploymentWorkflowPageContent() {
               </Link>
             </div>
           </article>
+        ) : serverAccessBlocked ? (
+          <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-member-blocked-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2>Server target is admin-managed</h2>
+                <p className="formHint">
+                  Members cannot access saved server inventory here. Ask an admin to confirm the remote target, then come back to create or review the rollout.
+                </p>
+              </div>
+            </div>
+            <div className="workspaceReviewerGrid">
+              <article className="workspaceReviewerCard">
+                <span>1. Ask an admin</span>
+                <strong>Confirm the target</strong>
+                <p>Saved server targets stay with admins for this workspace.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>2. Keep working</span>
+                <strong>Use the deployment workflow</strong>
+                <p>You can still review templates and plan the rollout while the target is being confirmed.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>3. Return here</span>
+                <strong>Create the deployment</strong>
+                <p>Come back once the target is available and continue with the guided form below.</p>
+              </article>
+            </div>
+            <div className="formActions">
+              <Link href="/app" className="landingButton primaryButton">
+                Back to overview
+              </Link>
+              <Link href="/app/deployment-workflow" className="landingButton secondaryButton">
+                Stay in workflow
+              </Link>
+            </div>
+          </article>
         ) : null}
 
         <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-primary-action-card">
@@ -1333,7 +1405,9 @@ function DeploymentWorkflowPageContent() {
               <span>Do this now</span>
               <strong>{workflowPrimaryAction.actionLabel}</strong>
               <p>
-                {workflowState.mode === "prerequisite"
+                {serverAccessBlocked
+                  ? "Saved server targets stay with admins, so the main task is confirming the target before a remote rollout can happen."
+                  : workflowState.mode === "prerequisite"
                   ? "This workspace is ready for rollout work, but the remote-only prerequisite still comes first."
                   : workflowPrimaryMode === "live"
                   ? "A failed rollout already exists, so review the live queue before creating anything new."
@@ -1395,20 +1469,28 @@ function DeploymentWorkflowPageContent() {
           </div>
           <div className="row">
             <span className="label">Current focus</span>
-            <span data-testid="deployment-workflow-main-next-step-focus">{workflowNextStep.focus}</span>
+            <span data-testid="deployment-workflow-main-next-step-focus">{memberWorkflowNextStep.focus}</span>
           </div>
           <div className="row">
             <span className="label">What to do</span>
-            <span data-testid="deployment-workflow-main-next-step-copy">{workflowNextStep.nextStep}</span>
+            <span data-testid="deployment-workflow-main-next-step-copy">{memberWorkflowNextStep.nextStep}</span>
           </div>
           <div className="backupSummaryBadges">
-            <span className={`status ${workflowNextStep.tone}`}>filtered {filteredDeployments.length}</span>
+            <span className={`status ${memberWorkflowNextStep.tone}`}>filtered {filteredDeployments.length}</span>
             <span className="status healthy">running {runningDeploymentCount}</span>
             <span className="status error">failed {failedDeploymentCount}</span>
             <span className="status info">templates {templates.length}</span>
           </div>
           <div className="actionCluster">
-            {workflowState.mode === "prerequisite" ? (
+            {serverAccessBlocked ? (
+              <Link
+                href="/app"
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+              >
+                Back to overview
+              </Link>
+            ) : workflowState.mode === "prerequisite" ? (
               <Link
                 href="/app/server-review"
                 className="landingButton primaryButton"
@@ -1425,7 +1507,7 @@ function DeploymentWorkflowPageContent() {
               >
                 Open live deployments
               </button>
-            ) : workflowNextStep.primaryAction === "Open templates" ? (
+            ) : memberWorkflowNextStep.primaryAction === "Open templates" ? (
               <button
                 type="button"
                 className="landingButton primaryButton"
@@ -1434,7 +1516,7 @@ function DeploymentWorkflowPageContent() {
               >
                 Open templates
               </button>
-            ) : workflowNextStep.primaryAction === "Fix the create form" ? (
+            ) : memberWorkflowNextStep.primaryAction === "Fix the create form" ? (
               <button
                 type="button"
                 className="landingButton primaryButton"
@@ -1669,16 +1751,24 @@ function DeploymentWorkflowPageContent() {
         <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
           <h2 data-testid="create-deployment-title">Create deployment</h2>
           <p className="formHint">
-            {workflowState.mode === "prerequisite"
-              ? "This form becomes the main path after one server target is saved in Server Review. Once that prerequisite is done, start with image first and open advanced setup only when needed."
-              : "Start with the smallest possible rollout: image first, then open advanced setup only if you need naming, ports, env vars, server targeting, or template save."}
+            {serverAccessBlocked
+              ? "Members cannot choose saved servers here. Ask an admin to confirm the target, then use the form for local deployment planning or template reuse."
+              : workflowState.mode === "prerequisite"
+                ? "This form becomes the main path after one server target is saved in Server Review. Once that prerequisite is done, start with image first and open advanced setup only when needed."
+                : "Start with the smallest possible rollout: image first, then open advanced setup only if you need naming, ports, env vars, server targeting, or template save."}
           </p>
           {!localDeploymentsEnabled ? (
             <div className="banner subtle">
-              This environment is running in remote-only mode. Local host deployments are disabled.
+              {serverAccessBlocked
+                ? "This workspace is remote-only and the saved server target is managed by an admin."
+                : "This environment is running in remote-only mode. Local host deployments are disabled."}
             </div>
           ) : null}
-          {workflowState.mode === "prerequisite" ? (
+          {serverAccessBlocked ? (
+            <div className="banner subtle" data-testid="create-deployment-prerequisite-banner">
+              Server selection is managed by an admin for this workspace. Ask an admin to confirm the target before creating a remote deployment.
+            </div>
+          ) : workflowState.mode === "prerequisite" ? (
             <div className="banner subtle" data-testid="create-deployment-prerequisite-banner">
               Remote-only rollout is enabled and no saved server targets are available yet. Open Server Review first, then return here.
             </div>
@@ -1710,12 +1800,16 @@ function DeploymentWorkflowPageContent() {
 
             <div className="banner subtle" data-testid="create-deployment-quickstart-banner">
               {form.image.trim()
-                ? selectedCreateServer
-                  ? `Image is set and target "${selectedCreateServer.name}" is already selected. Create now if defaults are enough, or open advanced setup only for ports, env vars, or template save.`
-                  : "Image is set. Create now if defaults are enough, or open advanced setup for ports, env vars, server target, and template save."
+                ? serverAccessBlocked
+                  ? "Image is set. Keep going with local deployment planning or template reuse while an admin confirms the remote target."
+                  : selectedCreateServer
+                    ? `Image is set and target "${selectedCreateServer.name}" is already selected. Create now if defaults are enough, or open advanced setup only for ports, env vars, or template save.`
+                    : "Image is set. Create now if defaults are enough, or open advanced setup for ports, env vars, server target, and template save."
                 : selectedCreateServer && requestedSource === "server-review"
                   ? `Target "${selectedCreateServer.name}" is already selected from Server Review. Set the image next and keep the rest closed unless the rollout really needs more.`
-                  : "Set the image first. Everything else is optional and can stay closed until you actually need it."}
+                  : serverAccessBlocked
+                    ? "Set the image first. Members cannot choose a saved server target here, so keep the rest of the form focused on the rollout itself."
+                    : "Set the image first. Everything else is optional and can stay closed until you actually need it."}
             </div>
 
             <div className="formActions">
@@ -1777,9 +1871,11 @@ function DeploymentWorkflowPageContent() {
                       : suggestedPorts.length > 0
                         ? `Suggested free ports on this server: ${formatSuggestedPorts(suggestedPorts)}.`
                         : "No suggested ports available right now. Try a free port above 8080."
-                    : localDeploymentsEnabled
-                      ? "For local deploys, choose a free external port if you want direct access."
-                      : "Choose a remote server to receive server-specific port suggestions."}
+                    : serverAccessBlocked
+                      ? "Server-specific port suggestions are only available after an admin confirms the target."
+                      : localDeploymentsEnabled
+                        ? "For local deploys, choose a free external port if you want direct access."
+                        : "Choose a remote server to receive server-specific port suggestions."}
                 </span>
                 <div className="portSuggestions">
                   {suggestedPorts.map((port) => (
@@ -1829,24 +1925,32 @@ function DeploymentWorkflowPageContent() {
                 </div>
               </div>
 
-              <label className="field">
-                <span>Server</span>
-                <select
-                  name="server_id"
-                  value={form.server_id}
-                  onChange={updateFormField}
-                  disabled={submitting}
-                >
-                  <option value="">
-                    {localDeploymentsEnabled ? "Local" : "Choose remote server"}
-                  </option>
-                  {servers.map((server) => (
-                    <option key={server.id} value={server.id}>
-                      {server.name} ({server.host})
+              {canAccessServers ? (
+                <label className="field">
+                  <span>Server</span>
+                  <select
+                    name="server_id"
+                    value={form.server_id}
+                    onChange={updateFormField}
+                    disabled={submitting}
+                  >
+                    <option value="">
+                      {localDeploymentsEnabled ? "Local" : "Choose remote server"}
                     </option>
-                  ))}
-                </select>
-              </label>
+                    {servers.map((server) => (
+                      <option key={server.id} value={server.id}>
+                        {server.name} ({server.host})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <div className="banner subtle">
+                  {localDeploymentsEnabled
+                    ? "Members can keep the server field empty for local deployments while admins manage the saved server list."
+                    : "Members cannot choose a saved server target here. Ask an admin to confirm the target before creating a remote deployment."}
+                </div>
+              )}
 
               <label className="field">
                 <span>Template name</span>

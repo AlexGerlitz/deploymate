@@ -75,6 +75,19 @@ These can stay in the product, but they must not compete with the main deploy pa
 - Do not add new top-level navigation without a very strong reason.
 - Refactor when a file stops matching the product story.
 
+## Security And Ownership Rules
+
+- No authenticated user may see or mutate another user's runtime data by accident.
+- Deployments, templates, activity, notifications, and any future runtime artifacts must have an explicit ownership rule.
+- If a surface is shared, the sharing model must be explicit in code and docs, not implied by "everyone can read it".
+- Remote server targets are privileged infrastructure, not generic shared UI state.
+- Until DeployMate has a real sharing model for servers, remote server inventory and remote server execution stay admin-only.
+- Plan limits, exports, overview counts, and alerts must reflect the current user's scope unless the screen is explicitly admin-wide.
+- Security-sensitive protections must not quietly disappear across restarts, workers, or environments.
+- If a feature needs shared mutable state, define the boundary first, then ship the UI.
+- Bootstrap credentials must be explicit. DeployMate must not quietly ship or restart with `admin/admin` unless local-only insecure bootstrap is explicitly acknowledged.
+- Remote SSH trust must stay pinned by default. Convenience modes like `accept-new` are opt-in escape hatches, not the baseline.
+
 ## Build Discipline
 
 - One weekly goal.

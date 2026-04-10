@@ -31,31 +31,44 @@ from app.services.auth import (
 router = APIRouter(prefix="/auth")
 
 
-def _cookie_secure_flag() -> bool:
-    return os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+def _cookie_secure_flag(request: Request | None = None) -> bool:
+    configured = os.getenv("SESSION_COOKIE_SECURE", "").strip().lower()
+    if configured in {"true", "1", "yes", "on"}:
+        return True
+    if configured in {"false", "0", "no", "off"}:
+        return False
+
+    if request is None:
+        return False
+
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    if forwarded_proto:
+        return forwarded_proto == "https"
+
+    return request.url.scheme == "https"
 
 
-def _set_session_cookie(response: Response, session_token: str) -> None:
+def _set_session_cookie(response: Response, session_token: str, request: Request | None = None) -> None:
     ttl_seconds = get_session_ttl_seconds()
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_token,
         httponly=True,
         samesite="lax",
-        secure=_cookie_secure_flag(),
+        secure=_cookie_secure_flag(request),
         path="/",
         max_age=ttl_seconds,
         expires=ttl_seconds,
     )
 
 
-def _clear_session_cookie(response: Response) -> None:
+def _clear_session_cookie(response: Response, request: Request | None = None) -> None:
     response.delete_cookie(
         key=SESSION_COOKIE_NAME,
         path="/",
         httponly=True,
         samesite="lax",
-        secure=_cookie_secure_flag(),
+        secure=_cookie_secure_flag(request),
     )
 
 
@@ -70,7 +83,7 @@ def login(payload: LoginRequest, response: Response, request: Request) -> UserRe
 
     session_token = create_session_token()
     create_session(session_token, user["id"])
-    _set_session_cookie(response, session_token)
+    _set_session_cookie(response, session_token, request)
     clear_auth_rate_limit("login", client_host, payload.username)
     return UserResponse(**build_user_response_payload(user))
 
@@ -81,8 +94,8 @@ def register(payload: PublicSignupRequest, response: Response, request: Request)
         raise HTTPException(status_code=403, detail="Public signup is disabled.")
 
     client_host = request.client.host if request.client else None
-
     username = payload.username.strip()
+    enforce_auth_rate_limit("register", client_host, username)
     if username != payload.username:
         raise HTTPException(
             status_code=400,
@@ -106,7 +119,7 @@ def register(payload: PublicSignupRequest, response: Response, request: Request)
 
     session_token = create_session_token()
     create_session(session_token, user_record["id"])
-    _set_session_cookie(response, session_token)
+    _set_session_cookie(response, session_token, request)
     clear_auth_rate_limit("register", client_host, payload.username)
     created_user = get_user_by_id(user_record["id"])
     if not created_user:
@@ -126,6 +139,7 @@ def change_password(
     user=Depends(get_current_user),
 ) -> UserResponse:
     client_host = request.client.host if request.client else None
+    enforce_auth_rate_limit("change-password", client_host, user["id"])
     full_user = get_user_by_id(user["id"])
     if not full_user:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -151,11 +165,12 @@ def change_password(
 
 @router.post("/logout")
 def logout(
+    request: Request,
     response: Response,
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
     user=Depends(get_current_user),
 ) -> dict:
     if session_token:
         delete_session(session_token)
-    _clear_session_cookie(response)
+    _clear_session_cookie(response, request)
     return {"status": "logged_out"}

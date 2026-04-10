@@ -21,6 +21,8 @@ Highlights:
 - made backend local Docker execution explicit opt-in by default and added local runtime boundary audit coverage
 - added runtime capability posture to ops overview so the UI reflects backend local-Docker, SSH trust, and credential-key state
 - added runtime capability contract audit and aligned production frontend local-runtime default with remote-only backend policy
+- added a production env security audit and wired it into preflight, security audit, and remote release before compose rebuilds
+- added a dedicated production contract gate for CI and manual release workflows so release/runtime regressions fail even on workflow-only or docs-heavy PRs
 - wired the runtime capability audit into the main security audit so release gates fail on frontend/backend capability drift
 - split runtime execution into dedicated local and remote executor layers so SSH transport and local Docker policy no longer live in one deployment service module
 - moved server diagnostics and connection probing into a dedicated service layer instead of keeping ops-oriented SSH health logic inside deployment runtime orchestration

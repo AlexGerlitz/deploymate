@@ -11,6 +11,16 @@ from fastapi import HTTPException
 from app.services.server_credentials import ServerCredentialCryptoError, decrypt_server_credential
 
 
+def _get_runtime_command_timeout_seconds() -> int:
+    raw_value = os.getenv("DEPLOYMATE_RUNTIME_COMMAND_TIMEOUT_SECONDS", "").strip()
+    if not raw_value:
+        return 20
+    try:
+        return max(int(raw_value), 1)
+    except ValueError:
+        return 20
+
+
 def local_docker_runtime_enabled() -> bool:
     raw_value = os.getenv("DEPLOYMATE_LOCAL_DOCKER_ENABLED", "false").strip().lower()
     return raw_value not in {"0", "false", "no", "off"}
@@ -34,10 +44,10 @@ def ensure_runtime_target_allowed(server: Optional[dict] = None) -> None:
 
 
 def _get_ssh_host_key_mode() -> str:
-    mode = os.getenv("DEPLOYMATE_SSH_HOST_KEY_CHECKING", "accept-new").strip().lower()
+    mode = os.getenv("DEPLOYMATE_SSH_HOST_KEY_CHECKING", "yes").strip().lower()
     if mode in {"accept-new", "yes", "no"}:
         return mode
-    return "accept-new"
+    return "yes"
 
 
 def _get_ssh_known_hosts_file(mode: str) -> str:
@@ -53,6 +63,13 @@ def _get_ssh_known_hosts_file(mode: str) -> str:
 def _build_ssh_base_command(server: dict) -> list[str]:
     mode = _get_ssh_host_key_mode()
     known_hosts_file = _get_ssh_known_hosts_file(mode)
+    server_host = server.get("host", "<host>")
+    server_port = server.get("port", 22)
+    known_hosts_guidance = (
+        "Prepare it with "
+        f'"bash scripts/prepare_known_hosts.sh --host {server_host} --port {server_port} '
+        f'--output {known_hosts_file}".'
+    )
 
     if mode == "yes":
         if not known_hosts_file or known_hosts_file == "/dev/null":
@@ -65,7 +82,7 @@ def _build_ssh_base_command(server: dict) -> list[str]:
                 status_code=500,
                 detail=(
                     "Strict SSH host key checking is enabled, but the known_hosts file "
-                    f'"{known_hosts_file}" does not exist.'
+                    f'"{known_hosts_file}" does not exist. {known_hosts_guidance}'
                 ),
             )
         if os.path.getsize(known_hosts_file) == 0:
@@ -73,7 +90,7 @@ def _build_ssh_base_command(server: dict) -> list[str]:
                 status_code=500,
                 detail=(
                     "Strict SSH host key checking is enabled, but the known_hosts file "
-                    f'"{known_hosts_file}" is empty.'
+                    f'"{known_hosts_file}" is empty. {known_hosts_guidance}'
                 ),
             )
 
@@ -99,17 +116,24 @@ def _build_ssh_base_command(server: dict) -> list[str]:
 class LocalRuntimeExecutor:
     def run(self, command: List[str]) -> subprocess.CompletedProcess:
         ensure_local_docker_runtime_enabled()
+        timeout_seconds = _get_runtime_command_timeout_seconds()
         try:
             return subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=timeout_seconds,
             )
         except FileNotFoundError as exc:
             raise HTTPException(
                 status_code=500,
                 detail=f"{command[0]} is not installed or not available in PATH.",
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(
+                status_code=504,
+                detail=f"{command[0]} timed out after {timeout_seconds} seconds.",
             ) from exc
 
 
@@ -120,6 +144,7 @@ class RemoteRuntimeExecutor:
     def run(self, command: List[str]) -> subprocess.CompletedProcess:
         ssh_command: List[str] = []
         temp_key_path = None
+        timeout_seconds = _get_runtime_command_timeout_seconds()
         try:
             password = decrypt_server_credential(self.server.get("password"))
             ssh_key = decrypt_server_credential(self.server.get("ssh_key"))
@@ -159,11 +184,20 @@ class RemoteRuntimeExecutor:
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=timeout_seconds,
             )
         except FileNotFoundError as exc:
             raise HTTPException(
                 status_code=500,
                 detail="SSH tooling is not installed or not available in PATH.",
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    f'SSH command for {self.server["host"]}:{self.server["port"]} '
+                    f"timed out after {timeout_seconds} seconds."
+                ),
             ) from exc
         finally:
             if temp_key_path and os.path.exists(temp_key_path):

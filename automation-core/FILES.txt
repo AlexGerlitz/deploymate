@@ -14,6 +14,8 @@ scripts/profile_surface.sh
 scripts/release_workflow.sh
 scripts/release_workflow_audit.sh
 scripts/runtime_capability_audit.sh
+scripts/production_env_audit.sh
+scripts/production_contract_gate.sh
 scripts/local_runtime_audit.sh
 scripts/security_audit.sh
 scripts/server_credentials_audit.sh

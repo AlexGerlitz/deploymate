@@ -165,17 +165,31 @@ if [ -f "scripts/runtime_capability_audit.sh" ]; then
   fi
 fi
 
+production_env_duration=0
+if [ -f "scripts/production_env_audit.sh" ]; then
+  if [ "${DEPLOYMATE_RUN_RUNTIME_AUDITS:-1}" = "1" ]; then
+    production_env_start_ts="$(date +%s)"
+    echo "[preflight] production env audit"
+    bash scripts/production_env_audit.sh
+    production_env_duration=$(( $(date +%s) - production_env_start_ts ))
+  else
+    echo "[preflight] production env audit skipped for this local diff"
+  fi
+fi
+
 total_duration=$(( $(date +%s) - SCRIPT_START_TS ))
 timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "frontend_build" "$frontend_build_duration"
 timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "backend_syntax" "$backend_syntax_duration"
 timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "security_audit" "$security_audit_duration"
 timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "runtime_capability_audit" "$runtime_capability_duration"
+timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "production_env_audit" "$production_env_duration"
 timing_history_append "preflight" "$SURFACE" "$FAST_MODE" "total" "$total_duration"
 echo "[preflight] timing summary:"
 echo "[preflight]   - frontend build: $(format_duration "$frontend_build_duration")"
 echo "[preflight]   - backend syntax: $(format_duration "$backend_syntax_duration")"
 echo "[preflight]   - security audit: $(format_duration "$security_audit_duration")"
 echo "[preflight]   - runtime capability audit: $(format_duration "$runtime_capability_duration")"
+echo "[preflight]   - production env audit: $(format_duration "$production_env_duration")"
 echo "[preflight]   - total: $(format_duration "$total_duration")"
 echo "[preflight] timing history: .logs/local_gate_timing.csv"
 audit_cache_print_summary "[preflight]"
