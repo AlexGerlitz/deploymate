@@ -72,7 +72,6 @@ export default function HomePage() {
     failedDeployments: opsSnapshot.deployments.failed,
     serversTotal: opsSnapshot.servers.total,
   });
-  const primaryReason = overviewPrimaryPath.reason;
   const memberServerCopy = canAccessServers
     ? null
     : localDeploymentsEnabled
@@ -103,311 +102,83 @@ export default function HomePage() {
     : localDeploymentsEnabled
       ? "Server inventory is admin-managed. Use the deployment workflow to continue."
       : "Server target is admin-managed. Return to the deployment workflow once it is confirmed.";
-  const beginnerNextStep = primaryReason === "server-setup"
+  const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
     ? "Next best step: connect and verify one server."
-    : primaryReason === "incident"
+    : overviewPrimaryPath.reason === "incident"
       ? "Next best step: open live deployments and review the problem first."
-      : primaryReason === "admin-target-needed"
+      : overviewPrimaryPath.reason === "admin-target-needed"
         ? "Next best step: ask an admin to confirm one server target, then return to the workflow."
       : memberServerCopy
         ? memberServerCopy.support
         : deployments.length === 0
           ? "Next best step: choose which app to run on that server."
           : "Next best step: open your app list and continue from one running service.";
-  const serverStepState =
-    primaryReason === "server-setup" || primaryReason === "admin-target-needed"
-      ? "current"
-      : "complete";
-  const deployStepState =
-    primaryReason === "first-deploy"
-      ? "current"
-      : primaryReason === "server-setup" || primaryReason === "admin-target-needed"
-        ? "upcoming"
-        : "complete";
-  const healthStepState =
-    primaryReason === "incident" || primaryReason === "steady-state"
-      ? "current"
-      : "upcoming";
-  const heroSpotlight =
-    primaryReason === "server-setup"
-      ? {
-          badge: "Do this now",
-          title: "Connect one server first",
-          detail:
-            "This overview is still Step 1 until DeployMate knows which machine it should reach.",
-          support:
-            "Once one target is saved and checked, the main path moves straight into app setup instead of more overview browsing.",
-          actionLabel: overviewPrimaryPath.label,
-          actionHref: overviewPrimaryPath.href,
-        }
-      : primaryReason === "admin-target-needed"
-        ? {
-            badge: "Waiting on admin",
-            title: "Wait for one confirmed server target",
-            detail:
-              "Members do not unblock the remote target here. The useful move is understanding when the rollout path will open.",
-            support:
-              "As soon as an admin confirms one saved target, this screen shifts into the same deploy-first story as the admin path.",
-            actionLabel: overviewPrimaryPath.label,
-            actionHref: overviewPrimaryPath.href,
-          }
-        : primaryReason === "incident"
-          ? {
-              badge: "Needs attention",
-              title: "Review the live runtime before more changes",
-              detail:
-                "A deployment already needs attention, so the safest next move is runtime review before another rollout or admin detour.",
-              support:
-                "Treat creation, reports, and admin surfaces as secondary until the failing runtime is understood.",
-              actionLabel: overviewPrimaryPath.label,
-              actionHref: overviewPrimaryPath.href,
-            }
-          : primaryReason === "first-deploy"
-            ? {
-                badge: "Step 1 complete",
-                title: "Choose the first app to run",
-                detail:
-                  "You already have a target. Keep the momentum and use one guided create path instead of exploring the whole workspace.",
-                support:
-                  "After the first deployment exists, this overview becomes more about live health and less about setup.",
-                actionLabel: overviewPrimaryPath.label,
-                actionHref: overviewPrimaryPath.href,
-              }
-            : {
-                badge: "Keep momentum",
-                title: "Use the deployment workspace for the next deliberate move",
-                detail:
-                  "The overview is no longer the work area. Confirm the situation here, then continue inside the dedicated rollout workspace.",
-                support:
-                  "Come back for the broad picture, not when you already know the next runtime action.",
-                actionLabel: overviewPrimaryPath.label,
-                actionHref: overviewPrimaryPath.href,
-              };
-  const heroHeadline =
-    primaryReason === "server-setup"
-      ? "Connect one server, choose one app, then check live health."
-      : primaryReason === "admin-target-needed"
-        ? "Wait for one confirmed target, then continue in the rollout flow."
-        : primaryReason === "first-deploy"
-          ? "Step 1 is done. The main path is now one first deployment."
-          : primaryReason === "incident"
-            ? "A live deployment needs review before anything else."
-            : "The runtime path is already live. Keep the next change deliberate.";
-  const heroSupportText =
-    primaryReason === "server-setup"
-      ? "You do not need the whole product at once. Save and verify one target first, then the rest of the path becomes much clearer."
-      : primaryReason === "admin-target-needed"
-        ? "Members do not unblock the saved target here. As soon as an admin confirms it, this overview shifts into the same deploy-first path."
-        : primaryReason === "first-deploy"
-          ? "Ignore the deeper admin surfaces for now and use Deployment Workflow as the single place to choose the first image, ports, env vars, or saved template."
-          : primaryReason === "incident"
-            ? "Treat new rollouts and admin tools as secondary until the current runtime problem is understood in the live deployment workspace."
-            : "Use the overview to confirm the current state, then do the real work in the dedicated runtime surfaces instead of bouncing across every screen.";
-  const explanationTitle =
-    primaryReason === "server-setup"
+  const stepOneIsPrimary =
+    overviewPrimaryPath.reason === "server-setup" ||
+    overviewPrimaryPath.reason === "admin-target-needed";
+  const heroHeadline = canAccessServers
+    ? servers.length === 0
+      ? "DeployMate helps you run one app on one server in three simple steps."
+      : deployments.length === 0
+        ? "Step 1 is done. Now choose one app to run on that server."
+        : "Your app is already running. Check health first, then make the next change."
+    : localDeploymentsEnabled
+      ? "DeployMate still gives you a simple path even when admins manage saved servers."
+      : "Your deployment target is admin-managed. Confirm it with an admin, then continue.";
+  const heroSupportText = canAccessServers
+    ? servers.length === 0
+      ? "In plain language: tell DeployMate which machine to use, choose the app image to start, and then check whether the app stays healthy."
+      : deployments.length === 0
+        ? "You already connected the machine. Stay on the main path now: choose one app image or one saved setup and start it."
+        : "Stay on the main path: open the app workspace, review what is healthy, and only then decide what to change next."
+    : localDeploymentsEnabled
+      ? "Members can still choose what to run and review health while admins keep the saved server list up to date."
+      : "Members do not manage saved server targets here. Ask an admin to confirm the target, then return to the workflow.";
+  const explanationTitle = canAccessServers
+    ? servers.length === 0
       ? "What DeployMate means in plain language"
-      : primaryReason === "admin-target-needed"
-        ? "What happens after an admin confirms the target"
-        : primaryReason === "first-deploy"
-          ? "What changes after the server step"
-          : primaryReason === "incident"
-            ? "Why runtime review comes before more changes"
-            : "What this overview is helping you decide";
-  const explanationBody =
-    primaryReason === "server-setup"
-      ? "You do not need to learn the whole workspace first. Understand the order, take the current step, and let the next screen do the deeper work."
-      : primaryReason === "admin-target-needed"
-        ? "The saved target is the blocker. Once an admin clears it, Deployment Workflow becomes the obvious next stop."
-        : primaryReason === "first-deploy"
-          ? "This overview is already past the server step. The next decision is simply what app to run first and how to confirm it stays healthy."
-          : primaryReason === "incident"
-            ? "Right now the product should make review feel simpler than change. Understand the broken runtime first, then decide the fix."
-            : "The overview is strongest when it confirms the current state quickly and sends you back into the dedicated rollout screens.";
-  const overviewStepCards = [
-    {
-      id: "server",
-      label: "1. Connect",
-      title: canAccessServers
-        ? "Connect one server"
-        : localDeploymentsEnabled
-          ? "Admin keeps targets"
-          : "Wait for admin target",
-      detail: canAccessServers
-        ? "Give DeployMate one machine to reach."
-        : localDeploymentsEnabled
-          ? "Your path still continues in rollout."
-          : "Remote rollout opens after one confirmed target.",
-      state: serverStepState,
-    },
-    {
-      id: "deploy",
-      label: "2. Launch",
-      title: "Choose one app",
-      detail: "Use one guided create path instead of hopping between tools.",
-      state: deployStepState,
-    },
-    {
-      id: "health",
-      label: "3. Review",
-      title: primaryReason === "incident" ? "Review the live issue" : "Check live health",
-      detail:
-        primaryReason === "incident"
-          ? "Fix what is already failing before another rollout."
-          : "Confirm the runtime looks healthy before the next change.",
-      state: healthStepState,
-    },
-  ];
+      : "What this app is helping you do"
+    : localDeploymentsEnabled
+      ? "What changes when admins manage saved servers"
+      : "What happens after an admin confirms the target";
+  const explanationBody = canAccessServers
+    ? servers.length === 0
+      ? "You do not need to learn the whole workspace first. Just understand the three-step path and take the next step."
+      : deployments.length === 0
+        ? "This workspace is already past the server step. The next decision is simply what app to run first."
+        : "You already have a running runtime story. Open the workflow to review status and keep the next action deliberate."
+    : localDeploymentsEnabled
+      ? "Admins keep the saved server list, but you can still understand the path: choose what to run, start it, and check health."
+      : "Once an admin confirms the saved server target, use Deployment Workflow to create or review the rollout.";
   const beginnerSteps = [
     {
       key: "step-1",
       step: "Step 1",
-      state: serverStepState,
-      stateLabel: serverStepState === "current" ? "Current step" : "Ready",
-      title: canAccessServers
-        ? servers.length === 0
-          ? "Connect a server"
-          : "Server step is already covered"
-        : localDeploymentsEnabled
-          ? memberServerCopy?.stepTitle || "Continue in deployment workflow"
-          : deployments.length === 0
-            ? memberServerCopy?.stepTitle || "Wait for the server target"
-            : "Target is already handled",
+      title: canAccessServers ? "Connect a server" : memberServerCopy?.stepTitle || "Continue in deployment workflow",
       detail: canAccessServers
-        ? servers.length === 0
-          ? "Add one machine and make sure DeployMate can sign in to it over SSH."
-          : `${servers.length} server target${servers.length === 1 ? "" : "s"} already exist. Revisit this step only if you need another machine or a deeper check.`
-        : localDeploymentsEnabled
-          ? memberServerCopy?.stepDetail || "Use the deployment workflow for the next rollout step."
-          : deployments.length === 0
-            ? memberServerCopy?.stepDetail ||
-              "Deployment creation stays blocked until an admin confirms the saved server target for this workspace."
-            : "The remote target is already managed outside this screen, so your useful work continues in the rollout workspace.",
+        ? "Add one machine and make sure DeployMate can sign in to it over SSH."
+        : memberServerCopy?.stepDetail || "Use the deployment workflow for the next rollout step.",
       href: canAccessServers ? "/app/server-review" : "/app/deployment-workflow",
-      actionLabel: canAccessServers
-        ? servers.length === 0
-          ? "Open server review"
-          : "Review server step"
-        : deployments.length === 0
-          ? memberServerCopy?.stepAction || "Open deployment workflow"
-          : "Open deployment workflow",
-      primary: serverStepState === "current",
+      actionLabel: canAccessServers ? "Open server setup" : memberServerCopy?.stepAction || "Open deployment workflow",
+      primary: stepOneIsPrimary,
     },
     {
       key: "step-2",
       step: "Step 2",
-      state: deployStepState,
-      stateLabel: deployStepState === "current" ? "Current step" : deployStepState === "complete" ? "Available" : "Later",
-      title:
-        deployments.length === 0
-          ? "Choose the first app"
-          : primaryReason === "incident"
-            ? "Hold the next rollout for now"
-            : "Choose the next app when ready",
-      detail:
-        deployments.length === 0
-          ? "Use the guided create path for image, target, ports, env vars, and optional template save."
-          : primaryReason === "incident"
-            ? "Pause new rollout decisions until the current runtime is understood. The deploy workspace is still where that review happens."
-            : "Deployment Workflow stays the shortest path for the next deliberate rollout or template reuse.",
+      title: "Choose your app",
+      detail: "Paste the app image you want to run, or pick a saved setup if you already have one.",
       href: "/app/deployment-workflow",
-      actionLabel: deployments.length === 0 ? "Start first deployment" : "Open deployment workflow",
-      primary: deployStepState === "current",
+      actionLabel: "Choose app to run",
+      primary: !stepOneIsPrimary,
     },
     {
       key: "step-3",
       step: "Step 3",
-      state: healthStepState,
-      stateLabel: healthStepState === "current" ? "Current step" : "Later",
-      title:
-        primaryReason === "incident"
-          ? "Review the live issue"
-          : deployments.length === 0
-            ? "Check live health after deploy"
-            : "Review live health",
-      detail:
-        primaryReason === "incident"
-          ? "Start with the affected runtime, gather status, then decide whether to redeploy, edit, or wait."
-          : deployments.length === 0
-            ? "As soon as the first rollout starts, confirm it is healthy and reachable before adding more changes."
-            : "Open the live runtime list or deployment detail and confirm the app stays healthy before the next change.",
+      title: "Start it and check status",
+      detail: "Start the app, then open live status to confirm it is running, healthy, and reachable.",
       href: "/app/deployment-workflow",
-      actionLabel:
-        primaryReason === "incident"
-          ? "Review deployments"
-          : deployments.length === 0
-            ? "See running apps"
-            : "Review live runtime",
-      primary: healthStepState === "current",
-    },
-  ];
-  const overviewFollowThrough =
-    primaryReason === "server-setup"
-      ? {
-          title: "One ready server unlocks the rest of the story",
-          detail:
-            "The overview only needs to push you through Step 1 once. After that, app setup becomes the clear main path.",
-        }
-      : primaryReason === "admin-target-needed"
-        ? {
-            title: "This path opens as soon as one target is confirmed",
-            detail:
-              "Until then, the saved-target blocker matters more than any export, report, or admin surface below.",
-          }
-        : primaryReason === "first-deploy"
-          ? {
-              title: "The first deployment changes what matters here",
-              detail:
-                "Once one app exists, the overview should point more toward live health and less toward initial setup.",
-            }
-          : primaryReason === "incident"
-            ? {
-                title: "Runtime clarity matters more than more controls",
-                detail:
-                  "Review first, understand the failure, then decide the safest fix instead of opening more tools.",
-              }
-            : {
-                title: "Use the overview for orientation, not for doing the work",
-                detail:
-                  "The dedicated rollout screens remain the place for creation, live review, and deeper decisions.",
-              };
-  const overviewGlanceCards = [
-    {
-      label: "Current state",
-      title: beginnerStatusSummary,
-      detail: beginnerNextStep,
-      elevated: true,
-    },
-    {
-      label: "After this",
-      title:
-        primaryReason === "server-setup" || primaryReason === "admin-target-needed"
-          ? "Deployment Workflow becomes Step 2"
-          : primaryReason === "first-deploy"
-            ? "Live health becomes Step 3"
-            : primaryReason === "incident"
-              ? "Choose the safest fix next"
-              : "Keep the next change deliberate",
-      detail:
-        primaryReason === "server-setup" || primaryReason === "admin-target-needed"
-          ? "As soon as one target is ready, move into app setup instead of staying in overview."
-          : primaryReason === "first-deploy"
-            ? "After the first rollout starts, confirm the runtime is healthy before you add more change."
-            : primaryReason === "incident"
-              ? "Use the runtime evidence to decide whether to redeploy, edit, or wait."
-              : "Use the dedicated runtime surfaces for the next change and return here only for the broad picture.",
-    },
-    {
-      label: "Ignore for now",
-      title: canAccessServers
-        ? "Reports and admin tools are secondary"
-        : localDeploymentsEnabled
-          ? "The saved server list is not your blocker"
-          : "Deeper admin surfaces are not the blocker",
-      detail: canAccessServers
-        ? "Users, upgrade review, exports, and reports should stay quieter than the current rollout step."
-        : localDeploymentsEnabled
-          ? "Admins own the saved targets. Your useful work still happens inside Deployment Workflow."
-          : "What matters first is one confirmed target, not a tour of every admin surface.",
+      actionLabel: "See running apps",
+      primary: false,
     },
   ];
   const plainLanguageCards = [
@@ -801,49 +572,30 @@ export default function HomePage() {
               <h1 data-testid="runtime-page-title">DeployMate</h1>
               <p>{heroHeadline}</p>
               <p className="formHint">{heroSupportText}</p>
+              <p className="formHint">
+                Right now: <strong>{overviewPrimaryPath.title}</strong>
+              </p>
             </div>
             <div className="buttonRow workspaceHeroActions">
+              <Link
+                href={overviewPrimaryPath.href}
+                className="landingButton primaryButton"
+                data-testid="workspace-hero-primary-action"
+              >
+                {overviewPrimaryPath.label}
+              </Link>
               <button type="button" onClick={handleLogout} className="workspaceGhostAction">
                 Logout
               </button>
-            </div>
-          </div>
-          <div className="overviewHeroSummary">
-            <article className="workspaceHeroBadge workspaceHeroSpotlight overviewHeroSpotlightCard">
-              <span>{heroSpotlight.badge}</span>
-              <strong>{heroSpotlight.title}</strong>
-              <p>{heroSpotlight.detail}</p>
-              <p className="workspaceHeroSpotlightNote">{heroSpotlight.support}</p>
-              <div className="formActions">
-                <Link
-                  href={heroSpotlight.actionHref}
-                  className="landingButton primaryButton"
-                  data-testid="workspace-hero-primary-action"
-                >
-                  {heroSpotlight.actionLabel}
-                </Link>
-              </div>
-            </article>
-            <div className="overviewStepStrip" aria-label="Overview path">
-              {overviewStepCards.map((step) => (
-                <article
-                  key={step.id}
-                  className={`overviewStepCard is${step.state[0].toUpperCase()}${step.state.slice(1)}`}
-                >
-                  <span>{step.label}</span>
-                  <strong>{step.title}</strong>
-                  <p>{step.detail}</p>
-                </article>
-              ))}
             </div>
           </div>
 
           <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
             <div className="sectionHeader workspaceGuideHeader">
               <div>
-                <h2 data-testid="workspace-scenario-title">Keep going in this order</h2>
+                <h2 data-testid="workspace-scenario-title">Do this now, then keep going in order</h2>
                 <p className="formHint">
-                  One step should feel current. The rest should read like context, not like competing instructions.
+                  If you are new here, ignore the deeper admin surfaces for now and just follow the next step.
                 </p>
               </div>
             </div>
@@ -851,11 +603,10 @@ export default function HomePage() {
               <div className="workspaceGuideSteps">
                 <article className="workspaceGlancePanel workspacePriorityPanel" data-testid="workspace-primary-task-card">
                   <div className="workspaceGlanceHeader">
-                    <span className="eyebrow">{heroSpotlight.badge}</span>
+                    <span className="eyebrow">Do this now</span>
                     <strong>{overviewPrimaryPath.title}</strong>
                   </div>
                   <p className="formHint">{overviewPrimaryPath.detail}</p>
-                  <p className="workspacePrioritySupport">{heroSpotlight.support}</p>
                   <div className="formActions">
                     <Link
                       href={overviewPrimaryPath.href}
@@ -871,16 +622,15 @@ export default function HomePage() {
                   {beginnerSteps.map((card) => (
                     <article
                       key={card.key}
-                      className={`stepCard workspaceStepCard is${card.state[0].toUpperCase()}${card.state.slice(1)}`}
+                      className="stepCard workspaceStepCard"
                       data-testid={`workspace-scenario-item-${card.key}`}
                     >
-                      <span className="overviewStepStateLabel">{card.stateLabel}</span>
                       <span className="stepNumber">{card.step}</span>
                       <h3>{card.title}</h3>
                       <p>{card.detail}</p>
                       <Link
                         href={card.href}
-                        className={card.primary ? "landingButton primaryButton" : "secondaryButton overviewStepAction"}
+                        className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
                         data-testid={`workspace-scenario-action-${card.key}`}
                       >
                         {card.actionLabel}
@@ -891,23 +641,50 @@ export default function HomePage() {
               </div>
               <aside className="workspaceGlancePanel">
                 <div className="workspaceGlanceHeader">
-                  <span className="eyebrow">What happens next</span>
-                  <strong>{overviewFollowThrough.title}</strong>
+                  <span className="eyebrow">Current state</span>
+                  <strong>{beginnerStatusSummary}</strong>
                 </div>
-                <p className="formHint">{overviewFollowThrough.detail}</p>
                 <div className="workspaceGlanceList">
-                  {overviewGlanceCards.map((card) => (
-                    <div
-                      key={card.label}
-                      className={`workspaceStatusCard workspaceGlanceItem ${
-                        card.elevated ? "workspaceStatusCardElevated" : ""
-                      }`.trim()}
-                    >
-                      <span>{card.label}</span>
-                      <strong>{card.title}</strong>
-                      <p>{card.detail}</p>
-                    </div>
-                  ))}
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Step 1</span>
+                    <strong>
+                      {canAccessServers
+                        ? servers.length === 0
+                          ? "Connect server"
+                          : "Server ready"
+                        : localDeploymentsEnabled
+                          ? "Server inventory managed"
+                          : "Server target managed"}
+                    </strong>
+                    <p>
+                      {canAccessServers
+                        ? servers.length === 0
+                          ? "Add one server target so DeployMate can reach your machine."
+                          : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved for rollout.`
+                        : localDeploymentsEnabled
+                          ? "Members can keep rolling out without touching the saved server list."
+                          : "Ask an admin to confirm the target before you create a remote deployment."}
+                    </p>
+                  </div>
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Step 2</span>
+                    <strong>{deployments.length === 0 ? "Choose first app" : "Choose next app"}</strong>
+                    <p>
+                      Use the deployment workflow to choose the image or saved setup you want to run.
+                    </p>
+                  </div>
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Step 3</span>
+                    <strong>{deployments.length === 0 ? "Check health after deploy" : "Review live health"}</strong>
+                    <p>
+                      Open the live runtime list or deployment detail and confirm the app is healthy before the next change.
+                    </p>
+                  </div>
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Right now</span>
+                    <strong>Keep the first pass simple</strong>
+                    <p>{beginnerNextStep}</p>
+                  </div>
                 </div>
               </aside>
             </div>

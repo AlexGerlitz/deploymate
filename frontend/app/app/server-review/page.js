@@ -237,9 +237,9 @@ function ServerReviewPageContent() {
   const heroSpotlight = noServers
     ? {
         badge: "Do this now",
-        title: "Save your first server target",
-        detail: "This is the only action that matters until DeployMate knows which machine it should reach.",
-        support: "After you save one server, this page switches to one simple readiness check.",
+        title: "Save one server for Step 1",
+        detail: "Start narrow: save one SSH target first, then run one check on that same machine.",
+        support: "You do not need a server list yet. One good target is enough to move the main path forward.",
         actionLabel: "Save first server",
         actionKind: "create",
       }
@@ -289,12 +289,12 @@ function ServerReviewPageContent() {
       state: selectedReadyItem ? "current" : "upcoming",
     },
   ];
-  const createSectionEyebrow = noServers ? "Do this now" : "Only if needed";
+  const createSectionEyebrow = noServers ? "Step 1: save one server" : "Only if needed";
   const createSectionTitle = noServers
-    ? "Save your first server target"
+    ? "Save one server target"
     : "Add another server only if this one is not the right target";
   const createSectionCopy = noServers
-    ? "Fill in the machine details once, save them, and then move straight to one check."
+    ? "Fill this in once, save one machine, then run one check. Stop here as soon as one server is ready."
     : selectedReadyItem
       ? "You already have a server that is ready for Step 2. This form is secondary now."
       : "A saved server already exists. Finish its check before adding another target unless you picked the wrong machine.";
@@ -788,12 +788,12 @@ function ServerReviewPageContent() {
         <div className="serverReviewHeroLayout">
           <div className="serverReviewHeroCopy">
             <div className="eyebrow">Step 1</div>
-            <h1 data-testid="server-review-page-title">Connect your server</h1>
+            <h1 data-testid="server-review-page-title">Step 1: Connect and verify one server</h1>
             <p className="serverReviewLead">
-              This page has one job: give DeployMate one machine it can reach before you choose what to run.
+              This page has one job: save one machine, run one check, and only then move to Step 2.
             </p>
             <p className="formHint serverReviewSubtleCopy">
-              Keep this step simple. You do not need rollout settings, templates, or runtime review yet.
+              Keep this step simple. Do not branch into rollout settings, templates, or runtime review yet.
             </p>
             <div className="serverReviewStepStrip" aria-label="Server review path">
               {stepCards.map((step) => (

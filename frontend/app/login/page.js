@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }) {
             <h1>DeployMate</h1>
             <p className="authLoginLead">
               {publicSignupEnabled
-                ? "Sign in to continue, or create a trial account."
+                ? "Sign in if you already have access, or start with a trial account."
                 : "Sign in to open the workspace."}
             </p>
           </div>
@@ -38,7 +38,7 @@ export default async function LoginPage({ searchParams }) {
                   <div className="eyebrow">Secure access</div>
                   <h2 data-testid="auth-login-title">Login</h2>
                   <p className="formHint">
-                    Enter your username and password.
+                    Enter your username and password. Trial access starts on the separate signup path.
                   </p>
                 </div>
                 <div className="authCardBadge">Live app</div>
@@ -104,27 +104,23 @@ export default async function LoginPage({ searchParams }) {
 
             {error ? <div className="banner error" data-testid="auth-login-error-banner">{error}</div> : null}
 
-            <div className="banner subtle authBanner" data-testid="auth-login-help-banner">
-              {publicSignupEnabled ? (
-                <>
-                  Use your workspace username and password, or start with a trial account below if you are new here.
-                </>
-              ) : (
-                <>
-                  Use the username and password your admin gave you to open the workspace.
-                </>
-              )}
-            </div>
-
             {publicSignupEnabled ? (
               <div className="banner subtle authBanner" data-testid="auth-login-signup-banner">
-                Need a trial account?{" "}
+                New here?{" "}
                 <Link href="/register" className="inlineLink" data-testid="auth-login-register-link">
-                  Create one here
+                  Start with a trial account
                 </Link>
-                .
+                . Paid and commercial access are handled after trial through the upgrade request flow.
               </div>
             ) : null}
+
+            <div className="banner subtle authBanner">
+              Need paid or commercial access?{" "}
+              <Link href="/upgrade" className="inlineLink">
+                Review the access request path
+              </Link>
+              .
+            </div>
 
             <div className="authCardFooter authLoginFooter">
               <Link href="/" className="linkButton">

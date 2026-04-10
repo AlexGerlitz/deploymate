@@ -15,7 +15,6 @@ import {
   formatSuggestedPorts,
   normalizeDeploymentActionError,
   readJsonOrError,
-  rolloutReviewerCopy,
 } from "../../lib/runtime-workspace-utils";
 import {
   smokeActivity,
@@ -696,6 +695,21 @@ export default function DeploymentDetailsPage({ params }) {
     attentionItems,
     activity,
   );
+  const runtimeHeroLead = deployment
+    ? `${deployment.container_name || deployment.image || deploymentId}. ${detailPriority}`
+    : "Review what is running, whether it is healthy, and what should happen next.";
+  const runtimeOverviewTitle =
+    deployment?.status === "failed" ||
+    (health?.status && health.status !== "healthy") ||
+    attentionItems.length > 0
+      ? "Why this runtime still needs review"
+      : "Why this runtime looks stable enough";
+  const runtimeOverviewBody =
+    deployment?.status === "failed" ||
+    (health?.status && health.status !== "healthy") ||
+    attentionItems.length > 0
+      ? "These signals explain why runtime review still comes before the next rollout change."
+      : "These signals explain why the runtime currently looks stable enough for a deliberate change instead of reactive cleanup.";
   const detailGlanceItems = [
     {
       label: "Endpoint",
@@ -1284,24 +1298,23 @@ export default function DeploymentDetailsPage({ params }) {
           <div className="workspaceHeroBackdrop" />
           <div className="header workspaceHeroHeader">
             <div>
-              <div className="eyebrow">Runtime detail</div>
-              <h1 data-testid="runtime-detail-page-title">Deployment details</h1>
-              <p>
-                {currentUser
-                  ? `${deploymentId} · ${currentUser.username}. ${detailPriority}`
-                  : rolloutReviewerCopy.detail.heroBody}
+              <div className="eyebrow">Step 3</div>
+              <h1 data-testid="runtime-detail-page-title">Step 3: Review runtime health and decide the next action</h1>
+              <p>{runtimeHeroLead}</p>
+              <p className="formHint">
+                This page should answer three things fast: what is running, is it healthy, and what should you do next.
               </p>
             </div>
             <div className="buttonRow workspaceHeroActions" data-testid="runtime-detail-header-actions">
-              <Link href="/app/deployment-workflow" className="linkButton workspaceSecondaryAction">
-                Back to deployment workflow
-              </Link>
               <Link
                 href={runtimeDecisionState.primaryHref}
                 className="landingButton primaryButton workspacePrimaryAction"
                 data-testid="runtime-detail-open-redeploy-button"
               >
                 {runtimeDecisionState.primaryAction}
+              </Link>
+              <Link href="/app/deployment-workflow" className="linkButton workspaceSecondaryAction">
+                Back to deployment workflow
               </Link>
               {deploymentUrl ? (
                 <a
@@ -1347,9 +1360,9 @@ export default function DeploymentDetailsPage({ params }) {
               </p>
             </div>
             <div className="workspaceHeroBadge workspaceHeroSpotlight">
-              <span>What matters now</span>
-              <strong>{detailPriority}</strong>
-              <p>{rolloutReviewerCopy.detail.spotlightBody}</p>
+              <span>Right now</span>
+              <strong>{runtimeDecisionState.focus}</strong>
+              <p>{runtimeDecisionState.nextStep}</p>
             </div>
           </div>
         </section>
@@ -1377,9 +1390,9 @@ export default function DeploymentDetailsPage({ params }) {
           >
             <div className="sectionHeader workspaceGuideHeader">
               <div>
-                <h2 data-testid="runtime-detail-main-next-step-title">{rolloutReviewerCopy.detail.mainNextStepTitle}</h2>
+                <h2 data-testid="runtime-detail-main-next-step-title">Do this now</h2>
                 <p className="formHint">
-                  {rolloutReviewerCopy.detail.mainNextStepBody} Use the main action below, then open just one secondary layer if you still need more.
+                  Start with one obvious action. Review first when the runtime is noisy. Change it only when the current state is believable.
                 </p>
               </div>
             </div>
@@ -1414,7 +1427,7 @@ export default function DeploymentDetailsPage({ params }) {
 
               <aside className="workspaceGlancePanel">
                 <div className="workspaceGlanceHeader">
-                  <span className="eyebrow">At a glance</span>
+                  <span className="eyebrow">What this page answers</span>
                   <strong>Current runtime</strong>
                 </div>
                 <div className="workspaceGlanceList">
@@ -1440,15 +1453,12 @@ export default function DeploymentDetailsPage({ params }) {
                   </p>
                 </div>
                 <div className="workspaceMetaLine">
-                  <span>
-                    Backend: <code>{apiBaseUrl}</code>
-                  </span>
                   {smokeMode ? (
                     <span data-testid="runtime-detail-smoke-banner">
                       Runtime detail smoke mode uses fixture deployment data.
                     </span>
                   ) : (
-                    <span>Authenticated deployment controls and runtime data flow through this API surface.</span>
+                    <span>Deployment, health, diagnostics, and activity keep refreshing while you review this runtime.</span>
                   )}
                 </div>
               </aside>
@@ -1465,7 +1475,7 @@ export default function DeploymentDetailsPage({ params }) {
                 onClick={() => setDetailTab("overview")}
                 data-testid="runtime-detail-tab-overview"
               >
-                Overview
+                Review runtime
               </button>
               <button
                 type="button"
@@ -1473,7 +1483,7 @@ export default function DeploymentDetailsPage({ params }) {
                 onClick={() => setDetailTab("change")}
                 data-testid="runtime-detail-tab-change"
               >
-                Change
+                Prepare change
               </button>
               <button
                 type="button"
@@ -1481,7 +1491,7 @@ export default function DeploymentDetailsPage({ params }) {
                 onClick={() => setDetailTab("share")}
                 data-testid="runtime-detail-tab-share"
               >
-                Share
+                Share and save
               </button>
               <button
                 type="button"
@@ -1489,67 +1499,7 @@ export default function DeploymentDetailsPage({ params }) {
                 onClick={() => setDetailTab("tools")}
                 data-testid="runtime-detail-tab-tools"
               >
-                Tools
-              </button>
-            </div>
-          </article>
-
-          <article className="card formCard" data-testid="runtime-detail-decision-card">
-            <div className="sectionHeader">
-              <div>
-                <h2 data-testid="runtime-detail-decision-title">Decision status</h2>
-                <p className="formHint">
-                  This layer answers the main question first: is the runtime blocked, still under review, or stable enough for a deliberate change.
-                </p>
-              </div>
-            </div>
-            <div className="row">
-              <span className="label">Current state</span>
-              <span className={`status ${runtimeDecisionState.tone}`} data-testid="runtime-detail-decision-state">
-                {runtimeDecisionState.label}
-              </span>
-            </div>
-            <div className="row">
-              <span className="label">Focus</span>
-              <span data-testid="runtime-detail-decision-focus">{runtimeDecisionState.focus}</span>
-            </div>
-            <div className="row">
-              <span className="label">Why</span>
-              <span data-testid="runtime-detail-decision-why">{runtimeDecisionState.why}</span>
-            </div>
-            <div className="row">
-              <span className="label">What to do</span>
-              <span data-testid="runtime-detail-decision-next-step">{runtimeDecisionState.nextStep}</span>
-            </div>
-            <div className="backupSummaryBadges">
-              {runtimeDecisionState.badges.map((badge) => (
-                <span key={badge.label} className={`status ${badge.tone}`}>
-                  {badge.label} {badge.value}
-                </span>
-              ))}
-            </div>
-            <div className="actionCluster">
-              <Link
-                href={runtimeDecisionState.primaryHref}
-                className="landingButton primaryButton"
-                data-testid="runtime-detail-decision-primary-action"
-              >
-                {runtimeDecisionState.primaryAction}
-              </Link>
-              <Link
-                href={runtimeDecisionState.secondaryHref}
-                className="secondaryButton"
-                data-testid="runtime-detail-decision-secondary-action"
-              >
-                {runtimeDecisionState.secondaryAction}
-              </Link>
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid="runtime-detail-decision-copy-button"
-                onClick={handleCopyRuntimeNextStep}
-              >
-                Copy next step
+                Logs and diagnostics
               </button>
             </div>
           </article>
@@ -1606,9 +1556,9 @@ export default function DeploymentDetailsPage({ params }) {
             <article className="card compactCard" data-testid="runtime-detail-risk-breakdown-card">
               <div className="sectionHeader">
                 <div>
-                  <h2 data-testid="runtime-detail-risk-breakdown-title">Why this state is leading</h2>
+                  <h2 data-testid="runtime-detail-risk-breakdown-title">{runtimeOverviewTitle}</h2>
                   <p className="formHint">
-                    These signals explain why this page currently behaves like a runtime review surface or a rollout-change surface.
+                    {runtimeOverviewBody}
                   </p>
                 </div>
               </div>
@@ -1648,7 +1598,7 @@ export default function DeploymentDetailsPage({ params }) {
         <article className="card formCard" data-testid="runtime-detail-change-readiness-card">
           <div className="sectionHeader">
             <div>
-              <h2 data-testid="runtime-detail-change-readiness-title">Change readiness</h2>
+              <h2 data-testid="runtime-detail-change-readiness-title">Prepare the next rollout change</h2>
               <p className="formHint">
                 Treat the redeploy form as a deliberate change surface. It should tell you first whether the draft is blocked, still needs judgment, or is ready for explicit review.
               </p>
@@ -1897,8 +1847,8 @@ export default function DeploymentDetailsPage({ params }) {
 
             <section hidden={detailTab !== "share"}>
             <AdminDisclosureSection
-              title="Templates and runtime tools"
-              subtitle="Save this configuration for later, then open diagnostics, logs, and activity only when you need deeper runtime context."
+              title="Share, handoff, and save this setup"
+              subtitle="Use this layer when you need to explain the current runtime, save it as a template, or open utility controls without crowding the main review path."
               badge={`${attentionItems.length} attention`}
               testId="runtime-detail-secondary-tools"
             >
@@ -2212,8 +2162,8 @@ export default function DeploymentDetailsPage({ params }) {
 
             <section hidden={detailTab !== "tools"}>
             <AdminDisclosureSection
-              title="Runtime tools and history"
-              subtitle="Quick reference, diagnostics, logs, and activity remain available here without crowding the first runtime screen."
+              title="Logs, diagnostics, and activity"
+              subtitle="Deeper runtime evidence stays here after the first-pass review is already clear."
               badge={`${attentionItems.length} attention`}
               testId="runtime-detail-tools-disclosure"
             >

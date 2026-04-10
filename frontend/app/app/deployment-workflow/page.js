@@ -193,28 +193,6 @@ function DeploymentWorkflowPageContent() {
           ? "You can start from a blank form or reuse one saved setup."
           : "This page is where you choose one app image and start it.";
   const workflowPrimaryMode = workflowState.mode === "live" ? "live" : "create";
-  const workflowPrimaryAction = serverAccessBlocked
-    ? filteredDeployments.length > 0
-      ? {
-          title: "Review the live deployments first",
-          detail:
-            "Admins still manage the saved target, but this page can already help you review what is running before the next rollout is unlocked.",
-          href: "#runtime-deployments",
-          actionLabel: "Open live deployments",
-        }
-      : {
-          title: "Server target is admin-managed",
-          detail:
-            "Members cannot pick saved server targets here. Ask an admin to confirm the target, then come back to the deployment workflow.",
-          href: "/app",
-          actionLabel: "Back to overview",
-        }
-    : {
-        title: workflowState.title,
-        detail: workflowState.detail,
-        href: workflowState.href,
-        actionLabel: workflowState.actionLabel,
-      };
   const primaryRuntimeDeployment =
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     filteredDeployments[0] ||
@@ -246,47 +224,6 @@ function DeploymentWorkflowPageContent() {
       : workflowPrimaryMode === "live"
         ? "Because something already needs review, start by checking the live queue before you create another deployment."
         : "Keep Step 2 simple: choose an app image or a saved setup first, then open advanced fields only if the rollout really needs them.";
-  const stepTwoGuideCards = waitingForAdminTarget
-    ? [
-        {
-          label: "1. Ask an admin",
-          title: "Confirm one server target",
-          detail:
-            "Members cannot finish Step 1 here. One admin-managed server target has to be confirmed before remote rollout can start.",
-        },
-        {
-          label: "2. Come back here",
-          title: "Return once the target is ready",
-          detail:
-            "As soon as the target is confirmed, this page becomes the place where you choose what app to run.",
-        },
-        {
-          label: "3. Then keep it simple",
-          title: "Choose one app, start it, then check health",
-          detail:
-            "Only after the target is ready do image choice, deploy start, and live health become the main path.",
-        },
-      ]
-    : [
-        {
-          label: "1. Pick what to run",
-          title: "Choose one app image or one saved setup",
-          detail:
-            "Most first deployments only need the image. A template is just a saved setup that already remembers the image, ports, and env vars.",
-        },
-        {
-          label: "2. Keep the form small",
-          title: "Ignore advanced fields until you actually need them",
-          detail:
-            "Name, ports, env vars, and template save are still here, but they should stay closed unless this rollout truly needs them.",
-        },
-        {
-          label: "3. Check health after start",
-          title: "Use the live lane after you create the deployment",
-          detail:
-            "Once the app starts, switch to live review or runtime detail and confirm the app is healthy before you make the next change.",
-        },
-      ];
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -1284,135 +1221,22 @@ function DeploymentWorkflowPageContent() {
           primaryAction: "Back to overview",
           secondaryAction: "Copy next step",
           tone: "warn",
-      }
+        }
     : workflowNextStep;
-  const workflowHeroSpotlight = waitingForAdminTarget
-    ? {
-        badge: "Waiting on admin",
-        title: "Wait for one confirmed target",
-        detail:
-          "This page should explain what opens next, not push you into rollout settings before a usable server target exists.",
-        support:
-          "As soon as one admin-managed target is confirmed, Step 2 becomes a simpler choice: pick one app, start it, then check health.",
-      }
-    : serverAccessBlocked
-      ? filteredDeployments.length > 0
-        ? {
-            badge: "Live review stays open",
-            title: "Use the runtime lane while admins manage the target",
-            detail:
-              "You cannot pick a saved target here, but you can still review the deployments that already exist and remove uncertainty there first.",
-            support:
-              "Treat create and template work as background until the target is confirmed or the live runtime is understood.",
-          }
-        : {
-            badge: "Waiting on admin",
-            title: "Ask for one confirmed target before rollout creation",
-            detail:
-              "Without one saved target, this page should only point toward the next unblock instead of pretending rollout creation is already ready.",
-            support:
-              "Once the target is confirmed, this workspace becomes the main place to choose what app should run next.",
-          }
-      : workflowState.mode === "prerequisite"
-        ? {
-            badge: "Finish Step 1",
-            title: "Connect one server before Step 2 takes over",
-            detail:
-              "This workspace becomes useful right after one target is saved and checked in Server Review.",
-            support:
-              "Do not split attention between rollout settings and server setup. Let Step 1 finish first, then come back here.",
-          }
-        : workflowState.mode === "live"
-          ? {
-              badge: "Needs attention",
-              title: "Review the live queue before another rollout",
-              detail:
-                "A deployment already needs review, so the safest move is understanding the runtime before you change anything else.",
-              support:
-                "Keep create and template reuse visible, but quieter than the current incident path.",
-            }
-          : templates.length > 0
-            ? {
-                badge: deployments.length === 0 ? "Step 1 complete" : "Keep momentum",
-                title: "Choose one app or reuse one saved setup",
-                detail:
-                  "This is the shortest route now: open one lane, finish that rollout step, then check health before you make another change.",
-                support:
-                  "If this deploy is brand new, start with the image form. If it is repeatable, let a template save time without reopening extra admin surfaces.",
-              }
-            : {
-                badge: deployments.length === 0 ? "Step 1 complete" : "Do this now",
-                title: "Choose the next app to run",
-                detail:
-                  "Stay inside one guided form so image, target, ports, env vars, and launch all read like one continuous task.",
-                support:
-                  "Advanced fields are still here, but they should stay quieter than the decision to start one deliberate rollout.",
-              };
-  const workflowServerStepState =
-    waitingForAdminTarget || workflowState.mode === "prerequisite" ? "current" : "complete";
-  const workflowLaunchStepState =
-    waitingForAdminTarget || workflowState.mode === "prerequisite"
-      ? "upcoming"
-      : workflowState.mode === "live"
-        ? "complete"
-        : "current";
-  const workflowReviewStepState = workflowState.mode === "live" ? "current" : "upcoming";
-  const workflowStepCards = [
-    {
-      id: "server",
-      label: "1. Connect",
-      title: waitingForAdminTarget
-        ? "Wait for admin target"
-        : canAccessServers && !localDeploymentsEnabled
-          ? servers.length > 0
-            ? "Server step is ready"
-            : "Connect one server"
-          : localDeploymentsEnabled
-            ? "Server step is already covered"
-            : "Target stays with admins",
-      detail: waitingForAdminTarget
-        ? "Remote rollout opens after one confirmed saved target."
-        : canAccessServers && !localDeploymentsEnabled
-          ? servers.length > 0
-            ? "At least one remote target is already saved for this workflow."
-            : "Save one SSH target before rollout creation becomes the main path."
-          : localDeploymentsEnabled
-            ? "Local mode lets this workspace move straight into what to run."
-            : "Members rely on one admin-confirmed target before remote rollout.",
-      state: workflowServerStepState,
-    },
-    {
-      id: "launch",
-      label: "2. Launch",
-      title:
-        workflowState.mode === "live"
-          ? "Choose the next rollout later"
-          : templates.length > 0
-            ? "Start from image or template"
-            : "Choose one app to run",
-      detail:
-        workflowState.mode === "live"
-          ? "Creation waits until the current runtime is understood."
-          : "Use one lane: blank form for new work, saved setup for repeat work.",
-      state: workflowLaunchStepState,
-    },
-    {
-      id: "review",
-      label: "3. Review",
-      title: workflowState.mode === "live" ? "Review the live issue" : "Check live health",
-      detail:
-        workflowState.mode === "live"
-          ? "This is the current step before another rollout."
-          : "After the app starts, confirm it is healthy before the next change.",
-      state: workflowReviewStepState,
-    },
-  ];
-  const workflowGuideTitle = waitingForAdminTarget
-    ? "What opens after the target is ready"
-    : "Keep Step 2 in one deliberate lane";
-  const workflowGuideBody = waitingForAdminTarget
-    ? "As soon as one target is confirmed, this page should feel simpler than it does now: choose the app, start it, then check health."
-    : "One lane should feel current. The other lanes should read like context, not like competing instructions.";
+  const pagePrimaryAction =
+    serverAccessBlocked && filteredDeployments.length === 0
+      ? { kind: "link", href: "/app", label: "Back to overview" }
+      : serverAccessBlocked
+        ? { kind: "button", tab: "live", label: "Open live deployments" }
+        : workflowState.mode === "prerequisite"
+          ? { kind: "link", href: "/app/server-review", label: "Open server review" }
+          : failedDeploymentCount > 0
+            ? { kind: "button", tab: "live", label: "Open live deployments" }
+            : memberWorkflowNextStep.primaryAction === "Open templates"
+              ? { kind: "button", tab: "templates", label: "Open saved setups" }
+              : memberWorkflowNextStep.primaryAction === "Fix the create form"
+                ? { kind: "button", tab: "create", label: "Fix the create form" }
+                : { kind: "button", tab: "create", label: "Create deployment" };
   const previewDiffRows = buildTemplateDiff(primaryTemplate, currentDraft, servers);
 
   if (!authChecked) {
@@ -1450,76 +1274,53 @@ function DeploymentWorkflowPageContent() {
   return (
     <main className="page">
       <div className="container">
-        <article className="card formCard workspaceHero deploymentWorkflowHero">
-          <div className="workspaceHeroBackdrop" />
-          <div className="deploymentWorkflowHeroLayout">
-            <div className="deploymentWorkflowHeroCopy">
-              <div className="header workspaceHeroHeader">
-                <div>
-                  <div className="eyebrow">Step 2</div>
-                  <h1 data-testid="deployment-workflow-title">Choose what to run</h1>
-                  <p className="deploymentWorkflowLead">{stepTwoLead}</p>
-                  <p className="formHint deploymentWorkflowSubtleCopy">{stepTwoSupport}</p>
-                </div>
-                <div className="buttonRow workspaceHeroActions deploymentWorkflowHeroActions">
-                  {canAccessServers ? (
-                    <Link href="/app/server-review" className="linkButton">
-                      Back to server step
-                    </Link>
-                  ) : (
-                    <Link href="/app" className="linkButton">
-                      Overview
-                    </Link>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => refreshWorkspace()}
-                    disabled={loading || serversLoading || templatesLoading}
-                    className="secondaryButton"
-                  >
-                    {loading || serversLoading || templatesLoading ? "Refreshing..." : "Refresh"}
-                  </button>
-                </div>
-              </div>
-              <div className="deploymentWorkflowStepStrip" aria-label="Deployment workflow path">
-                {workflowStepCards.map((step) => (
-                  <article
-                    key={step.id}
-                    className={`deploymentWorkflowStepCard is${step.state[0].toUpperCase()}${step.state.slice(1)}`}
-                  >
-                    <span>{step.label}</span>
-                    <strong>{step.title}</strong>
-                    <p>{step.detail}</p>
-                  </article>
-                ))}
-              </div>
+        <article className="card formCard">
+          <div className="header">
+            <div>
+              <div className="eyebrow">Step 2</div>
+              <h1 data-testid="deployment-workflow-title">Step 2: Choose what to run and deploy it</h1>
+              <p className="formHint">{stepTwoLead}</p>
+              <p className="formHint">{stepTwoSupport}</p>
+              <p className="formHint">
+                Right now: <strong>{memberWorkflowNextStep.focus}</strong>
+              </p>
             </div>
-            <div className="deploymentWorkflowHeroRail">
-              <article className="workspaceHeroBadge deploymentWorkflowHeroPanel">
-                <span>{workflowHeroSpotlight.badge}</span>
-                <strong>{workflowHeroSpotlight.title}</strong>
-                <p>{workflowHeroSpotlight.detail}</p>
-                <p className="workspaceHeroSpotlightNote">{workflowHeroSpotlight.support}</p>
-                <div className="formActions">
-                  <Link href={workflowPrimaryAction.href} className="landingButton primaryButton">
-                    {workflowPrimaryAction.actionLabel}
-                  </Link>
-                </div>
-                <div className="deploymentWorkflowHeroStats" aria-label="Deployment workflow summary">
-                  <div className="deploymentWorkflowHeroStat">
-                    <span>Running</span>
-                    <strong>{runningDeploymentCount}</strong>
-                  </div>
-                  <div className="deploymentWorkflowHeroStat">
-                    <span>Need review</span>
-                    <strong>{failedDeploymentCount}</strong>
-                  </div>
-                  <div className="deploymentWorkflowHeroStat">
-                    <span>Saved setups</span>
-                    <strong>{templates.length}</strong>
-                  </div>
-                </div>
-              </article>
+            <div className="buttonRow">
+              {pagePrimaryAction.kind === "link" ? (
+                <Link
+                  href={pagePrimaryAction.href}
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-hero-primary-action"
+                >
+                  {pagePrimaryAction.label}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-hero-primary-action"
+                  onClick={() => setWorkflowTab(pagePrimaryAction.tab)}
+                >
+                  {pagePrimaryAction.label}
+                </button>
+              )}
+              {canAccessServers ? (
+                <Link href="/app/server-review" className="linkButton">
+                  Back to server step
+                </Link>
+              ) : (
+                <Link href="/app" className="linkButton">
+                  Overview
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => refreshWorkspace()}
+                disabled={loading || serversLoading || templatesLoading}
+                className="secondaryButton"
+              >
+                {loading || serversLoading || templatesLoading ? "Refreshing..." : "Refresh"}
+              </button>
             </div>
           </div>
         </article>
@@ -1632,174 +1433,89 @@ function DeploymentWorkflowPageContent() {
           </article>
         ) : null}
 
-        <article className="card formCard workspaceGuidePanel deploymentWorkflowGuidePanel" data-testid="deployment-workflow-step-guide-card">
-          <div className="sectionHeader workspaceGuideHeader">
+        <article className="card formCard" data-testid="deployment-workflow-main-next-step-card">
+          <div className="sectionHeader">
             <div>
-              <h2>{workflowGuideTitle}</h2>
+              <h2 data-testid="deployment-workflow-main-next-step-title">Do this now</h2>
               <p className="formHint">
-                {workflowGuideBody}
+                Use one lane at a time on this page. Finish the current job before you open the others.
               </p>
             </div>
           </div>
-          <div className="workspaceGuideGrid deploymentWorkflowGuideGrid">
-            <div className="workspaceGuideSteps">
-              <article
-                className="workspaceGlancePanel workspacePriorityPanel deploymentWorkflowPrimaryCard"
-                data-testid="deployment-workflow-primary-action-card"
-              >
-                <div className="workspaceGlanceHeader">
-                  <span className="eyebrow">{workflowHeroSpotlight.badge}</span>
-                  <strong data-testid="deployment-workflow-primary-action-title">{workflowPrimaryAction.title}</strong>
-                </div>
-                <p className="formHint">{workflowPrimaryAction.detail}</p>
-                <p className="workspacePrioritySupport">{workflowHeroSpotlight.support}</p>
-                <div className="formActions">
-                  <Link href={workflowPrimaryAction.href} className="landingButton primaryButton">
-                    {workflowPrimaryAction.actionLabel}
-                  </Link>
-                </div>
-              </article>
-              <div className="workspaceReviewerGrid deploymentWorkflowGuideCards">
-                {stepTwoGuideCards.map((card) => (
-                  <article key={card.label} className="workspaceReviewerCard">
-                    <span>{card.label}</span>
-                    <strong>{card.title}</strong>
-                    <p>{card.detail}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
-            <aside
-              className="workspaceGlancePanel deploymentWorkflowGuideAside"
-              data-testid="deployment-workflow-main-next-step-card"
+          <div className="row">
+            <span className="label">Current focus</span>
+            <span data-testid="deployment-workflow-main-next-step-focus">{memberWorkflowNextStep.focus}</span>
+          </div>
+          <div className="row">
+            <span className="label">What to do</span>
+            <span data-testid="deployment-workflow-main-next-step-copy">{memberWorkflowNextStep.nextStep}</span>
+          </div>
+          <div className="backupSummaryBadges">
+            <span className={`status ${memberWorkflowNextStep.tone}`}>filtered {filteredDeployments.length}</span>
+            <span className="status healthy">running {runningDeploymentCount}</span>
+            <span className="status error">failed {failedDeploymentCount}</span>
+            <span className="status info">templates {templates.length}</span>
+          </div>
+          {!serverAccessBlocked ? (
+            <div
+              className="filterTabs"
+              role="tablist"
+              aria-label="Deployment workflow tabs"
+              data-testid="deployment-workflow-tabs-card"
             >
-              <div className="workspaceGlanceHeader">
-                <span className="eyebrow">Your current lane</span>
-                <strong data-testid="deployment-workflow-main-next-step-title">Your next task on this page</strong>
-              </div>
-              <p className="formHint">
-                Trust this summary first. The other lanes should read like backup, not like competing instructions.
-              </p>
-              <div className="row">
-                <span className="label">Current focus</span>
-                <span data-testid="deployment-workflow-main-next-step-focus">{memberWorkflowNextStep.focus}</span>
-              </div>
-              <div className="row">
-                <span className="label">What to do</span>
-                <span data-testid="deployment-workflow-main-next-step-copy">{memberWorkflowNextStep.nextStep}</span>
-              </div>
-              <div className="backupSummaryBadges">
-                <span className={`status ${memberWorkflowNextStep.tone}`}>filtered {filteredDeployments.length}</span>
-                <span className="status healthy">running {runningDeploymentCount}</span>
-                <span className="status error">failed {failedDeploymentCount}</span>
-                <span className="status info">templates {templates.length}</span>
-              </div>
-              {!serverAccessBlocked ? (
-                <div
-                  className="filterTabs deploymentWorkflowLaneTabs"
-                  role="tablist"
-                  aria-label="Deployment workflow tabs"
-                  data-testid="deployment-workflow-tabs-card"
-                >
-                  <button
-                    type="button"
-                    className={workflowTab === "live" ? "active" : ""}
-                    onClick={() => setWorkflowTab("live")}
-                    data-testid="deployment-workflow-tab-live"
-                  >
-                    Check live apps
-                  </button>
-                  <button
-                    type="button"
-                    className={workflowTab === "create" ? "active" : ""}
-                    onClick={() => setWorkflowTab("create")}
-                    data-testid="deployment-workflow-tab-create"
-                  >
-                    Start app
-                  </button>
-                  <button
-                    type="button"
-                    className={workflowTab === "templates" ? "active" : ""}
-                    onClick={() => setWorkflowTab("templates")}
-                    data-testid="deployment-workflow-tab-templates"
-                  >
-                    Use saved setup
-                  </button>
-                </div>
-              ) : null}
-              <div className="actionCluster">
-                {serverAccessBlocked && filteredDeployments.length === 0 ? (
-                  <Link
-                    href="/app"
-                    className="landingButton primaryButton"
-                    data-testid="deployment-workflow-main-next-step-button"
-                  >
-                    Back to overview
-                  </Link>
-                ) : serverAccessBlocked ? (
-                  <button
-                    type="button"
-                    className="landingButton primaryButton"
-                    data-testid="deployment-workflow-main-next-step-button"
-                    onClick={() => setWorkflowTab("live")}
-                  >
-                    Open live deployments
-                  </button>
-                ) : workflowState.mode === "prerequisite" ? (
-                  <Link
-                    href="/app/server-review"
-                    className="landingButton primaryButton"
-                    data-testid="deployment-workflow-main-next-step-button"
-                  >
-                    Open server review
-                  </Link>
-                ) : failedDeploymentCount > 0 ? (
-                  <button
-                    type="button"
-                    className="landingButton primaryButton"
-                    data-testid="deployment-workflow-main-next-step-button"
-                    onClick={() => setWorkflowTab("live")}
-                  >
-                    Open live deployments
-                  </button>
-                ) : memberWorkflowNextStep.primaryAction === "Open templates" ? (
-                  <button
-                    type="button"
-                    className="landingButton primaryButton"
-                    data-testid="deployment-workflow-main-next-step-button"
-                    onClick={() => setWorkflowTab("templates")}
-                  >
-                    Open templates
-                  </button>
-                ) : memberWorkflowNextStep.primaryAction === "Fix the create form" ? (
-                  <button
-                    type="button"
-                    className="landingButton primaryButton"
-                    data-testid="deployment-workflow-main-next-step-button"
-                    onClick={() => setWorkflowTab("create")}
-                  >
-                    Fix the create form
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="landingButton primaryButton"
-                    data-testid="deployment-workflow-main-next-step-button"
-                    onClick={() => setWorkflowTab("create")}
-                  >
-                    Create deployment
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  data-testid="deployment-workflow-main-next-step-copy-button"
-                  onClick={handleCopyNextStep}
-                >
-                  Copy next step
-                </button>
-              </div>
-            </aside>
+              <button
+                type="button"
+                className={workflowTab === "live" ? "active" : ""}
+                onClick={() => setWorkflowTab("live")}
+                data-testid="deployment-workflow-tab-live"
+              >
+                Check live apps
+              </button>
+              <button
+                type="button"
+                className={workflowTab === "create" ? "active" : ""}
+                onClick={() => setWorkflowTab("create")}
+                data-testid="deployment-workflow-tab-create"
+              >
+                Start with image
+              </button>
+              <button
+                type="button"
+                className={workflowTab === "templates" ? "active" : ""}
+                onClick={() => setWorkflowTab("templates")}
+                data-testid="deployment-workflow-tab-templates"
+              >
+                Use saved setup
+              </button>
+            </div>
+          ) : null}
+          <div className="actionCluster">
+            {pagePrimaryAction.kind === "link" ? (
+              <Link
+                href={pagePrimaryAction.href}
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+              >
+                {pagePrimaryAction.label}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+                onClick={() => setWorkflowTab(pagePrimaryAction.tab)}
+              >
+                {pagePrimaryAction.label}
+              </button>
+            )}
+            <button
+              type="button"
+              className="secondaryButton"
+              data-testid="deployment-workflow-main-next-step-copy-button"
+              onClick={handleCopyNextStep}
+            >
+              Copy next step
+            </button>
           </div>
         </article>
 
@@ -2006,7 +1722,7 @@ function DeploymentWorkflowPageContent() {
 
         <section hidden={workflowTab !== "create" || serverAccessBlocked}>
         <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
-          <h2 data-testid="create-deployment-title">Start one app</h2>
+          <h2 data-testid="create-deployment-title">Step 2A: Start one app</h2>
           <p className="formHint">
             {serverAccessBlocked
               ? "Members cannot choose saved servers here. Ask an admin to confirm the target, then keep this form focused on the app itself."
@@ -2364,7 +2080,7 @@ function DeploymentWorkflowPageContent() {
         <article className="card formCard" data-testid="templates-card" id="templates">
           <div className="sectionHeader" data-testid="templates-section-header">
             <div>
-              <h2 data-testid="templates-section-title">Use a saved setup</h2>
+              <h2 data-testid="templates-section-title">Step 2B: Reuse a saved setup</h2>
               <p className="formHint">
                 A template is just a saved rollout setup. Reuse one when you do not want to fill the whole form again.
               </p>

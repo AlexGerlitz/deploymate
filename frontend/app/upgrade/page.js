@@ -145,8 +145,8 @@ export default function UpgradePage() {
               {loadingUser
                 ? "Loading plan..."
                 : currentUser
-                  ? `Current plan: ${currentUser.plan}`
-                  : "Request trial, team, or commercial-use access"}
+                  ? `Current plan: ${currentUser.plan}. Use this page to request the next level of access.`
+                  : "Start with a trial account first, then use this page to request paid or commercial access."}
             </p>
           </div>
           <div className="buttonRow">
@@ -165,8 +165,7 @@ export default function UpgradePage() {
           <div className="sectionHeader">
             <h2>Plans</h2>
             <p className="formHint">
-              Trial and paid plans cover normal product access. Commercial use of the public codebase
-              still requires a separate license.
+              Trial is the self-serve entry point. Paid plans and commercial use still go through a reviewed request path.
             </p>
           </div>
           <div className="pricingGrid">
@@ -246,11 +245,14 @@ export default function UpgradePage() {
         <article className="card formCard">
           <div className="sectionHeader">
             <div>
-              <h2>Request plan or commercial access</h2>
+              <h2>Request paid or commercial access</h2>
               <p className="formHint">
-                Use this form for paid plans, team onboarding, or a separate commercial license request.
+                Use this form after trial when you want a paid plan, team onboarding, or a separate commercial license.
               </p>
             </div>
+          </div>
+          <div className="banner subtle">
+            This is a review request, not an instant checkout. We read the request, confirm fit, and then move the account or license path forward.
           </div>
           <div className="banner subtle">
             Prefer a direct explanation first? Start on{" "}
@@ -316,7 +318,7 @@ export default function UpgradePage() {
 
             <div className="formActions">
               <button type="submit" disabled={submitting}>
-                {submitting ? "Submitting..." : "Send request"}
+                {submitting ? "Submitting..." : "Send access request"}
               </button>
             </div>
           </form>
@@ -325,7 +327,7 @@ export default function UpgradePage() {
           {success ? <div className="banner success">{success}</div> : null}
           {success ? (
             <div className="banner subtle">
-              Next step: review scope, support needs, and whether your request is for a paid plan or a separate commercial license. If needed, you can also follow up through{" "}
+              Next step: we review scope, support needs, and whether this should become a paid plan change or a separate commercial license. If needed, you can also follow up through{" "}
               <a
                 href={buildBusinessMailto("DeployMate commercial license follow-up")}
                 className="inlineLink"
