@@ -233,6 +233,12 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_post_deploy_smoke_defines_json_query_helper(self):
+        script = (self.repo_root / "scripts" / "post_deploy_smoke.sh").read_text(encoding="utf-8")
+
+        self.assertIn("json_get()", script)
+        self.assertIn("json_query()", script)
+
 
 if __name__ == "__main__":
     unittest.main()
