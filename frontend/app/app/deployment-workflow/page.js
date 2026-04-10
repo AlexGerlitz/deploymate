@@ -125,6 +125,8 @@ function DeploymentWorkflowPageContent() {
   });
   const runningDeploymentCount = deployments.filter((deployment) => deployment.status === "running").length;
   const failedDeploymentCount = deployments.filter((deployment) => deployment.status === "failed").length;
+  const filteredRunningDeploymentCount = filteredDeployments.filter((deployment) => deployment.status === "running").length;
+  const filteredReviewDeploymentCount = filteredDeployments.filter((deployment) => deployment.status !== "running").length;
   const normalizedTemplateQuery = templateQuery.trim().toLowerCase();
   const filteredTemplates = [...templates]
     .filter((template) => {
@@ -222,6 +224,119 @@ function DeploymentWorkflowPageContent() {
   const secondaryRuntimeDeployments = primaryRuntimeDeployment
     ? filteredDeployments.filter((deployment) => deployment.id !== primaryRuntimeDeployment.id)
     : [];
+  const primaryRuntimeUrl = primaryRuntimeDeployment
+    ? buildDeploymentUrl(primaryRuntimeDeployment)
+    : "";
+  const runtimeLaneSummary = primaryRuntimeDeployment
+    ? primaryRuntimeDeployment.status === "failed"
+      ? {
+          badge: "Needs review",
+          title: "Start with the failed runtime",
+          detail:
+            "A rollout already failed, so the safest move is opening that deployment detail before you think about another change.",
+          support:
+            "Treat the remaining queue as background until the current failure is concrete enough to explain.",
+          actionHref: `/deployments/${primaryRuntimeDeployment.id}`,
+          actionLabel: "Open deployment details",
+          tone: "error",
+          nextStep:
+            "Read the failing runtime first, then decide whether the next move is stability work or a deliberate redeploy.",
+        }
+      : {
+          badge: "Review this now",
+          title: "Confirm one live deployment stays healthy",
+          detail:
+            "Use one runtime as the current focus so status, health, and next actions stay easier to read.",
+          support:
+            "If the focus deployment still looks believable after review, the rest of the queue can stay quieter.",
+          actionHref: `/deployments/${primaryRuntimeDeployment.id}`,
+          actionLabel: "Open deployment details",
+          tone: "healthy",
+          nextStep:
+            "Check this deployment first, then return to the rest of the queue only if another runtime still needs attention.",
+        }
+    : filteredDeployments.length === 0 && deployments.length > 0
+      ? {
+          badge: "Nothing matches",
+          title: "Reset the live filters first",
+          detail:
+            "The live lane is empty only because the current filters or search hide the deployments that already exist.",
+          support:
+            "Clear the filters, pick one runtime to review, and keep the rest of the queue in the background again.",
+          actionHref: "",
+          actionLabel: "Clear live filters",
+          tone: "warn",
+          nextStep:
+            "Remove the search or filter that is hiding the queue, then focus one deployment instead of scanning the whole list.",
+        }
+      : {
+          badge: "Nothing is running",
+          title: "This lane becomes useful after the first launch",
+          detail:
+            "Step 3 is for checking whether a started app is healthy enough to keep. Right now there is no live runtime to review yet.",
+          support:
+            "Go back to the create lane, start one app, and then return here to confirm it behaves the way you expect.",
+          actionHref: "#create-deployment",
+          actionLabel: "Go to create lane",
+          tone: "warn",
+          nextStep:
+            "Launch one app first. After that, this lane becomes the place to review health and decide what to do next.",
+        };
+  const runtimeLaneGuideCards = primaryRuntimeDeployment
+    ? [
+        {
+          label: "Current focus",
+          title:
+            primaryRuntimeDeployment.container_name ||
+            primaryRuntimeDeployment.image ||
+            "This deployment",
+          detail:
+            primaryRuntimeDeployment.status === "failed"
+              ? "The current focus already failed, so it should explain the next move before the rest of the queue competes for attention."
+              : "Start with one live runtime and confirm whether it is healthy enough to keep before the rest of the queue gets louder.",
+        },
+        {
+          label: "Check next",
+          title: primaryRuntimeUrl ? "Open the runtime and verify the public path" : "Open the runtime and verify the internal state",
+          detail:
+            primaryRuntimeUrl
+              ? `The current endpoint is ${primaryRuntimeUrl}. Use deployment detail to review health, diagnostics, activity, and rollout change readiness together.`
+              : "This runtime has no public URL yet. Open deployment detail to review status, diagnostics, and the next safe action in one place.",
+        },
+        {
+          label: "Ignore for now",
+          title:
+            secondaryRuntimeDeployments.length > 0
+              ? `${secondaryRuntimeDeployments.length} more deployment${secondaryRuntimeDeployments.length === 1 ? "" : "s"} stay in the queue`
+              : "There is no extra queue pressure right now",
+          detail:
+            secondaryRuntimeDeployments.length > 0
+              ? "The remaining queue still matters, but it should not outrank the one runtime you are currently trying to understand."
+              : "Once this focused runtime is understood, the next move can stay deliberate instead of reactive.",
+        },
+      ]
+    : [
+        {
+          label: "Current focus",
+          title: filteredDeployments.length === 0 ? "Nothing is visible yet" : "No runtime is leading yet",
+          detail:
+            filteredDeployments.length === 0
+              ? "The current filter or search is hiding the queue, so there is no useful runtime to review until the list is visible again."
+              : "This lane becomes useful as soon as one deployment exists and can act as the current review target.",
+        },
+        {
+          label: "What unlocks next",
+          title: "One visible runtime makes the page simpler",
+          detail:
+            "As soon as one deployment is visible, Step 3 becomes about understanding that runtime first and leaving the rest of the queue quieter.",
+        },
+        {
+          label: "Ignore for now",
+          title: "Do not over-read the empty lane",
+          detail:
+            "If there is no visible live runtime, the right move is either clearing filters or launching the first app, not opening deeper review tools prematurely.",
+        },
+      ];
   const requestedTemplateId = searchParams.get("template") || "";
   const requestedTemplateAction = searchParams.get("template_action") || "preview";
   const requestedTemplateSource = searchParams.get("template_source") || "";
@@ -1852,6 +1967,91 @@ function DeploymentWorkflowPageContent() {
             </div>
           </div>
         </div>
+
+        <article className="card formCard workspaceGuidePanel runtimeLaneGuidePanel">
+          <div className="sectionHeader workspaceGuideHeader">
+            <div>
+              <h2>Use Step 3 to verify the rollout</h2>
+              <p className="formHint">
+                This lane should answer one question first: is one live runtime believable enough to keep, or does it still need review before another change?
+              </p>
+            </div>
+          </div>
+          <div className="workspaceGuideGrid">
+            <div className="runtimeLaneGuideStack">
+              <article className="workspaceGlancePanel workspacePriorityPanel runtimeLanePrimaryCard">
+                <div className="workspaceGlanceHeader">
+                  <span className="eyebrow">{runtimeLaneSummary.badge}</span>
+                  <strong>{runtimeLaneSummary.title}</strong>
+                </div>
+                <p className="formHint">{runtimeLaneSummary.detail}</p>
+                <p className="workspacePrioritySupport">{runtimeLaneSummary.support}</p>
+                <div className="actionCluster">
+                  {runtimeLaneSummary.actionHref ? (
+                    <Link href={runtimeLaneSummary.actionHref} className="landingButton primaryButton">
+                      {runtimeLaneSummary.actionLabel}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="landingButton primaryButton"
+                      onClick={() => {
+                        setDeploymentFilter("all");
+                        setDeploymentQuery("");
+                      }}
+                    >
+                      {runtimeLaneSummary.actionLabel}
+                    </button>
+                  )}
+                  {primaryRuntimeUrl ? (
+                    <a href={primaryRuntimeUrl} target="_blank" rel="noreferrer" className="secondaryButton">
+                      Open app
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+              <div className="workspaceReviewerGrid runtimeLaneGuideCards">
+                {runtimeLaneGuideCards.map((card) => (
+                  <article key={card.label} className="workspaceReviewerCard">
+                    <span>{card.label}</span>
+                    <strong>{card.title}</strong>
+                    <p>{card.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+            <aside className="workspaceGlancePanel runtimeLaneGuideAside">
+              <div className="workspaceGlanceHeader">
+                <span className="eyebrow">Live queue</span>
+                <strong>Current runtime posture</strong>
+              </div>
+                <div className="workspaceGlanceList">
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Visible</span>
+                    <strong>{filteredDeployments.length}</strong>
+                    <p>Deployments currently visible in this lane.</p>
+                  </div>
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Running</span>
+                    <strong>{filteredRunningDeploymentCount}</strong>
+                    <p>Visible runtimes that currently report a healthy running state.</p>
+                  </div>
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Need review</span>
+                    <strong>{filteredReviewDeploymentCount}</strong>
+                    <p>Visible deployments whose current state still competes for attention.</p>
+                  </div>
+                </div>
+              <div className="overviewAttentionItem">
+                <div className="overviewAttentionHeader">
+                  <span className={`status ${runtimeLaneSummary.tone}`}>{runtimeLaneSummary.badge.toLowerCase()}</span>
+                  <strong>{runtimeLaneSummary.nextStep}</strong>
+                </div>
+                <p>{runtimeLaneSummary.support}</p>
+              </div>
+            </aside>
+          </div>
+        </article>
 
         <div className="list" data-testid="runtime-deployments-list">
           {loading && deployments.length === 0 ? (

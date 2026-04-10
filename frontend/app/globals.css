@@ -3396,6 +3396,50 @@ button.landingButton.primaryButton:disabled {
   gap: 18px;
 }
 
+.runtimeLaneGuideStack,
+.runtimeDetailReviewStack,
+.runtimeDetailReviewCardsBlock {
+  display: grid;
+  gap: 14px;
+}
+
+.runtimeLanePrimaryCard,
+.runtimeDetailReviewPrimary {
+  gap: 16px;
+}
+
+.runtimeLaneGuideCards .workspaceReviewerCard,
+.runtimeDetailReviewCards .workspaceReviewerCard {
+  height: 100%;
+}
+
+.runtimeLaneGuideAside,
+.runtimeDetailReviewAside {
+  align-content: start;
+}
+
+.runtimeLaneGuideAside .workspaceGlanceList,
+.runtimeDetailReviewAside .workspaceGlanceList {
+  align-content: start;
+}
+
+.runtimeDetailDecisionBadges {
+  margin: 0;
+}
+
+.runtimeDetailReviewCardsHeader {
+  display: grid;
+  gap: 6px;
+}
+
+.runtimeDetailReviewCardsHeader h3 {
+  margin: 0;
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
 .workspaceGuideSteps {
   align-items: stretch;
 }

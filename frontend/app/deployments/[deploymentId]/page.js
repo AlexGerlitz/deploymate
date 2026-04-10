@@ -734,6 +734,86 @@ export default function DeploymentDetailsPage({ params }) {
     form,
     suggestedPorts,
   );
+  const recentFailureCount = diagnostics?.activity?.recent_failure_count || 0;
+  const runtimeReviewSignalCard =
+    deployment?.status === "failed"
+      ? {
+          title: "Deployment status is already failed",
+          detail:
+            deployment.error ||
+            "A failed runtime stays the strongest signal on this page until the cause is concrete enough to explain.",
+        }
+      : health?.status && health.status !== "healthy"
+        ? {
+            title: `Health is ${health.status}`,
+            detail:
+              health?.error ||
+              "Health is the strongest signal right now, so deeper tools stay in service of explaining it.",
+          }
+        : recentFailureCount > 0
+          ? {
+              title: `${recentFailureCount} recent failure event${recentFailureCount === 1 ? "" : "s"} still matter`,
+              detail:
+                "Diagnostics history still carries failure pressure, so the runtime should stay readable before another rollout becomes the main story.",
+            }
+          : attentionItems.length > 0
+            ? {
+                title: `${attentionItems.length} runtime warning${attentionItems.length === 1 ? "" : "s"} are still visible`,
+                detail:
+                  attentionItems[0]?.message ||
+                  "The runtime still has open warnings, even if the deployment is currently reachable.",
+              }
+            : {
+                title: "No active runtime warning is leading",
+                detail:
+                  "The runtime looks calm enough that redeploy, handoff, and deeper tools can stay deliberate instead of reactive.",
+              };
+  const runtimeReviewGuideCards = [
+    {
+      label: "Current focus",
+      title: runtimeDecisionState.focus,
+      detail: runtimeDecisionState.why,
+    },
+    {
+      label: "Signal leading",
+      title: runtimeReviewSignalCard.title,
+      detail: runtimeReviewSignalCard.detail,
+    },
+    {
+      label: "What opens next",
+      title: changeReadinessState.focus,
+      detail:
+        runtimeDecisionState.tone === "healthy"
+          ? changeReadinessState.nextStep
+          : "Keep change work secondary until this runtime is understood well enough to explain.",
+    },
+  ];
+  const runtimeReviewPostureItems = [
+    {
+      label: "Attention",
+      value: `${attentionItems.length}`,
+      detail:
+        attentionItems.length > 0
+          ? `${attentionItems.length} runtime warning${attentionItems.length === 1 ? "" : "s"} are still visible on this page.`
+          : "No visible runtime warnings are leading right now.",
+    },
+    {
+      label: "Recent failures",
+      value: `${recentFailureCount}`,
+      detail:
+        recentFailureCount > 0
+          ? "Diagnostics history still needs explanation before the next rollout should become the main story."
+          : "No recent failure events are currently leading the review.",
+    },
+    {
+      label: "Change draft",
+      value: changeReadinessState.label,
+      detail:
+        redeployChangeRows.length > 0
+          ? changeReadinessState.focus
+          : "No visible redeploy changes are queued yet.",
+    },
+  ];
   const redeployConfirmationTarget = deployment?.container_name || deployment?.id || "";
   const redeployConfirmationPhrase = buildReviewConfirmationPhrase(
     "redeploy",
@@ -1494,63 +1574,111 @@ export default function DeploymentDetailsPage({ params }) {
             </div>
           </article>
 
-          <article className="card formCard" data-testid="runtime-detail-decision-card">
-            <div className="sectionHeader">
+          <article className="card formCard workspaceGuidePanel runtimeDetailReviewPanel" data-testid="runtime-detail-decision-card">
+            <div className="sectionHeader workspaceGuideHeader">
               <div>
-                <h2 data-testid="runtime-detail-decision-title">Decision status</h2>
+                <h2 data-testid="runtime-detail-decision-title">Read the runtime in one pass</h2>
                 <p className="formHint">
-                  This layer answers the main question first: is the runtime blocked, still under review, or stable enough for a deliberate change.
+                  Use this layer to keep one runtime readable: understand what is leading, decide whether the page still belongs to review, and only then let rollout changes compete for attention.
                 </p>
               </div>
             </div>
-            <div className="row">
-              <span className="label">Current state</span>
-              <span className={`status ${runtimeDecisionState.tone}`} data-testid="runtime-detail-decision-state">
-                {runtimeDecisionState.label}
-              </span>
-            </div>
-            <div className="row">
-              <span className="label">Focus</span>
-              <span data-testid="runtime-detail-decision-focus">{runtimeDecisionState.focus}</span>
-            </div>
-            <div className="row">
-              <span className="label">Why</span>
-              <span data-testid="runtime-detail-decision-why">{runtimeDecisionState.why}</span>
-            </div>
-            <div className="row">
-              <span className="label">What to do</span>
-              <span data-testid="runtime-detail-decision-next-step">{runtimeDecisionState.nextStep}</span>
-            </div>
-            <div className="backupSummaryBadges">
-              {runtimeDecisionState.badges.map((badge) => (
-                <span key={badge.label} className={`status ${badge.tone}`}>
-                  {badge.label} {badge.value}
-                </span>
-              ))}
-            </div>
-            <div className="actionCluster">
-              <Link
-                href={runtimeDecisionState.primaryHref}
-                className="landingButton primaryButton"
-                data-testid="runtime-detail-decision-primary-action"
-              >
-                {runtimeDecisionState.primaryAction}
-              </Link>
-              <Link
-                href={runtimeDecisionState.secondaryHref}
-                className="secondaryButton"
-                data-testid="runtime-detail-decision-secondary-action"
-              >
-                {runtimeDecisionState.secondaryAction}
-              </Link>
-              <button
-                type="button"
-                className="secondaryButton"
-                data-testid="runtime-detail-decision-copy-button"
-                onClick={handleCopyRuntimeNextStep}
-              >
-                Copy next step
-              </button>
+            <div className="workspaceGuideGrid runtimeDetailReviewGrid">
+              <div className="runtimeDetailReviewStack">
+                <article className="workspaceGlancePanel workspacePriorityPanel runtimeDetailReviewPrimary">
+                  <div className="workspaceGlanceHeader">
+                    <span
+                      className={`status ${runtimeDecisionState.tone}`}
+                      data-testid="runtime-detail-decision-state"
+                    >
+                      {runtimeDecisionState.label}
+                    </span>
+                    <strong data-testid="runtime-detail-decision-focus">{runtimeDecisionState.focus}</strong>
+                  </div>
+                  <p className="formHint" data-testid="runtime-detail-decision-why">{runtimeDecisionState.why}</p>
+                  <p className="workspacePrioritySupport" data-testid="runtime-detail-decision-next-step">
+                    {runtimeDecisionState.nextStep}
+                  </p>
+                  <div className="backupSummaryBadges runtimeDetailDecisionBadges">
+                    {runtimeDecisionState.badges.map((badge) => (
+                      <span key={badge.label} className={`status ${badge.tone}`}>
+                        {badge.label} {badge.value}
+                      </span>
+                    ))}
+                    <span className={`status ${changeReadinessState.tone}`}>
+                      change {changeReadinessState.label.toLowerCase()}
+                    </span>
+                  </div>
+                  <div className="actionCluster">
+                    <Link
+                      href={runtimeDecisionState.primaryHref}
+                      className="landingButton primaryButton"
+                      data-testid="runtime-detail-decision-primary-action"
+                    >
+                      {runtimeDecisionState.primaryAction}
+                    </Link>
+                    <Link
+                      href={runtimeDecisionState.secondaryHref}
+                      className="secondaryButton"
+                      data-testid="runtime-detail-decision-secondary-action"
+                    >
+                      {runtimeDecisionState.secondaryAction}
+                    </Link>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      data-testid="runtime-detail-decision-copy-button"
+                      onClick={handleCopyRuntimeNextStep}
+                    >
+                      Copy next step
+                    </button>
+                  </div>
+                </article>
+
+                <article
+                  className="runtimeDetailReviewCardsBlock"
+                  data-testid="runtime-detail-risk-breakdown-card"
+                >
+                  <div className="runtimeDetailReviewCardsHeader">
+                    <span className="eyebrow">Signals</span>
+                    <h3 data-testid="runtime-detail-risk-breakdown-title">What is shaping this review</h3>
+                  </div>
+                  <div className="workspaceReviewerGrid runtimeDetailReviewCards">
+                    {runtimeReviewGuideCards.map((card) => (
+                      <article key={card.label} className="workspaceReviewerCard">
+                        <span>{card.label}</span>
+                        <strong>{card.title}</strong>
+                        <p>{card.detail}</p>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+              </div>
+
+              <aside className="workspaceGlancePanel runtimeDetailReviewAside">
+                <div className="workspaceGlanceHeader">
+                  <span className="eyebrow">Review posture</span>
+                  <strong>What is leading this page</strong>
+                </div>
+                <div className="workspaceGlanceList">
+                  {runtimeReviewPostureItems.map((item) => (
+                    <div key={item.label} className="workspaceStatusCard workspaceGlanceItem">
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                      <p>{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="overviewAttentionItem">
+                  <div className="overviewAttentionHeader">
+                    <span className={`status ${changeReadinessState.tone}`}>
+                      change {changeReadinessState.label.toLowerCase()}
+                    </span>
+                    <strong>{changeReadinessState.focus}</strong>
+                  </div>
+                  <p>{recommendedNextStep}</p>
+                </div>
+              </aside>
             </div>
           </article>
         </div>
@@ -1602,46 +1730,6 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               </div>
             </div>
-
-            <article className="card compactCard" data-testid="runtime-detail-risk-breakdown-card">
-              <div className="sectionHeader">
-                <div>
-                  <h2 data-testid="runtime-detail-risk-breakdown-title">Why this state is leading</h2>
-                  <p className="formHint">
-                    These signals explain why this page currently behaves like a runtime review surface or a rollout-change surface.
-                  </p>
-                </div>
-              </div>
-              <div className="workspaceReviewerGrid">
-                <article className="workspaceReviewerCard">
-                  <span>Runtime</span>
-                  <strong>{deployment?.status || "unknown"}</strong>
-                  <p>
-                    {deployment?.status === "failed"
-                      ? "A failed deployment keeps the page in incident mode until the cause is understood."
-                      : "Deployment status alone is not currently forcing an incident path."}
-                  </p>
-                </article>
-                <article className="workspaceReviewerCard">
-                  <span>Health</span>
-                  <strong>{health?.status || "unknown"}</strong>
-                  <p>
-                    {health?.status && health.status !== "healthy"
-                      ? health?.error || "Health is degraded, so the runtime still needs review."
-                      : "Health is not currently the main blocker."}
-                  </p>
-                </article>
-                <article className="workspaceReviewerCard">
-                  <span>Diagnostics</span>
-                  <strong>{diagnostics?.activity?.recent_failure_count || 0} recent failures</strong>
-                  <p>
-                    {diagnostics?.activity?.recent_failure_count > 0
-                      ? "Recent failures in diagnostics history still need explanation before the next rollout."
-                      : "Diagnostics history is not currently adding new failure pressure."}
-                  </p>
-                </article>
-              </div>
-            </article>
             </section>
 
         <section hidden={detailTab !== "change"}>
