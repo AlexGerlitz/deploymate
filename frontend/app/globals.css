@@ -3046,6 +3046,83 @@ button.landingButton.primaryButton:disabled {
   gap: 4px;
 }
 
+.workspaceHeroSpotlightNote {
+  color: #405166;
+}
+
+.overviewHeroSummary {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+  align-items: start;
+}
+
+.overviewHeroSpotlightCard {
+  gap: 10px;
+  border-color: rgba(214, 225, 235, 0.94);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.98) 0%, rgba(244, 249, 253, 0.98) 100%);
+  box-shadow: 0 20px 44px rgba(17, 24, 39, 0.07);
+}
+
+.overviewStepStrip {
+  display: grid;
+  gap: 12px;
+}
+
+.overviewStepCard {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid rgba(215, 226, 236, 0.92);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.overviewStepCard span {
+  color: #73849a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.overviewStepCard strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 21px;
+  letter-spacing: -0.03em;
+}
+
+.overviewStepCard p {
+  margin: 0;
+  color: #5f6675;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.overviewStepCard.isCurrent {
+  border-color: rgba(197, 166, 111, 0.74);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 242, 0.96) 0%, rgba(250, 245, 236, 0.94) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 18px 34px rgba(201, 147, 56, 0.1);
+}
+
+.overviewStepCard.isComplete {
+  border-color: rgba(191, 211, 204, 0.9);
+  background:
+    linear-gradient(180deg, rgba(245, 251, 248, 0.96) 0%, rgba(238, 247, 242, 0.94) 100%);
+}
+
+.overviewStepCard.isUpcoming {
+  background: rgba(255, 255, 255, 0.58);
+}
+
 .workspaceBannerStack {
   display: grid;
   gap: 12px;
@@ -3086,6 +3163,12 @@ button.landingButton.primaryButton:disabled {
     linear-gradient(180deg, rgba(255, 252, 246, 0.98) 0%, rgba(244, 249, 253, 0.98) 100%);
 }
 
+.workspacePrioritySupport {
+  margin: 0;
+  color: #405166;
+  line-height: 1.65;
+}
+
 .workspaceStepCard {
   display: grid;
   gap: 14px;
@@ -3097,6 +3180,49 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceStepCard .landingButton {
   justify-self: flex-start;
+}
+
+.workspaceStepCard.isCurrent {
+  border-color: rgba(197, 166, 111, 0.76);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 242, 0.98) 0%, rgba(248, 244, 236, 0.97) 100%);
+  box-shadow: 0 18px 42px rgba(201, 147, 56, 0.1);
+}
+
+.workspaceStepCard.isComplete {
+  border-color: rgba(196, 215, 208, 0.88);
+  background:
+    linear-gradient(180deg, rgba(246, 252, 248, 0.98) 0%, rgba(242, 248, 245, 0.97) 100%);
+}
+
+.workspaceStepCard.isUpcoming {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 251, 253, 0.92) 100%);
+}
+
+.workspaceStepCard.isCurrent .stepNumber {
+  background: linear-gradient(135deg, #c99338 0%, #8f5e0d 100%);
+}
+
+.workspaceStepCard.isComplete .stepNumber {
+  background: linear-gradient(135deg, #2f6b55 0%, #244d40 100%);
+}
+
+.overviewStepStateLabel {
+  color: #8f5e0d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.overviewStepAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  color: #304255;
+  text-decoration: none;
 }
 
 .workspaceGlancePanel {
@@ -3520,6 +3646,9 @@ button.landingButton.primaryButton:disabled {
     grid-template-columns: 1fr;
   }
 
+  .overviewStepStrip {
+    grid-template-columns: 1fr;
+  }
   .serverReviewHeroActions,
   .serverReviewToolbarHeader {
     justify-content: stretch;
@@ -3650,6 +3779,10 @@ button.landingButton.primaryButton:disabled {
 
   .landingPathGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overviewStepStrip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .workspaceHeroSummary {
