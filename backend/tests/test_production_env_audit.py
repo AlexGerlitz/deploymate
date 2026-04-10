@@ -199,6 +199,40 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_remote_release_dry_run_supports_remote_smoke_runner(self):
+        env = os.environ.copy()
+        env["DEPLOYMATE_SMOKE_RUNNER"] = "remote"
+        env["DEPLOYMATE_SMOKE_CURL_RESOLVE"] = "deploymatecloud.ru:443:127.0.0.1"
+
+        result = subprocess.run(
+            [
+                "bash",
+                "scripts/remote_release.sh",
+                "--host",
+                "deploymate",
+                "--base-url",
+                "https://deploymatecloud.ru",
+                "--admin-username",
+                "admin",
+                "--admin-password",
+                "super-secret-admin-password",
+                "--dry-run",
+            ],
+            cwd=self.repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("[remote-release] smoke runner: remote", result.stdout)
+        self.assertIn("ssh deploymate", result.stdout)
+        self.assertIn(
+            "DEPLOYMATE_SMOKE_CURL_RESOLVE=deploymatecloud.ru:443:127.0.0.1",
+            result.stdout,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
