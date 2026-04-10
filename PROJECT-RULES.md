@@ -65,6 +65,7 @@ These can stay in the product, but they must not compete with the main deploy pa
 - Server setup should feel like the natural first step when no target exists.
 - When a user opens one server, the page should show ordered next tasks first and keep edit/delete behind a secondary disclosure.
 - Do not show a primary first-pass control that is known to be blocked or unconfigured. Hide it or replace it with the real next step.
+- The primary first-pass CTA must respect the current user's real blocker. A `member` waiting on admin server confirmation must not see `start deployment` as the main action.
 - Deployment creation should feel like the natural next step after server setup.
 - Deployment detail should answer: what is running, is it healthy, and what should I do next.
 - Advanced controls should be visible only when they help the current decision.

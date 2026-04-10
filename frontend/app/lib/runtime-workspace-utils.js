@@ -191,6 +191,7 @@ export const rolloutReviewerCopy = {
 
 export function buildOverviewPrimaryPath({
   isAdmin,
+  localDeploymentsEnabled,
   deploymentsTotal,
   failedDeployments,
   serversTotal,
@@ -214,6 +215,17 @@ export function buildOverviewPrimaryPath({
       detail:
         "Start in Server Review so DeployMate can confirm one saved target before the first remote rollout path becomes the main story.",
       reason: "server-setup",
+    };
+  }
+
+  if (!isAdmin && !localDeploymentsEnabled && deploymentsTotal === 0) {
+    return {
+      href: "/app/deployment-workflow",
+      label: "See what opens next",
+      title: "Wait for the server target",
+      detail:
+        "An admin still needs to confirm one saved server target before the first remote deployment can start here.",
+      reason: "admin-target-needed",
     };
   }
 

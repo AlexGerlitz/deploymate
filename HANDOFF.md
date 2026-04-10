@@ -63,6 +63,7 @@ Updated: 2026-04-10
   - server edit/delete are now secondary details instead of competing with the main path
   - login can now hide demo access by default unless a dedicated demo user is explicitly configured
   - member blocked flow in `/app/deployment-workflow` is being simplified so it stops showing dead create/template surfaces before admin Step 1 is done
+  - after a live walkthrough, overview primary CTA was corrected so `member` users waiting on admin Step 1 no longer see a false `start deployment` main action
 
 ## Current Release Reality
 

@@ -88,10 +88,10 @@ export default function HomePage() {
           headline: "Server target is managed by an admin",
           support:
             "Members do not manage saved server targets here. Ask an admin to confirm the remote target, then return to Deployment Workflow.",
-          stepTitle: "Confirm the server target",
+          stepTitle: "Wait for the server target",
           stepDetail:
             "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
-          stepAction: "Open deployment workflow",
+          stepAction: "See what opens next",
         };
   const beginnerStatusSummary = canAccessServers
     ? servers.length === 0
@@ -106,11 +106,16 @@ export default function HomePage() {
     ? "Next best step: connect and verify one server."
     : overviewPrimaryPath.reason === "incident"
       ? "Next best step: open live deployments and review the problem first."
+      : overviewPrimaryPath.reason === "admin-target-needed"
+        ? "Next best step: ask an admin to confirm one server target, then return to the workflow."
       : memberServerCopy
         ? memberServerCopy.support
         : deployments.length === 0
           ? "Next best step: choose which app to run on that server."
           : "Next best step: open your app list and continue from one running service.";
+  const stepOneIsPrimary =
+    overviewPrimaryPath.reason === "server-setup" ||
+    overviewPrimaryPath.reason === "admin-target-needed";
   const heroHeadline = canAccessServers
     ? servers.length === 0
       ? "DeployMate helps you run one app on one server in three simple steps."
@@ -155,7 +160,7 @@ export default function HomePage() {
         : memberServerCopy?.stepDetail || "Use the deployment workflow for the next rollout step.",
       href: canAccessServers ? "/app/server-review" : "/app/deployment-workflow",
       actionLabel: canAccessServers ? "Open server setup" : memberServerCopy?.stepAction || "Open deployment workflow",
-      primary: overviewPrimaryPath.reason === "server-setup" && canAccessServers,
+      primary: stepOneIsPrimary,
     },
     {
       key: "step-2",
@@ -164,7 +169,7 @@ export default function HomePage() {
       detail: "Paste the app image you want to run, or pick a saved setup if you already have one.",
       href: "/app/deployment-workflow",
       actionLabel: "Choose app to run",
-      primary: overviewPrimaryPath.reason !== "server-setup",
+      primary: !stepOneIsPrimary,
     },
     {
       key: "step-3",
