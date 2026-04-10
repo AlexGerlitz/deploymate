@@ -134,7 +134,7 @@ function ServerReviewPageContent() {
   const router = useRouter();
 
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("Step 1 is ready. Save one server target, then run one check.");
+  const [success, setSuccess] = useState("Start here: save one server target, then run one check.");
   const [servers, setServers] = useState([]);
   const [serverTestResults, setServerTestResults] = useState({});
   const [serverDiagnostics, setServerDiagnostics] = useState({});
@@ -206,8 +206,156 @@ function ServerReviewPageContent() {
     items[0] ||
     null;
 
+  const noServers = items.length === 0;
   const readyCount = items.filter((item) => item.segment === "ready").length;
   const reviewCount = items.filter((item) => item.segment !== "ready").length;
+  const selectedReadyItem =
+    selectedItem?.segment === "ready"
+      ? selectedItem
+      : items.find((item) => item.segment === "ready") || null;
+  const selectedNeedsReviewItem =
+    selectedItem && selectedItem.segment !== "ready"
+      ? selectedItem
+      : items.find((item) => item.segment !== "ready") || null;
+  const heroSpotlight = noServers
+    ? {
+        badge: "Do this now",
+        title: "Save your first server target",
+        detail: "This is the only action that matters until DeployMate knows which machine it should reach.",
+        support: "After you save one server, this page switches to one simple readiness check.",
+        actionLabel: "Save first server",
+        actionKind: "create",
+      }
+    : selectedReadyItem
+      ? {
+          badge: "Step 1 complete",
+          title: `${selectedReadyItem.label} is ready for Step 2`,
+          detail: "You already have one confirmed server. Keep the momentum and choose what to run next.",
+          support: "You can always come back later, but the main path has already moved on from this screen.",
+          actionLabel: "Go to Step 2",
+          actionKind: "continue",
+          actionHref: `/app/deployment-workflow?server=${selectedReadyItem.id}&source=server-review`,
+        }
+      : {
+          badge: "Do this now",
+          title: `Check ${selectedNeedsReviewItem?.label || "your saved server"}`,
+          detail: "You already saved a server. The next useful move is one readiness check, not another form.",
+          support: selectedNeedsReviewItem
+            ? `${selectedNeedsReviewItem.label} is the best next target to confirm before you continue.`
+            : "Pick one saved server and finish the check before you add more targets.",
+          actionLabel:
+            selectedItem && selectedItem.segment !== "ready"
+              ? "Open this server check"
+              : "Open next server check",
+          actionKind: "queue",
+        };
+  const stepCards = [
+    {
+      id: "save",
+      label: "1. Save",
+      title: "Save one server",
+      detail: "Give DeployMate one SSH target first.",
+      state: noServers ? "current" : "complete",
+    },
+    {
+      id: "check",
+      label: "2. Check",
+      title: "Run one check",
+      detail: "Confirm the server is reachable and ready.",
+      state: noServers ? "upcoming" : selectedReadyItem ? "complete" : "current",
+    },
+    {
+      id: "continue",
+      label: "3. Continue",
+      title: "Move to app setup",
+      detail: "Choose what to run only after one server looks ready.",
+      state: selectedReadyItem ? "current" : "upcoming",
+    },
+  ];
+  const createSectionEyebrow = noServers ? "Do this now" : "Only if needed";
+  const createSectionTitle = noServers
+    ? "Save your first server target"
+    : "Add another server only if this one is not the right target";
+  const createSectionCopy = noServers
+    ? "Fill in the machine details once, save them, and then move straight to one check."
+    : selectedReadyItem
+      ? "You already have a server that is ready for Step 2. This form is secondary now."
+      : "A saved server already exists. Finish its check before adding another target unless you picked the wrong machine.";
+  const createSubmitLabel = noServers ? "Save first server" : "Save another server";
+  const nextPanelLabel = noServers
+    ? "What happens next"
+    : selectedReadyItem
+      ? "You can leave this page"
+      : "You are almost done here";
+  const nextPanelTitle = noServers
+    ? "One good server is enough for this step"
+    : selectedReadyItem
+      ? `${selectedReadyItem.label} is ready for Step 2`
+      : "One saved server still needs a quick check";
+  const nextPanelCopy = noServers
+    ? "You do not need a list of servers yet. Save one, confirm it, and only then move into app setup."
+    : selectedReadyItem
+      ? "Use the ready server in Step 2. Come back only if you need to fix or replace the saved connection details."
+      : "Stay focused on one saved server until DeployMate can confirm that it is safe to use for the first rollout.";
+  const queueTitle = noServers
+    ? "Your saved servers will appear here"
+    : selectedReadyItem
+      ? "One server is already ready"
+      : "Choose one saved server to confirm";
+  const queueDescription = noServers
+    ? "After you save the first target above, come here to run the first check."
+    : selectedReadyItem
+      ? "You can review other servers here, but the clearest next step is already app setup."
+      : "Open one server, run the readiness check, and move on as soon as it looks safe.";
+  const emptyQueueText = noServers
+    ? "No server saved yet. Start with the form above, save one server, then come back here for the first check."
+    : "No saved servers match the current filters.";
+
+  function focusCreateServer() {
+    const createSection = document.getElementById("server-review-create-server-section");
+    createSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    window.setTimeout(() => {
+      const nameInput = document.querySelector('[data-testid="server-review-create-name"]');
+      if (nameInput instanceof HTMLElement) {
+        nameInput.focus();
+      }
+    }, 180);
+  }
+
+  function focusServerQueue(itemId = "") {
+    const nextItemId = itemId || selectedNeedsReviewItem?.id || selectedReadyItem?.id || "";
+    if (nextItemId) {
+      setSelectedItemId(nextItemId);
+    }
+
+    window.setTimeout(() => {
+      const taskPanel = nextItemId
+        ? document.querySelector(`[data-testid="server-review-tasks-${nextItemId}"]`)
+        : null;
+      if (taskPanel instanceof HTMLElement) {
+        taskPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
+      const queueRoot = document.getElementById("server-review-live-queue");
+      queueRoot?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }
+
+  function handleHeroPrimaryAction() {
+    if (heroSpotlight.actionKind === "create") {
+      focusCreateServer();
+      return;
+    }
+
+    if (heroSpotlight.actionKind === "continue" && heroSpotlight.actionHref) {
+      router.push(heroSpotlight.actionHref);
+      return;
+    }
+
+    focusServerQueue();
+  }
 
   useEffect(() => {
     if (!selectedItem) {
@@ -244,7 +392,11 @@ function ServerReviewPageContent() {
       if (nextServers[0] && !selectedItemId) {
         setSelectedItemId(nextServers[0].id);
       }
-      setSuccess(`Loaded ${nextServers.length} live server target${nextServers.length === 1 ? "" : "s"}.`);
+      setSuccess(
+        nextServers.length === 0
+          ? "Start here: save one server target, then run one check."
+          : `Loaded ${nextServers.length} live server target${nextServers.length === 1 ? "" : "s"}.`,
+      );
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
         router.replace("/login");
@@ -502,6 +654,18 @@ function ServerReviewPageContent() {
             <p className="formHint serverReviewSubtleCopy">
               Keep this step simple. You do not need rollout settings, templates, or runtime review yet.
             </p>
+            <div className="serverReviewStepStrip" aria-label="Server review path">
+              {stepCards.map((step) => (
+                <article
+                  key={step.id}
+                  className={`serverReviewStepCard is${step.state[0].toUpperCase()}${step.state.slice(1)}`}
+                >
+                  <span>{step.label}</span>
+                  <strong>{step.title}</strong>
+                  <p>{step.detail}</p>
+                </article>
+              ))}
+            </div>
           </div>
           <div className="serverReviewHeroRail">
             <div className="buttonRow serverReviewHeroActions">
@@ -519,11 +683,17 @@ function ServerReviewPageContent() {
               </button>
             </div>
             <div className="serverReviewHeroPanel">
-              <span className="serverReviewPanelLabel">Finish Step 1</span>
-              <strong>Save one server target. Then check that DeployMate can use it.</strong>
-              <p>
-                A beginner only needs one confirmed target here. Everything else can wait until Step 2.
-              </p>
+              <span className="serverReviewPanelLabel">{heroSpotlight.badge}</span>
+              <strong>{heroSpotlight.title}</strong>
+              <p>{heroSpotlight.detail}</p>
+              <p className="serverReviewHeroSpotlightNote">{heroSpotlight.support}</p>
+              <button
+                type="button"
+                className="landingButton primaryButton serverReviewHeroPrimaryAction"
+                onClick={handleHeroPrimaryAction}
+              >
+                {heroSpotlight.actionLabel}
+              </button>
               <div className="serverReviewHeroStats" aria-label="Server review summary">
                 <div className="serverReviewHeroStat">
                   <span>Saved</span>
@@ -552,17 +722,20 @@ function ServerReviewPageContent() {
       />
 
       <article
-        className="card formCard workspaceGuidePanel serverReviewCreateCard serverReviewReveal"
+        className={`card formCard workspaceGuidePanel serverReviewCreateCard serverReviewReveal ${noServers ? "" : "isSecondary"}`.trim()}
         data-testid="server-review-create-card"
       >
         <div className="serverReviewCreateLayout">
-          <div id="server-review-create-server-section" className="workspaceGlancePanel serverReviewCreatePanel">
+          <div
+            id="server-review-create-server-section"
+            className={`workspaceGlancePanel serverReviewCreatePanel ${noServers ? "" : "isSecondary"}`.trim()}
+          >
             <div className="workspaceGlanceHeader">
-              <span className="eyebrow">Step 1 action</span>
-              <strong>Save one server target</strong>
+              <span className="eyebrow">{createSectionEyebrow}</span>
+              <strong>{createSectionTitle}</strong>
             </div>
             <p className="formHint serverReviewSubtleCopy">
-              Fill in the machine details, save them once, then run a check before you move on.
+              {createSectionCopy}
             </p>
             <form className="form" onSubmit={handleCreateServer} data-testid="server-review-create-server">
               <label className="field">
@@ -646,22 +819,20 @@ function ServerReviewPageContent() {
               <div className="formActions">
                 <button
                   type="submit"
-                  className="landingButton primaryButton"
+                  className={noServers ? "landingButton primaryButton" : "secondaryButton serverReviewCreateSecondaryAction"}
                   disabled={serverSubmitting}
                   data-testid="server-review-create-submit"
                 >
-                  {serverSubmitting ? "Saving..." : "Save server target"}
+                  {serverSubmitting ? "Saving..." : createSubmitLabel}
                 </button>
               </div>
             </form>
           </div>
 
           <aside className="serverReviewSoftPanel serverReviewNextPanel">
-            <span className="serverReviewPanelLabel">Leave this page when</span>
-            <h2>One server looks ready for Step 2</h2>
-            <p className="formHint">
-              You are done here once one saved target passes a quick check and looks safe to use.
-            </p>
+            <span className="serverReviewPanelLabel">{nextPanelLabel}</span>
+            <h2>{nextPanelTitle}</h2>
+            <p className="formHint">{nextPanelCopy}</p>
             <div className="serverReviewMiniSteps">
               <div className="serverReviewMiniStep">
                 <strong>1. Save one server target</strong>
@@ -685,11 +856,9 @@ function ServerReviewPageContent() {
           <div className="serverReviewToolbarHeader">
             <div>
               <span className="serverReviewPanelLabel">Saved servers</span>
-              <h2>Open one saved server and confirm it</h2>
+              <h2>{queueTitle}</h2>
             </div>
-            <p className="formHint">
-              Stay focused on one server at a time. If it looks ready, move straight to Step 2.
-            </p>
+            <p className="formHint">{queueDescription}</p>
           </div>
           <label className="field serverReviewFilterField">
             <span>Show</span>
@@ -710,14 +879,14 @@ function ServerReviewPageContent() {
         <AdminSurfaceQueue
           className="serverReviewQueueShell serverReviewReveal"
           title="Your servers"
-          description="Open a server, check it, or continue to app setup."
+          description={queueDescription}
           searchLabel="Search saved servers"
           searchValue={query}
           onSearchChange={(event) => setQuery(event.target.value)}
           searchPlaceholder={starterStrings.searchPlaceholder}
           searchTestId="server-review-search"
           emptyTestId="server-review-empty"
-          emptyText="No saved servers match the current filters."
+          emptyText={emptyQueueText}
           items={filteredItems}
         >
           {filteredItems.map((item) => (
