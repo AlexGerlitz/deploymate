@@ -34,15 +34,38 @@ frontend_smoke_url_alive() {
   curl -sS -o /dev/null "$BASE_URL$FRONTEND_READY_PATH"
 }
 
+frontend_smoke_port_pids() {
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+
+  lsof -ti "tcp:${PORT}" 2>/dev/null | tr '\n' ' ' | xargs || true
+}
+
 frontend_smoke_kill_port() {
   local pids=""
-  if command -v lsof >/dev/null 2>&1; then
-    pids="$(lsof -ti "tcp:${PORT}" 2>/dev/null | tr '\n' ' ' | xargs || true)"
-    if [ -n "$pids" ]; then
-      kill $pids >/dev/null 2>&1 || true
-      return 0
-    fi
+
+  pids="$(frontend_smoke_port_pids)"
+  if [ -n "$pids" ]; then
+    kill $pids >/dev/null 2>&1 || true
+    for _ in $(seq 1 10); do
+      sleep 1
+      pids="$(frontend_smoke_port_pids)"
+      if [ -z "$pids" ]; then
+        return 0
+      fi
+    done
+
+    kill -9 $pids >/dev/null 2>&1 || true
+    for _ in $(seq 1 5); do
+      sleep 1
+      pids="$(frontend_smoke_port_pids)"
+      if [ -z "$pids" ]; then
+        return 0
+      fi
+    done
   fi
+
   return 1
 }
 
@@ -76,6 +99,8 @@ start_frontend_smoke_server() {
   local state_file=""
 
   state_file="$(frontend_smoke_server_state_file)"
+
+  frontend_smoke_kill_port >/dev/null 2>&1 || true
 
   if [ "$PERSIST_SERVER" = "1" ]; then
     if python3 "$SCRIPT_DIR/frontend_smoke_daemon.py" status \
