@@ -92,6 +92,7 @@ function DeploymentWorkflowPageContent() {
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const canAccessServers = Boolean(currentUser?.is_admin);
   const serverAccessBlocked = !canAccessServers && !localDeploymentsEnabled;
+  const waitingForAdminTarget = serverAccessBlocked && deployments.length === 0;
 
   const deploymentLimitReached =
     currentUser &&
@@ -183,14 +184,14 @@ function DeploymentWorkflowPageContent() {
   });
   const workflowPriority =
     serverAccessBlocked
-      ? "Server inventory is managed by an admin for this workspace. Continue in the deployment workflow and ask an admin to confirm the target."
+      ? "Admins manage the saved server target here. Your job on this page is still choosing what app should run next."
       : workflowState.mode === "prerequisite"
-      ? "Remote rollout path needs one server target before deployment creation."
+      ? "Before Step 2 can start for a remote rollout, Step 1 needs one saved server target."
       : workflowState.mode === "live"
-        ? "Failed rollout needs review before the next deploy."
+        ? "One rollout needs attention. Review what is already running before you start another one."
         : templates.length > 0
-          ? "Template-driven rollout path is ready."
-          : "Create the next deployment from one guided workspace.";
+          ? "You can start from a blank form or reuse one saved setup."
+          : "This page is where you choose one app image and start it.";
   const workflowPrimaryMode = workflowState.mode === "live" ? "live" : "create";
   const workflowPrimaryAction = serverAccessBlocked
     ? {
@@ -223,6 +224,61 @@ function DeploymentWorkflowPageContent() {
   const selectedServerLabel = selectedCreateServer
     ? formatServerLabel(selectedCreateServer.name, selectedCreateServer.host)
     : "";
+  const stepTwoLead = waitingForAdminTarget
+    ? "Step 1 still needs an admin to confirm one server target before this page becomes the main path."
+    : selectedCreateServer
+      ? `Step 1 is done on ${selectedServerLabel}. Now choose one app to run on that server.`
+      : workflowPriority;
+  const stepTwoSupport = waitingForAdminTarget
+    ? "This page should not make you guess. Until the target is confirmed, the only real next step is asking an admin to finish Step 1."
+    : serverAccessBlocked
+      ? "Keep this page focused on the rollout itself. The saved server target stays with admins until they confirm it."
+      : workflowState.mode === "prerequisite"
+      ? "Do not overthink this page yet. Save one server in Step 1 first, then come back and keep Step 2 focused on the app you want to start."
+      : workflowPrimaryMode === "live"
+        ? "Because something already needs review, start by checking the live queue before you create another deployment."
+        : "Keep Step 2 simple: choose an app image or a saved setup first, then open advanced fields only if the rollout really needs them.";
+  const stepTwoGuideCards = waitingForAdminTarget
+    ? [
+        {
+          label: "1. Ask an admin",
+          title: "Confirm one server target",
+          detail:
+            "Members cannot finish Step 1 here. One admin-managed server target has to be confirmed before remote rollout can start.",
+        },
+        {
+          label: "2. Come back here",
+          title: "Return once the target is ready",
+          detail:
+            "As soon as the target is confirmed, this page becomes the place where you choose what app to run.",
+        },
+        {
+          label: "3. Then keep it simple",
+          title: "Choose one app, start it, then check health",
+          detail:
+            "Only after the target is ready do image choice, deploy start, and live health become the main path.",
+        },
+      ]
+    : [
+        {
+          label: "1. Pick what to run",
+          title: "Choose one app image or one saved setup",
+          detail:
+            "Most first deployments only need the image. A template is just a saved setup that already remembers the image, ports, and env vars.",
+        },
+        {
+          label: "2. Keep the form small",
+          title: "Ignore advanced fields until you actually need them",
+          detail:
+            "Name, ports, env vars, and template save are still here, but they should stay closed unless this rollout truly needs them.",
+        },
+        {
+          label: "3. Check health after start",
+          title: "Use the live lane after you create the deployment",
+          detail:
+            "Once the app starts, switch to live review or runtime detail and confirm the app is healthy before you make the next change.",
+        },
+      ];
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -1204,14 +1260,23 @@ function DeploymentWorkflowPageContent() {
     templateFormPreflight,
   });
   const memberWorkflowNextStep = serverAccessBlocked
-    ? {
-        focus: "Server target is admin-managed",
-        nextStep:
-          "Ask an admin to confirm the saved server target before you create a remote deployment here.",
-        primaryAction: "Back to overview",
-        secondaryAction: "Copy next step",
-        tone: "warn",
-      }
+    ? filteredDeployments.length > 0
+      ? {
+          focus: "Live apps are still available",
+          nextStep:
+            "Review the running deployments first while the saved server target stays with admins.",
+          primaryAction: "Open live deployments",
+          secondaryAction: "Copy next step",
+          tone: "info",
+        }
+      : {
+          focus: "Server target is admin-managed",
+          nextStep:
+            "Ask an admin to confirm the saved server target before you create a remote deployment here.",
+          primaryAction: "Back to overview",
+          secondaryAction: "Copy next step",
+          tone: "warn",
+        }
     : workflowNextStep;
   const previewDiffRows = buildTemplateDiff(primaryTemplate, currentDraft, servers);
 
@@ -1255,11 +1320,8 @@ function DeploymentWorkflowPageContent() {
             <div>
               <div className="eyebrow">Step 2</div>
               <h1 data-testid="deployment-workflow-title">Choose what to run</h1>
-              <p className="formHint">
-                {selectedCreateServer
-                  ? `Step 1 is done on ${selectedServerLabel}. Now choose what to run on this server.`
-                  : workflowPriority}
-              </p>
+              <p className="formHint">{stepTwoLead}</p>
+              <p className="formHint">{stepTwoSupport}</p>
             </div>
             <div className="buttonRow">
               {canAccessServers ? (
@@ -1391,79 +1453,136 @@ function DeploymentWorkflowPageContent() {
           </article>
         ) : null}
 
-        <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-primary-action-card">
+        <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-step-guide-card">
           <div className="sectionHeader workspaceGuideHeader">
             <div>
-              <h2 data-testid="deployment-workflow-primary-action-title">{workflowPrimaryAction.title}</h2>
+              <h2>How to use Step 2 without getting lost</h2>
               <p className="formHint">
-                {workflowPrimaryAction.detail} Pick one lane below and ignore the rest until this job is done.
+                This page can do a lot, but a beginner only needs one lane at a time: choose the app, start it, then check health.
               </p>
             </div>
           </div>
           <div className="workspaceReviewerGrid">
-            <article className="workspaceReviewerCard">
-              <span>Do this now</span>
-              <strong>{workflowPrimaryAction.actionLabel}</strong>
-              <p>
-                {serverAccessBlocked
-                  ? "Saved server targets stay with admins, so the main task is confirming the target before a remote rollout can happen."
-                  : workflowState.mode === "prerequisite"
-                  ? "This workspace is ready for rollout work, but the remote-only prerequisite still comes first."
-                  : workflowPrimaryMode === "live"
-                  ? "A failed rollout already exists, so review the live queue before creating anything new."
-                  : "Start the next deployment from one guided form instead of scanning the whole workspace."}
+            {stepTwoGuideCards.map((card) => (
+              <article key={card.label} className="workspaceReviewerCard">
+                <span>{card.label}</span>
+                <strong>{card.title}</strong>
+                <p>{card.detail}</p>
+              </article>
+            ))}
+          </div>
+        </article>
+
+        <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-primary-action-card">
+          <div className="sectionHeader workspaceGuideHeader">
+            <div>
+              <h2 data-testid="deployment-workflow-primary-action-title">Do this now</h2>
+              <p className="formHint">
+                {workflowPrimaryAction.detail} Pick one lane below, finish that job, and ignore the other lanes until the next decision is obvious.
               </p>
-              <Link href={workflowPrimaryAction.href} className="landingButton primaryButton">
-                {workflowPrimaryAction.actionLabel}
-              </Link>
-            </article>
-            <article className="workspaceReviewerCard">
-              <span>Core lanes</span>
-              <strong>Use one lane at a time</strong>
-              <p>
-                Live review, create, and templates are still here, but only one should stay open on screen at a time.
-              </p>
-              <div
-                className="filterTabs"
-                role="tablist"
-                aria-label="Deployment workflow tabs"
-                data-testid="deployment-workflow-tabs-card"
-              >
-                <button
-                  type="button"
-                  className={workflowTab === "live" ? "active" : ""}
-                  onClick={() => setWorkflowTab("live")}
-                  data-testid="deployment-workflow-tab-live"
-                >
-                  Live
-                </button>
-                <button
-                  type="button"
-                  className={workflowTab === "create" ? "active" : ""}
-                  onClick={() => setWorkflowTab("create")}
-                  data-testid="deployment-workflow-tab-create"
-                >
-                  Create
-                </button>
-                <button
-                  type="button"
-                  className={workflowTab === "templates" ? "active" : ""}
-                  onClick={() => setWorkflowTab("templates")}
-                  data-testid="deployment-workflow-tab-templates"
-                >
-                  Templates
-                </button>
-              </div>
-            </article>
+            </div>
+          </div>
+          <div className="workspaceReviewerGrid">
+            {serverAccessBlocked ? (
+              <>
+                <article className="workspaceReviewerCard">
+                  <span>Do this now</span>
+                  <strong>{workflowPrimaryAction.actionLabel}</strong>
+                  <p>
+                    Saved server targets stay with admins, so the main task is confirming the target before a remote rollout can happen.
+                  </p>
+                  <Link href={workflowPrimaryAction.href} className="landingButton primaryButton">
+                    {workflowPrimaryAction.actionLabel}
+                  </Link>
+                </article>
+                <article className="workspaceReviewerCard">
+                  <span>{filteredDeployments.length > 0 ? "Still available" : "What unlocks next"}</span>
+                  <strong>
+                    {filteredDeployments.length > 0
+                      ? "You can still review live apps"
+                      : "Step 2 becomes simple after the target is ready"}
+                  </strong>
+                  <p>
+                    {filteredDeployments.length > 0
+                      ? "Even while admins manage the saved target, this page can still be used to inspect what is already running."
+                      : "Once one server target is confirmed, this page becomes a clean three-part path: choose one app, start it, then check health."}
+                  </p>
+                  {filteredDeployments.length > 0 ? (
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => setWorkflowTab("live")}
+                    >
+                      Open live apps
+                    </button>
+                  ) : null}
+                </article>
+              </>
+            ) : (
+              <>
+                <article className="workspaceReviewerCard">
+                  <span>Do this now</span>
+                  <strong>{workflowPrimaryAction.actionLabel}</strong>
+                  <p>
+                    {workflowState.mode === "prerequisite"
+                      ? "This workspace is ready for rollout work, but the remote-only prerequisite still comes first."
+                      : workflowPrimaryMode === "live"
+                        ? "A rollout already needs attention, so open the live lane before you create anything new."
+                        : "Use one guided form for the next app instead of scanning every part of the workspace."}
+                  </p>
+                  <Link href={workflowPrimaryAction.href} className="landingButton primaryButton">
+                    {workflowPrimaryAction.actionLabel}
+                  </Link>
+                </article>
+                <article className="workspaceReviewerCard">
+                  <span>Core lanes</span>
+                  <strong>Use one lane at a time</strong>
+                  <p>
+                    These are the only three lanes that matter here. Keep one of them active and treat the others as background.
+                  </p>
+                  <div
+                    className="filterTabs"
+                    role="tablist"
+                    aria-label="Deployment workflow tabs"
+                    data-testid="deployment-workflow-tabs-card"
+                  >
+                    <button
+                      type="button"
+                      className={workflowTab === "live" ? "active" : ""}
+                      onClick={() => setWorkflowTab("live")}
+                      data-testid="deployment-workflow-tab-live"
+                    >
+                      Check live apps
+                    </button>
+                    <button
+                      type="button"
+                      className={workflowTab === "create" ? "active" : ""}
+                      onClick={() => setWorkflowTab("create")}
+                      data-testid="deployment-workflow-tab-create"
+                    >
+                      Start app
+                    </button>
+                    <button
+                      type="button"
+                      className={workflowTab === "templates" ? "active" : ""}
+                      onClick={() => setWorkflowTab("templates")}
+                      data-testid="deployment-workflow-tab-templates"
+                    >
+                      Use saved setup
+                    </button>
+                  </div>
+                </article>
+              </>
+            )}
           </div>
         </article>
 
         <article className="card formCard" data-testid="deployment-workflow-main-next-step-card">
           <div className="sectionHeader">
             <div>
-              <h2 data-testid="deployment-workflow-main-next-step-title">Main next step</h2>
+              <h2 data-testid="deployment-workflow-main-next-step-title">Your next task on this page</h2>
               <p className="formHint">
-                Keep one lane active at a time. Live runtime review, rollout creation, and template reuse can all happen here, but only one should define the next decision.
+                If you are new here, trust this summary and let it choose the active lane for you.
               </p>
             </div>
           </div>
@@ -1482,7 +1601,7 @@ function DeploymentWorkflowPageContent() {
             <span className="status info">templates {templates.length}</span>
           </div>
           <div className="actionCluster">
-            {serverAccessBlocked ? (
+            {serverAccessBlocked && filteredDeployments.length === 0 ? (
               <Link
                 href="/app"
                 className="landingButton primaryButton"
@@ -1490,6 +1609,15 @@ function DeploymentWorkflowPageContent() {
               >
                 Back to overview
               </Link>
+            ) : serverAccessBlocked ? (
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                data-testid="deployment-workflow-main-next-step-button"
+                onClick={() => setWorkflowTab("live")}
+              >
+                Open live deployments
+              </button>
             ) : workflowState.mode === "prerequisite" ? (
               <Link
                 href="/app/server-review"
@@ -1553,9 +1681,9 @@ function DeploymentWorkflowPageContent() {
           id="runtime-deployments"
         >
           <div>
-            <h2 data-testid="runtime-deployments-title">Deployments</h2>
+            <h2 data-testid="runtime-deployments-title">Step 3: check what is running</h2>
             <p className="formHint">
-              Filter current deployments by status or search by image, container, or server.
+              After you start an app, this lane is where you confirm whether it is running, healthy, and worth keeping.
             </p>
           </div>
           <div className="deploymentControls">
@@ -1747,15 +1875,15 @@ function DeploymentWorkflowPageContent() {
         </div>
         </section>
 
-        <section hidden={workflowTab !== "create"}>
+        <section hidden={workflowTab !== "create" || serverAccessBlocked}>
         <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
-          <h2 data-testid="create-deployment-title">Create deployment</h2>
+          <h2 data-testid="create-deployment-title">Start one app</h2>
           <p className="formHint">
             {serverAccessBlocked
-              ? "Members cannot choose saved servers here. Ask an admin to confirm the target, then use the form for local deployment planning or template reuse."
+              ? "Members cannot choose saved servers here. Ask an admin to confirm the target, then keep this form focused on the app itself."
               : workflowState.mode === "prerequisite"
-                ? "This form becomes the main path after one server target is saved in Server Review. Once that prerequisite is done, start with image first and open advanced setup only when needed."
-                : "Start with the smallest possible rollout: image first, then open advanced setup only if you need naming, ports, env vars, server targeting, or template save."}
+                ? "This becomes the main path as soon as Step 1 has one saved server target. When that is done, start with the image first and open advanced setup only if needed."
+                : "For a first pass, start with the image first. Leave advanced setup closed unless you need custom ports, env vars, server targeting, or a saved setup."}
           </p>
           {!localDeploymentsEnabled ? (
             <div className="banner subtle">
@@ -1801,14 +1929,14 @@ function DeploymentWorkflowPageContent() {
             <div className="banner subtle" data-testid="create-deployment-quickstart-banner">
               {form.image.trim()
                 ? serverAccessBlocked
-                  ? "Image is set. Keep going with local deployment planning or template reuse while an admin confirms the remote target."
+                  ? "The app image is set. Keep the rest of the form focused on the rollout while an admin confirms the remote target."
                   : selectedCreateServer
-                    ? `Image is set and target "${selectedCreateServer.name}" is already selected. Create now if defaults are enough, or open advanced setup only for ports, env vars, or template save.`
-                    : "Image is set. Create now if defaults are enough, or open advanced setup for ports, env vars, server target, and template save."
+                    ? `The app image is set and "${selectedCreateServer.name}" is already selected. Create now if the defaults are enough, or only open advanced setup for ports, env vars, or template save.`
+                    : "The app image is set. Create now if the defaults are enough, or open advanced setup only for ports, env vars, server target, and template save."
                 : selectedCreateServer && requestedSource === "server-review"
-                  ? `Target "${selectedCreateServer.name}" is already selected from Server Review. Set the image next and keep the rest closed unless the rollout really needs more.`
+                  ? `Server "${selectedCreateServer.name}" is already selected from Step 1. Set the image next and keep the rest closed unless the rollout really needs more.`
                   : serverAccessBlocked
-                    ? "Set the image first. Members cannot choose a saved server target here, so keep the rest of the form focused on the rollout itself."
+                    ? "Set the image first. Members cannot choose a saved server target here, so keep everything else focused on the rollout itself."
                     : "Set the image first. Everything else is optional and can stay closed until you actually need it."}
             </div>
 
@@ -1819,9 +1947,9 @@ function DeploymentWorkflowPageContent() {
                 onClick={() => setCreateAdvancedOpen((current) => !current)}
                 data-testid="create-advanced-toggle-button"
               >
-                {createAdvancedOpen ? "Hide advanced setup" : "Open advanced setup"}
-              </button>
-            </div>
+                  {createAdvancedOpen ? "Hide advanced setup" : "Open advanced setup"}
+                </button>
+              </div>
 
             <section hidden={!createAdvancedOpen} data-testid="create-advanced-section">
               <label className="field">
@@ -2073,13 +2201,43 @@ function DeploymentWorkflowPageContent() {
         </article>
         </section>
 
-        <section hidden={workflowTab !== "templates"}>
+        {waitingForAdminTarget ? (
+          <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-member-waiting-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2>What opens after the target is confirmed</h2>
+                <p className="formHint">
+                  This page should stay calm until Step 1 is done. After one admin confirms the target, Step 2 becomes a short path again.
+                </p>
+              </div>
+            </div>
+            <div className="workspaceReviewerGrid">
+              <article className="workspaceReviewerCard">
+                <span>Then</span>
+                <strong>Choose one app</strong>
+                <p>Set the image you want to run and leave advanced setup closed unless the rollout really needs it.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>After that</span>
+                <strong>Start it</strong>
+                <p>Create the deployment once the target is confirmed instead of filling a blocked form early.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>Finally</span>
+                <strong>Check health</strong>
+                <p>Use the live lane only after the app starts so the next decision stays obvious.</p>
+              </article>
+            </div>
+          </article>
+        ) : null}
+
+        <section hidden={workflowTab !== "templates" || serverAccessBlocked}>
         <article className="card formCard" data-testid="templates-card" id="templates">
           <div className="sectionHeader" data-testid="templates-section-header">
             <div>
-              <h2 data-testid="templates-section-title">Deployment templates</h2>
+              <h2 data-testid="templates-section-title">Use a saved setup</h2>
               <p className="formHint">
-                Preview, deploy, edit, duplicate, or delete rollout presets without leaving the deployment workflow.
+                A template is just a saved rollout setup. Reuse one when you do not want to fill the whole form again.
               </p>
             </div>
           </div>

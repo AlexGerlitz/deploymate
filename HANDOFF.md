@@ -53,6 +53,16 @@ Updated: 2026-04-10
   - production env audit и contract gate уже часть нормального release path
   - post-deploy smoke теперь умеет явный host resolve
   - если локальный runner не видит staging по DNS/TLS, smoke можно и нужно запускать прямо на deploy host через SSH
+- Week 2 beginner story теперь уже началась в реальном UI:
+  - `/app` объясняет three-step path и даёт plain-language meaning для `server`, `what to run`, и `healthy`
+  - `/app/server-review` теперь жёстко framed как один job: save one server target, run one check, then leave for Step 2
+  - `/app/deployment-workflow` теперь явно framed как Step 2 with one-lane-at-a-time guidance instead of operator-first scanning
+- Task-first framing уже усилился ещё на один шаг:
+  - `/app` now shows one explicit `Do this now` task card before the rest of the three-step map
+  - opening a saved server now shows `what to do with this server` before edit/delete surfaces
+  - server edit/delete are now secondary details instead of competing with the main path
+  - login can now hide demo access by default unless a dedicated demo user is explicitly configured
+  - member blocked flow in `/app/deployment-workflow` is being simplified so it stops showing dead create/template surfaces before admin Step 1 is done
 
 ## Current Release Reality
 
@@ -71,16 +81,12 @@ Updated: 2026-04-10
 
 ## Next Recommended Package
 
-- Сначала безопасно опубликовать уже проверенный package:
-  - release candidate branch: `codex/deploymate-staging-hardening`
-  - validated commit on staging: `740be1d`
-  - следующий безопасный шаг: fast-forward/merge этого пакета в `origin/develop`
-- Сразу после публикации возвращаться к Week 2 beginner story:
-  - explain what the product does in plain language
-  - show the first step without requiring product knowledge
-  - keep `server-review` and `deployment-workflow` as step-based screens, not operator-first workspaces
-  - align copy, CTA language, and page order around a real novice path
-- При этом новый release contract не считать временным workaround и не ослаблять его ради скорости.
+- Проверить новый beginner story не только глазами автора, а живым walkthrough:
+  - first-time admin path: `/app -> /app/server-review -> /app/deployment-workflow`
+  - member path under admin-managed server inventory
+  - confirm that the next click is still obvious after login, after saving a server, and after the first deploy
+- После walkthrough уже добивать remaining clarity gaps instead of blindly rewriting copy.
+- Параллельно не ослаблять новый release contract и не превращать его во временный workaround.
 
 ## Week 1 Result
 
@@ -108,18 +114,21 @@ Updated: 2026-04-10
 - When a reviewed server is ready, `server-review` now opens `deployment-workflow` with that target preselected.
 - The create form now says more clearly when the target already came from `Server Review`, so the user knows the next move is simply setting the image.
 - After the first successful deploy, the success state now points straight to runtime detail instead of leaving the user in a vague success-only state.
-- A live prod walkthrough under the real admin account confirmed the current deeper problem:
-  - `/app` still sounds too smart instead of explaining the product simply
-  - `server-review` still feels like an internal review tool instead of `Step 1`
-  - `deployment-workflow` still assumes the user already understands terms like `image`, `template`, and `runtime`
+- The first-pass copy is now much closer to a real novice path:
+  - `/app` now explains the product in a three-step story instead of only reflecting workspace state
+  - `/app` also now starts with one explicit `Do this now` action instead of making the user choose from the whole page
+  - `server-review` now reads as one job: save one server target, check it, then move on
+  - opening a saved server now shows ordered tasks first, while edit/delete moved behind a secondary disclosure
+  - `deployment-workflow` now explains Step 2 with one-lane-at-a-time guidance and simpler language around image, template, and health
+- The remaining question is no longer "do we have the right frame?" but "does a real beginner now follow it without hesitation?"
 
 ## Current State
 
-- Local working branch for the validated package: `codex/deploymate-staging-hardening`
-- Validated staging commit: `740be1d`
+- Local working branch for current product work: `codex/deploymate-staging-hardening`
+- Latest published `develop` commit: `0384fa3`
 - Staging host `deploymate`:
-  - `/opt/deploymate` branch `develop` currently points to `740be1d`
-  - remote `origin/develop` still points to `defad05`
+  - `/opt/deploymate` branch `develop` currently points to `0384fa3`
+  - remote `origin/develop` also points to `0384fa3`
   - pre-cleanup dirty remote state was preserved in backup branch `codex/remote-host-backup-20260410-023502`
 - Latest validated package now includes:
   - member/admin runtime ownership isolation
@@ -127,6 +136,7 @@ Updated: 2026-04-10
   - production env audit and production contract gate
   - remote release smoke that can run on the deploy host and can pin host resolution explicitly
   - successful end-to-end staging walkthrough with runtime smoke create/health/diagnostics/logs/activity/delete
+  - first-pass beginner story rewrite across overview, server step, and deployment step
 - Host-specific note:
   - saved runtime smoke server `prod-runtime-smoke` currently points to `103.88.241.103`
   - do not switch it back to `deploymatecloud.ru` until backend-container DNS resolution is explicitly re-verified

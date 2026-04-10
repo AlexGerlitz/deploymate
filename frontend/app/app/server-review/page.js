@@ -134,7 +134,7 @@ function ServerReviewPageContent() {
   const router = useRouter();
 
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("Step 1 is ready. Save one server and then test the connection.");
+  const [success, setSuccess] = useState("Step 1 is ready. Save one server target, then run one check.");
   const [servers, setServers] = useState([]);
   const [serverTestResults, setServerTestResults] = useState({});
   const [serverDiagnostics, setServerDiagnostics] = useState({});
@@ -313,7 +313,8 @@ function ServerReviewPageContent() {
 
   function handleSelectItem(itemId) {
     setSelectedItemId(itemId);
-    setSuccess("Opened this server.");
+    setActionNote("");
+    setSuccess("Opened this server. Follow the next task below.");
     setError("");
   }
 
@@ -340,7 +341,7 @@ function ServerReviewPageContent() {
       });
       await loadServers(true);
       setSelectedItemId(createdServer.id);
-      setSuccess(`Server target "${createdServer.name}" created.`);
+      setSuccess(`Server target "${createdServer.name}" created. Open it and run one check.`);
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
         router.replace("/login");
@@ -418,7 +419,9 @@ function ServerReviewPageContent() {
       setServers((currentServers) =>
         currentServers.map((server) => (server.id === selectedItem.id ? updatedServer : server)),
       );
-      setSuccess(`Server target "${updatedServer.name}" updated.`);
+      setSuccess(
+        `Server target "${updatedServer.name}" updated. Run a fresh check if the connection details changed.`,
+      );
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
         router.replace("/login");
@@ -494,10 +497,10 @@ function ServerReviewPageContent() {
             <div className="eyebrow">Step 1</div>
             <h1 data-testid="server-review-page-title">Connect your server</h1>
             <p className="serverReviewLead">
-              Add one server, check that it works, then choose what to run.
+              This page has one job: give DeployMate one machine it can reach before you choose what to run.
             </p>
             <p className="formHint serverReviewSubtleCopy">
-              Keep this step simple.
+              Keep this step simple. You do not need rollout settings, templates, or runtime review yet.
             </p>
           </div>
           <div className="serverReviewHeroRail">
@@ -516,10 +519,10 @@ function ServerReviewPageContent() {
               </button>
             </div>
             <div className="serverReviewHeroPanel">
-              <span className="serverReviewPanelLabel">What matters now</span>
-              <strong>Save one server. Then check it.</strong>
+              <span className="serverReviewPanelLabel">Finish Step 1</span>
+              <strong>Save one server target. Then check that DeployMate can use it.</strong>
               <p>
-                You do not need to configure everything here. Just save the server and confirm it is ready.
+                A beginner only needs one confirmed target here. Everything else can wait until Step 2.
               </p>
               <div className="serverReviewHeroStats" aria-label="Server review summary">
                 <div className="serverReviewHeroStat">
@@ -555,11 +558,11 @@ function ServerReviewPageContent() {
         <div className="serverReviewCreateLayout">
           <div id="server-review-create-server-section" className="workspaceGlancePanel serverReviewCreatePanel">
             <div className="workspaceGlanceHeader">
-              <span className="eyebrow">Start here</span>
-              <strong>Add your server</strong>
+              <span className="eyebrow">Step 1 action</span>
+              <strong>Save one server target</strong>
             </div>
             <p className="formHint serverReviewSubtleCopy">
-              Save one server first. Then run a check before you move on.
+              Fill in the machine details, save them once, then run a check before you move on.
             </p>
             <form className="form" onSubmit={handleCreateServer} data-testid="server-review-create-server">
               <label className="field">
@@ -573,6 +576,9 @@ function ServerReviewPageContent() {
                   required
                   data-testid="server-review-create-name"
                 />
+                <span className="fieldHint">
+                  Pick a label you will recognize later, like `production-vps` or `main-server`.
+                </span>
               </label>
               <label className="field">
                 <span>Host</span>
@@ -585,6 +591,9 @@ function ServerReviewPageContent() {
                   required
                   data-testid="server-review-create-host"
                 />
+                <span className="fieldHint">
+                  Use the IP address or hostname DeployMate should dial over SSH.
+                </span>
               </label>
               <label className="field">
                 <span>Port</span>
@@ -599,6 +608,9 @@ function ServerReviewPageContent() {
                   required
                   data-testid="server-review-create-port"
                 />
+                <span className="fieldHint">
+                  Leave this at `22` unless your server uses a different SSH port.
+                </span>
               </label>
               <label className="field">
                 <span>Username</span>
@@ -611,6 +623,9 @@ function ServerReviewPageContent() {
                   required
                   data-testid="server-review-create-username"
                 />
+                <span className="fieldHint">
+                  This is the SSH user DeployMate should sign in as on that machine.
+                </span>
               </label>
               <label className="field">
                 <span>SSH key</span>
@@ -624,6 +639,9 @@ function ServerReviewPageContent() {
                   required
                   data-testid="server-review-create-ssh-key"
                 />
+                <span className="fieldHint">
+                  Paste the private SSH key DeployMate should use for this server.
+                </span>
               </label>
               <div className="formActions">
                 <button
@@ -632,30 +650,30 @@ function ServerReviewPageContent() {
                   disabled={serverSubmitting}
                   data-testid="server-review-create-submit"
                 >
-                  {serverSubmitting ? "Adding..." : "Save server"}
+                  {serverSubmitting ? "Saving..." : "Save server target"}
                 </button>
               </div>
             </form>
           </div>
 
           <aside className="serverReviewSoftPanel serverReviewNextPanel">
-            <span className="serverReviewPanelLabel">Next</span>
-            <h2>What to do after you save it</h2>
+            <span className="serverReviewPanelLabel">Leave this page when</span>
+            <h2>One server looks ready for Step 2</h2>
             <p className="formHint">
-              Do one quick check, then continue.
+              You are done here once one saved target passes a quick check and looks safe to use.
             </p>
             <div className="serverReviewMiniSteps">
               <div className="serverReviewMiniStep">
-                <strong>1. Save one server</strong>
-                <p>Add one SSH target.</p>
+                <strong>1. Save one server target</strong>
+                <p>Add one SSH machine DeployMate can reach.</p>
               </div>
               <div className="serverReviewMiniStep">
-                <strong>2. Check it</strong>
-                <p>Use connection test or full check.</p>
+                <strong>2. Run one check</strong>
+                <p>Use sign-in check or the full readiness check.</p>
               </div>
               <div className="serverReviewMiniStep">
-                <strong>3. Choose what to run</strong>
-                <p>Move on only when the server looks ready.</p>
+                <strong>3. Go to Step 2</strong>
+                <p>Only then choose what app to run on that server.</p>
               </div>
             </div>
           </aside>
@@ -667,10 +685,10 @@ function ServerReviewPageContent() {
           <div className="serverReviewToolbarHeader">
             <div>
               <span className="serverReviewPanelLabel">Saved servers</span>
-              <h2>Check a saved server</h2>
+              <h2>Open one saved server and confirm it</h2>
             </div>
             <p className="formHint">
-              Open one server, check it, then move on.
+              Stay focused on one server at a time. If it looks ready, move straight to Step 2.
             </p>
           </div>
           <label className="field serverReviewFilterField">
@@ -712,7 +730,7 @@ function ServerReviewPageContent() {
             >
               {item.segment === "ready" ? (
                 <div className="banner success">
-                  This server is ready. Next: choose what to run.
+                  Step 1 is complete for this server. Next: go to Step 2 and choose what to run.
                 </div>
               ) : null}
 
@@ -725,183 +743,222 @@ function ServerReviewPageContent() {
                 </p>
               </div>
 
-              <div className="serverReviewPrimaryActions">
-                <div className="inlineHelpGroup serverReviewActionWithHelp">
-                  <button
-                    type="button"
-                    className="secondaryButton serverReviewActionButton"
-                    data-testid={`${item.id}-primary-action`}
-                    onClick={() => handleRunStarterAction("primary", item.id)}
-                    disabled={actionLoadingId === item.id}
-                  >
-                    Run full check
-                  </button>
-                  <InlineHelp
-                    id={`full-check-${item.id}`}
-                    testId={`${item.id}-full-check-help`}
-                    label="What full check means"
-                    text="Checks that this server is reachable and looks ready for the next step."
-                    isOpen={openHelpId === `full-check-${item.id}`}
-                    onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
-                  />
-                </div>
+              {item.id === selectedItemId ? (
+                <>
+                  <section className="serverReviewTaskPanel" data-testid={`server-review-tasks-${item.id}`}>
+                    <div className="serverReviewTaskHeader">
+                      <span className="serverReviewPanelLabel">Tasks for this server</span>
+                      <strong>
+                        {item.segment === "ready"
+                          ? "This server is ready. Use it for Step 2."
+                          : "Finish the check here, then move on."}
+                      </strong>
+                      <p>
+                        {item.segment === "ready"
+                          ? "You can still rerun a check if something changed, but the main path is choosing what to run next."
+                          : "Stay on this server, run the readiness check, and only then continue to the app step."}
+                      </p>
+                    </div>
 
-                <div className="inlineHelpGroup serverReviewActionWithHelp">
-                  <button
-                    type="button"
-                    className="secondaryButton serverReviewActionButton"
-                    data-testid={`${item.id}-secondary-action`}
-                    onClick={() => handleRunStarterAction("secondary", item.id)}
-                    disabled={actionLoadingId === item.id}
-                  >
-                    Check connection
-                  </button>
-                  <InlineHelp
-                    id={`check-connection-${item.id}`}
-                    testId={`${item.id}-check-connection-help`}
-                    label="What check connection means"
-                    text="Use this when you only want to confirm that DeployMate can sign in."
-                    isOpen={openHelpId === `check-connection-${item.id}`}
-                    onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
-                  />
-                </div>
+                    <div className="workspaceReviewerGrid serverReviewTaskGrid">
+                      <article className="workspaceReviewerCard serverReviewTaskCard">
+                        <span>Do this now</span>
+                        <strong>Check whether this server is ready</strong>
+                        <p>
+                          {item.diagnostics
+                            ? "Run the readiness check again if you changed the server details or want a fresh answer."
+                            : "This is the main action on this screen. It checks that the server is reachable and looks safe for Step 2."}
+                        </p>
+                        <button
+                          type="button"
+                          className="landingButton primaryButton"
+                          data-testid={`${item.id}-primary-action`}
+                          onClick={() => handleRunStarterAction("primary", item.id)}
+                          disabled={actionLoadingId === item.id}
+                        >
+                          {actionLoadingId === item.id ? "Checking..." : "Check server readiness"}
+                        </button>
+                      </article>
 
-                {item.segment === "ready" ? (
-                  <div className="inlineHelpGroup serverReviewActionWithHelp">
-                    <Link
-                      href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
-                      className="landingButton primaryButton serverReviewActionButton"
-                    >
-                      Choose what to run
-                    </Link>
-                    <InlineHelp
-                      id={`choose-run-${item.id}`}
-                      testId={`${item.id}-choose-run-help`}
-                      label="What choose what to run means"
-                      text="This is where you choose the app or service to start on this server."
-                      isOpen={openHelpId === `choose-run-${item.id}`}
-                      onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
-                    />
-                  </div>
-                ) : null}
-              </div>
+                      <article className="workspaceReviewerCard serverReviewTaskCard">
+                        <span>If you only need a quick test</span>
+                        <strong>Only test sign-in</strong>
+                        <p>
+                          Use this shorter check when you only want to confirm that DeployMate can log in before a fuller review.
+                        </p>
+                        <button
+                          type="button"
+                          className="secondaryButton"
+                          data-testid={`${item.id}-secondary-action`}
+                          onClick={() => handleRunStarterAction("secondary", item.id)}
+                          disabled={actionLoadingId === item.id}
+                        >
+                          {actionLoadingId === item.id ? "Checking..." : "Only test sign-in"}
+                        </button>
+                      </article>
 
-              <div className="adminFilterActions">
-                {item.id === selectedItemId ? null : (
+                      <article className="workspaceReviewerCard serverReviewTaskCard">
+                        <span>Then do this</span>
+                        <strong>
+                          {item.segment === "ready"
+                            ? "Choose what to run on this server"
+                            : "Move to Step 2 after this server looks ready"}
+                        </strong>
+                        <p>
+                          {item.segment === "ready"
+                            ? "Step 1 is done for this machine. Keep the momentum and pick one app or one saved setup next."
+                            : "Once the readiness result looks good, use the same server in Step 2 and keep the rollout path simple."}
+                        </p>
+                        {item.segment === "ready" ? (
+                          <Link
+                            href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
+                            className="landingButton primaryButton"
+                          >
+                            Go to Step 2
+                          </Link>
+                        ) : (
+                          <div className="banner subtle inlineBanner">
+                            Waiting for a ready result before Step 2 becomes the main path.
+                          </div>
+                        )}
+                      </article>
+                    </div>
+
+                    <div className="workspaceGlancePanel serverReviewTaskNotePanel">
+                      <div className="workspaceGlanceHeader">
+                        <span className="eyebrow">Optional</span>
+                        <strong>Add a note before the next check</strong>
+                      </div>
+                      <p className="formHint">
+                        This is only for context you want to keep in mind while you run the next check.
+                      </p>
+                      <label className="field">
+                        <span>Note for the next check</span>
+                        <textarea
+                          rows={3}
+                          value={actionNote}
+                          onChange={(event) => setActionNote(event.target.value)}
+                          placeholder={starterStrings.actionNotePlaceholder}
+                        />
+                      </label>
+                    </div>
+                  </section>
+
+                  <details className="serverReviewSecondaryDetails">
+                    <summary className="serverReviewSecondarySummary">
+                      <div>
+                        <strong>Need to fix this server or remove it?</strong>
+                        <p>Open the advanced details only if the saved name, host, port, user, or SSH key is wrong.</p>
+                      </div>
+                    </summary>
+                    <div className="serverReviewSecondaryBody">
+                      <form className="form serverReviewEditForm" onSubmit={handleUpdateServer}>
+                        <label className="field">
+                          <span>Name</span>
+                          <input
+                            name="name"
+                            value={editForm.name}
+                            onChange={updateEditFormField}
+                            disabled={serverUpdating}
+                            required
+                            data-testid="server-review-edit-name"
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Host</span>
+                          <input
+                            name="host"
+                            value={editForm.host}
+                            onChange={updateEditFormField}
+                            disabled={serverUpdating}
+                            required
+                            data-testid="server-review-edit-host"
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Port</span>
+                          <input
+                            name="port"
+                            type="number"
+                            min="1"
+                            max="65535"
+                            value={editForm.port}
+                            onChange={updateEditFormField}
+                            disabled={serverUpdating}
+                            required
+                            data-testid="server-review-edit-port"
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Username</span>
+                          <input
+                            name="username"
+                            value={editForm.username}
+                            onChange={updateEditFormField}
+                            disabled={serverUpdating}
+                            required
+                            data-testid="server-review-edit-username"
+                          />
+                        </label>
+                        <label className="field">
+                          <span className="fieldLabelWithHelp">
+                            <span>SSH key</span>
+                            <InlineHelp
+                              id={`ssh-key-${item.id}`}
+                              testId={`${item.id}-ssh-key-help`}
+                              label="What SSH key means"
+                              text="Paste the private key DeployMate should use to connect to this server."
+                              isOpen={openHelpId === `ssh-key-${item.id}`}
+                              onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
+                            />
+                          </span>
+                          <textarea
+                            name="ssh_key"
+                            rows={6}
+                            value={editForm.ssh_key}
+                            onChange={updateEditFormField}
+                            placeholder="Leave empty to keep the current key, or paste a replacement private key."
+                            disabled={serverUpdating}
+                            data-testid="server-review-edit-ssh-key"
+                          />
+                        </label>
+                        <div className="formActions">
+                          <button
+                            type="submit"
+                            className="landingButton primaryButton"
+                            disabled={serverUpdating}
+                            data-testid="server-review-edit-submit"
+                          >
+                            {serverUpdating ? "Saving..." : "Save changes"}
+                          </button>
+                        </div>
+                      </form>
+
+                      <div className="formActions">
+                        <button
+                          type="button"
+                          className="dangerButton"
+                          data-testid={`${item.id}-delete`}
+                          onClick={() => handleDeleteServer(item.id)}
+                          disabled={deletingServerId === item.id}
+                        >
+                          {deletingServerId === item.id ? "Deleting..." : "Delete server target"}
+                        </button>
+                      </div>
+                    </div>
+                  </details>
+                </>
+              ) : (
+                <div className="formActions">
                   <button
                     type="button"
                     className="secondaryButton"
                     onClick={() => handleSelectItem(item.id)}
                   >
-                    Edit
+                    Open tasks
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="dangerButton"
-                  data-testid={`${item.id}-delete`}
-                  onClick={() => handleDeleteServer(item.id)}
-                  disabled={deletingServerId === item.id}
-                >
-                  {deletingServerId === item.id ? "Deleting..." : "Delete"}
-                </button>
-              </div>
-
-              {item.id === selectedItemId ? (
-                <>
-                  <form className="form serverReviewEditForm" onSubmit={handleUpdateServer}>
-                    <label className="field">
-                      <span>Name</span>
-                      <input
-                        name="name"
-                        value={editForm.name}
-                        onChange={updateEditFormField}
-                        disabled={serverUpdating}
-                        required
-                        data-testid="server-review-edit-name"
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Host</span>
-                      <input
-                        name="host"
-                        value={editForm.host}
-                        onChange={updateEditFormField}
-                        disabled={serverUpdating}
-                        required
-                        data-testid="server-review-edit-host"
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Port</span>
-                      <input
-                        name="port"
-                        type="number"
-                        min="1"
-                        max="65535"
-                        value={editForm.port}
-                        onChange={updateEditFormField}
-                        disabled={serverUpdating}
-                        required
-                        data-testid="server-review-edit-port"
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Username</span>
-                      <input
-                        name="username"
-                        value={editForm.username}
-                        onChange={updateEditFormField}
-                        disabled={serverUpdating}
-                        required
-                        data-testid="server-review-edit-username"
-                      />
-                    </label>
-                    <label className="field">
-                      <span className="fieldLabelWithHelp">
-                        <span>SSH key</span>
-                        <InlineHelp
-                          id={`ssh-key-${item.id}`}
-                          testId={`${item.id}-ssh-key-help`}
-                          label="What SSH key means"
-                          text="Paste the private key DeployMate should use to connect to this server."
-                          isOpen={openHelpId === `ssh-key-${item.id}`}
-                          onToggle={(nextId) => setOpenHelpId((currentId) => (currentId === nextId ? "" : nextId))}
-                        />
-                      </span>
-                      <textarea
-                        name="ssh_key"
-                        rows={6}
-                        value={editForm.ssh_key}
-                        onChange={updateEditFormField}
-                        placeholder="Leave empty to keep the current key, or paste a replacement private key."
-                        disabled={serverUpdating}
-                        data-testid="server-review-edit-ssh-key"
-                      />
-                    </label>
-                    <div className="formActions">
-                      <button
-                        type="submit"
-                        className="landingButton primaryButton"
-                        disabled={serverUpdating}
-                        data-testid="server-review-edit-submit"
-                      >
-                        {serverUpdating ? "Saving..." : "Save changes"}
-                      </button>
-                    </div>
-                  </form>
-
-                  <label className="field">
-                    <span>Note for the next check</span>
-                    <textarea
-                      rows={3}
-                      value={actionNote}
-                      onChange={(event) => setActionNote(event.target.value)}
-                      placeholder={starterStrings.actionNotePlaceholder}
-                    />
-                  </label>
-                </>
-              ) : null}
+                </div>
+              )}
             </AdminSurfaceQueueCard>
           ))}
         </AdminSurfaceQueue>

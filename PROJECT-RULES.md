@@ -60,7 +60,11 @@ These can stay in the product, but they must not compete with the main deploy pa
 
 - The overview page should explain the workspace, not try to do everything.
 - The overview page should explain the product itself before it explains the workspace.
+- The first pass should define plain-language meanings for `server`, `what to run`, and `healthy` before it asks the user to make deeper choices.
+- The first pass should show one explicit `do this now` task before it shows the rest of the workspace.
 - Server setup should feel like the natural first step when no target exists.
+- When a user opens one server, the page should show ordered next tasks first and keep edit/delete behind a secondary disclosure.
+- Do not show a primary first-pass control that is known to be blocked or unconfigured. Hide it or replace it with the real next step.
 - Deployment creation should feel like the natural next step after server setup.
 - Deployment detail should answer: what is running, is it healthy, and what should I do next.
 - Advanced controls should be visible only when they help the current decision.

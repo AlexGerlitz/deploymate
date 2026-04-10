@@ -66,7 +66,7 @@ What to evaluate quickly:
 If you want the shortest coherent pass through the project:
 
 1. open the live app at `https://deploymatecloud.ru/login`
-2. use demo access or create a trial account
+2. create a trial account
 3. inspect `/app` and one deployment detail page for the runtime story
 4. inspect `/app/server-review` for the dedicated server workspace
 5. inspect `/app/users` and `/app/upgrade-requests` for admin depth
@@ -74,7 +74,7 @@ If you want the shortest coherent pass through the project:
 
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
-- live demo surface
+- live product surface
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 

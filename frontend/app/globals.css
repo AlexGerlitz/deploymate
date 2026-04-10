@@ -1022,10 +1022,87 @@ summary:focus-visible {
   margin-bottom: 14px;
 }
 
-.serverReviewEditForm {
-  margin-top: 16px;
-  padding-top: 16px;
+.serverReviewTaskPanel {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.serverReviewTaskHeader {
+  display: grid;
+  gap: 8px;
+}
+
+.serverReviewTaskHeader strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+
+.serverReviewTaskHeader p {
+  margin: 0;
+  color: #5f6675;
+}
+
+.serverReviewTaskGrid {
+  margin-top: 2px;
+}
+
+.serverReviewTaskCard .landingButton,
+.serverReviewTaskCard .secondaryButton {
+  justify-self: flex-start;
+}
+
+.serverReviewTaskNotePanel {
+  margin-top: 2px;
+}
+
+.serverReviewSecondaryDetails {
+  margin-top: 18px;
+  padding-top: 18px;
   border-top: 1px solid rgba(219, 228, 237, 0.9);
+}
+
+.serverReviewSecondaryDetails[open] {
+  padding-bottom: 2px;
+}
+
+.serverReviewSecondarySummary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.serverReviewSecondarySummary::-webkit-details-marker {
+  display: none;
+}
+
+.serverReviewSecondarySummary > div {
+  display: grid;
+  gap: 6px;
+}
+
+.serverReviewSecondarySummary strong {
+  color: #132238;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.serverReviewSecondarySummary p {
+  margin: 0;
+  color: #617287;
+}
+
+.serverReviewSecondaryBody {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.serverReviewEditForm {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .serverReviewReveal {
@@ -3001,6 +3078,12 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceGuideSteps {
   align-items: stretch;
+}
+
+.workspacePriorityPanel {
+  border-color: rgba(214, 225, 235, 0.95);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.98) 0%, rgba(244, 249, 253, 0.98) 100%);
 }
 
 .workspaceStepCard {

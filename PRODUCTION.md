@@ -40,6 +40,7 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 - Production now defaults to a `remote-only` profile. The backend does not need `/var/run/docker.sock` for the standard production setup.
 - Keep `NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0` in production so the UI matches the remote-only backend policy and does not offer local host deployment paths.
 - Public demo signup can be enabled with `DEPLOYMATE_PUBLIC_SIGNUP_ENABLED=true` and `NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED=1`. New users are created as `member` on the `trial` plan.
+- Live demo access is now opt-in. Set `NEXT_PUBLIC_DEMO_ACCESS_ENABLED=1`, `DEPLOYMATE_DEMO_ACCESS_ENABLED=true`, `DEPLOYMATE_DEMO_USERNAME`, and `DEPLOYMATE_DEMO_PASSWORD` only when you intentionally want a dedicated demo login. Do not reuse the admin password for reviewer/demo access.
 - HTTPS is Caddy-ready. With a real public domain on ports `80` and `443`, Caddy can issue certificates automatically.
 - DeployMate now refuses silent `admin/admin` bootstrap. Set a real `DEPLOYMATE_ADMIN_PASSWORD`, or acknowledge local-only insecure bootstrap explicitly with `DEPLOYMATE_ALLOW_INSECURE_DEFAULT_ADMIN=true`.
 - Remote server deployments over SSH still require reachable target hosts and valid SSH credentials stored in DeployMate.

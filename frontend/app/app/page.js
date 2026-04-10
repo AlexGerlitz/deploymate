@@ -113,37 +113,37 @@ export default function HomePage() {
           : "Next best step: open your app list and continue from one running service.";
   const heroHeadline = canAccessServers
     ? servers.length === 0
-      ? "Connect one server, choose what to run, and check that it works."
+      ? "DeployMate helps you run one app on one server in three simple steps."
       : deployments.length === 0
-        ? "Your server is ready. Next choose which app to run and start it."
-        : "Your app workspace is live. Review what is running, then deploy the next change."
+        ? "Step 1 is done. Now choose one app to run on that server."
+        : "Your app is already running. Check health first, then make the next change."
     : localDeploymentsEnabled
-      ? "Keep working in the deployment workflow while admins own saved servers."
+      ? "DeployMate still gives you a simple path even when admins manage saved servers."
       : "Your deployment target is admin-managed. Confirm it with an admin, then continue.";
   const heroSupportText = canAccessServers
     ? servers.length === 0
-      ? "DeployMate gives you one clear path: connect a server first, then deploy one app."
+      ? "In plain language: tell DeployMate which machine to use, choose the app image to start, and then check whether the app stays healthy."
       : deployments.length === 0
-        ? "You are already past Step 1. The next move is choosing the app you want to run on that server."
-        : "Open the app workspace for the next action. Keep admin and reports secondary until the runtime story is clear."
+        ? "You already connected the machine. Stay on the main path now: choose one app image or one saved setup and start it."
+        : "Stay on the main path: open the app workspace, review what is healthy, and only then decide what to change next."
     : localDeploymentsEnabled
-      ? "Members can stay in the deployment workflow while server inventory remains with admins."
+      ? "Members can still choose what to run and review health while admins keep the saved server list up to date."
       : "Members do not manage saved server targets here. Ask an admin to confirm the target, then return to the workflow.";
   const explanationTitle = canAccessServers
     ? servers.length === 0
-      ? "What happens after you connect a server"
-      : "What happens next"
+      ? "What DeployMate means in plain language"
+      : "What this app is helping you do"
     : localDeploymentsEnabled
-      ? "What happens when server inventory is admin-managed"
+      ? "What changes when admins manage saved servers"
       : "What happens after an admin confirms the target";
   const explanationBody = canAccessServers
     ? servers.length === 0
-      ? "After Step 1, choose the app you want to run, start it, and then check whether it is healthy."
+      ? "You do not need to learn the whole workspace first. Just understand the three-step path and take the next step."
       : deployments.length === 0
-        ? "After Step 1, choose what app to run, start the first app, and then review status."
-        : "Open the app workspace to review status first, then make the next change deliberately."
+        ? "This workspace is already past the server step. The next decision is simply what app to run first."
+        : "You already have a running runtime story. Open the workflow to review status and keep the next action deliberate."
     : localDeploymentsEnabled
-      ? "Continue in Deployment Workflow for local rollouts and template reuse while admins keep the saved server list up to date."
+      ? "Admins keep the saved server list, but you can still understand the path: choose what to run, start it, and check health."
       : "Once an admin confirms the saved server target, use Deployment Workflow to create or review the rollout.";
   const beginnerSteps = [
     {
@@ -151,7 +151,7 @@ export default function HomePage() {
       step: "Step 1",
       title: canAccessServers ? "Connect a server" : memberServerCopy?.stepTitle || "Continue in deployment workflow",
       detail: canAccessServers
-        ? "Add one server and check that DeployMate can reach it over SSH."
+        ? "Add one machine and make sure DeployMate can sign in to it over SSH."
         : memberServerCopy?.stepDetail || "Use the deployment workflow for the next rollout step.",
       href: canAccessServers ? "/app/server-review" : "/app/deployment-workflow",
       actionLabel: canAccessServers ? "Open server setup" : memberServerCopy?.stepAction || "Open deployment workflow",
@@ -161,7 +161,7 @@ export default function HomePage() {
       key: "step-2",
       step: "Step 2",
       title: "Choose your app",
-      detail: "Open the app setup screen, paste the app image, or use a ready template.",
+      detail: "Paste the app image you want to run, or pick a saved setup if you already have one.",
       href: "/app/deployment-workflow",
       actionLabel: "Choose app to run",
       primary: overviewPrimaryPath.reason !== "server-setup",
@@ -170,10 +170,30 @@ export default function HomePage() {
       key: "step-3",
       step: "Step 3",
       title: "Start it and check status",
-      detail: "Start the app, then check whether it is running and healthy.",
+      detail: "Start the app, then open live status to confirm it is running, healthy, and reachable.",
       href: "/app/deployment-workflow",
       actionLabel: "See running apps",
       primary: false,
+    },
+  ];
+  const plainLanguageCards = [
+    {
+      title: "What “server” means here",
+      detail: canAccessServers
+        ? "It is simply the machine where your app will run. Step 1 only tells DeployMate how to reach that machine."
+        : localDeploymentsEnabled
+          ? "Admins keep the saved server list, but your rollout path still starts by choosing what to run."
+          : "The remote machine is confirmed by an admin first, then you continue in the rollout workflow.",
+    },
+    {
+      title: "What “choose your app” means",
+      detail:
+        "Usually this is a container image like `nginx:latest`, or one saved template that already remembers the image, ports, and env vars.",
+    },
+    {
+      title: "What “healthy” means",
+      detail:
+        "After the app starts, DeployMate shows whether it is running and whether the health checks and runtime details look good enough to keep going.",
     },
   ];
   const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
@@ -558,42 +578,51 @@ export default function HomePage() {
           <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
             <div className="sectionHeader workspaceGuideHeader">
               <div>
-                <h2 data-testid="workspace-scenario-title">Try it now</h2>
+                <h2 data-testid="workspace-scenario-title">Do this now, then keep going in order</h2>
                 <p className="formHint">
-                  Start with one action. The explanation sits lower on the page.
+                  If you are new here, ignore the deeper admin surfaces for now and just follow the next step.
                 </p>
               </div>
             </div>
             <div className="workspaceGuideGrid" data-testid="workspace-scenario-grid">
-              <div className="stepsGrid workspaceGuideSteps">
-                {beginnerSteps.map((card) => (
-                  <article
-                    key={card.key}
-                    className="stepCard workspaceStepCard"
-                    data-testid={`workspace-scenario-item-${card.key}`}
-                  >
-                    <span className="stepNumber">{card.step}</span>
-                    <h3>{card.title}</h3>
-                    <p>
-                      {card.step === "Step 1"
-                        ? canAccessServers
-                          ? "Add one server."
-                          : localDeploymentsEnabled
-                            ? "Use the deployment workflow while admins manage saved servers."
-                            : "Ask an admin to confirm the target."
-                        : card.step === "Step 2"
-                          ? "Choose one app."
-                          : "Check whether it works."}
-                    </p>
+              <div className="workspaceGuideSteps">
+                <article className="workspaceGlancePanel workspacePriorityPanel" data-testid="workspace-primary-task-card">
+                  <div className="workspaceGlanceHeader">
+                    <span className="eyebrow">Do this now</span>
+                    <strong>{overviewPrimaryPath.title}</strong>
+                  </div>
+                  <p className="formHint">{overviewPrimaryPath.detail}</p>
+                  <div className="formActions">
                     <Link
-                      href={card.href}
-                      className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
-                      data-testid={`workspace-scenario-action-${card.key}`}
+                      href={overviewPrimaryPath.href}
+                      className="landingButton primaryButton"
+                      data-testid="workspace-primary-task-action"
                     >
-                      {card.actionLabel}
+                      {overviewPrimaryPath.label}
                     </Link>
-                  </article>
-                ))}
+                  </div>
+                </article>
+
+                <div className="stepsGrid">
+                  {beginnerSteps.map((card) => (
+                    <article
+                      key={card.key}
+                      className="stepCard workspaceStepCard"
+                      data-testid={`workspace-scenario-item-${card.key}`}
+                    >
+                      <span className="stepNumber">{card.step}</span>
+                      <h3>{card.title}</h3>
+                      <p>{card.detail}</p>
+                      <Link
+                        href={card.href}
+                        className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                        data-testid={`workspace-scenario-action-${card.key}`}
+                      >
+                        {card.actionLabel}
+                      </Link>
+                    </article>
+                  ))}
+                </div>
               </div>
               <aside className="workspaceGlancePanel">
                 <div className="workspaceGlanceHeader">
@@ -624,13 +653,20 @@ export default function HomePage() {
                   </div>
                   <div className="workspaceStatusCard workspaceGlanceItem">
                     <span>Step 2</span>
-                    <strong>{deployments.length === 0 ? "Choose app" : "Start next app"}</strong>
+                    <strong>{deployments.length === 0 ? "Choose first app" : "Choose next app"}</strong>
                     <p>
-                      Open the app setup screen, paste the app image, or use a ready template.
+                      Use the deployment workflow to choose the image or saved setup you want to run.
                     </p>
                   </div>
                   <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Next best step</span>
+                    <span>Step 3</span>
+                    <strong>{deployments.length === 0 ? "Check health after deploy" : "Review live health"}</strong>
+                    <p>
+                      Open the live runtime list or deployment detail and confirm the app is healthy before the next change.
+                    </p>
+                  </div>
+                  <div className="workspaceStatusCard workspaceGlanceItem">
+                    <span>Right now</span>
                     <strong>Keep the first pass simple</strong>
                     <p>{beginnerNextStep}</p>
                   </div>
@@ -642,10 +678,19 @@ export default function HomePage() {
 
         <article className="card formCard workspaceGuidePanel">
           <div className="sectionHeader workspaceGuideHeader">
-            <div className="stepsGrid workspaceGuideSteps">
+            <div>
               <h2>{explanationTitle}</h2>
               <p className="formHint">{explanationBody}</p>
             </div>
+          </div>
+          <div className="workspaceReviewerGrid">
+            {plainLanguageCards.map((card) => (
+              <article key={card.title} className="workspaceReviewerCard">
+                <span>Plain language</span>
+                <strong>{card.title}</strong>
+                <p>{card.detail}</p>
+              </article>
+            ))}
           </div>
         </article>
 

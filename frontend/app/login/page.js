@@ -2,6 +2,8 @@ import Link from "next/link";
 
 const publicSignupEnabled =
   process.env.NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED === "1";
+const liveDemoEnabled =
+  process.env.NEXT_PUBLIC_DEMO_ACCESS_ENABLED === "1";
 
 export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
@@ -23,7 +25,9 @@ export default async function LoginPage({ searchParams }) {
             <span className="eyebrow">Live product access</span>
             <h1>DeployMate</h1>
             <p className="authLoginLead">
-              Sign in to open the workspace.
+              {publicSignupEnabled
+                ? "Sign in to continue, or create a trial account."
+                : "Sign in to open the workspace."}
             </p>
           </div>
 
@@ -75,31 +79,30 @@ export default async function LoginPage({ searchParams }) {
               </form>
             </div>
 
-            <div className="authLoginDivider" aria-hidden="true">
-              <span />
-              <small>or</small>
-              <span />
-            </div>
+            {liveDemoEnabled ? (
+              <>
+                <div className="authLoginDivider" aria-hidden="true">
+                  <span />
+                  <small>or</small>
+                  <span />
+                </div>
 
-            <form method="post" action="/login/demo" className="authDemoForm authLoginDemoForm">
-              <button
-                type="submit"
-                className="linkButton authDemoAction authLoginDemoAction"
-                data-testid="auth-demo-submit-button"
-              >
-                Open live demo
-              </button>
-              <p className="formHint">
-                Fastest way to look around before creating an account.
-              </p>
-            </form>
+                <form method="post" action="/login/demo" className="authDemoForm authLoginDemoForm">
+                  <button
+                    type="submit"
+                    className="linkButton authDemoAction authLoginDemoAction"
+                    data-testid="auth-demo-submit-button"
+                  >
+                    Open live demo
+                  </button>
+                  <p className="formHint">
+                    Fastest way to look around before creating an account.
+                  </p>
+                </form>
+              </>
+            ) : null}
 
             {error ? <div className="banner error" data-testid="auth-login-error-banner">{error}</div> : null}
-
-            <div className="banner subtle authBanner" data-testid="auth-login-help-banner">
-              If this is the first run with the default admin account, you will be asked to
-              change the password after login.
-            </div>
 
             {publicSignupEnabled ? (
               <div className="banner subtle authBanner" data-testid="auth-login-signup-banner">

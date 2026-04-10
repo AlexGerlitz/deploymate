@@ -15,16 +15,13 @@ function redirectWithError(request, message) {
 }
 
 export async function POST(request) {
-  const username =
-    process.env.DEPLOYMATE_DEMO_USERNAME ||
-    process.env.DEPLOYMATE_ADMIN_USERNAME ||
-    "admin";
-  const password =
-    process.env.DEPLOYMATE_DEMO_PASSWORD ||
-    process.env.DEPLOYMATE_ADMIN_PASSWORD ||
-    "DeployMateDemo2026";
+  const demoAccessEnabled =
+    process.env.DEPLOYMATE_DEMO_ACCESS_ENABLED === "true" ||
+    process.env.NEXT_PUBLIC_DEMO_ACCESS_ENABLED === "1";
+  const username = process.env.DEPLOYMATE_DEMO_USERNAME || "";
+  const password = process.env.DEPLOYMATE_DEMO_PASSWORD || "";
 
-  if (!password) {
+  if (!demoAccessEnabled || !username || !password) {
     return redirectWithError(request, "Demo access is not configured right now.");
   }
 
