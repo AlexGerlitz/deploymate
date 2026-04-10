@@ -1,6 +1,6 @@
 # DeployMate Project Rules
 
-Updated: 2026-04-07
+Updated: 2026-04-10
 
 ## Core Goal
 
@@ -88,6 +88,26 @@ These can stay in the product, but they must not compete with the main deploy pa
 - Bootstrap credentials must be explicit. DeployMate must not quietly ship or restart with `admin/admin` unless local-only insecure bootstrap is explicitly acknowledged.
 - Remote SSH trust must stay pinned by default. Convenience modes like `accept-new` are opt-in escape hatches, not the baseline.
 
+## Release And Production Rules
+
+- Production and staging releases must fail closed on insecure configuration, not just warn.
+- The baseline production contract is explicit:
+  - real `DEPLOYMATE_ADMIN_PASSWORD`
+  - shared auth throttling backend
+  - strict SSH host key checking
+  - persistent `known_hosts`
+  - secure cookies on HTTPS
+- A release path is not done until the real deploy flow is verified on a live host, not just through local unit tests.
+- Post-deploy smoke must verify the actual product path:
+  - login
+  - auth/session state
+  - backup dry-run
+  - runtime create/health/diagnostics/logs/activity/delete
+- Smoke must run from a network position that can actually reach the target. If the local runner cannot reliably resolve or reach the public hostname, running smoke on the deploy host is valid and preferred.
+- Host resolution overrides for smoke are acceptable only as explicit release inputs, not hidden defaults.
+- Do not wipe remote operator work just to make a release easier. Snapshot or branch off dirty remote state first, then clean the checkout.
+- If a slice changes the release or security contract, update rules, handoff, and ops docs in the same slice.
+
 ## Build Discipline
 
 - One weekly goal.
@@ -105,6 +125,7 @@ A slice is done only if:
 - the code still fits the existing project shape
 - the docs still describe reality
 - the verification needed for that slice was actually run
+- any release-affecting change has passed the right live smoke or staging walkthrough, not only local tests
 
 ## 30-Day Plan
 

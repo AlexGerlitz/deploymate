@@ -1,6 +1,6 @@
 # DeployMate Handoff
 
-Updated: 2026-04-07
+Updated: 2026-04-10
 
 ## Web Terminal Pointer
 
@@ -29,6 +29,11 @@ Updated: 2026-04-07
   - auth throttling должен жить в shared state, а не в памяти одного процесса
   - bootstrap `admin/admin` не допускается без явного local-only override
   - SSH host trust по умолчанию должен быть strict/pinned, а не `accept-new`
+- Production/release boundary теперь тоже зафиксирована как часть security contract:
+  - `DEPLOYMATE_ADMIN_PASSWORD` должен быть реальным секретом
+  - `DEPLOYMATE_AUTH_RATE_LIMIT_BACKEND` должен быть shared, а не `memory`
+  - `DEPLOYMATE_SSH_HOST_KEY_CHECKING=yes` и `DEPLOYMATE_SSH_KNOWN_HOSTS_FILE` обязательны для remote runtime
+  - post-deploy smoke должен проверять реальный runtime path, а не только `/api/health`
 - Любой новый runtime surface дальше нужно оценивать не только по clarity, но и по ownership boundary: кто именно может это видеть, экспортировать и менять.
 
 ## Current Build Reality
@@ -44,14 +49,38 @@ Updated: 2026-04-07
   - `deployment detail` now answers state, risk, and next action more directly
 - продукт стал заметно понятнее с первого прохода, но живой walkthrough на проде показал более глубокую проблему:
   новичок всё ещё не понимает, что делает продукт и какой у него первый шаг
+- Одновременно infra/release слой теперь тоже сильно жёстче:
+  - production env audit и contract gate уже часть нормального release path
+  - post-deploy smoke теперь умеет явный host resolve
+  - если локальный runner не видит staging по DNS/TLS, smoke можно и нужно запускать прямо на deploy host через SSH
+
+## Current Release Reality
+
+- 2026-04-10 живой staging walkthrough завершён end-to-end успешно на хосте `deploymate`.
+- Проверенный release path теперь реально включает:
+  - remote audits
+  - compose rebuild
+  - login/auth smoke
+  - backup bundle + restore dry-run
+  - runtime smoke deploy with health/diagnostics/logs/activity/delete
+- В процессе walkthrough были пойманы и закрыты три настоящих release-path дефекта:
+  - локальный smoke runner зависел от внешнего DNS/TLS
+  - `post_deploy_smoke.sh` не умел `curl --resolve`
+  - в `post_deploy_smoke.sh` отсутствовал `json_query()` helper
+- Важный operational вывод: release path нельзя считать здоровым, пока он не прогнан на реальном staging host, даже если локальные тесты зелёные.
 
 ## Next Recommended Package
 
-- Week 2 now needs to rebuild the beginner story itself:
+- Сначала безопасно опубликовать уже проверенный package:
+  - release candidate branch: `codex/deploymate-staging-hardening`
+  - validated commit on staging: `740be1d`
+  - следующий безопасный шаг: fast-forward/merge этого пакета в `origin/develop`
+- Сразу после публикации возвращаться к Week 2 beginner story:
   - explain what the product does in plain language
   - show the first step without requiring product knowledge
   - keep `server-review` and `deployment-workflow` as step-based screens, not operator-first workspaces
   - align copy, CTA language, and page order around a real novice path
+- При этом новый release contract не считать временным workaround и не ослаблять его ради скорости.
 
 ## Week 1 Result
 
@@ -86,19 +115,21 @@ Updated: 2026-04-07
 
 ## Current State
 
-- Branch: `develop`
-- Working tree at the last published checkpoint was clean; verify with `git status --short` before continuing.
-- Latest published packages:
-  - dedicated `server-review` workspace for server operations
-  - synced docs/handoff for that new server flow
-  - richer runtime detail handoff/export tooling on deployment detail pages
-  - richer deployment mutation trace in backend activity, including explicit started events for create/redeploy/delete
-  - clearer restore import-preparation decision layer for backup dry-run
-  - restore dry-run cross-section reference guardrails for missing linked users, servers, and templates
-  - deeper restore preparation workspace with risk-focused filtering, search, and visible-sections CSV export
-  - stronger destructive runtime guardrails on deployment delete flow with typed confirmation review
-  - structured restore preparation plan with per-section preparation modes, recommended actions, and richer import-preparation handoff/export output
-  - dedicated `deployment-workflow` workspace for rollout creation, template reuse, and live deployment review
+- Local working branch for the validated package: `codex/deploymate-staging-hardening`
+- Validated staging commit: `740be1d`
+- Staging host `deploymate`:
+  - `/opt/deploymate` branch `develop` currently points to `740be1d`
+  - remote `origin/develop` still points to `defad05`
+  - pre-cleanup dirty remote state was preserved in backup branch `codex/remote-host-backup-20260410-023502`
+- Latest validated package now includes:
+  - member/admin runtime ownership isolation
+  - shared auth throttling, explicit bootstrap admin password, strict SSH trust with persistent known_hosts
+  - production env audit and production contract gate
+  - remote release smoke that can run on the deploy host and can pin host resolution explicitly
+  - successful end-to-end staging walkthrough with runtime smoke create/health/diagnostics/logs/activity/delete
+- Host-specific note:
+  - saved runtime smoke server `prod-runtime-smoke` currently points to `103.88.241.103`
+  - do not switch it back to `deploymatecloud.ru` until backend-container DNS resolution is explicitly re-verified
 
 ## Product Rule
 
