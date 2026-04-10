@@ -1227,6 +1227,165 @@ summary:focus-visible {
   right: 0;
 }
 
+.deploymentWorkflowHero {
+  margin-bottom: 18px;
+}
+
+.deploymentWorkflowHeroLayout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+}
+
+.deploymentWorkflowHeroCopy {
+  display: grid;
+  gap: 18px;
+}
+
+.deploymentWorkflowLead {
+  margin: 0;
+  color: #132238;
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+.deploymentWorkflowSubtleCopy {
+  margin: 0;
+  color: #516175;
+  line-height: 1.65;
+}
+
+.deploymentWorkflowStepStrip {
+  display: grid;
+  gap: 12px;
+}
+
+.deploymentWorkflowStepCard {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid rgba(215, 226, 236, 0.92);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.deploymentWorkflowStepCard span {
+  color: #73849a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.deploymentWorkflowStepCard strong {
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 21px;
+  letter-spacing: -0.03em;
+}
+
+.deploymentWorkflowStepCard p {
+  margin: 0;
+  color: #5f6675;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.deploymentWorkflowStepCard.isCurrent {
+  border-color: rgba(197, 166, 111, 0.74);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 242, 0.96) 0%, rgba(250, 245, 236, 0.94) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 18px 34px rgba(201, 147, 56, 0.1);
+}
+
+.deploymentWorkflowStepCard.isComplete {
+  border-color: rgba(191, 211, 204, 0.9);
+  background:
+    linear-gradient(180deg, rgba(245, 251, 248, 0.96) 0%, rgba(238, 247, 242, 0.94) 100%);
+}
+
+.deploymentWorkflowStepCard.isUpcoming {
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.deploymentWorkflowHeroRail {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.deploymentWorkflowHeroActions {
+  justify-content: flex-end;
+}
+
+.deploymentWorkflowHeroPanel {
+  gap: 10px;
+  border-color: rgba(214, 225, 235, 0.94);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.98) 0%, rgba(244, 249, 253, 0.98) 100%);
+  box-shadow: 0 20px 44px rgba(17, 24, 39, 0.07);
+}
+
+.deploymentWorkflowHeroStats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.deploymentWorkflowHeroStat {
+  padding: 12px 14px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.deploymentWorkflowHeroStat span {
+  display: block;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.deploymentWorkflowHeroStat strong {
+  display: block;
+  margin-top: 8px;
+  color: #132238;
+  font-family: var(--font-display), sans-serif;
+  font-size: 28px;
+  letter-spacing: -0.05em;
+}
+
+.deploymentWorkflowGuidePanel {
+  overflow: hidden;
+}
+
+.deploymentWorkflowPrimaryCard {
+  border-color: rgba(214, 225, 235, 0.95);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.98) 0%, rgba(244, 249, 253, 0.98) 100%);
+}
+
+.deploymentWorkflowGuideCards {
+  margin-top: 16px;
+}
+
+.deploymentWorkflowGuideAside {
+  align-content: start;
+  border-color: rgba(214, 225, 235, 0.95);
+  background:
+    linear-gradient(180deg, rgba(248, 251, 254, 0.98) 0%, rgba(241, 246, 251, 0.98) 100%);
+}
+
+.deploymentWorkflowLaneTabs {
+  margin-top: 4px;
+}
+
 .inlineHelp {
   position: relative;
   display: inline-flex;
@@ -3726,23 +3885,25 @@ button.landingButton.primaryButton:disabled {
   }
 
   .serverReviewHeroLayout,
-  .serverReviewCreateLayout {
+  .serverReviewCreateLayout,
+  .deploymentWorkflowHeroLayout {
     grid-template-columns: 1fr;
   }
 
-  .serverReviewStepStrip {
-    grid-template-columns: 1fr;
-  }
-
+  .serverReviewStepStrip,
+  .deploymentWorkflowStepStrip,
   .overviewStepStrip {
     grid-template-columns: 1fr;
   }
+
   .serverReviewHeroActions,
+  .deploymentWorkflowHeroActions,
   .serverReviewToolbarHeader {
     justify-content: stretch;
   }
 
-  .serverReviewHeroStats {
+  .serverReviewHeroStats,
+  .deploymentWorkflowHeroStats {
     grid-template-columns: 1fr;
   }
 
@@ -3873,6 +4034,10 @@ button.landingButton.primaryButton:disabled {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .deploymentWorkflowStepStrip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .workspaceHeroSummary {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -3894,6 +4059,11 @@ button.landingButton.primaryButton:disabled {
 @media (min-width: 920px) {
   .landingHeroGrid {
     grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  }
+
+  .deploymentWorkflowHeroLayout {
+    grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+    align-items: start;
   }
 
   .showcaseScoreboard {
