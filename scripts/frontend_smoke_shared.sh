@@ -17,7 +17,7 @@ FRONTEND_DIR="$(automation_frontend_dir)"
 FRONTEND_READY_PATH="$(automation_frontend_ready_path)"
 
 frontend_smoke_server_key() {
-  printf '%s\n' "port-${PORT}_dist-${DIST_DIR}_restore-${NEXT_PUBLIC_SMOKE_RESTORE_REPORT:-0}" | tr '/ :' '___'
+  printf '%s\n' "port-${PORT}_dist-${DIST_DIR}_restore-${NEXT_PUBLIC_SMOKE_RESTORE_REPORT:-0}_role-${NEXT_PUBLIC_SMOKE_USER_ROLE:-admin}" | tr '/ :' '___'
 }
 
 frontend_smoke_server_state_file() {

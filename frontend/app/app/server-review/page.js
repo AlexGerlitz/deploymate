@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { readJsonOrError } from "../../lib/admin-page-utils";
+import { smokeMode, smokeUser } from "../../lib/smoke-fixtures";
 import {
   AdminFeedbackBanners,
   AdminSurfaceQueue,
@@ -21,6 +23,11 @@ import {
   runServerReviewStarterAction,
   updateServerReviewServer,
 } from "./starter-api";
+
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const localDeploymentsEnabled =
+  process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
 
 function buildServerMeta(server, diagnostics, suggestedPorts) {
   const target = `${server.username}@${server.host}:${server.port}`;
@@ -133,6 +140,9 @@ function InlineHelp({ id, label, text, testId, isOpen, onToggle }) {
 function ServerReviewPageContent() {
   const router = useRouter();
 
+  const [authChecked, setAuthChecked] = useState(smokeMode);
+  const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
+  const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("Start here: save one server target, then run one check.");
   const [servers, setServers] = useState([]);
@@ -172,6 +182,13 @@ function ServerReviewPageContent() {
     }),
     [serverDiagnostics, serverSuggestedPorts, serverTestResults],
   );
+  const canAccessServers = Boolean(currentUser?.is_admin);
+  const blockedLead = localDeploymentsEnabled
+    ? "Saved server targets stay with admins. Your next step is choosing what to run in Deployment Workflow."
+    : "Step 1 is admin-only in this remote-only workspace. Ask an admin to save and confirm one server target first.";
+  const blockedSupport = localDeploymentsEnabled
+    ? "This page should not distract you with server-edit controls you cannot use."
+    : "Until an admin confirms the target, this page should not pretend you can finish server setup here.";
 
   const items = useMemo(
     () => servers.map((server) => mapServerToItem(server, runtimeState)),
@@ -357,6 +374,16 @@ function ServerReviewPageContent() {
     focusServerQueue();
   }
 
+  async function fetchCurrentUser() {
+    const response = await fetch(`${apiBaseUrl}/auth/me`, {
+      cache: "no-store",
+      credentials: "include",
+    });
+    const data = await readJsonOrError(response, "Authentication failed.");
+    setCurrentUser(data);
+    return data;
+  }
+
   useEffect(() => {
     if (!selectedItem) {
       setEditForm({
@@ -378,7 +405,13 @@ function ServerReviewPageContent() {
     });
   }, [selectedItemId, selectedItem]);
 
-  async function loadServers(silent = false) {
+  async function loadServers(silent = false, user = currentUser) {
+    if (!user?.is_admin) {
+      setServers([]);
+      setLoading(false);
+      return;
+    }
+
     if (!silent) {
       setLoading(true);
       setError("");
@@ -615,8 +648,39 @@ function ServerReviewPageContent() {
   }
 
   useEffect(() => {
-    loadServers();
-  }, []);
+    if (smokeMode) {
+      return;
+    }
+
+    async function checkAuthAndLoad() {
+      try {
+        const user = await fetchCurrentUser();
+        setAuthChecked(true);
+        setAuthFallbackVisible(false);
+        if (user?.is_admin) {
+          await loadServers(false, user);
+        }
+      } catch {
+        router.replace("/login");
+      }
+    }
+
+    checkAuthAndLoad();
+  }, [router]);
+
+  useEffect(() => {
+    if (smokeMode || authChecked) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setAuthFallbackVisible(true);
+    }, 3500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [authChecked]);
 
   useEffect(() => {
     function handlePointerDown(event) {
@@ -640,6 +704,83 @@ function ServerReviewPageContent() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  if (!authChecked) {
+    return (
+      <main className="page">
+        <div className="container">
+          {authFallbackVisible ? (
+            <div className="card formCard">
+              <h1>Checking authentication</h1>
+              <div className="banner subtle">
+                This page usually redirects into the authenticated workspace automatically. If that
+                bootstrap flow stalls, use the direct entry points below.
+              </div>
+              <div className="formActions">
+                <Link href="/login" className="linkButton">
+                  Open login
+                </Link>
+                <Link href="/register" className="linkButton">
+                  Create trial account
+                </Link>
+                <Link href="/" className="linkButton">
+                  Back to homepage
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="empty">Checking authentication...</div>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  if (!canAccessServers) {
+    return (
+      <main className="workspaceShell serverReviewPage">
+        <article className="card formCard workspaceGuidePanel" data-testid="server-review-blocked-card">
+          <div className="workspaceGlanceHeader">
+            <span className="eyebrow">Server setup stays with admins</span>
+            <strong data-testid="server-review-blocked-title">Ask an admin to finish Step 1</strong>
+          </div>
+          <p className="serverReviewLead">{blockedLead}</p>
+          <p className="formHint">{blockedSupport}</p>
+          <div className="banner subtle" data-testid="server-review-blocked-banner">
+            {localDeploymentsEnabled
+              ? "The real next step for you is Deployment Workflow, not saved server management."
+              : "The real next step is waiting for one admin-managed target, then returning to Deployment Workflow."}
+          </div>
+          <div className="serverReviewMiniSteps">
+            <div className="serverReviewMiniStep">
+              <strong>1. Ask an admin</strong>
+              <p>One saved server target has to be confirmed before this path opens for remote rollout.</p>
+            </div>
+            <div className="serverReviewMiniStep">
+              <strong>2. Return to Step 2</strong>
+              <p>Once the target is ready, use Deployment Workflow to choose what app should run.</p>
+            </div>
+            <div className="serverReviewMiniStep">
+              <strong>3. Keep the next click obvious</strong>
+              <p>Do not stay on a blocked page when the real next move lives somewhere else.</p>
+            </div>
+          </div>
+          <div className="formActions">
+            <Link href="/app" className="linkButton" data-testid="server-review-blocked-overview-link">
+              Back to overview
+            </Link>
+            <Link
+              href="/app/deployment-workflow"
+              className="landingButton primaryButton"
+              data-testid="server-review-blocked-workflow-link"
+            >
+              Open deployment workflow
+            </Link>
+          </div>
+        </article>
+      </main>
+    );
+  }
 
   return (
     <main className="workspaceShell serverReviewPage">

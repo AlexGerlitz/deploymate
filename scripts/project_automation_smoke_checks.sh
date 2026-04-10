@@ -10,7 +10,7 @@ automation_smoke_auth_checks() {
 /login|login username input|data-testid="auth-login-username-input"
 /login|login password input|data-testid="auth-login-password-input"
 /login|login submit button|data-testid="auth-login-submit-button"
-/login|login help banner|data-testid="auth-login-help-banner"
+/login|login signup or helper path|data-testid="auth-login-signup-banner"|data-testid="auth-demo-submit-button"|Quiet login, then straight into the product\.
 /register|register card|data-testid="auth-register-card"
 /register|register title|data-testid="auth-register-title"
 /register|register username input or disabled banner|data-testid="auth-register-username-input"|data-testid="auth-register-disabled-banner"
@@ -338,6 +338,17 @@ automation_smoke_servers_checks() {
 /app/server-review|server review create submit button|data-testid="server-review-create-submit"
 /app/server-review|server review search input|data-testid="server-review-search"
 /app/server-review|server review segment filter|data-testid="server-review-segment-filter"
+EOF
+}
+
+automation_smoke_servers_member_checks() {
+  cat <<'EOF'
+/app/server-review|server review blocked card|data-testid="server-review-blocked-card"
+/app/server-review|server review blocked title|data-testid="server-review-blocked-title"
+/app/server-review|server review blocked banner|data-testid="server-review-blocked-banner"
+/app/server-review|server review blocked overview link|data-testid="server-review-blocked-overview-link"
+/app/server-review|server review blocked workflow link|data-testid="server-review-blocked-workflow-link"
+/app/server-review|server review blocked copy|Ask an admin to finish Step 1
 EOF
 }
 

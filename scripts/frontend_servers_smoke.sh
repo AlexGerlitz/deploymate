@@ -6,6 +6,9 @@ PORT="${FRONTEND_SMOKE_PORT:-3001}"
 BASE_URL="http://127.0.0.1:${PORT}"
 SERVER_LOG="${FRONTEND_SMOKE_LOG:-/tmp/deploymate-frontend-servers-smoke.log}"
 DIST_DIR="${FRONTEND_SMOKE_DIST_DIR:-.next-smoke-${PORT}}"
+MEMBER_PORT="${FRONTEND_SMOKE_MEMBER_PORT:-3002}"
+MEMBER_LOG="${FRONTEND_SMOKE_MEMBER_LOG:-/tmp/deploymate-frontend-servers-member-smoke.log}"
+MEMBER_DIST_DIR="${FRONTEND_SMOKE_MEMBER_DIST_DIR:-.next-smoke-member-${MEMBER_PORT}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
@@ -26,6 +29,42 @@ fi
 wait_for_frontend_smoke_url "/app"
 frontend_smoke_assert_checks "frontend-servers-smoke" "$BASE_URL" automation_smoke_servers_checks
 
+(
+  set -euo pipefail
+  source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+  source "${SCRIPT_DIR}/lib/frontend_smoke_checks.sh"
+
+  export PORT="$MEMBER_PORT"
+  export BASE_URL="http://127.0.0.1:${PORT}"
+  export SERVER_LOG="$MEMBER_LOG"
+  export DIST_DIR="$MEMBER_DIST_DIR"
+  export FRONTEND_SMOKE_PORT="$MEMBER_PORT"
+  export FRONTEND_SMOKE_LOG="$MEMBER_LOG"
+  export FRONTEND_SMOKE_DIST_DIR="$MEMBER_DIST_DIR"
+  export FRONTEND_SMOKE_REUSE_SERVER=0
+  export NEXT_PUBLIC_SMOKE_USER_ROLE=member
+
+  cleanup_member() {
+    stop_frontend_smoke_server
+  }
+
+  trap cleanup_member EXIT
+
+  start_frontend_smoke_server
+  wait_for_frontend_smoke_url "/app"
+  frontend_smoke_assert_checks "frontend-servers-member-smoke" "$BASE_URL" automation_smoke_servers_member_checks
+
+  member_html="$(mktemp)"
+  curl -sS "${BASE_URL}/app/server-review" > "$member_html"
+  if grep -Eq 'data-testid="server-review-create-card"|data-testid="server-review-create-server"|data-testid="server-review-page-title"' "$member_html"; then
+    echo "[frontend-servers-member-smoke] member path leaked admin server-review controls" >&2
+    rm -f "$member_html"
+    exit 1
+  fi
+  rm -f "$member_html"
+)
+
 echo "[frontend-servers-smoke] server management surface rendered"
 echo "[frontend-servers-smoke] diagnostics surface rendered"
+echo "[frontend-servers-smoke] member blocked surface rendered"
 echo "[frontend-servers-smoke] complete"
