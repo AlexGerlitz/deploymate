@@ -1,20 +1,38 @@
 export const smokeMode = process.env.NEXT_PUBLIC_SMOKE_TEST_MODE === "1";
+const smokeUserRole = process.env.NEXT_PUBLIC_SMOKE_USER_ROLE === "member" ? "member" : "admin";
 
-export const smokeUser = {
-  id: "smoke-admin",
-  username: "smoke-admin",
-  is_admin: true,
-  role: "admin",
-  plan: "team",
-  limits: {
-    max_servers: 10,
-    max_deployments: 100,
-  },
-  usage: {
-    servers: 1,
-    deployments: 1,
-  },
-};
+export const smokeUser =
+  smokeUserRole === "member"
+    ? {
+        id: "smoke-member",
+        username: "smoke-member",
+        is_admin: false,
+        role: "member",
+        plan: "trial",
+        limits: {
+          max_servers: 1,
+          max_deployments: 3,
+        },
+        usage: {
+          servers: 0,
+          deployments: 0,
+        },
+      }
+    : {
+        id: "smoke-admin",
+        username: "smoke-admin",
+        is_admin: true,
+        role: "admin",
+        plan: "team",
+        limits: {
+          max_servers: 10,
+          max_deployments: 100,
+        },
+        usage: {
+          servers: 1,
+          deployments: 1,
+        },
+      };
 
 export const smokeOverviewDeployments = [];
 
@@ -27,9 +45,9 @@ export const smokeOverviewTemplates = [];
 export const smokeOverviewOpsOverview = {
   generated_at: "2026-04-07T00:02:00Z",
   user: {
-    username: "smoke-admin",
-    plan: "team",
-    role: "admin",
+    username: smokeUser.username,
+    plan: smokeUser.plan,
+    role: smokeUser.role,
   },
   deployments: {
     total: 0,
