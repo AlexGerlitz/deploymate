@@ -104,6 +104,18 @@ export default async function LoginPage({ searchParams }) {
 
             {error ? <div className="banner error" data-testid="auth-login-error-banner">{error}</div> : null}
 
+            <div className="banner subtle authBanner" data-testid="auth-login-help-banner">
+              {publicSignupEnabled ? (
+                <>
+                  Use your workspace username and password, or start with a trial account below if you are new here.
+                </>
+              ) : (
+                <>
+                  Use the username and password your admin gave you to open the workspace.
+                </>
+              )}
+            </div>
+
             {publicSignupEnabled ? (
               <div className="banner subtle authBanner" data-testid="auth-login-signup-banner">
                 Need a trial account?{" "}
