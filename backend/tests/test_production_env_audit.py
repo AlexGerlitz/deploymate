@@ -168,6 +168,37 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=1", result.stderr)
 
+    def test_remote_release_dry_run_forwards_smoke_curl_resolve(self):
+        env = os.environ.copy()
+        env["DEPLOYMATE_SMOKE_CURL_RESOLVE"] = "deploymatecloud.ru:443:103.88.241.103"
+
+        result = subprocess.run(
+            [
+                "bash",
+                "scripts/remote_release.sh",
+                "--host",
+                "deploymate",
+                "--base-url",
+                "https://deploymatecloud.ru",
+                "--admin-username",
+                "admin",
+                "--admin-password",
+                "super-secret-admin-password",
+                "--dry-run",
+            ],
+            cwd=self.repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "DEPLOYMATE_SMOKE_CURL_RESOLVE=deploymatecloud.ru:443:103.88.241.103",
+            result.stdout,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

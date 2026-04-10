@@ -39,6 +39,8 @@ Options:
 Environment passthrough:
   Any DEPLOYMATE_SMOKE_* variables already set in the shell are forwarded to
   scripts/post_deploy_smoke.sh. Use that for optional runtime smoke inputs.
+  Set DEPLOYMATE_SMOKE_CURL_RESOLVE=host:443:ip when the smoke runner cannot
+  resolve the public hostname directly.
 
 Examples:
   bash scripts/remote_release.sh \
@@ -216,6 +218,7 @@ run_cmd env \
   DEPLOYMATE_SMOKE_EXTERNAL_PORT="${DEPLOYMATE_SMOKE_EXTERNAL_PORT:-}" \
   DEPLOYMATE_SMOKE_START_PORT="${DEPLOYMATE_SMOKE_START_PORT:-}" \
   DEPLOYMATE_SMOKE_HEALTH_TIMEOUT="${DEPLOYMATE_SMOKE_HEALTH_TIMEOUT:-}" \
+  DEPLOYMATE_SMOKE_CURL_RESOLVE="${DEPLOYMATE_SMOKE_CURL_RESOLVE:-}" \
   bash scripts/post_deploy_smoke.sh
 
 echo "[remote-release] deploy and smoke passed"

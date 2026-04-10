@@ -5,6 +5,7 @@ set -euo pipefail
 BASE_URL="${DEPLOYMATE_BASE_URL:-}"
 USERNAME="${DEPLOYMATE_ADMIN_USERNAME:-}"
 PASSWORD="${DEPLOYMATE_ADMIN_PASSWORD:-}"
+SMOKE_CURL_RESOLVE="${DEPLOYMATE_SMOKE_CURL_RESOLVE:-}"
 RUNTIME_ENABLED="${DEPLOYMATE_SMOKE_RUNTIME_ENABLED:-0}"
 RUNTIME_SERVER_ID="${DEPLOYMATE_SMOKE_SERVER_ID:-}"
 RUNTIME_TEMP_SERVER_ID=""
@@ -37,14 +38,23 @@ RUNTIME_PORTS_BODY_FILE="$(mktemp)"
 RUNTIME_SERVER_CREATE_BODY_FILE="$(mktemp)"
 RUNTIME_SERVER_DELETE_BODY_FILE="$(mktemp)"
 
+CURL_ARGS=()
+if [ -n "$SMOKE_CURL_RESOLVE" ]; then
+  CURL_ARGS+=(--resolve "$SMOKE_CURL_RESOLVE")
+fi
+
+curl_smoke() {
+  curl "${CURL_ARGS[@]}" "$@"
+}
+
 cleanup() {
   if [ -n "$RUNTIME_DEPLOYMENT_ID" ] && [ -s "$COOKIE_JAR" ]; then
-    curl -sS -o "$RUNTIME_DELETE_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_DELETE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       -X DELETE "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID" >/dev/null || true
   fi
   if [ -n "$RUNTIME_TEMP_SERVER_ID" ] && [ -s "$COOKIE_JAR" ]; then
-    curl -sS -o "$RUNTIME_SERVER_DELETE_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_SERVER_DELETE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       -X DELETE "$BASE_URL/api/servers/$RUNTIME_TEMP_SERVER_ID" >/dev/null || true
   fi
@@ -83,7 +93,7 @@ check_http_ok() {
   local url="$2"
 
   local status_code
-  status_code="$(curl -sS -o /dev/null -w "%{http_code}" "$url")"
+  status_code="$(curl_smoke -sS -o /dev/null -w "%{http_code}" "$url")"
   if [ "$status_code" != "200" ]; then
     echo "[smoke] $label failed with HTTP $status_code: $url" >&2
     exit 1
@@ -98,7 +108,7 @@ check_http_redirect_to_login() {
   local headers_file
   headers_file="$(mktemp)"
   local status_code
-  status_code="$(curl -sS -D "$headers_file" -o /dev/null -w "%{http_code}" "$url")"
+  status_code="$(curl_smoke -sS -D "$headers_file" -o /dev/null -w "%{http_code}" "$url")"
   local location
   location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/, "", $2); print $2}' "$headers_file" | tail -n 1)"
   rm -f "$headers_file"
@@ -213,7 +223,7 @@ PY
 
   local create_status
   create_status="$(
-    curl -sS -o "$RUNTIME_SERVER_CREATE_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_SERVER_CREATE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       -H "Content-Type: application/json" \
       -X POST "$BASE_URL/api/servers" \
@@ -245,7 +255,7 @@ resolve_runtime_external_port() {
 
   local ports_status
   ports_status="$(
-    curl -sS -o "$RUNTIME_PORTS_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_PORTS_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       "$BASE_URL/api/servers/$RUNTIME_SERVER_ID/suggested-ports?limit=1&start_port=$RUNTIME_START_PORT"
   )"
@@ -298,7 +308,7 @@ PY
 
   local create_status
   create_status="$(
-    curl -sS -o "$RUNTIME_CREATE_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_CREATE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       -H "Content-Type: application/json" \
       -X POST "$BASE_URL/api/deployments" \
@@ -319,7 +329,7 @@ PY
   while [ "$SECONDS" -lt "$deadline" ]; do
     local health_status
     health_status="$(
-      curl -sS -o "$RUNTIME_HEALTH_BODY_FILE" -w "%{http_code}" \
+      curl_smoke -sS -o "$RUNTIME_HEALTH_BODY_FILE" -w "%{http_code}" \
         -b "$COOKIE_JAR" \
         "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID/health"
     )"
@@ -342,7 +352,7 @@ PY
 
   local diagnostics_status
   diagnostics_status="$(
-    curl -sS -o "$RUNTIME_DIAGNOSTICS_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_DIAGNOSTICS_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID/diagnostics"
   )"
@@ -356,7 +366,7 @@ PY
 
   local logs_status
   logs_status="$(
-    curl -sS -o "$RUNTIME_LOGS_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_LOGS_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID/logs"
   )"
@@ -370,7 +380,7 @@ PY
 
   local activity_status
   activity_status="$(
-    curl -sS -o "$RUNTIME_ACTIVITY_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_ACTIVITY_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID/activity"
   )"
@@ -384,7 +394,7 @@ PY
 
   local delete_status
   delete_status="$(
-    curl -sS -o "$RUNTIME_DELETE_BODY_FILE" -w "%{http_code}" \
+    curl_smoke -sS -o "$RUNTIME_DELETE_BODY_FILE" -w "%{http_code}" \
       -b "$COOKIE_JAR" \
       -X DELETE "$BASE_URL/api/deployments/$RUNTIME_DEPLOYMENT_ID"
   )"
@@ -403,11 +413,14 @@ require_env "DEPLOYMATE_ADMIN_USERNAME" "$USERNAME"
 require_env "DEPLOYMATE_ADMIN_PASSWORD" "$PASSWORD"
 
 echo "[smoke] base url: $BASE_URL"
+if [ -n "$SMOKE_CURL_RESOLVE" ]; then
+  echo "[smoke] curl resolve: $SMOKE_CURL_RESOLVE"
+fi
 
 check_http_ok "login page" "$BASE_URL/login"
 check_http_redirect_to_login "app shell redirect" "$BASE_URL/app"
 
-health_body="$(curl -sS --fail-with-body "$BASE_URL/api/health")"
+health_body="$(curl_smoke -sS --fail-with-body "$BASE_URL/api/health")"
 health_status="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$health_body")"
 if [ "$health_status" != "healthy" ]; then
   echo "[smoke] backend health is not healthy: $health_body" >&2
@@ -416,7 +429,7 @@ fi
 echo "[smoke] backend health ok"
 
 login_status="$(
-  curl -sS -o "$LOGIN_BODY_FILE" -w "%{http_code}" \
+  curl_smoke -sS -o "$LOGIN_BODY_FILE" -w "%{http_code}" \
     -c "$COOKIE_JAR" \
     -H "Content-Type: application/json" \
     -X POST "$BASE_URL/api/auth/login" \
@@ -437,7 +450,7 @@ fi
 echo "[smoke] login ok"
 
 me_status="$(
-  curl -sS -o "$ME_BODY_FILE" -w "%{http_code}" \
+  curl_smoke -sS -o "$ME_BODY_FILE" -w "%{http_code}" \
     -b "$COOKIE_JAR" \
     "$BASE_URL/api/auth/me"
 )"
@@ -456,7 +469,7 @@ fi
 echo "[smoke] auth/me ok"
 
 backup_bundle_status="$(
-  curl -sS -o "$BACKUP_BUNDLE_BODY_FILE" -w "%{http_code}" \
+  curl_smoke -sS -o "$BACKUP_BUNDLE_BODY_FILE" -w "%{http_code}" \
     -b "$COOKIE_JAR" \
     "$BASE_URL/api/admin/backup-bundle"
 )"
@@ -485,7 +498,7 @@ print(json.dumps({"bundle": bundle}, ensure_ascii=True))
 PY
 
 dry_run_status="$(
-  curl -sS -o "$ME_AFTER_LOGOUT_BODY_FILE" -w "%{http_code}" \
+  curl_smoke -sS -o "$ME_AFTER_LOGOUT_BODY_FILE" -w "%{http_code}" \
     -b "$COOKIE_JAR" \
     -H "Content-Type: application/json" \
     -X POST "$BASE_URL/api/admin/restore/dry-run" \
@@ -513,7 +526,7 @@ else
 fi
 
 logout_status="$(
-  curl -sS -o "$LOGOUT_BODY_FILE" -w "%{http_code}" \
+  curl_smoke -sS -o "$LOGOUT_BODY_FILE" -w "%{http_code}" \
     -b "$COOKIE_JAR" \
     -c "$COOKIE_JAR" \
     -X POST "$BASE_URL/api/auth/logout"
@@ -527,7 +540,7 @@ fi
 echo "[smoke] logout ok"
 
 me_after_logout_status="$(
-  curl -sS -o "$ME_AFTER_LOGOUT_BODY_FILE" -w "%{http_code}" \
+  curl_smoke -sS -o "$ME_AFTER_LOGOUT_BODY_FILE" -w "%{http_code}" \
     -b "$COOKIE_JAR" \
     "$BASE_URL/api/auth/me"
 )"
