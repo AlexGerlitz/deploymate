@@ -147,6 +147,7 @@ run_frontend_smokes_shared() {
   shift 3
   local smoke_targets=("$@")
   local smoke_target=""
+  local shared_member_port=$((shared_port + 1))
 
   source scripts/frontend_smoke_shared.sh
 
@@ -158,6 +159,7 @@ run_frontend_smokes_shared() {
   export FRONTEND_SMOKE_PORT="$shared_port"
   export FRONTEND_SMOKE_LOG="$shared_log"
   export FRONTEND_SMOKE_DIST_DIR="$shared_dist"
+  export FRONTEND_SMOKE_MEMBER_PORT="$shared_member_port"
   export FRONTEND_SMOKE_REUSE_SERVER=1
 
   start_frontend_smoke_server
@@ -296,12 +298,15 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
   fi
 
   if [ "$FAST_MODE" != "1" ]; then
-    run_frontend_smokes_shared 3001 "/tmp/deploymate-frontend-full-smoke.log" ".next-smoke-full-3001" \
+    shared_full_port=3010
+    shared_restore_port=3012
+
+    run_frontend_smokes_shared "$shared_full_port" "/tmp/deploymate-frontend-full-smoke.log" ".next-smoke-full-${shared_full_port}" \
       auth ops runtime admin admin-interactions servers templates
 
-    FRONTEND_SMOKE_PORT=3002 \
+    FRONTEND_SMOKE_PORT="$shared_restore_port" \
     FRONTEND_SMOKE_LOG="/tmp/deploymate-frontend-restore-shared.log" \
-    FRONTEND_SMOKE_DIST_DIR=".next-smoke-restore-3002" \
+    FRONTEND_SMOKE_DIST_DIR=".next-smoke-restore-${shared_restore_port}" \
     FRONTEND_SMOKE_REUSE_SERVER=0 \
     NEXT_PUBLIC_SMOKE_RESTORE_REPORT=1 \
       bash scripts/frontend_restore_smoke.sh
