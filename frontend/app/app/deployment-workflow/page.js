@@ -506,6 +506,13 @@ function DeploymentWorkflowPageContent() {
   ]);
 
   useEffect(() => {
+    if (serverAccessBlocked) {
+      if (filteredDeployments.length > 0 && workflowTab !== "live") {
+        setWorkflowTab("live");
+      }
+      return;
+    }
+
     if (workflowState.mode === "live") {
       setWorkflowTab("live");
       return;
@@ -514,7 +521,7 @@ function DeploymentWorkflowPageContent() {
     if (workflowState.mode === "prerequisite" && workflowTab === "live") {
       setWorkflowTab("create");
     }
-  }, [workflowState.mode, workflowTab]);
+  }, [filteredDeployments.length, serverAccessBlocked, workflowState.mode, workflowTab]);
 
   useEffect(() => {
     if (requestedTemplateSource !== "deployment-detail") {
@@ -1401,7 +1408,7 @@ function DeploymentWorkflowPageContent() {
               <div>
                 <h2>Server target is admin-managed</h2>
                 <p className="formHint">
-                  Members cannot access saved server inventory here. Ask an admin to confirm the remote target, then come back to create or review the rollout.
+                  Members cannot access saved server inventory here. Ask an admin to confirm the remote target first, then come back when Step 2 is actually open.
                 </p>
               </div>
             </div>
@@ -1412,9 +1419,9 @@ function DeploymentWorkflowPageContent() {
                 <p>Saved server targets stay with admins for this workspace.</p>
               </article>
               <article className="workspaceReviewerCard">
-                <span>2. Keep working</span>
-                <strong>Use the deployment workflow</strong>
-                <p>You can still review templates and plan the rollout while the target is being confirmed.</p>
+                <span>2. Keep the path clear</span>
+                <strong>Do not fill a blocked form early</strong>
+                <p>Until Step 1 is done, this page should stay simple instead of pretending rollout setup is already available.</p>
               </article>
               <article className="workspaceReviewerCard">
                 <span>3. Return here</span>
@@ -1426,9 +1433,15 @@ function DeploymentWorkflowPageContent() {
               <Link href="/app" className="landingButton primaryButton">
                 Back to overview
               </Link>
-              <Link href="/app/deployment-workflow" className="landingButton secondaryButton">
-                Stay in workflow
-              </Link>
+              {filteredDeployments.length > 0 ? (
+                <button
+                  type="button"
+                  className="landingButton secondaryButton"
+                  onClick={() => setWorkflowTab("live")}
+                >
+                  Open live deployments
+                </button>
+              ) : null}
             </div>
           </article>
         ) : null}
