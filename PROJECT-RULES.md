@@ -188,7 +188,31 @@ For normal product work, the default order is:
 3. implement the narrowest complete fix
 4. run the verification that matches the slice
 5. update handoff or rules if the project reality changed
-6. commit and push when the checkpoint is meaningful
+6. re-check the finished slice against these project rules before closing the checkpoint
+7. choose the next recommended slice deliberately, based on strategy and the current checkpoint
+8. commit and push when the checkpoint is meaningful
+
+## Checkpoint Review Rule
+
+Every checkpoint closeout must include a deliberate rules review.
+
+Before a checkpoint is considered closed:
+
+- verify that the slice still fits the main product story
+- verify that the slice did not accidentally widen scope
+- verify that the right verification actually ran
+- verify that docs and handoff still match reality if the slice changed project understanding
+- verify that `DeployMate` and `Web Terminal` did not get mixed casually
+
+Every checkpoint closeout must also include a deliberate next-step decision.
+
+The next step must not be a vague continuation.
+It must be:
+
+- one concrete recommended slice
+- clearly connected to the current strategy
+- justified in one or two sentences
+- small enough to finish as a real checkpoint
 
 ## Release Cadence
 
@@ -210,6 +234,8 @@ A slice is done only if:
 - the right verification was actually run
 - docs still describe reality
 - the checkpoint is understandable by someone reopening the project later
+- the checkpoint was explicitly re-checked against the project rules before closing
+- the next recommended slice was chosen deliberately, not as filler
 
 ## Hard Anti-Patterns
 
