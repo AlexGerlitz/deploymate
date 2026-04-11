@@ -99,6 +99,31 @@ run_beginner_admin_smoke() {
     start_frontend_smoke_server
     wait_for_frontend_smoke_url "/app"
     frontend_smoke_assert_checks "frontend-beginner-admin-smoke" "$BASE_URL" automation_smoke_beginner_admin_checks
+
+    overview_html="$(mktemp)"
+    curl -sS "${BASE_URL}/app" > "$overview_html"
+    python3 - "$overview_html" <<'PY'
+import sys
+from pathlib import Path
+
+html = Path(sys.argv[1]).read_text(encoding="utf-8")
+required_order = [
+    'data-testid="workspace-product-hero"',
+    'data-testid="workspace-primary-task-card"',
+    'data-testid="workspace-scenario-card"',
+    'data-testid="ops-overview-disclosure"',
+]
+positions = []
+for marker in required_order:
+    index = html.find(marker)
+    if index == -1:
+        raise SystemExit(f"missing marker: {marker}")
+    positions.append(index)
+
+if positions != sorted(positions):
+    raise SystemExit("overview primary product blocks no longer render before operations depth")
+PY
+    rm -f "$overview_html"
   )
 }
 

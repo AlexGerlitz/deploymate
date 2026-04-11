@@ -120,6 +120,8 @@ EOF
 automation_smoke_beginner_admin_checks() {
   cat <<'EOF'
 /app|beginner overview title|data-testid="runtime-page-title"
+/app|beginner overview product hero|data-testid="workspace-product-hero"
+/app|beginner overview signal strip|data-testid="workspace-product-signals"
 /app|beginner overview guide title|data-testid="workspace-scenario-title"
 /app|beginner overview primary hero action|data-testid="workspace-hero-primary-action"
 /app|beginner overview primary task card|data-testid="workspace-primary-task-card"
@@ -127,7 +129,7 @@ automation_smoke_beginner_admin_checks() {
 /app|beginner overview step 1 action|data-testid="workspace-scenario-action-step-1"
 /app|beginner overview step 2 blocked|(<button[^>]*data-testid="workspace-scenario-action-step-2"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-2")
 /app|beginner overview step 3 blocked|(<button[^>]*data-testid="workspace-scenario-action-step-3"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-3")
-/app|beginner overview ordering copy|Do this now, then keep going in order
+/app|beginner overview path copy|One path, three steps
 /app/server-review|beginner server review title|data-testid="server-review-page-title"
 /app/server-review|beginner server review step framing|Step 1: Connect and verify one server
 /app/server-review|beginner server review create card|data-testid="server-review-create-card"

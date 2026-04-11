@@ -293,6 +293,34 @@ export default function HomePage() {
   const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
     opsSnapshot.attention_items.length === 1 ? "" : "s"
   }`;
+  const productSignalCards = [
+    {
+      label: "Server",
+      value: canAccessServers
+        ? servers.length === 0
+          ? "Not connected"
+          : "Ready"
+        : "Admin-managed",
+      detail: canAccessServers
+        ? servers.length === 0
+          ? "Step 1 is the only setup that matters right now."
+          : `${servers.length} target${servers.length === 1 ? "" : "s"} saved.`
+        : "Server details stay with admins.",
+    },
+    {
+      label: "Apps",
+      value: opsSnapshot.deployments.total === 0 ? "None yet" : `${opsSnapshot.deployments.total}`,
+      detail:
+        opsSnapshot.deployments.total === 0
+          ? "Create the first deployment before runtime review opens."
+          : `${opsSnapshot.deployments.running} running, ${opsSnapshot.deployments.failed} failed.`,
+    },
+    {
+      label: "Next action",
+      value: overviewPrimaryPath.label,
+      detail: overviewPrimaryPath.title,
+    },
+  ];
 
   async function fetchCurrentUser() {
     const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -651,185 +679,119 @@ export default function HomePage() {
   }
 
   return (
-    <main className="page">
-      <div className="container">
-        <section className="workspaceHero">
-          <div className="workspaceHeroBackdrop" />
-          <div className="header workspaceHeroHeader">
-            <div>
-              <div className="eyebrow">Begin here</div>
-              <h1 data-testid="runtime-page-title">DeployMate</h1>
-              <p>{heroHeadline}</p>
-              <p className="formHint">{heroSupportText}</p>
-              <p className="formHint">
-                Right now: <strong>{overviewPrimaryPath.title}</strong>
-              </p>
-            </div>
-            <div className="buttonRow workspaceHeroActions">
+    <main className="page workspaceProductPage">
+      <div className="container workspaceProductContainer">
+        <section className="overviewProductHero" data-testid="workspace-product-hero">
+          <div className="overviewProductHeroCopy">
+            <span className="overviewProductEyebrow">DeployMate</span>
+            <h1 data-testid="runtime-page-title">Deploy Docker apps on your own server.</h1>
+            <p className="overviewProductLead">{heroHeadline}</p>
+            <p className="overviewProductSupport">{heroSupportText}</p>
+            <div className="overviewProductActions">
               <Link
                 href={overviewPrimaryHref}
-                className="landingButton primaryButton"
+                className="landingButton primaryButton overviewProductPrimaryButton"
                 data-testid="workspace-hero-primary-action"
               >
                 {overviewPrimaryPath.label}
               </Link>
-              <button type="button" onClick={handleLogout} className="workspaceGhostAction">
+              <button type="button" onClick={handleLogout} className="overviewProductTextButton">
                 Logout
               </button>
             </div>
           </div>
 
-          <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
-            <div className="sectionHeader workspaceGuideHeader">
-              <div>
-                <h2 data-testid="workspace-scenario-title">Do this now, then keep going in order</h2>
-                <p className="formHint">
-                  If you are new here, ignore the deeper admin surfaces for now and just follow the next step.
-                </p>
-              </div>
-            </div>
-            <div className="workspaceGuideGrid" data-testid="workspace-scenario-grid">
-              <div className="workspaceGuideSteps">
-                <article className="workspaceGlancePanel workspacePriorityPanel" data-testid="workspace-primary-task-card">
-                  <div className="workspaceGlanceHeader">
-                    <span className="eyebrow">Do this now</span>
-                    <strong>{overviewPrimaryPath.title}</strong>
-                  </div>
-                  <p className="formHint">{overviewPrimaryPath.detail}</p>
-                  <div className="formActions">
-                    <Link
-                      href={overviewPrimaryHref}
-                      className="landingButton primaryButton"
-                      data-testid="workspace-primary-task-action"
-                    >
-                      {overviewPrimaryPath.label}
-                    </Link>
-                  </div>
-                </article>
-
-                <div className="stepsGrid">
-                  {beginnerSteps.map((card) => (
-                    <article
-                      key={card.key}
-                      className="stepCard workspaceStepCard"
-                      data-testid={`workspace-scenario-item-${card.key}`}
-                    >
-                      <span className="stepNumber">{card.step}</span>
-                      <h3>{card.title}</h3>
-                      <p>{card.detail}</p>
-                      {card.disabled ? (
-                        <button
-                          type="button"
-                          disabled
-                          className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
-                          data-testid={`workspace-scenario-action-${card.key}`}
-                        >
-                          {card.actionLabel}
-                        </button>
-                      ) : (
-                        <Link
-                          href={card.href}
-                          className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
-                          data-testid={`workspace-scenario-action-${card.key}`}
-                        >
-                          {card.actionLabel}
-                        </Link>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              </div>
-              <aside className="workspaceGlancePanel">
-                <div className="workspaceGlanceHeader">
-                  <span className="eyebrow">Current state</span>
-                  <strong>{beginnerStatusSummary}</strong>
-                </div>
-                <div className="workspaceGlanceList">
-                  <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Step 1</span>
-                    <strong>
-                      {canAccessServers
-                        ? servers.length === 0
-                          ? "Connect server"
-                          : "Server ready"
-                        : localDeploymentsEnabled
-                          ? "Server inventory managed"
-                          : "Server target managed"}
-                    </strong>
-                    <p>
-                      {canAccessServers
-                        ? servers.length === 0
-                          ? "Add one server target so DeployMate can reach your machine."
-                          : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved for rollout.`
-                        : localDeploymentsEnabled
-                          ? "Members can keep rolling out without touching the saved server list."
-                          : "Ask an admin to confirm the target before you create a remote deployment."}
-                    </p>
-                  </div>
-                  <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Step 2</span>
-                    <strong>
-                      {waitingForAdminTarget
-                        ? "Blocked until Step 1"
-                        : memberNewDeploymentBlocked
-                          ? "New deploy needs admin"
-                        : deployments.length === 0
-                          ? "Choose first app"
-                          : "Choose next app"}
-                    </strong>
-                    <p>
-                      {waitingForAdminTarget
-                        ? "This stays blocked until an admin confirms one saved server target for the workspace."
-                        : memberNewDeploymentBlocked
-                          ? "Existing deployments can be reviewed, but new remote deployment creation needs an admin-managed target."
-                        : "Use the deployment workflow to choose the image or saved setup you want to run."}
-                    </p>
-                  </div>
-                  <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Step 3</span>
-                    <strong>
-                      {waitingForAdminTarget
-                        ? "Opens after first deploy"
-                        : deployments.length === 0
-                          ? "Check health after deploy"
-                          : "Review live health"}
-                    </strong>
-                    <p>
-                      {waitingForAdminTarget
-                        ? "Live review starts only after the first deployment exists."
-                        : memberHasLiveDeployments
-                          ? "Open the live runtime list or deployment detail and review health without server inventory controls."
-                        : "Open the live runtime list or deployment detail and confirm the app is healthy before the next change."}
-                    </p>
-                  </div>
-                  <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Right now</span>
-                    <strong>Keep the first pass simple</strong>
-                    <p>{beginnerNextStep}</p>
-                  </div>
-                </div>
-              </aside>
-            </div>
-          </article>
+          <aside className="overviewProductNextPanel" data-testid="workspace-primary-task-card">
+            <span>Next</span>
+            <strong>{overviewPrimaryPath.title}</strong>
+            <p>{overviewPrimaryPath.detail}</p>
+            <Link
+              href={overviewPrimaryHref}
+              className="landingButton primaryButton overviewProductPrimaryButton"
+              data-testid="workspace-primary-task-action"
+            >
+              {overviewPrimaryPath.label}
+            </Link>
+          </aside>
         </section>
 
-        <article className="card formCard workspaceGuidePanel">
-          <div className="sectionHeader workspaceGuideHeader">
-            <div>
-              <h2>{explanationTitle}</h2>
-              <p className="formHint">{explanationBody}</p>
-            </div>
+        <section className="overviewProductSignals" data-testid="workspace-product-signals">
+          {productSignalCards.map((signal) => (
+            <article key={signal.label} className="overviewProductSignal">
+              <span>{signal.label}</span>
+              <strong>{signal.value}</strong>
+              <p>{signal.detail}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="overviewProductPathSection" data-testid="workspace-scenario-card">
+          <div className="overviewProductSectionHeader">
+            <span>First pass</span>
+            <h2 data-testid="workspace-scenario-title">One path, three steps</h2>
+            <p>{beginnerNextStep}</p>
           </div>
-          <div className="workspaceReviewerGrid">
+          <div className="overviewProductPath" data-testid="workspace-scenario-grid">
+            {beginnerSteps.map((card) => (
+              <article
+                key={card.key}
+                className={`overviewProductStep ${card.primary ? "isPrimary" : card.disabled ? "isLocked" : "isReady"}`}
+                data-testid={`workspace-scenario-item-${card.key}`}
+              >
+                <div className="overviewProductStepMeta">
+                  <span className="overviewProductStepNumber">{card.step}</span>
+                  <span className="overviewProductStepState">
+                    {card.primary
+                      ? "Current"
+                      : card.disabled
+                        ? card.key === "step-2" && waitingForAdminTarget
+                          ? "Blocked until Step 1"
+                          : card.actionLabel
+                        : "Ready"}
+                  </span>
+                </div>
+                <div className="overviewProductStepCopy">
+                  <h3>{card.title}</h3>
+                  <p>{card.detail}</p>
+                </div>
+                {card.disabled ? (
+                  <button
+                    type="button"
+                    disabled
+                    className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                    data-testid={`workspace-scenario-action-${card.key}`}
+                  >
+                    {card.actionLabel}
+                  </button>
+                ) : (
+                  <Link
+                    href={card.href}
+                    className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                    data-testid={`workspace-scenario-action-${card.key}`}
+                  >
+                    {card.actionLabel}
+                  </Link>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="overviewProductExplainer">
+          <div className="overviewProductSectionHeader">
+            <span>Plain language</span>
+            <h2>{explanationTitle}</h2>
+            <p>{explanationBody}</p>
+          </div>
+          <div className="overviewProductExplainerGrid">
             {plainLanguageCards.map((card) => (
-              <article key={card.title} className="workspaceReviewerCard">
-                <span>Plain language</span>
-                <strong>{card.title}</strong>
+              <article key={card.title} className="overviewProductExplainerCard">
+                <span>{card.title}</span>
                 <p>{card.detail}</p>
               </article>
             ))}
           </div>
-        </article>
+        </section>
 
         <div className="workspaceBannerStack">
           {error ? <div className="banner error">{error}</div> : null}
