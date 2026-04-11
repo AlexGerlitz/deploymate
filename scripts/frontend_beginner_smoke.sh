@@ -3,6 +3,76 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+run_beginner_export_payload_smoke() {
+  (
+    set -euo pipefail
+    cd "$REPO_ROOT"
+
+    node --experimental-default-type=module --input-type=module <<'NODE'
+import { buildAccessControlledRuntimeExportPayload } from "./frontend/app/lib/runtime-workspace-utils.js";
+import {
+  smokeActivity,
+  smokeDeployments,
+  smokeDiagnostics,
+  smokeHealth,
+} from "./frontend/app/lib/smoke-fixtures.js";
+
+const payload = buildAccessControlledRuntimeExportPayload({
+  deployment: smokeDeployments[0],
+  health: smokeHealth,
+  diagnostics: smokeDiagnostics,
+  activity: [
+    ...smokeActivity,
+    {
+      id: "server-leak-regression",
+      deployment_id: "smoke-deployment",
+      level: "warn",
+      title: "Smoke VPS target changed",
+      message: "deploy@smoke.example.com:22 uses smoke-server for diagnostics.",
+      created_at: "2026-04-02T00:04:00Z",
+      category: "diagnostics",
+    },
+  ],
+  attentionItems: [
+    {
+      key: "server-leak-regression",
+      label: "Smoke VPS",
+      status: "warn",
+      message: "deploy@smoke.example.com:22 needs review.",
+    },
+  ],
+  suggestedPorts: [38080, 38081],
+  canAccessServers: false,
+});
+
+const serialized = JSON.stringify(payload);
+const forbidden = [
+  '"server_name"',
+  '"server_host"',
+  '"server_id"',
+  "Smoke VPS",
+  "deploy@smoke.example.com:22",
+  "smoke-server",
+];
+
+for (const value of forbidden) {
+  if (serialized.includes(value)) {
+    throw new Error(`member export payload leaked ${value}`);
+  }
+}
+
+if (!serialized.includes("Managed by an admin")) {
+  throw new Error("member export payload lost the admin-managed target marker");
+}
+
+if (!Array.isArray(payload.suggestedPorts) || payload.suggestedPorts.length !== 0) {
+  throw new Error("member export payload leaked remote suggested ports");
+}
+NODE
+  )
+}
 
 run_beginner_admin_smoke() {
   (
@@ -75,12 +145,30 @@ run_beginner_member_smoke() {
       exit 1
     fi
 
+    if grep -Eq 'Ops Batch|ops-batch\.demo\.example\.com' "$workflow_html"; then
+      echo "[frontend-beginner-member-smoke] member remote-only workflow leaked admin-managed server identity" >&2
+      rm -f "$member_html" "$workflow_html"
+      exit 1
+    fi
+
     detail_html="$(mktemp)"
     failed_detail_html="$(mktemp)"
     curl -sS "${BASE_URL}/deployments/smoke-deployment" > "$detail_html"
     curl -sS "${BASE_URL}/deployments/review-worker" > "$failed_detail_html"
     if grep -Eq 'data-testid="runtime-detail-tab-change"|data-testid="runtime-detail-redeploy-review-button"|data-testid="runtime-detail-delete-review-button"|data-testid="runtime-detail-delete-confirm-button"' "$detail_html" "$failed_detail_html"; then
       echo "[frontend-beginner-member-smoke] member runtime detail leaked mutation or destructive controls" >&2
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html"
+      exit 1
+    fi
+
+    if grep -Eq 'Smoke VPS' "$detail_html"; then
+      echo "[frontend-beginner-member-smoke] member healthy runtime detail leaked admin-managed server label" >&2
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html"
+      exit 1
+    fi
+
+    if grep -Eq 'Ops Batch|ops-batch\.demo\.example\.com' "$failed_detail_html"; then
+      echo "[frontend-beginner-member-smoke] member failed runtime detail leaked admin-managed server identity" >&2
       rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html"
       exit 1
     fi
@@ -162,8 +250,10 @@ run_beginner_first_deploy_smoke() {
 run_beginner_admin_smoke
 run_beginner_member_smoke
 run_beginner_first_deploy_smoke
+run_beginner_export_payload_smoke
 
 echo "[frontend-beginner-smoke] first-time admin path rendered"
 echo "[frontend-beginner-smoke] member remote-only blocked path rendered"
 echo "[frontend-beginner-smoke] first deploy after server review rendered"
+echo "[frontend-beginner-smoke] member export payload sanitized"
 echo "[frontend-beginner-smoke] complete"

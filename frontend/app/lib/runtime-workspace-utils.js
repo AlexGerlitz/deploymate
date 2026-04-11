@@ -43,6 +43,124 @@ export function formatServerLabel(serverName, serverHost) {
   return serverName ? `${serverName} (${serverHost})` : "Local";
 }
 
+export function formatAccessibleServerLabel({
+  canAccessServers,
+  serverName,
+  serverHost,
+  serverId,
+  localLabel = "Local",
+  managedLabel = "Managed by an admin",
+}) {
+  if (canAccessServers) {
+    if (serverName) {
+      return formatServerLabel(serverName, serverHost);
+    }
+
+    if (serverId) {
+      return serverId;
+    }
+  }
+
+  return serverId ? managedLabel : localLabel;
+}
+
+function redactRuntimeInventoryText(value, sensitiveValues) {
+  if (typeof value !== "string" || sensitiveValues.length === 0) {
+    return value;
+  }
+
+  return sensitiveValues.reduce(
+    (current, sensitiveValue) => current.split(sensitiveValue).join("admin-managed target"),
+    value,
+  );
+}
+
+function redactRuntimeInventoryObject(value, sensitiveValues) {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactRuntimeInventoryObject(item, sensitiveValues));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        redactRuntimeInventoryObject(item, sensitiveValues),
+      ]),
+    );
+  }
+
+  return redactRuntimeInventoryText(value, sensitiveValues);
+}
+
+function buildRuntimeInventorySensitiveValues(deployment, diagnostics) {
+  return [
+    deployment?.server_name,
+    deployment?.server_id,
+    diagnostics?.server_target,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value))
+    .sort((left, right) => right.length - left.length);
+}
+
+function sanitizeRuntimeDeploymentForExport(deployment, sensitiveValues) {
+  if (!deployment) {
+    return null;
+  }
+
+  const { server_id: serverId, server_name: _serverName, server_host: _serverHost, ...safeDeployment } = deployment;
+  return {
+    ...redactRuntimeInventoryObject(safeDeployment, sensitiveValues),
+    target: serverId ? "Managed by an admin" : "Local",
+  };
+}
+
+function sanitizeRuntimeDiagnosticsForExport(diagnostics, deployment, sensitiveValues) {
+  if (!diagnostics) {
+    return null;
+  }
+
+  return {
+    ...redactRuntimeInventoryObject(diagnostics, sensitiveValues),
+    server_target: deployment?.server_id ? "Managed by an admin" : null,
+  };
+}
+
+export function buildAccessControlledRuntimeExportPayload({
+  deployment,
+  health,
+  diagnostics,
+  activity,
+  attentionItems,
+  suggestedPorts,
+  canAccessServers,
+}) {
+  if (canAccessServers) {
+    return {
+      deployment,
+      health,
+      diagnostics,
+      activity: Array.isArray(activity) ? activity : [],
+      attentionItems: Array.isArray(attentionItems) ? attentionItems : [],
+      suggestedPorts: Array.isArray(suggestedPorts) ? suggestedPorts : [],
+    };
+  }
+
+  const sensitiveValues = buildRuntimeInventorySensitiveValues(deployment, diagnostics);
+
+  return {
+    deployment: sanitizeRuntimeDeploymentForExport(deployment, sensitiveValues),
+    health: redactRuntimeInventoryObject(health || null, sensitiveValues),
+    diagnostics: sanitizeRuntimeDiagnosticsForExport(diagnostics, deployment, sensitiveValues),
+    activity: redactRuntimeInventoryObject(Array.isArray(activity) ? activity : [], sensitiveValues),
+    attentionItems: redactRuntimeInventoryObject(
+      Array.isArray(attentionItems) ? attentionItems : [],
+      sensitiveValues,
+    ),
+    suggestedPorts: [],
+  };
+}
+
 export function formatPortMapping(internalPort, externalPort) {
   if (!internalPort || !externalPort) {
     return "No port mapping";

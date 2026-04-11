@@ -11,6 +11,8 @@ import {
   buildReviewConfirmationPhrase,
   buildReviewIntroText,
   buildRolloutDraftSummary,
+  buildAccessControlledRuntimeExportPayload,
+  formatAccessibleServerLabel,
   formatDate,
   formatSuggestedPorts,
   normalizeDeploymentActionError,
@@ -177,11 +179,11 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
 function buildIncidentSnapshotPayload(
   deployment,
   health,
-  diagnostics,
-  activity,
-  attentionItems,
-  suggestedPorts,
-  canAccessServers,
+  exportPayload,
+  runtimeSummaryText,
+  plainLanguageSummary,
+  nextStep,
+  status,
 ) {
   if (!deployment) {
     return null;
@@ -190,29 +192,16 @@ function buildIncidentSnapshotPayload(
   return {
     generated_at: new Date().toISOString(),
     deployment_id: deployment.id,
-    status: deployment.status || "unknown",
-    next_step: buildRecommendedNextStep(deployment, health, diagnostics, attentionItems),
-    human_summary: buildPlainLanguageSummary(
-      deployment,
-      health,
-      diagnostics,
-      attentionItems,
-      activity,
-      canAccessServers,
-    ),
-    runtime_summary: buildRuntimeSummaryText(
-      deployment,
-      health,
-      diagnostics,
-      activity,
-      canAccessServers,
-    ),
-    attention_items: attentionItems,
-    suggested_ports: suggestedPorts,
-    deployment,
-    health,
-    diagnostics,
-    activity,
+    status,
+    next_step: nextStep,
+    human_summary: plainLanguageSummary,
+    runtime_summary: runtimeSummaryText,
+    attention_items: exportPayload.attentionItems,
+    suggested_ports: exportPayload.suggestedPorts,
+    deployment: exportPayload.deployment,
+    health: exportPayload.health,
+    diagnostics: exportPayload.diagnostics,
+    activity: exportPayload.activity,
   };
 }
 
@@ -693,32 +682,61 @@ export default function DeploymentDetailsPage({ params }) {
   const canAccessServers = Boolean(currentUser?.is_admin);
   const canMutateRuntime = canAccessServers || !deployment?.server_id;
   const deploymentUrl = buildDeploymentUrl(deployment);
-  const attentionItems = buildAttentionItems(deployment, health, diagnostics);
-  const runtimeSummaryText = buildRuntimeSummaryText(
+  const runtimeServerLabel = formatAccessibleServerLabel({
+    canAccessServers,
+    serverName: deployment?.server_name,
+    serverHost: deployment?.server_host,
+    serverId: deployment?.server_id,
+  });
+  const runtimeOverviewMetaText = deployment?.server_id
+    ? canAccessServers
+      ? `Server ${runtimeServerLabel}`
+      : "Target admin-managed"
+    : "Target local";
+  const rawAttentionItems = buildAttentionItems(deployment, health, diagnostics);
+  const runtimeExportPayload = buildAccessControlledRuntimeExportPayload({
     deployment,
     health,
     diagnostics,
     activity,
+    attentionItems: rawAttentionItems,
+    suggestedPorts,
+    canAccessServers,
+  });
+  const exportDiagnostics = runtimeExportPayload.diagnostics;
+  const exportActivity = runtimeExportPayload.activity;
+  const attentionItems = runtimeExportPayload.attentionItems;
+  const runtimeSummaryText = buildRuntimeSummaryText(
+    deployment,
+    health,
+    exportDiagnostics,
+    exportActivity,
     canAccessServers,
   );
   const plainLanguageSummary = buildPlainLanguageSummary(
     deployment,
     health,
-    diagnostics,
+    exportDiagnostics,
     attentionItems,
-    activity,
+    exportActivity,
     canAccessServers,
+  );
+  const recommendedNextStep = buildRecommendedNextStep(
+    deployment,
+    health,
+    exportDiagnostics,
+    attentionItems,
   );
   const incidentSnapshot = buildIncidentSnapshotPayload(
     deployment,
     health,
-    diagnostics,
-    activity,
-    attentionItems,
-    suggestedPorts,
-    canAccessServers,
+    runtimeExportPayload,
+    runtimeSummaryText,
+    plainLanguageSummary,
+    recommendedNextStep,
+    deployment?.status || "unknown",
   );
-  const filteredActivity = [...activity]
+  const filteredActivity = [...exportActivity]
     .filter((item) => {
       if (activityLevelFilter !== "all" && (item.level || "unknown") !== activityLevelFilter) {
         return false;
@@ -788,18 +806,12 @@ export default function DeploymentDetailsPage({ params }) {
       : health?.status && health.status !== "healthy"
         ? `Health is currently ${health.status}.`
         : "Runtime surface is stable enough for review.");
-  const recommendedNextStep = buildRecommendedNextStep(
-    deployment,
-    health,
-    diagnostics,
-    attentionItems,
-  );
   const runtimeDecisionState = buildRuntimeDecisionState(
     deployment,
     health,
-    diagnostics,
+    exportDiagnostics,
     attentionItems,
-    activity,
+    exportActivity,
     { canMutateRuntime },
   );
   const runtimeHeroLead = deployment
@@ -1653,7 +1665,7 @@ export default function DeploymentDetailsPage({ params }) {
                 <strong className="overviewValue">{deployment.container_name || "Container pending"}</strong>
                 <div className="overviewMeta">
                   <span>Status {deployment.status || "unknown"}</span>
-                  <span>Server {deployment.server_name || "Local"}</span>
+                  <span>{runtimeOverviewMetaText}</span>
                 </div>
               </div>
               <div className="overviewCard" data-testid="runtime-detail-health-overview-card">
@@ -2165,13 +2177,7 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
               <div className="row">
                 <span className="label">Server</span>
-                <span>
-                  {canAccessServers && deployment.server_name
-                    ? `${deployment.server_name} (${deployment.server_host})`
-                    : deployment.server_id
-                      ? "Managed by an admin"
-                      : "Local"}
-                </span>
+                <span>{runtimeServerLabel}</span>
               </div>
               <div className="row">
                 <span className="label">Created</span>

@@ -21,6 +21,7 @@ import {
   buildEnvIssues,
   buildRolloutDraftSummary,
   buildTemplateDiff,
+  formatAccessibleServerLabel,
   formatDate,
   formatPortMapping,
   formatServerLabel,
@@ -256,6 +257,16 @@ function DeploymentWorkflowPageContent() {
       : workflowPrimaryMode === "live"
         ? "Because something already needs review, start by checking the live queue before you create another deployment."
         : "Keep Step 2 simple: choose an app image or a saved setup first, then open advanced fields only if the rollout really needs them.";
+  const primaryRuntimeTargetLabel = primaryRuntimeDeployment
+    ? formatAccessibleServerLabel({
+        canAccessServers,
+        serverName: primaryRuntimeDeployment.server_name,
+        serverHost: primaryRuntimeDeployment.server_host,
+        serverId: primaryRuntimeDeployment.server_id,
+        localLabel: "Local target",
+        managedLabel: "Admin-managed target",
+      })
+    : "";
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -1648,11 +1659,7 @@ function DeploymentWorkflowPageContent() {
                 <div>
                   <span className="deploymentCardEyebrow">Focus deployment</span>
                   <h3>{primaryRuntimeDeployment.container_name || primaryRuntimeDeployment.image || "Unnamed deployment"}</h3>
-                  <p>
-                    {primaryRuntimeDeployment.server_name
-                      ? `${primaryRuntimeDeployment.server_name} (${primaryRuntimeDeployment.server_host})`
-                      : "Local target"}
-                  </p>
+                  <p>{primaryRuntimeTargetLabel}</p>
                 </div>
                 <span className={`status ${primaryRuntimeDeployment.status || "unknown"}`}>
                   {primaryRuntimeDeployment.status || "unknown"}

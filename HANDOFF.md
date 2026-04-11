@@ -166,6 +166,16 @@ Updated: 2026-04-11
   - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
   - fix: member remote-only workflow no longer renders blocked create/templates lanes, and admin-managed runtime detail no longer renders redeploy/delete controls
   - guardrail: `smoke:beginner` now checks that member workflow/detail HTML stays free of those controls while preserving `Open running app` and `Review runtime issues`
+- The next member-safe pass closed one remaining identity leak:
+  - screen: member live queue on `/app/deployment-workflow` and member `/deployments/*` detail for admin-managed remote runtimes
+  - issue: the blocked/member-safe path still rendered admin-managed server labels like `Ops Batch` and `Smoke VPS` in review UI even after mutation controls were hidden
+  - fix: member-safe runtime review now falls back to generic admin-managed target labels instead of server inventory names/host labels
+  - guardrail: `smoke:beginner` now fails if the member workflow/detail fixtures expose those admin-managed server identities again
+- The member export/handoff pass closed the same boundary at generated-payload level:
+  - screen: member runtime detail utility/handoff layer
+  - issue: the visual UI was generic, but downloadable incident JSON/markdown and copy/export payloads could still be built from raw deployment/diagnostics/activity objects
+  - fix: member export payloads now strip server inventory fields, replace admin-managed targets with generic labels, redact matching activity/attention text, and omit remote suggested ports
+  - guardrail: `smoke:beginner` now imports the payload sanitizer directly and fails if member exports contain raw server inventory keys, server names, SSH targets, server ids, or suggested ports
 - Local frontend smoke for the beginner path passed after this slice:
   - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`
