@@ -189,6 +189,10 @@ Updated: 2026-04-11
   - member live-search no longer matches hidden admin-managed server names/hosts
   - if member has no deployments, the page still stays blocked on admin Step 1 and keeps create/templates/live cards out of the HTML
   - guardrail: `smoke:beginner` now checks both the live-review member path and the waiting-for-admin member path
+- The member overview now follows the same split:
+  - if member already has deployments, `/app` makes live review the main path and keeps new remote deployment gated behind admin target control
+  - the smoke fixture for that path uses redacted admin-managed deployments so the overview does not reintroduce server identity leaks
+  - guardrail: `smoke:beginner` now checks the member overview live-review path separately from the waiting path
 - Local frontend smoke for the beginner path passed after this slice:
   - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`
@@ -998,6 +1002,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `git diff --check` после shared reviewer-facing rollout copy layer -> ok
 - `npm --prefix frontend run build` после member live/waiting deployment workflow split -> ok
 - `npm --prefix frontend run smoke:beginner` после member live/waiting deployment workflow split -> ok
+- `npm --prefix frontend run build` после member overview live-review split -> ok
+- `npm --prefix frontend run smoke:beginner` после member overview live-review split -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

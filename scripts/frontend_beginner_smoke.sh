@@ -228,6 +228,63 @@ run_beginner_member_smoke() {
   )
 }
 
+run_beginner_member_overview_live_smoke() {
+  (
+    set -euo pipefail
+    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+
+    export PORT="${FRONTEND_SMOKE_BEGINNER_MEMBER_OVERVIEW_LIVE_PORT:-3009}"
+    export BASE_URL="http://127.0.0.1:${PORT}"
+    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_MEMBER_OVERVIEW_LIVE_LOG:-/tmp/deploymate-frontend-beginner-member-overview-live-smoke.log}"
+    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_MEMBER_OVERVIEW_LIVE_DIST_DIR:-.next-smoke-beginner-member-overview-live-${PORT}}"
+    export FRONTEND_SMOKE_PORT="$PORT"
+    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
+    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
+    export FRONTEND_SMOKE_REUSE_SERVER=0
+    export NEXT_PUBLIC_SMOKE_USER_ROLE=member
+    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
+    export NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=member-live-review
+
+    cleanup_member_overview_live() {
+      stop_frontend_smoke_server
+    }
+
+    trap cleanup_member_overview_live EXIT
+
+    start_frontend_smoke_server
+    wait_for_frontend_smoke_url "/app"
+
+    overview_html="$(mktemp)"
+    curl -sS "${BASE_URL}/app" > "$overview_html"
+
+    if ! grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Review deployments<' "$overview_html"; then
+      echo "[frontend-beginner-member-overview-live-smoke] member overview live path lost the review primary action" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if ! grep -Eq '(<button[^>]*data-testid="workspace-scenario-action-step-2"[^>]*disabled[^>]*>Ask admin for new deploy<)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-2"[^>]*>Ask admin for new deploy<)' "$overview_html"; then
+      echo "[frontend-beginner-member-overview-live-smoke] member overview live path did not gate new deployments" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="workspace-scenario-action-step-3"[^>]*>Review live apps<' "$overview_html"; then
+      echo "[frontend-beginner-member-overview-live-smoke] member overview live path did not make live review the Step 3 action" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if grep -Eq 'Smoke VPS|Edge EU Central|Ops Batch|smoke\.example\.com|ops-batch\.demo\.example\.com|eu-central\.demo\.example\.com' "$overview_html"; then
+      echo "[frontend-beginner-member-overview-live-smoke] member overview live path leaked admin-managed server identity" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    rm -f "$overview_html"
+  )
+}
+
 run_beginner_member_waiting_smoke() {
   (
     set -euo pipefail
@@ -338,12 +395,14 @@ run_beginner_first_deploy_smoke() {
 
 run_beginner_admin_smoke
 run_beginner_member_smoke
+run_beginner_member_overview_live_smoke
 run_beginner_member_waiting_smoke
 run_beginner_first_deploy_smoke
 run_beginner_export_payload_smoke
 
 echo "[frontend-beginner-smoke] first-time admin path rendered"
 echo "[frontend-beginner-smoke] member remote-only live review path rendered"
+echo "[frontend-beginner-smoke] member overview live review path rendered"
 echo "[frontend-beginner-smoke] member remote-only waiting path rendered"
 echo "[frontend-beginner-smoke] first deploy after server review rendered"
 echo "[frontend-beginner-smoke] member export payload sanitized"

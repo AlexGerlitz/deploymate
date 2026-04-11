@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminDisclosureSection } from "./admin-ui";
 import {
+  smokeDeployments,
   smokeMode,
   smokeOverviewDeployments,
   smokeOverviewNotifications,
@@ -28,6 +29,22 @@ const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const localDeploymentsEnabled =
   process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
+const smokeOverviewScenario =
+  process.env.NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO || "default";
+const smokeMemberOverviewDeployments = smokeDeployments.map(
+  ({ server_id: _serverId, server_name: _serverName, server_host: _serverHost, ...deployment }) => ({
+    ...deployment,
+    server_managed_by_admin: true,
+  }),
+);
+const smokeHomeDeployments =
+  smokeMode && smokeOverviewScenario === "member-live-review"
+    ? smokeMemberOverviewDeployments
+    : smokeOverviewDeployments;
+const smokeHomeOpsOverview =
+  smokeMode && smokeOverviewScenario === "member-live-review"
+    ? null
+    : smokeOverviewOpsOverview;
 
 export default function HomePage() {
   const router = useRouter();
@@ -35,7 +52,7 @@ export default function HomePage() {
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
-  const [deployments, setDeployments] = useState(smokeMode ? smokeOverviewDeployments : []);
+  const [deployments, setDeployments] = useState(smokeMode ? smokeHomeDeployments : []);
   const [servers, setServers] = useState(smokeMode ? smokeOverviewServers : []);
   const [notifications, setNotifications] = useState(smokeMode ? smokeOverviewNotifications : []);
   const [templates, setTemplates] = useState(smokeMode ? smokeOverviewTemplates : []);
@@ -48,7 +65,7 @@ export default function HomePage() {
   const [serversError, setServersError] = useState("");
   const [notificationsError, setNotificationsError] = useState("");
   const [templatesError, setTemplatesError] = useState("");
-  const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeOverviewOpsOverview : null);
+  const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeHomeOpsOverview : null);
   const [opsActionMessage, setOpsActionMessage] = useState("");
   const [opsActionError, setOpsActionError] = useState("");
 
@@ -62,6 +79,8 @@ export default function HomePage() {
       templates,
     });
   const canAccessServers = Boolean(currentUser?.is_admin);
+  const memberRemoteOnly = !canAccessServers && !localDeploymentsEnabled;
+  const memberHasLiveDeployments = memberRemoteOnly && opsSnapshot.deployments.total > 0;
   const degradedOpsAttentionItems = opsSnapshot.attention_items.filter((item) =>
     item.title.includes("temporarily unavailable"),
   );
@@ -85,13 +104,17 @@ export default function HomePage() {
           stepAction: "Open deployment workflow",
         }
       : {
-          headline: "Server target is managed by an admin",
-          support:
-            "Members do not manage saved server targets here. Ask an admin to confirm the remote target, then return to Deployment Workflow.",
-          stepTitle: "Wait for the server target",
-          stepDetail:
-            "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
-          stepAction: "See what opens next",
+          headline: memberHasLiveDeployments
+            ? "Server target stays admin-managed"
+            : "Server target is managed by an admin",
+          support: memberHasLiveDeployments
+            ? "Review the deployments that already exist. Ask an admin before a new remote rollout or target change."
+            : "Members do not manage saved server targets here. Ask an admin to confirm the remote target, then return to Deployment Workflow.",
+          stepTitle: memberHasLiveDeployments ? "Server target stays with admins" : "Wait for the server target",
+          stepDetail: memberHasLiveDeployments
+            ? "You can review existing deployments, but target control and new remote deploys stay admin-managed."
+            : "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
+          stepAction: memberHasLiveDeployments ? "Open live review" : "See what opens next",
         };
   const beginnerStatusSummary = canAccessServers
     ? servers.length === 0
@@ -101,6 +124,8 @@ export default function HomePage() {
         : `${opsSnapshot.deployments.running} running · ${opsSnapshot.deployments.failed} failed · ${servers.length} server target${servers.length === 1 ? "" : "s"} saved.`
     : localDeploymentsEnabled
       ? "Server inventory is admin-managed. Use the deployment workflow to continue."
+      : memberHasLiveDeployments
+        ? `${opsSnapshot.deployments.total} deployment${opsSnapshot.deployments.total === 1 ? "" : "s"} available for live review. Server target stays admin-managed.`
       : "Server target is admin-managed. Return to the deployment workflow once it is confirmed.";
   const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
     ? "Next best step: connect and verify one server."
@@ -115,8 +140,12 @@ export default function HomePage() {
           : "Next best step: open your app list and continue from one running service.";
   const waitingForAdminTarget = overviewPrimaryPath.reason === "admin-target-needed";
   const waitingForServerSetup = overviewPrimaryPath.reason === "server-setup";
-  const stepTwoBlocked = waitingForServerSetup || waitingForAdminTarget;
-  const stepThreeBlocked = stepTwoBlocked || opsSnapshot.deployments.total === 0;
+  const memberNewDeploymentBlocked = memberHasLiveDeployments;
+  const stepTwoBlocked =
+    waitingForServerSetup || waitingForAdminTarget || memberNewDeploymentBlocked;
+  const stepThreeBlocked =
+    waitingForServerSetup || waitingForAdminTarget || opsSnapshot.deployments.total === 0;
+  const stepThreeIsPrimary = memberHasLiveDeployments && !stepThreeBlocked;
   const stepOneIsPrimary =
     overviewPrimaryPath.reason === "server-setup" ||
     overviewPrimaryPath.reason === "admin-target-needed";
@@ -128,6 +157,8 @@ export default function HomePage() {
         : "Your app is already running. Check health first, then make the next change."
     : localDeploymentsEnabled
       ? "DeployMate still gives you a simple path even when admins manage saved servers."
+      : memberHasLiveDeployments
+        ? "You can review existing deployments while admins manage the server target."
       : "Your deployment target is admin-managed. Confirm it with an admin, then continue.";
   const heroSupportText = canAccessServers
     ? servers.length === 0
@@ -137,6 +168,8 @@ export default function HomePage() {
         : "Stay on the main path: open the app workspace, review what is healthy, and only then decide what to change next."
     : localDeploymentsEnabled
       ? "Members can still choose what to run and review health while admins keep the saved server list up to date."
+      : memberHasLiveDeployments
+        ? "Use Deployment Workflow to inspect live apps. Ask an admin before a new remote rollout or target change."
       : "Members do not manage saved server targets here. Ask an admin to confirm the target, then return to the workflow.";
   const explanationTitle = canAccessServers
     ? servers.length === 0
@@ -144,6 +177,8 @@ export default function HomePage() {
       : "What this app is helping you do"
     : localDeploymentsEnabled
       ? "What changes when admins manage saved servers"
+      : memberHasLiveDeployments
+        ? "What you can review without server access"
       : "What happens after an admin confirms the target";
   const explanationBody = canAccessServers
     ? servers.length === 0
@@ -153,6 +188,8 @@ export default function HomePage() {
         : "You already have a running runtime story. Open the workflow to review status and keep the next action deliberate."
     : localDeploymentsEnabled
       ? "Admins keep the saved server list, but you can still understand the path: choose what to run, start it, and check health."
+      : memberHasLiveDeployments
+        ? "Server inventory stays controlled, but the live runtime review path is open for deployments that already exist."
       : "Once an admin confirms the saved server target, use Deployment Workflow to create or review the rollout.";
   const beginnerSteps = [
     {
@@ -174,23 +211,35 @@ export default function HomePage() {
       detail: stepTwoBlocked
         ? waitingForAdminTarget
           ? "This step opens after an admin confirms one saved server target for the workspace."
-          : "This step opens after Step 1 is done and one server is already connected."
+          : memberNewDeploymentBlocked
+            ? "New remote deployments need an admin-managed target. Review the live apps that already exist instead."
+            : "This step opens after Step 1 is done and one server is already connected."
         : "Paste the app image you want to run, or pick a saved setup if you already have one.",
       href: "/app/deployment-workflow",
-      actionLabel: stepTwoBlocked ? "Opens after Step 1" : "Choose app to run",
-      primary: !stepOneIsPrimary,
+      actionLabel: stepTwoBlocked
+        ? memberNewDeploymentBlocked
+          ? "Ask admin for new deploy"
+          : "Opens after Step 1"
+        : "Choose app to run",
+      primary: !stepOneIsPrimary && !stepThreeIsPrimary,
       disabled: stepTwoBlocked,
     },
     {
       key: "step-3",
       step: "Step 3",
-      title: "Start it and check status",
+      title: memberHasLiveDeployments ? "Review live apps" : "Start it and check status",
       detail: stepThreeBlocked
         ? "This step opens after the first deployment exists and DeployMate has live runtime state to review."
+        : memberHasLiveDeployments
+          ? "Open live status and runtime detail without exposing saved server inventory or target controls."
         : "Start the app, then open live status to confirm it is running, healthy, and reachable.",
       href: "/app/deployment-workflow",
-      actionLabel: stepThreeBlocked ? "Opens after deploy" : "See running apps",
-      primary: false,
+      actionLabel: stepThreeBlocked
+        ? "Opens after deploy"
+        : memberHasLiveDeployments
+          ? "Review live apps"
+          : "See running apps",
+      primary: stepThreeIsPrimary,
       disabled: stepThreeBlocked,
     },
   ];
@@ -201,12 +250,15 @@ export default function HomePage() {
         ? "It is simply the machine where your app will run. Step 1 only tells DeployMate how to reach that machine."
         : localDeploymentsEnabled
           ? "Admins keep the saved server list, but your rollout path still starts by choosing what to run."
+          : memberHasLiveDeployments
+            ? "The server target stays admin-managed. Your current job is reviewing existing live apps without changing target controls."
           : "The remote machine is confirmed by an admin first, then you continue in the rollout workflow.",
     },
     {
       title: "What “choose your app” means",
-      detail:
-        "Usually this is a container image like `nginx:latest`, or one saved template that already remembers the image, ports, and env vars.",
+      detail: memberNewDeploymentBlocked
+        ? "For a new remote deployment, ask an admin to confirm the target and rollout change. Existing deployments stay available for review."
+        : "Usually this is a container image like `nginx:latest`, or one saved template that already remembers the image, ports, and env vars.",
     },
     {
       title: "What “healthy” means",
@@ -695,6 +747,8 @@ export default function HomePage() {
                     <strong>
                       {waitingForAdminTarget
                         ? "Blocked until Step 1"
+                        : memberNewDeploymentBlocked
+                          ? "New deploy needs admin"
                         : deployments.length === 0
                           ? "Choose first app"
                           : "Choose next app"}
@@ -702,6 +756,8 @@ export default function HomePage() {
                     <p>
                       {waitingForAdminTarget
                         ? "This stays blocked until an admin confirms one saved server target for the workspace."
+                        : memberNewDeploymentBlocked
+                          ? "Existing deployments can be reviewed, but new remote deployment creation needs an admin-managed target."
                         : "Use the deployment workflow to choose the image or saved setup you want to run."}
                     </p>
                   </div>
@@ -717,6 +773,8 @@ export default function HomePage() {
                     <p>
                       {waitingForAdminTarget
                         ? "Live review starts only after the first deployment exists."
+                        : memberHasLiveDeployments
+                          ? "Open the live runtime list or deployment detail and review health without server inventory controls."
                         : "Open the live runtime list or deployment detail and confirm the app is healthy before the next change."}
                     </p>
                   </div>

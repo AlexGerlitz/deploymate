@@ -32,6 +32,7 @@ Run this in a remote-only setup where server inventory stays admin-managed.
 1. Open `/app`.
    Ask: does the page clearly say that Step 1 is still blocked on admin server setup?
    Expected: no false `start deployment` primary CTA before a target exists.
+   If deployments already exist, expected: live review is the main path and new remote deployment stays admin-gated.
 2. Open `/app/server-review`.
    Expected: blocked/admin-managed state only, with no server create or edit controls.
 3. Open `/app/deployment-workflow`.
