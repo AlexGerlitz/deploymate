@@ -121,11 +121,18 @@ Updated: 2026-04-10
   - `server-review` now reads as one job: save one server target, check it, then move on
   - opening a saved server now shows ordered tasks first, while edit/delete moved behind a secondary disclosure
   - `deployment-workflow` now explains Step 2 with one-lane-at-a-time guidance and simpler language around image, template, and health
+- The blocked member path is now more internally consistent:
+  - `/app` no longer presents Step 2 and Step 3 as if they were already open before admin Step 1 is complete
+  - `/app/server-review` no longer shows a false remote-only CTA into `Deployment Workflow`
+  - `/app/deployment-workflow` now opens the live lane directly when a blocked member already has deployments to review
+- Local frontend smoke for the beginner path passed after this slice:
+  - `scripts/frontend_servers_smoke.sh`
+  - `scripts/frontend_runtime_smoke.sh`
 - The remaining question is no longer "do we have the right frame?" but "does a real beginner now follow it without hesitation?"
 
 ## Current State
 
-- Local working branch for current product work: `codex/deploymate-staging-hardening`
+- Local working branch for current product work: `deploymate/product-wip`
 - Latest published `develop` commit: `0384fa3`
 - Staging host `deploymate`:
   - `/opt/deploymate` branch `develop` currently points to `0384fa3`
@@ -138,6 +145,8 @@ Updated: 2026-04-10
   - remote release smoke that can run on the deploy host and can pin host resolution explicitly
   - successful end-to-end staging walkthrough with runtime smoke create/health/diagnostics/logs/activity/delete
   - first-pass beginner story rewrite across overview, server step, and deployment step
+  - blocked member first-pass alignment across overview, server step, and deployment step
+  - local frontend smoke confirmation for `/app`, `/app/server-review`, `/app/deployment-workflow`, and deployment detail
 - Host-specific note:
   - saved runtime smoke server `prod-runtime-smoke` currently points to `103.88.241.103`
   - do not switch it back to `deploymatecloud.ru` until backend-container DNS resolution is explicitly re-verified
