@@ -6,6 +6,9 @@ The project is already beyond a UI mock: the live app, release workflow, smoke
 coverage, admin tooling, and operational docs are real. The roadmap below shows
 what is intentionally next.
 
+For the longer-lived strategic thesis, ICP, market angle, and signature product
+hook, see [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md).
+
 ## Product Direction
 
 DeployMate is being shaped as a self-hosted deployment control panel for small
@@ -15,6 +18,10 @@ teams that want:
 - admin workflows that feel productized rather than bolted on
 - release and recovery discipline around the app, not outside it
 - a first-run experience where a non-technical user can still see the obvious next click
+
+The shorter product formula is:
+
+`Render-like clarity on your own servers`
 
 ## Long-Lived Product Rule
 
@@ -97,6 +104,7 @@ Near-term slices:
 - richer observability and deployment metrics
 - clearer multi-environment workflows
 - a more structured bridge from restore analysis into safe import orchestration
+- stronger deployment passport and runtime handoff ergonomics
 
 ## Deliberate Non-Goals
 

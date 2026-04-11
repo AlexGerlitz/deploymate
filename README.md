@@ -52,6 +52,7 @@ If you are opening this repository as a hiring reviewer, these are the fastest e
 - public signup: `https://deploymatecloud.ru/register`
 - release notes: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)
 - roadmap: [ROADMAP.md](ROADMAP.md)
+- product strategy: [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md)
 - architecture overview: [ARCHITECTURE.md](ARCHITECTURE.md)
 - production/release discipline: [RUNBOOK.md](RUNBOOK.md), [SAFE-RELEASE.md](SAFE-RELEASE.md), [SECURITY.md](SECURITY.md)
 
@@ -71,6 +72,7 @@ If you want the shortest coherent pass through the project:
 4. inspect `/app/server-review` for the dedicated server workspace
 5. inspect `/app/users` and `/app/upgrade-requests` for admin depth
 6. return to [ARCHITECTURE.md](ARCHITECTURE.md), [RUNBOOK.md](RUNBOOK.md), and [ROADMAP.md](ROADMAP.md) for system and release framing
+7. read [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md) for the product thesis, ICP, and long-term differentiator
 
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
@@ -197,6 +199,7 @@ Browser
 
 More detail: see [ARCHITECTURE.md](ARCHITECTURE.md).
 Project focus rules: see [PROJECT-RULES.md](PROJECT-RULES.md).
+Product strategy: see [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md).
 
 ![Architecture flow](docs/architecture-flow.svg)
 
@@ -571,6 +574,7 @@ The repository is meant to show not only a UI, but a product plus delivery disci
 - [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the initial public release framing
 - [RUNBOOK.md](RUNBOOK.md) for local gate, remote release, post-deploy smoke, and workflow contract
 - [ROADMAP.md](ROADMAP.md) for what is intentionally next rather than vaguely planned
+- [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md) for category, ICP, market angle, and differentiator
 
 ## Local Development
 

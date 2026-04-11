@@ -1,6 +1,6 @@
 # DeployMate Handoff
 
-Updated: 2026-04-10
+Updated: 2026-04-11
 
 ## Web Terminal Pointer
 
@@ -12,6 +12,7 @@ Updated: 2026-04-10
 ## Current Product Goal
 
 - Главная цель сейчас: не просто наращивать deploy/control функции, а сделать путь понятным с первого прохода.
+- Долгоживущий стратегический source of truth теперь отдельно зафиксирован в [PRODUCT-STRATEGY.md](/Users/alexgerlitz/deploymate/PRODUCT-STRATEGY.md).
 - Ближайший продуктовый ориентир:
   - подключить сервер
   - увидеть, жив ли сервис
@@ -88,6 +89,11 @@ Updated: 2026-04-10
   - confirm that the next click is still obvious after login, after saving a server, and after the first deploy
 - После walkthrough уже добивать remaining clarity gaps instead of blindly rewriting copy.
 - Параллельно не ослаблять новый release contract и не превращать его во временный workaround.
+- Следующий стратегический слой после beginner clarity уже зафиксирован:
+  - `first deploy in 10 minutes`
+  - `production-useful runtime`
+  - `team and agency fit`
+  - `deployment passport` как главный продуктовый differentiator
 
 ## Week 1 Result
 
