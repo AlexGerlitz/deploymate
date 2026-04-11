@@ -49,6 +49,16 @@ if grep -Eq 'data-testid="runtime-deployment-delete-button-review-worker"' "$APP
   exit 1
 fi
 
+if ! grep -Eq '(<a[^>]*data-testid="runtime-deployment-details-link-review-worker"[^>]*class="[^"]*landingButton primaryButton[^"]*")|(<a[^>]*class="[^"]*landingButton primaryButton[^"]*"[^>]*data-testid="runtime-deployment-details-link-review-worker")' "$APP_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime queue does not make review the primary card action" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-deployment-details-link-review-worker"[^>]*>Review runtime issues<' "$APP_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime queue lost the explicit runtime review action label" >&2
+  exit 1
+fi
+
 curl -sS "${BASE_URL}/deployments/review-worker" > "$FAILED_DETAIL_HTML"
 if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Review runtime issues<' "$FAILED_DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] failed runtime detail is not review-first" >&2

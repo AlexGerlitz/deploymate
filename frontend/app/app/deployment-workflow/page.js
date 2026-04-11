@@ -1821,10 +1821,16 @@ function DeploymentWorkflowPageContent() {
                 ) : null}
                 <Link
                   href={`/deployments/${primaryRuntimeDeployment.id}`}
-                  className={primaryRuntimeUrl && primaryRuntimeDeployment.status !== "failed" ? "secondaryButton" : "linkButton"}
+                  className={
+                    primaryRuntimeDeployment.status === "failed"
+                      ? "landingButton primaryButton"
+                      : primaryRuntimeUrl
+                        ? "secondaryButton"
+                        : "linkButton"
+                  }
                   data-testid={`runtime-deployment-details-link-${primaryRuntimeDeployment.id}`}
                 >
-                  View details
+                  {primaryRuntimeDeployment.status === "failed" ? "Review runtime issues" : "View details"}
                 </Link>
                 {primaryRuntimeUrl && primaryRuntimeDeployment.status === "failed" ? (
                   <a
@@ -1839,7 +1845,7 @@ function DeploymentWorkflowPageContent() {
                 ) : null}
                 {primaryRuntimeDeployment.status === "failed" ? (
                   <div className="banner subtle inlineBanner">
-                    Review details before deleting this failed runtime.
+                    Review runtime issues before deleting this failed runtime.
                   </div>
                 ) : (
                   <button

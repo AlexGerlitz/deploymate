@@ -161,6 +161,11 @@ Updated: 2026-04-11
   - issue: the workflow queue exposed delete before the failed runtime had been reviewed, and smoke detail did not represent the failed deployment
   - fix: failed cards now point to detail review before delete, and smoke detail resolves `review-worker` as a failed runtime
   - guardrail: `smoke:runtime` now fails if the failed queue exposes early delete or if failed detail stops making `Review runtime issues` primary
+- The failed-runtime focus card now makes the review action explicit:
+  - screen: failed primary card on `/app/deployment-workflow`
+  - issue: the card no longer exposed delete first, but its main CTA still said `View details`, which left the safest next step too vague during a failed rollout
+  - fix: failed focus cards now make `Review runtime issues` the primary action and keep the inline warning aligned with that same review-first wording
+  - guardrail: `smoke:runtime` now fails if the failed focus card loses its primary `Review runtime issues` CTA
 - The member-safe pass found one blocked-path leak:
   - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
   - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
@@ -1021,6 +1026,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:beginner` после overview-to-workflow first-deploy bridge -> ok
 - `npm --prefix frontend run build` после healthy workflow open-app priority slice -> ok
 - `npm --prefix frontend run smoke:runtime` после healthy workflow open-app priority slice -> ok
+- `npm --prefix frontend run build` после failed workflow review-first CTA slice -> ok
+- `npm --prefix frontend run smoke:runtime` после failed workflow review-first CTA slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:
