@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { AdminDisclosureSection } from "../../app/admin-ui";
 import { escapeCsvCell, triggerFileDownload } from "../../lib/admin-page-utils";
@@ -395,7 +395,7 @@ function buildRuntimeDecisionState(
   activity,
   options = {},
 ) {
-  const { canMutateRuntime = true } = options;
+  const { canMutateRuntime = true, freshRolloutReview = false } = options;
   const latestEvent = Array.isArray(activity) && activity.length > 0 ? activity[0] : null;
   const recentFailureCount = diagnostics?.activity?.recent_failure_count || 0;
   const errorCount = attentionItems.filter((item) => item.status === "error").length;
@@ -468,26 +468,47 @@ function buildRuntimeDecisionState(
   }
 
   const deploymentUrl = buildDeploymentUrl(deployment);
+  const freshRolloutWithPublicUrl = freshRolloutReview && Boolean(deploymentUrl);
 
   return {
     tone: "healthy",
-    label: "Ready",
+    label: freshRolloutReview ? "Verify" : "Ready",
     focus: deploymentUrl
-      ? "Runtime is healthy. Open the app once before changing it"
-      : "Runtime is private. Review the stable service before changing it",
+      ? freshRolloutReview
+        ? "Fresh rollout is live. Check it before treating this deploy as done"
+        : "Runtime is healthy. Open the app once before changing it"
+      : freshRolloutReview
+        ? "Fresh rollout is private. Review the stable service before treating this change as done"
+        : "Runtime is private. Review the stable service before changing it",
     why:
       deploymentUrl
-        ? "No active runtime warnings are leading the page right now. The safest next step is verifying the live app before opening change tools."
-        : "No active runtime warnings are leading the page right now. Because there is no public URL to click from here, the safest next step is reviewing the stable runtime before opening change tools.",
+        ? freshRolloutReview
+          ? "This rollout was just created from Deployment Workflow. Verify the user-facing path and runtime signals now, while the change context is still fresh."
+          : "No active runtime warnings are leading the page right now. The safest next step is verifying the live app before opening change tools."
+        : freshRolloutReview
+          ? "This rollout was just created without a public URL. Review the stable runtime signals now, while the rollout context is still fresh."
+          : "No active runtime warnings are leading the page right now. Because there is no public URL to click from here, the safest next step is reviewing the stable runtime before opening change tools.",
     nextStep:
       deploymentUrl
-        ? "Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional."
-        : "Review the current runtime overview, port mapping, health, and recent activity first. Prepare a rollout change only after that review is intentional.",
+        ? freshRolloutReview
+          ? "Open the running app, then return here and confirm health and recent activity before preparing another rollout change."
+          : "Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional."
+        : freshRolloutReview
+          ? "Review the current runtime overview, port mapping, health, and recent activity before preparing another rollout change."
+          : "Review the current runtime overview, port mapping, health, and recent activity first. Prepare a rollout change only after that review is intentional.",
     primaryHref: deploymentUrl || "#runtime-detail-overview",
     primaryExternal: Boolean(deploymentUrl),
     primaryAction: deploymentUrl ? "Open running app" : "Review stable runtime",
-    secondaryHref: canMutateRuntime ? "#runtime-detail-redeploy" : "#runtime-detail-handoff-tools",
-    secondaryAction: canMutateRuntime ? "Prepare rollout change" : "Open handoff tools",
+    secondaryHref: freshRolloutWithPublicUrl
+      ? "#runtime-detail-overview"
+      : canMutateRuntime
+        ? "#runtime-detail-redeploy"
+        : "#runtime-detail-handoff-tools",
+    secondaryAction: freshRolloutWithPublicUrl
+      ? "Review runtime overview"
+      : canMutateRuntime
+        ? "Prepare rollout change"
+        : "Open handoff tools",
     badges: [
       { label: "health", value: health?.status || "unknown", tone: "healthy" },
       { label: "attention", value: `${attentionItems.length}`, tone: "healthy" },
@@ -552,6 +573,7 @@ function buildChangeReadinessState(redeployPreflight, redeployChangeRows, form, 
 export default function DeploymentDetailsPage({ params }) {
   const { deploymentId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const smokeDetailDeployment = smokeMode
     ? deploymentId === "internal-runtime"
       ? smokeInternalRuntimeDeployment
@@ -814,6 +836,12 @@ export default function DeploymentDetailsPage({ params }) {
   const exportDiagnostics = runtimeExportPayload.diagnostics;
   const exportActivity = runtimeExportPayload.activity;
   const attentionItems = runtimeExportPayload.attentionItems;
+  const requestedSource = searchParams.get("source") || "";
+  const freshRolloutReview =
+    requestedSource === "workflow-success" &&
+    deployment?.status === "running" &&
+    (!health?.status || health.status === "healthy") &&
+    attentionItems.length === 0;
   const runtimeSummaryText = buildRuntimeSummaryText(
     deployment,
     health,
@@ -920,7 +948,7 @@ export default function DeploymentDetailsPage({ params }) {
     exportDiagnostics,
     attentionItems,
     exportActivity,
-    { canMutateRuntime },
+    { canMutateRuntime, freshRolloutReview },
   );
   const runtimeHeroLead = deployment
     ? `${deployment.container_name || deployment.image || deploymentId}. ${detailPriority}`
@@ -963,10 +991,18 @@ export default function DeploymentDetailsPage({ params }) {
           ? "Review runtime issues"
           : deployment?.status === "failed"
             ? "Redeploy deliberately"
+            : freshRolloutReview
+              ? deploymentUrl
+                ? "Verify fresh rollout"
+                : "Review fresh runtime"
             : deploymentUrl
               ? "Open running app"
               : "Review stable runtime",
-      detail: detailPriority,
+      detail: freshRolloutReview
+        ? deploymentUrl
+          ? "This rollout was just created. Verify the live app and runtime signals before queuing another change."
+          : "This rollout was just created. Verify the stable runtime signals before queuing another change."
+        : detailPriority,
     },
   ];
   const renderRuntimeDecisionPrimaryAction = (className, testId) =>
@@ -1662,6 +1698,16 @@ export default function DeploymentDetailsPage({ params }) {
               data-testid="runtime-detail-admin-managed-live-checks-banner"
             >
               {adminManagedRuntimeMessage}
+            </div>
+          ) : null}
+          {freshRolloutReview ? (
+            <div
+              className="banner subtle"
+              data-testid="runtime-detail-fresh-rollout-banner"
+            >
+              {deploymentUrl
+                ? "Fresh rollout: open the app once, then confirm health and recent activity before preparing another change."
+                : "Fresh rollout: review overview, health, and recent activity before preparing another change."}
             </div>
           ) : null}
           {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}

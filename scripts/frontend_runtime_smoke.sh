@@ -8,6 +8,7 @@ SERVER_LOG="${FRONTEND_SMOKE_LOG:-/tmp/deploymate-frontend-runtime-smoke.log}"
 DIST_DIR="${FRONTEND_SMOKE_DIST_DIR:-.next-smoke-${PORT}}"
 APP_HTML="$(mktemp)"
 DETAIL_HTML="$(mktemp)"
+FRESH_DETAIL_HTML="$(mktemp)"
 FAILED_DETAIL_HTML="$(mktemp)"
 HEALTHY_WORKFLOW_HTML="$(mktemp)"
 FAILED_WORKFLOW_HTML="$(mktemp)"
@@ -24,7 +25,7 @@ cleanup() {
   if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
     stop_frontend_smoke_server
   fi
-  rm -f "$APP_HTML" "$DETAIL_HTML" "$FAILED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML"
+  rm -f "$APP_HTML" "$DETAIL_HTML" "$FRESH_DETAIL_HTML" "$FAILED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML"
 }
 
 trap cleanup EXIT
@@ -44,6 +45,22 @@ fi
 
 if grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Prepare rollout change<' "$DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] healthy runtime detail still makes rollout change the main next step" >&2
+  exit 1
+fi
+
+curl -sS "${BASE_URL}/deployments/smoke-deployment?source=workflow-success" > "$FRESH_DETAIL_HTML"
+if ! grep -Eq 'data-testid="runtime-detail-fresh-rollout-banner"' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout detail lost the workflow-success bridge banner" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-secondary"[^>]*>Review runtime overview<' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout detail does not keep review-first secondary guidance" >&2
+  exit 1
+fi
+
+if grep -Eq 'data-testid="runtime-detail-main-next-step-action-secondary"[^>]*>Prepare rollout change<' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout detail still exposes prepare-change as the immediate secondary path" >&2
   exit 1
 fi
 

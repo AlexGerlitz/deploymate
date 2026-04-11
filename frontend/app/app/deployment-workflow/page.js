@@ -2403,7 +2403,11 @@ function DeploymentWorkflowPageContent() {
               {createdDeployment?.id || buildDeploymentUrl(createdDeployment) ? (
                 <div className="successActions">
                   {createdDeployment?.id ? (
-                    <Link href={`/deployments/${createdDeployment.id}`} className="landingButton primaryButton">
+                    <Link
+                      href={`/deployments/${createdDeployment.id}?source=workflow-success`}
+                      className="landingButton primaryButton"
+                      data-testid="create-deployment-success-open-detail-link"
+                    >
                       Open runtime detail
                     </Link>
                   ) : null}
@@ -2727,7 +2731,7 @@ function DeploymentWorkflowPageContent() {
                 <div className="successActions">
                   {templateCreatedDeployment?.id ? (
                     <Link
-                      href={`/deployments/${templateCreatedDeployment.id}`}
+                      href={`/deployments/${templateCreatedDeployment.id}?source=workflow-success`}
                       className="landingButton primaryButton"
                       data-testid="template-deploy-success-open-detail-link"
                     >
