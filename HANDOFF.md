@@ -200,6 +200,10 @@ Updated: 2026-04-11
   - if overview knows exactly one ready server and no deployments exist, `/app` links into `deployment-workflow` with that target already selected
   - `deployment-workflow` now explains when the first-deploy target came from Overview, not only from Server Review
   - guardrail: `smoke:beginner` now follows the overview link, checks the preserved `server` query, and fails if Step 2 loses the selected target or shows a premature image error
+- The healthy runtime happy path is now reinforced in workflow as well as detail:
+  - on the primary healthy runtime card in `deployment-workflow`, `Open app` now comes first and uses the primary action styling
+  - `smoke:runtime` now runs a healthy-only workflow fixture so the safe verify path is checked in live queue before detail review
+  - the existing detail guardrail still holds `Open running app` as the main next step on healthy runtime detail
 - Local frontend smoke for the beginner path passed after this slice:
   - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`
@@ -1015,6 +1019,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:beginner` после admin server-ready overview guardrail -> ok
 - `npm --prefix frontend run build` после overview-to-workflow first-deploy bridge -> ok
 - `npm --prefix frontend run smoke:beginner` после overview-to-workflow first-deploy bridge -> ok
+- `npm --prefix frontend run build` после healthy workflow open-app priority slice -> ok
+- `npm --prefix frontend run smoke:runtime` после healthy workflow open-app priority slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

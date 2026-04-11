@@ -55,6 +55,20 @@ const smokeWorkflowFixture =
           ? `Server "${smokeServers[0].name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`
           : "",
       }
+    : smokeMode && smokeWorkflowScenario === "healthy-live-review"
+      ? {
+          deployments: smokeDeployments.filter((deployment) => deployment.status === "running"),
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+        }
     : smokeMode && smokeWorkflowScenario === "first-deploy-after-overview"
       ? {
           deployments: [],
@@ -275,6 +289,9 @@ function DeploymentWorkflowPageContent() {
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     filteredDeployments[0] ||
     null;
+  const primaryRuntimeUrl = primaryRuntimeDeployment
+    ? buildDeploymentUrl(primaryRuntimeDeployment)
+    : "";
   const secondaryRuntimeDeployments = primaryRuntimeDeployment
     ? filteredDeployments.filter((deployment) => deployment.id !== primaryRuntimeDeployment.id)
     : [];
@@ -1791,19 +1808,31 @@ function DeploymentWorkflowPageContent() {
                 <span>{buildDeploymentUrl(primaryRuntimeDeployment) || "-"}</span>
               </div>
               <div className="actions">
+                {primaryRuntimeUrl && primaryRuntimeDeployment.status !== "failed" ? (
+                  <a
+                    href={primaryRuntimeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="landingButton primaryButton"
+                    data-testid={`runtime-deployment-open-app-link-${primaryRuntimeDeployment.id}`}
+                  >
+                    Open app
+                  </a>
+                ) : null}
                 <Link
                   href={`/deployments/${primaryRuntimeDeployment.id}`}
-                  className="linkButton"
+                  className={primaryRuntimeUrl && primaryRuntimeDeployment.status !== "failed" ? "secondaryButton" : "linkButton"}
                   data-testid={`runtime-deployment-details-link-${primaryRuntimeDeployment.id}`}
                 >
                   View details
                 </Link>
-                {buildDeploymentUrl(primaryRuntimeDeployment) ? (
+                {primaryRuntimeUrl && primaryRuntimeDeployment.status === "failed" ? (
                   <a
-                    href={buildDeploymentUrl(primaryRuntimeDeployment)}
+                    href={primaryRuntimeUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="linkButton"
+                    data-testid={`runtime-deployment-open-app-link-${primaryRuntimeDeployment.id}`}
                   >
                     Open app
                   </a>
