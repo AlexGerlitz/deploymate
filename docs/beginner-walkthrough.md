@@ -16,6 +16,7 @@ Use it before rewriting first-pass copy or changing the main beginner screens.
 1. Open `/app`.
    Ask: what is this product, what should I do now, and is the primary CTA correct?
    Expected: the page explains the three-step story and points to server setup when no target exists.
+   If one server is already connected and no deployments exist, expected: Step 2 / first deployment becomes the primary path.
 2. Open `/app/server-review`.
    Ask: does Step 1 read as one job, and do create/check actions clearly outrank edit/delete controls?
    Expected: save one server, run one check, then move to Step 2.

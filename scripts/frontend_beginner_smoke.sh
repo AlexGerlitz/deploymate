@@ -102,6 +102,62 @@ run_beginner_admin_smoke() {
   )
 }
 
+run_beginner_admin_server_ready_smoke() {
+  (
+    set -euo pipefail
+    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+
+    export PORT="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_PORT:-3010}"
+    export BASE_URL="http://127.0.0.1:${PORT}"
+    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_LOG:-/tmp/deploymate-frontend-beginner-admin-server-ready-smoke.log}"
+    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_DIST_DIR:-.next-smoke-beginner-admin-server-ready-${PORT}}"
+    export FRONTEND_SMOKE_PORT="$PORT"
+    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
+    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
+    export FRONTEND_SMOKE_REUSE_SERVER=0
+    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
+    export NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-server-ready-first-deploy
+
+    cleanup_admin_server_ready() {
+      stop_frontend_smoke_server
+    }
+
+    trap cleanup_admin_server_ready EXIT
+
+    start_frontend_smoke_server
+    wait_for_frontend_smoke_url "/app"
+
+    overview_html="$(mktemp)"
+    curl -sS "${BASE_URL}/app" > "$overview_html"
+
+    if ! grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Launch first deployment<' "$overview_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] overview did not point the ready-server admin to first deployment" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="workspace-scenario-action-step-2"[^>]*>Choose app to run<' "$overview_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] Step 2 was not the active first-deploy action" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Add first server target<|data-testid="workspace-primary-task-action"[^>]*>Add first server target<' "$overview_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] overview regressed to server setup after a server was ready" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if grep -Eq 'data-testid="workspace-scenario-action-step-2"[^>]*disabled' "$overview_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] Step 2 stayed blocked after a server was ready" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    rm -f "$overview_html"
+  )
+}
+
 run_beginner_member_smoke() {
   (
     set -euo pipefail
@@ -394,6 +450,7 @@ run_beginner_first_deploy_smoke() {
 }
 
 run_beginner_admin_smoke
+run_beginner_admin_server_ready_smoke
 run_beginner_member_smoke
 run_beginner_member_overview_live_smoke
 run_beginner_member_waiting_smoke
@@ -401,6 +458,7 @@ run_beginner_first_deploy_smoke
 run_beginner_export_payload_smoke
 
 echo "[frontend-beginner-smoke] first-time admin path rendered"
+echo "[frontend-beginner-smoke] admin server-ready first deploy path rendered"
 echo "[frontend-beginner-smoke] member remote-only live review path rendered"
 echo "[frontend-beginner-smoke] member overview live review path rendered"
 echo "[frontend-beginner-smoke] member remote-only waiting path rendered"

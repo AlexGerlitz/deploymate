@@ -193,6 +193,9 @@ Updated: 2026-04-11
   - if member already has deployments, `/app` makes live review the main path and keeps new remote deployment gated behind admin target control
   - the smoke fixture for that path uses redacted admin-managed deployments so the overview does not reintroduce server identity leaks
   - guardrail: `smoke:beginner` now checks the member overview live-review path separately from the waiting path
+- The admin overview now has an explicit server-ready/no-deployments guardrail:
+  - if one server is already connected and no deployments exist, `/app` points to first deployment instead of server setup
+  - guardrail: `smoke:beginner` now checks that the hero CTA is `Launch first deployment`, Step 2 is active, and `Add first server target` does not return as the primary action
 - Local frontend smoke for the beginner path passed after this slice:
   - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`
@@ -1004,6 +1007,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:beginner` после member live/waiting deployment workflow split -> ok
 - `npm --prefix frontend run build` после member overview live-review split -> ok
 - `npm --prefix frontend run smoke:beginner` после member overview live-review split -> ok
+- `npm --prefix frontend run build` после admin server-ready overview guardrail -> ok
+- `npm --prefix frontend run smoke:beginner` после admin server-ready overview guardrail -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

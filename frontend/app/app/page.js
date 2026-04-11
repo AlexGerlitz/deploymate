@@ -12,6 +12,7 @@ import {
   smokeOverviewOpsOverview,
   smokeOverviewServers,
   smokeOverviewTemplates,
+  smokeServers,
   smokeUser,
 } from "../lib/smoke-fixtures";
 import {
@@ -41,8 +42,14 @@ const smokeHomeDeployments =
   smokeMode && smokeOverviewScenario === "member-live-review"
     ? smokeMemberOverviewDeployments
     : smokeOverviewDeployments;
+const smokeHomeServers =
+  smokeMode && smokeOverviewScenario === "admin-server-ready-first-deploy"
+    ? smokeServers.slice(0, 1)
+    : smokeOverviewServers;
 const smokeHomeOpsOverview =
-  smokeMode && smokeOverviewScenario === "member-live-review"
+  smokeMode &&
+  (smokeOverviewScenario === "member-live-review" ||
+    smokeOverviewScenario === "admin-server-ready-first-deploy")
     ? null
     : smokeOverviewOpsOverview;
 
@@ -53,7 +60,7 @@ export default function HomePage() {
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
   const [deployments, setDeployments] = useState(smokeMode ? smokeHomeDeployments : []);
-  const [servers, setServers] = useState(smokeMode ? smokeOverviewServers : []);
+  const [servers, setServers] = useState(smokeMode ? smokeHomeServers : []);
   const [notifications, setNotifications] = useState(smokeMode ? smokeOverviewNotifications : []);
   const [templates, setTemplates] = useState(smokeMode ? smokeOverviewTemplates : []);
   const [loading, setLoading] = useState(!smokeMode);
