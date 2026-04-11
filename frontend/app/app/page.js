@@ -273,16 +273,29 @@ export default function HomePage() {
       "step-2": "Deploy app",
       "step-3": "Review health",
     };
-    const disabledLabelByStep = {
-      "step-1": "Needs admin",
-      "step-2": memberNewDeploymentBlocked ? "Needs admin" : "After server",
-      "step-3": "After deploy",
+    const quickDetailByStep = {
+      "step-1": canAccessServers
+        ? servers.length === 0
+          ? "Save one target so DeployMate can reach your machine."
+          : `${servers.length} target${servers.length === 1 ? "" : "s"} already saved for rollout.`
+        : "Admins manage the saved server target for this workspace.",
+      "step-2": stepTwoBlocked
+        ? memberNewDeploymentBlocked
+          ? "New remote deploys open when an admin confirms the target."
+          : "This unlocks as soon as one server target is connected."
+        : "Pick the image or saved setup you want to run next.",
+      "step-3": stepThreeBlocked
+        ? "This opens after the first deployment is live."
+        : memberHasLiveDeployments
+          ? "Open runtime status and live detail without server inventory controls."
+          : "Check the app, runtime health, and activity after deploy.",
     };
 
     return {
       ...card,
       quickLabel: quickLabelByStep[card.key],
-      quickState: card.primary ? "Current" : card.disabled ? disabledLabelByStep[card.key] : "Open",
+      quickState: card.primary ? "Start here" : card.disabled ? "Locked" : "Ready",
+      quickDetail: quickDetailByStep[card.key],
     };
   });
   const plainLanguageCards = [
@@ -706,43 +719,49 @@ export default function HomePage() {
             <p className="overviewProductLead">{heroHeadline}</p>
             <p className="overviewProductSupport">{heroSupportText}</p>
             <div
-              className="overviewProductQuickRail"
+              className="overviewProductQuickGrid"
               data-testid="workspace-quick-actions"
               aria-label="How to use DeployMate"
             >
               {productQuickActions.map((card) => {
-                const quickActionClassName = `overviewProductQuickAction ${
+                const quickCardClassName = `overviewProductQuickCard ${
                   card.primary ? "isPrimary" : card.disabled ? "isLocked" : "isReady"
                 }`;
-                const quickActionContent = (
-                  <>
-                    <span className="overviewProductQuickIndex">{card.step.replace("Step ", "")}</span>
-                    <span className="overviewProductQuickText">
-                      <strong>{card.quickLabel}</strong>
-                      <span>{card.quickState}</span>
-                    </span>
-                  </>
-                );
+                const quickActionButtonClassName = `landingButton secondaryButton overviewProductQuickButton ${
+                  card.primary ? "isCurrent" : ""
+                }`;
 
-                return card.disabled ? (
+                const quickActionNode = card.disabled ? (
                   <button
-                    key={card.key}
                     type="button"
                     disabled
-                    className={quickActionClassName}
+                    className={quickActionButtonClassName}
                     data-testid={`workspace-quick-action-${card.key}`}
                   >
-                    {quickActionContent}
+                    {card.actionLabel}
                   </button>
                 ) : (
                   <Link
-                    key={card.key}
                     href={card.href}
-                    className={quickActionClassName}
+                    className={quickActionButtonClassName}
                     data-testid={`workspace-quick-action-${card.key}`}
                   >
-                    {quickActionContent}
+                    {card.actionLabel}
                   </Link>
+                );
+
+                return (
+                  <article key={card.key} className={quickCardClassName} data-testid={`workspace-quick-card-${card.key}`}>
+                    <div className="overviewProductQuickHeader">
+                      <span className="overviewProductQuickStep">{card.step}</span>
+                      <span className="overviewProductQuickStateBadge">{card.quickState}</span>
+                    </div>
+                    <div className="overviewProductQuickCopy">
+                      <h3>{card.quickLabel}</h3>
+                      <p>{card.quickDetail}</p>
+                    </div>
+                    <div className="overviewProductQuickFooter">{quickActionNode}</div>
+                  </article>
                 );
               })}
             </div>

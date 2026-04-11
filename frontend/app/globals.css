@@ -3629,7 +3629,7 @@ button.landingButton.primaryButton:disabled {
 .workspaceProductPage {
   min-height: 100vh;
   padding-top: 0;
-  background: #f5f5f7;
+  background: linear-gradient(180deg, #eef3f8 0%, #f5f5f7 34%, #fbfbfd 100%);
   color: #1d1d1f;
 }
 
@@ -3651,7 +3651,8 @@ button.landingButton.primaryButton:disabled {
 
 .overviewProductEyebrow,
 .overviewProductSectionHeader > span,
-.overviewProductQuickText > span,
+.overviewProductQuickStep,
+.overviewProductQuickStateBadge,
 .overviewProductNextPanel > span,
 .overviewProductSignal > span,
 .overviewProductExplainerCard > span {
@@ -3721,80 +3722,136 @@ button.landingButton.primaryButton:disabled {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
 }
 
-.overviewProductQuickRail {
+.overviewProductQuickGrid {
   display: grid;
   gap: 8px;
   margin-top: 24px;
 }
 
-.overviewProductQuickAction {
-  display: flex;
-  min-height: 64px;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+.overviewProductQuickCard {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 212px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(244, 247, 251, 0.58));
   color: #1d1d1f;
-  padding: 10px;
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
-  transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+  padding: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    0 16px 36px rgba(105, 120, 145, 0.14);
 }
 
-.overviewProductQuickAction.isReady:hover {
-  border-color: rgba(0, 0, 0, 0.18);
-  background: #fff;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
+@supports ((backdrop-filter: blur(18px)) or (-webkit-backdrop-filter: blur(18px))) {
+  .overviewProductQuickCard,
+  .overviewProductNextPanel,
+  .overviewProductSignal,
+  .overviewProductPathSection,
+  .overviewProductExplainer {
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+  }
 }
 
-.overviewProductQuickAction.isPrimary {
-  border-color: #1d1d1f;
-  background: #1d1d1f;
-  color: #fff;
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.14);
+.overviewProductQuickCard.isPrimary {
+  border-color: rgba(176, 198, 225, 0.92);
+  background:
+    linear-gradient(135deg, rgba(248, 251, 255, 0.9), rgba(226, 235, 245, 0.76));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 18px 38px rgba(125, 144, 170, 0.18);
 }
 
-.overviewProductQuickAction.isLocked {
-  color: #86868b;
-  cursor: not-allowed;
+.overviewProductQuickCard.isReady {
+  border-color: rgba(186, 215, 201, 0.9);
+  background:
+    linear-gradient(135deg, rgba(250, 253, 251, 0.88), rgba(235, 246, 240, 0.72));
 }
 
-.overviewProductQuickIndex {
-  display: inline-flex;
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
+.overviewProductQuickCard.isLocked {
+  border-color: rgba(214, 218, 227, 0.88);
+  background:
+    linear-gradient(135deg, rgba(251, 251, 253, 0.86), rgba(242, 244, 247, 0.74));
+}
+
+.overviewProductQuickHeader {
+  display: flex;
+  gap: 10px;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.overviewProductQuickStep,
+.overviewProductQuickStateBadge {
+  width: fit-content;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.overviewProductQuickCard.isPrimary .overviewProductQuickStateBadge {
+  background: rgba(208, 223, 241, 0.9);
+  color: #35506b;
+}
+
+.overviewProductQuickCard.isReady .overviewProductQuickStateBadge {
+  background: rgba(213, 236, 222, 0.92);
+  color: #256f5c;
+}
+
+.overviewProductQuickCard.isLocked .overviewProductQuickStateBadge {
+  background: rgba(237, 239, 244, 0.96);
+  color: #7b818d;
+}
+
+.overviewProductQuickCopy {
+  display: grid;
+  gap: 8px;
+}
+
+.overviewProductQuickCopy h3 {
+  margin: 0;
+  color: #1d1d1f;
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.overviewProductQuickCopy p {
+  margin: 0;
+  color: #5e6673;
+  line-height: 1.55;
+}
+
+.overviewProductQuickFooter {
+  margin-top: auto;
+}
+
+.overviewProductQuickButton {
+  min-height: 44px;
+  width: 100%;
   justify-content: center;
   border-radius: 8px;
-  background: #f5f5f7;
+}
+
+.overviewProductQuickButton.secondaryButton {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.08);
   color: #1d1d1f;
-  font-weight: 800;
 }
 
-.overviewProductQuickAction.isPrimary .overviewProductQuickIndex {
-  background: #fff;
+.overviewProductQuickButton.isCurrent {
+  background: rgba(212, 225, 240, 0.88);
+  border-color: rgba(129, 157, 188, 0.46);
+  box-shadow: 0 12px 24px rgba(128, 145, 170, 0.12);
 }
 
-.overviewProductQuickText {
-  display: grid;
-  gap: 2px;
-}
-
-.overviewProductQuickText strong {
-  font-size: 14px;
-  line-height: 1.2;
-}
-
-.overviewProductQuickAction.isPrimary .overviewProductQuickText > span {
-  color: rgba(255, 255, 255, 0.7);
+.overviewProductQuickButton.secondaryButton:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .overviewProductTextButton {
@@ -3815,10 +3872,13 @@ button.landingButton.primaryButton:disabled {
   display: grid;
   gap: 14px;
   padding: 22px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.08);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(238, 243, 249, 0.66));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    0 18px 42px rgba(105, 120, 145, 0.14);
 }
 
 .overviewProductNextPanel strong {
@@ -3843,9 +3903,13 @@ button.landingButton.primaryButton:disabled {
   display: grid;
   gap: 6px;
   padding: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(243, 247, 251, 0.58));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 10px 24px rgba(118, 132, 158, 0.08);
 }
 
 .overviewProductSignal strong {
@@ -3862,9 +3926,13 @@ button.landingButton.primaryButton:disabled {
   display: block;
   margin-bottom: 22px;
   padding: 24px;
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(243, 246, 250, 0.6));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    0 14px 32px rgba(120, 132, 156, 0.08);
 }
 
 .overviewProductDetails > summary {
@@ -4404,7 +4472,6 @@ button.landingButton.primaryButton:disabled {
   }
 
   .overviewProductActions > *,
-  .overviewProductQuickAction,
   .overviewProductNextPanel .landingButton,
   .overviewProductStep .landingButton,
   .overviewProductStep .secondaryButton {
@@ -4429,6 +4496,10 @@ button.landingButton.primaryButton:disabled {
     position: static;
     width: fit-content;
     margin-top: 4px;
+  }
+
+  .overviewProductQuickButton {
+    width: 100%;
   }
 }
 
@@ -4502,7 +4573,7 @@ button.landingButton.primaryButton:disabled {
     grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   }
 
-  .overviewProductQuickRail {
+  .overviewProductQuickGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
