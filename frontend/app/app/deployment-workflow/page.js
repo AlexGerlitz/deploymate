@@ -702,10 +702,10 @@ function DeploymentWorkflowPageContent() {
       return;
     }
 
-    if (workflowState.mode === "prerequisite" && workflowTab === "live") {
+    if ((workflowState.mode === "prerequisite" || deployments.length === 0) && workflowTab === "live") {
       setWorkflowTab("create");
     }
-  }, [memberHasLiveDeployments, serverAccessBlocked, workflowState.mode, workflowTab]);
+  }, [deployments.length, memberHasLiveDeployments, serverAccessBlocked, workflowState.mode, workflowTab]);
 
   useEffect(() => {
     if (requestedTemplateSource !== "deployment-detail") {
@@ -1396,6 +1396,12 @@ function DeploymentWorkflowPageContent() {
       editingTemplateId ||
       envRows.some((row) => row.key.trim() || row.value.trim()),
   );
+  const firstDeployCreatePriority =
+    Boolean(form.server_id) &&
+    deployments.length === 0 &&
+    !rolloutDraftStarted &&
+    !editingTemplateId;
+  const showLiveTab = deployments.length > 0;
   const createDeploymentBlocked =
     submitting ||
     deploymentLimitReached ||
@@ -1711,6 +1717,14 @@ function DeploymentWorkflowPageContent() {
             <span className="status error">failed {failedDeploymentCount}</span>
             <span className="status info">templates {templates.length}</span>
           </div>
+          {firstDeployCreatePriority && templates.length > 0 ? (
+            <div
+              className="banner subtle inlineBanner"
+              data-testid="deployment-workflow-first-deploy-templates-note"
+            >
+              Saved setups stay here as a fallback. For this first deploy, start with the image unless you already know one template should win.
+            </div>
+          ) : null}
           {!serverAccessBlocked ? (
             <div
               className="filterTabs"
@@ -1718,14 +1732,16 @@ function DeploymentWorkflowPageContent() {
               aria-label="Deployment workflow tabs"
               data-testid="deployment-workflow-tabs-card"
             >
-              <button
-                type="button"
-                className={workflowTab === "live" ? "active" : ""}
-                onClick={() => setWorkflowTab("live")}
-                data-testid="deployment-workflow-tab-live"
-              >
-                Check live apps
-              </button>
+              {showLiveTab ? (
+                <button
+                  type="button"
+                  className={workflowTab === "live" ? "active" : ""}
+                  onClick={() => setWorkflowTab("live")}
+                  data-testid="deployment-workflow-tab-live"
+                >
+                  Check live apps
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={workflowTab === "create" ? "active" : ""}
@@ -1740,7 +1756,7 @@ function DeploymentWorkflowPageContent() {
                 onClick={() => setWorkflowTab("templates")}
                 data-testid="deployment-workflow-tab-templates"
               >
-                Use saved setup
+                {firstDeployCreatePriority ? "Use saved setup instead" : "Use saved setup"}
               </button>
             </div>
           ) : null}

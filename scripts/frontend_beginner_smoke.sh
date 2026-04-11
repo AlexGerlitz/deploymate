@@ -475,6 +475,24 @@ run_beginner_first_deploy_smoke() {
       exit 1
     fi
 
+    if grep -Eq 'data-testid="deployment-workflow-tab-live"' "$first_deploy_html"; then
+      echo "[frontend-beginner-first-deploy-smoke] live-review tab still appears before the first deployment exists" >&2
+      rm -f "$first_deploy_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="deployment-workflow-tab-templates"[^>]*>Use saved setup instead<' "$first_deploy_html"; then
+      echo "[frontend-beginner-first-deploy-smoke] template tab did not stay framed as the fallback path" >&2
+      rm -f "$first_deploy_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="deployment-workflow-first-deploy-templates-note"' "$first_deploy_html"; then
+      echo "[frontend-beginner-first-deploy-smoke] first deploy path lost the explicit template fallback note" >&2
+      rm -f "$first_deploy_html"
+      exit 1
+    fi
+
     if grep -Eq 'Image is required\.' "$first_deploy_html"; then
       echo "[frontend-beginner-first-deploy-smoke] empty first draft shows a premature validation error" >&2
       rm -f "$first_deploy_html"
