@@ -181,6 +181,11 @@ Updated: 2026-04-11
   - issue: the primary CTA still said `See what opens next`, which was directionally correct but too vague for a first-time user trying to understand why rollout is blocked
   - fix: the blocked member overview now uses `Review rollout status`, matching the fact that the click opens the blocked deployment workflow state instead of a hidden next-step surprise
   - guardrail: `smoke:beginner` now fails if the member waiting overview loses that explicit rollout-status action
+- The ready server-review state now points forward instead of backward:
+  - screen: ready server task panel on `/app/server-review`
+  - issue: once a server was already ready, the open task grid still kept `Check server readiness` as a primary action, so the page visually competed with the actual next move into app setup
+  - fix: ready server cards now make `Choose what to run` the primary CTA, while readiness check is demoted to an explicit recheck-only action
+  - guardrail: `smoke:servers` now runs a ready-server fixture and fails if the continue action stops being primary or the recheck action regains primary weight
 - The member-safe pass found one blocked-path leak:
   - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
   - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
@@ -1049,6 +1054,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:runtime` после internal-only runtime review path package -> ok
 - `npm --prefix frontend run build` после blocked member overview CTA wording slice -> ok
 - `npm --prefix frontend run smoke:beginner` после blocked member overview CTA wording slice -> ok
+- `npm --prefix frontend run build` после ready server-review CTA hierarchy slice -> ok
+- `npm --prefix frontend run smoke:servers` после ready server-review CTA hierarchy slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

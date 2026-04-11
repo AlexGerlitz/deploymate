@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { readJsonOrError } from "../../lib/admin-page-utils";
-import { smokeMode, smokeServers, smokeUser } from "../../lib/smoke-fixtures";
+import {
+  smokeMode,
+  smokeServerDiagnostics,
+  smokeServerTestResults,
+  smokeServers,
+  smokeUser,
+} from "../../lib/smoke-fixtures";
 import {
   AdminFeedbackBanners,
   AdminSurfaceQueue,
@@ -31,15 +37,32 @@ const localDeploymentsEnabled =
 const smokeServerReviewScenario =
   process.env.NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO || "empty";
 const smokeServerReviewFixture =
-  smokeMode && smokeServerReviewScenario === "pending"
+  smokeMode && smokeServerReviewScenario === "ready"
+    ? {
+        servers: [smokeServers[0]],
+        successMessage:
+          'Loaded 1 ready server target. Step 2 is now the main path.',
+        testResults: smokeServerTestResults,
+        diagnostics: smokeServerDiagnostics,
+        suggestedPorts: {
+          "smoke-server": [38080, 38081],
+        },
+      }
+    : smokeMode && smokeServerReviewScenario === "pending"
     ? {
         servers: [smokeServers[0]],
         successMessage:
           'Loaded 1 saved server target. Finish the check before adding another server.',
+        testResults: {},
+        diagnostics: {},
+        suggestedPorts: {},
       }
     : {
         servers: [],
         successMessage: "Start here: save one server target, then run one check.",
+        testResults: {},
+        diagnostics: {},
+        suggestedPorts: {},
       };
 
 function buildServerMeta(server, diagnostics, suggestedPorts) {
@@ -159,9 +182,15 @@ function ServerReviewPageContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(smokeMode ? smokeServerReviewFixture.successMessage : "Start here: save one server target, then run one check.");
   const [servers, setServers] = useState(smokeMode ? smokeServerReviewFixture.servers : []);
-  const [serverTestResults, setServerTestResults] = useState({});
-  const [serverDiagnostics, setServerDiagnostics] = useState({});
-  const [serverSuggestedPorts, setServerSuggestedPorts] = useState({});
+  const [serverTestResults, setServerTestResults] = useState(
+    smokeMode ? smokeServerReviewFixture.testResults : {},
+  );
+  const [serverDiagnostics, setServerDiagnostics] = useState(
+    smokeMode ? smokeServerReviewFixture.diagnostics : {},
+  );
+  const [serverSuggestedPorts, setServerSuggestedPorts] = useState(
+    smokeMode ? smokeServerReviewFixture.suggestedPorts : {},
+  );
   const [selectedItemId, setSelectedItemId] = useState(
     smokeMode ? smokeServerReviewFixture.servers[0]?.id || "" : "",
   );
@@ -264,7 +293,7 @@ function ServerReviewPageContent() {
           title: `${selectedReadyItem.label} is ready for Step 2`,
           detail: "You already have one confirmed server. Keep the momentum and choose what to run next.",
           support: "You can always come back later, but the main path has already moved on from this screen.",
-          actionLabel: "Go to Step 2",
+          actionLabel: "Choose what to run",
           actionKind: "continue",
           actionHref: `/app/deployment-workflow?server=${selectedReadyItem.id}&source=server-review`,
         }
@@ -1100,21 +1129,29 @@ function ServerReviewPageContent() {
 
                     <div className="workspaceReviewerGrid serverReviewTaskGrid">
                       <article className="workspaceReviewerCard serverReviewTaskCard">
-                        <span>Do this now</span>
-                        <strong>Check whether this server is ready</strong>
+                        <span>{item.segment === "ready" ? "Only if something changed" : "Do this now"}</span>
+                        <strong>
+                          {item.segment === "ready" ? "Recheck this server" : "Check whether this server is ready"}
+                        </strong>
                         <p>
-                          {item.diagnostics
+                          {item.segment === "ready"
+                            ? "This is no longer the main path. Run the readiness check again only if the server details changed or you want a fresh answer."
+                            : item.diagnostics
                             ? "Run the readiness check again if you changed the server details or want a fresh answer."
                             : "This is the main action on this screen. It checks that the server is reachable and looks safe for Step 2."}
                         </p>
                         <button
                           type="button"
-                          className="landingButton primaryButton"
-                          data-testid={`${item.id}-primary-action`}
+                          className={item.segment === "ready" ? "secondaryButton" : "landingButton primaryButton"}
+                          data-testid={`${item.id}-${item.segment === "ready" ? "recheck-action" : "primary-action"}`}
                           onClick={() => handleRunStarterAction("primary", item.id)}
                           disabled={actionLoadingId === item.id}
                         >
-                          {actionLoadingId === item.id ? "Checking..." : "Check server readiness"}
+                          {actionLoadingId === item.id
+                            ? "Checking..."
+                            : item.segment === "ready"
+                              ? "Recheck server readiness"
+                              : "Check server readiness"}
                         </button>
                       </article>
 
@@ -1136,7 +1173,7 @@ function ServerReviewPageContent() {
                       </article>
 
                       <article className="workspaceReviewerCard serverReviewTaskCard">
-                        <span>Then do this</span>
+                        <span>{item.segment === "ready" ? "Do this now" : "Then do this"}</span>
                         <strong>
                           {item.segment === "ready"
                             ? "Choose what to run on this server"
@@ -1150,9 +1187,10 @@ function ServerReviewPageContent() {
                         {item.segment === "ready" ? (
                           <Link
                             href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
+                            data-testid={`${item.id}-continue-action`}
                             className="landingButton primaryButton"
                           >
-                            Go to Step 2
+                            Choose what to run
                           </Link>
                         ) : (
                           <div className="banner subtle inlineBanner">
