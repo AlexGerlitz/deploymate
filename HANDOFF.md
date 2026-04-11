@@ -191,6 +191,11 @@ Updated: 2026-04-11
   - issue: the page still showed `Check live apps` and a neutral template tab before the first deploy existed, which made Step 2 read like several equal paths instead of one obvious first click
   - fix: the live-review tab now stays hidden until at least one deployment exists, and the template path is explicitly framed as `Use saved setup instead` with a first-deploy fallback note
   - guardrail: `smoke:beginner` now fails if the first-deploy fixture brings back the live tab or loses the explicit template-fallback framing
+- Template deploy success now lands on the same next step as manual create:
+  - screen: template deploy success banner on `/app/deployment-workflow`
+  - issue: manual create already made `Open runtime detail` the obvious next click, but template deploy success still fell back to low-emphasis `View details` copy without a secondary route back into the live queue
+  - fix: template deploy success now uses the same review-first wording as manual create, with `Open runtime detail` as the primary action and `Review live queue` as the secondary follow-up
+  - guardrail: `smoke:runtime` now runs a template-success workflow fixture and fails if runtime detail stops being the primary success action
 - The member-safe pass found one blocked-path leak:
   - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
   - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
@@ -1063,6 +1068,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:servers` после ready server-review CTA hierarchy slice -> ok
 - `npm --prefix frontend run build` после first-deploy workflow tab hierarchy slice -> ok
 - `npm --prefix frontend run smoke:beginner` после first-deploy workflow tab hierarchy slice -> ok
+- `npm --prefix frontend run build` после template deploy success consistency slice -> ok
+- `npm --prefix frontend run smoke:runtime` после template deploy success consistency slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

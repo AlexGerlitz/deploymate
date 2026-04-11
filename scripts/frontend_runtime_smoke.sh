@@ -13,6 +13,7 @@ HEALTHY_WORKFLOW_HTML="$(mktemp)"
 FAILED_WORKFLOW_HTML="$(mktemp)"
 INTERNAL_DETAIL_HTML="$(mktemp)"
 INTERNAL_WORKFLOW_HTML="$(mktemp)"
+TEMPLATE_SUCCESS_WORKFLOW_HTML="$(mktemp)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${SCRIPT_DIR}/lib/project_automation.sh"
@@ -23,7 +24,7 @@ cleanup() {
   if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
     stop_frontend_smoke_server
   fi
-  rm -f "$APP_HTML" "$DETAIL_HTML" "$FAILED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML"
+  rm -f "$APP_HTML" "$DETAIL_HTML" "$FAILED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML"
 }
 
 trap cleanup EXIT
@@ -232,10 +233,57 @@ fi
   fi
 )
 
+(
+  set -euo pipefail
+  source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+
+  export PORT="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_PORT:-3014}"
+  export BASE_URL="http://127.0.0.1:${PORT}"
+  export SERVER_LOG="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_LOG:-/tmp/deploymate-frontend-template-success-smoke.log}"
+  export DIST_DIR="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_DIST_DIR:-.next-smoke-template-success-${PORT}}"
+  export FRONTEND_SMOKE_PORT="$PORT"
+  export FRONTEND_SMOKE_LOG="$SERVER_LOG"
+  export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
+  export FRONTEND_SMOKE_REUSE_SERVER=0
+  export NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=template-deploy-success
+
+  cleanup_template_success() {
+    stop_frontend_smoke_server
+  }
+
+  trap cleanup_template_success EXIT
+
+  start_frontend_smoke_server
+  wait_for_frontend_smoke_url "/app/deployment-workflow"
+
+  curl -sS "${BASE_URL}/app/deployment-workflow" > "$TEMPLATE_SUCCESS_WORKFLOW_HTML"
+
+  if ! grep -Eq 'data-testid="template-deploy-success-banner"' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] template deploy success scenario lost the success banner" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<a[^>]*data-testid="template-deploy-success-open-detail-link"[^>]*class="[^"]*landingButton primaryButton[^"]*")|(<a[^>]*class="[^"]*landingButton primaryButton[^"]*"[^>]*data-testid="template-deploy-success-open-detail-link")' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] template deploy success does not make runtime detail the primary action" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="template-deploy-success-open-detail-link"[^>]*>Open runtime detail<' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] template deploy success lost the explicit runtime-detail action label" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<button[^>]*data-testid="template-deploy-success-open-live-button"[^>]*class="[^"]*secondaryButton[^"]*")|(<button[^>]*class="[^"]*secondaryButton[^"]*"[^>]*data-testid="template-deploy-success-open-live-button")' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] template deploy success does not keep live queue review secondary" >&2
+    exit 1
+  fi
+)
+
 echo "[frontend-runtime-smoke] app runtime surface rendered"
 echo "[frontend-runtime-smoke] deployment detail surface rendered"
 echo "[frontend-runtime-smoke] internal-only runtime detail rendered"
 echo "[frontend-runtime-smoke] healthy workflow happy path rendered"
 echo "[frontend-runtime-smoke] failed secondary workflow review path rendered"
 echo "[frontend-runtime-smoke] internal-only workflow review path rendered"
+echo "[frontend-runtime-smoke] template deploy success path rendered"
 echo "[frontend-runtime-smoke] complete"

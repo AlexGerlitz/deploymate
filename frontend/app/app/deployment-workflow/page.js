@@ -49,6 +49,13 @@ const smokeInternalRuntimeShadowDeployment = {
   container_id: "container-internal-2",
   created_at: "2026-04-02T00:22:00Z",
 };
+const smokeTemplateCreatedDeployment = {
+  ...smokeDeployments[0],
+  id: "template-success-deployment",
+  container_name: "template-success-runtime",
+  container_id: "container-template-success-1",
+  created_at: "2026-04-02T00:25:00Z",
+};
 const smokeFailedQueueReviewDeployments = smokeReviewWorkerDeployment
   ? [
       smokeReviewWorkerDeployment,
@@ -79,6 +86,11 @@ const smokeWorkflowFixture =
         workflowMessage: smokeServers[0]
           ? `Server "${smokeServers[0].name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`
           : "",
+        workflowTab: "create",
+        submitSuccess: "",
+        createdDeployment: null,
+        templateDeploySuccess: "",
+        templateCreatedDeployment: null,
       }
     : smokeMode && smokeWorkflowScenario === "healthy-live-review"
       ? {
@@ -93,6 +105,11 @@ const smokeWorkflowFixture =
             server_id: "",
           },
           workflowMessage: "",
+          workflowTab: "live",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
         }
     : smokeMode && smokeWorkflowScenario === "internal-only-live-review"
       ? {
@@ -111,6 +128,11 @@ const smokeWorkflowFixture =
             server_id: "",
           },
           workflowMessage: "",
+          workflowTab: "live",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
         }
     : smokeMode && smokeWorkflowScenario === "failed-live-review"
       ? {
@@ -125,6 +147,31 @@ const smokeWorkflowFixture =
             server_id: "",
           },
           workflowMessage: "",
+          workflowTab: "live",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
+        }
+    : smokeMode && smokeWorkflowScenario === "template-deploy-success"
+      ? {
+          deployments: smokeDeployments,
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "templates",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess:
+            "Deployment created from template. Open runtime detail next while this rollout is still fresh.",
+          templateCreatedDeployment: smokeTemplateCreatedDeployment,
         }
     : smokeMode && smokeWorkflowScenario === "first-deploy-after-overview"
       ? {
@@ -141,6 +188,11 @@ const smokeWorkflowFixture =
           workflowMessage: smokeServers[0]
             ? `Server "${smokeServers[0].name}" is already selected from Overview. Continue with the first deployment while that target is still understood.`
             : "",
+          workflowTab: "create",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
         }
     : smokeMode && smokeWorkflowScenario === "member-waiting-for-admin-target"
       ? {
@@ -155,6 +207,11 @@ const smokeWorkflowFixture =
             server_id: "",
           },
           workflowMessage: "",
+          workflowTab: "create",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
         }
       : smokeMode && !smokeUser.is_admin
         ? {
@@ -169,6 +226,11 @@ const smokeWorkflowFixture =
               server_id: "",
             },
             workflowMessage: "",
+            workflowTab: "create",
+            submitSuccess: "",
+            createdDeployment: null,
+            templateDeploySuccess: "",
+            templateCreatedDeployment: null,
           }
     : {
         deployments: smokeDeployments,
@@ -182,6 +244,11 @@ const smokeWorkflowFixture =
           server_id: "",
         },
         workflowMessage: "",
+        workflowTab: "create",
+        submitSuccess: "",
+        createdDeployment: null,
+        templateDeploySuccess: "",
+        templateCreatedDeployment: null,
       };
 
 function buildRuntimeCardActionState(deployment) {
@@ -221,14 +288,22 @@ function DeploymentWorkflowPageContent() {
   const [templatesError, setTemplatesError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [submitSuccess, setSubmitSuccess] = useState("");
-  const [createdDeployment, setCreatedDeployment] = useState(null);
+  const [submitSuccess, setSubmitSuccess] = useState(
+    smokeMode ? smokeWorkflowFixture.submitSuccess : "",
+  );
+  const [createdDeployment, setCreatedDeployment] = useState(
+    smokeMode ? smokeWorkflowFixture.createdDeployment : null,
+  );
   const [templateSubmitting, setTemplateSubmitting] = useState(false);
   const [templateSubmitError, setTemplateSubmitError] = useState("");
   const [templateSubmitSuccess, setTemplateSubmitSuccess] = useState("");
   const [templateDeployError, setTemplateDeployError] = useState("");
-  const [templateDeploySuccess, setTemplateDeploySuccess] = useState("");
-  const [templateCreatedDeployment, setTemplateCreatedDeployment] = useState(null);
+  const [templateDeploySuccess, setTemplateDeploySuccess] = useState(
+    smokeMode ? smokeWorkflowFixture.templateDeploySuccess : "",
+  );
+  const [templateCreatedDeployment, setTemplateCreatedDeployment] = useState(
+    smokeMode ? smokeWorkflowFixture.templateCreatedDeployment : null,
+  );
   const [templateDuplicateError, setTemplateDuplicateError] = useState("");
   const [templateDuplicateSuccess, setTemplateDuplicateSuccess] = useState("");
   const [deleteError, setDeleteError] = useState("");
@@ -246,7 +321,9 @@ function DeploymentWorkflowPageContent() {
   const [workflowMessage, setWorkflowMessage] = useState(smokeMode ? smokeWorkflowFixture.workflowMessage : "");
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
-  const [workflowTab, setWorkflowTab] = useState("create");
+  const [workflowTab, setWorkflowTab] = useState(
+    smokeMode ? smokeWorkflowFixture.workflowTab : "create",
+  );
   const [createAdvancedOpen, setCreateAdvancedOpen] = useState(false);
   const [form, setForm] = useState({
     image: smokeMode ? smokeWorkflowFixture.form.image : "",
@@ -1355,7 +1432,9 @@ function DeploymentWorkflowPageContent() {
       );
       const data = await readJsonOrError(response, "Failed to deploy from template.");
       setTemplateCreatedDeployment(data);
-      setTemplateDeploySuccess("Deployment created from template.");
+      setTemplateDeploySuccess(
+        "Deployment created from template. Open runtime detail next while this rollout is still fresh.",
+      );
       await refreshWorkspace();
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -2647,8 +2726,12 @@ function DeploymentWorkflowPageContent() {
               {templateCreatedDeployment?.id || buildDeploymentUrl(templateCreatedDeployment) ? (
                 <div className="successActions">
                   {templateCreatedDeployment?.id ? (
-                    <Link href={`/deployments/${templateCreatedDeployment.id}`} className="linkButton">
-                      View details
+                    <Link
+                      href={`/deployments/${templateCreatedDeployment.id}`}
+                      className="landingButton primaryButton"
+                      data-testid="template-deploy-success-open-detail-link"
+                    >
+                      Open runtime detail
                     </Link>
                   ) : null}
                   {buildDeploymentUrl(templateCreatedDeployment) ? (
@@ -2657,10 +2740,19 @@ function DeploymentWorkflowPageContent() {
                       target="_blank"
                       rel="noreferrer"
                       className="linkButton"
+                      data-testid="template-deploy-success-open-app-link"
                     >
                       Open app
                     </a>
                   ) : null}
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => setWorkflowTab("live")}
+                    data-testid="template-deploy-success-open-live-button"
+                  >
+                    Review live queue
+                  </button>
                 </div>
               ) : null}
             </div>
