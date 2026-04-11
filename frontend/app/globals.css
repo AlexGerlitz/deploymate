@@ -3651,6 +3651,7 @@ button.landingButton.primaryButton:disabled {
 
 .overviewProductEyebrow,
 .overviewProductSectionHeader > span,
+.overviewProductQuickText > span,
 .overviewProductNextPanel > span,
 .overviewProductSignal > span,
 .overviewProductExplainerCard > span {
@@ -3702,7 +3703,7 @@ button.landingButton.primaryButton:disabled {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  margin-top: 28px;
+  margin-top: 18px;
 }
 
 .overviewProductHero .landingButton,
@@ -3718,6 +3719,82 @@ button.landingButton.primaryButton:disabled {
   background: #1d1d1f;
   color: #fff;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.overviewProductQuickRail {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.overviewProductQuickAction {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #1d1d1f;
+  padding: 10px;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.overviewProductQuickAction.isReady:hover {
+  border-color: rgba(0, 0, 0, 0.18);
+  background: #fff;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.overviewProductQuickAction.isPrimary {
+  border-color: #1d1d1f;
+  background: #1d1d1f;
+  color: #fff;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.14);
+}
+
+.overviewProductQuickAction.isLocked {
+  color: #86868b;
+  cursor: not-allowed;
+}
+
+.overviewProductQuickIndex {
+  display: inline-flex;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font-weight: 800;
+}
+
+.overviewProductQuickAction.isPrimary .overviewProductQuickIndex {
+  background: #fff;
+}
+
+.overviewProductQuickText {
+  display: grid;
+  gap: 2px;
+}
+
+.overviewProductQuickText strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.overviewProductQuickAction.isPrimary .overviewProductQuickText > span {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .overviewProductTextButton {
@@ -3782,13 +3859,49 @@ button.landingButton.primaryButton:disabled {
 
 .overviewProductPathSection,
 .overviewProductExplainer {
-  display: grid;
-  gap: 18px;
+  display: block;
   margin-bottom: 22px;
   padding: 24px;
   border: 1px solid rgba(0, 0, 0, 0.07);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.78);
+}
+
+.overviewProductDetails > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.overviewProductDetails > summary::-webkit-details-marker {
+  display: none;
+}
+
+.overviewProductSummary {
+  position: relative;
+  padding-right: 112px;
+}
+
+.overviewProductSummary::after {
+  content: "View details";
+  position: absolute;
+  top: 0;
+  right: 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  color: #1d1d1f;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.overviewProductDetails[open] .overviewProductSummary::after {
+  content: "Hide details";
+}
+
+.overviewProductDetails[open] > .overviewProductPath,
+.overviewProductDetails[open] > .overviewProductExplainerGrid {
+  margin-top: 18px;
 }
 
 .overviewProductSectionHeader {
@@ -3833,7 +3946,7 @@ button.landingButton.primaryButton:disabled {
 .overviewProductStepNumber {
   display: inline-flex;
   width: fit-content;
-  border-radius: 999px;
+  border-radius: 8px;
   background: #1d1d1f;
   color: #fff;
   padding: 6px 10px;
@@ -3850,7 +3963,7 @@ button.landingButton.primaryButton:disabled {
 
 .overviewProductStepState {
   display: inline-flex;
-  border-radius: 999px;
+  border-radius: 8px;
   background: #f5f5f7;
   color: #6e6e73;
   padding: 6px 10px;
@@ -4291,6 +4404,7 @@ button.landingButton.primaryButton:disabled {
   }
 
   .overviewProductActions > *,
+  .overviewProductQuickAction,
   .overviewProductNextPanel .landingButton,
   .overviewProductStep .landingButton,
   .overviewProductStep .secondaryButton {
@@ -4305,6 +4419,16 @@ button.landingButton.primaryButton:disabled {
 
   .overviewProductSectionHeader h2 {
     font-size: 28px;
+  }
+
+  .overviewProductSummary {
+    padding-right: 0;
+  }
+
+  .overviewProductSummary::after {
+    position: static;
+    width: fit-content;
+    margin-top: 4px;
   }
 }
 
@@ -4376,6 +4500,10 @@ button.landingButton.primaryButton:disabled {
 
   .overviewProductHero {
     grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  }
+
+  .overviewProductQuickRail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .overviewProductSignals,

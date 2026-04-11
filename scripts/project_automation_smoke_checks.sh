@@ -121,6 +121,10 @@ automation_smoke_beginner_admin_checks() {
   cat <<'EOF'
 /app|beginner overview title|data-testid="runtime-page-title"
 /app|beginner overview product hero|data-testid="workspace-product-hero"
+/app|beginner overview quick actions|data-testid="workspace-quick-actions"
+/app|beginner overview quick action step 1|data-testid="workspace-quick-action-step-1"
+/app|beginner overview quick action step 2 disabled|(<button[^>]*data-testid="workspace-quick-action-step-2"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-quick-action-step-2")
+/app|beginner overview quick action step 3 disabled|(<button[^>]*data-testid="workspace-quick-action-step-3"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-quick-action-step-3")
 /app|beginner overview signal strip|data-testid="workspace-product-signals"
 /app|beginner overview guide title|data-testid="workspace-scenario-title"
 /app|beginner overview primary hero action|data-testid="workspace-hero-primary-action"

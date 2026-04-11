@@ -267,6 +267,24 @@ export default function HomePage() {
       disabled: stepThreeBlocked,
     },
   ];
+  const productQuickActions = beginnerSteps.map((card) => {
+    const quickLabelByStep = {
+      "step-1": "Connect server",
+      "step-2": "Deploy app",
+      "step-3": "Review health",
+    };
+    const disabledLabelByStep = {
+      "step-1": "Needs admin",
+      "step-2": memberNewDeploymentBlocked ? "Needs admin" : "After server",
+      "step-3": "After deploy",
+    };
+
+    return {
+      ...card,
+      quickLabel: quickLabelByStep[card.key],
+      quickState: card.primary ? "Current" : card.disabled ? disabledLabelByStep[card.key] : "Open",
+    };
+  });
   const plainLanguageCards = [
     {
       title: "What “server” means here",
@@ -687,6 +705,47 @@ export default function HomePage() {
             <h1 data-testid="runtime-page-title">Deploy Docker apps on your own server.</h1>
             <p className="overviewProductLead">{heroHeadline}</p>
             <p className="overviewProductSupport">{heroSupportText}</p>
+            <div
+              className="overviewProductQuickRail"
+              data-testid="workspace-quick-actions"
+              aria-label="How to use DeployMate"
+            >
+              {productQuickActions.map((card) => {
+                const quickActionClassName = `overviewProductQuickAction ${
+                  card.primary ? "isPrimary" : card.disabled ? "isLocked" : "isReady"
+                }`;
+                const quickActionContent = (
+                  <>
+                    <span className="overviewProductQuickIndex">{card.step.replace("Step ", "")}</span>
+                    <span className="overviewProductQuickText">
+                      <strong>{card.quickLabel}</strong>
+                      <span>{card.quickState}</span>
+                    </span>
+                  </>
+                );
+
+                return card.disabled ? (
+                  <button
+                    key={card.key}
+                    type="button"
+                    disabled
+                    className={quickActionClassName}
+                    data-testid={`workspace-quick-action-${card.key}`}
+                  >
+                    {quickActionContent}
+                  </button>
+                ) : (
+                  <Link
+                    key={card.key}
+                    href={card.href}
+                    className={quickActionClassName}
+                    data-testid={`workspace-quick-action-${card.key}`}
+                  >
+                    {quickActionContent}
+                  </Link>
+                );
+              })}
+            </div>
             <div className="overviewProductActions">
               <Link
                 href={overviewPrimaryHref}
@@ -725,12 +784,12 @@ export default function HomePage() {
           ))}
         </section>
 
-        <section className="overviewProductPathSection" data-testid="workspace-scenario-card">
-          <div className="overviewProductSectionHeader">
+        <details className="overviewProductDetails overviewProductPathSection" data-testid="workspace-scenario-card">
+          <summary className="overviewProductSectionHeader overviewProductSummary">
             <span>First pass</span>
             <h2 data-testid="workspace-scenario-title">One path, three steps</h2>
             <p>{beginnerNextStep}</p>
-          </div>
+          </summary>
           <div className="overviewProductPath" data-testid="workspace-scenario-grid">
             {beginnerSteps.map((card) => (
               <article
@@ -775,14 +834,14 @@ export default function HomePage() {
               </article>
             ))}
           </div>
-        </section>
+        </details>
 
-        <section className="overviewProductExplainer">
-          <div className="overviewProductSectionHeader">
+        <details className="overviewProductDetails overviewProductExplainer">
+          <summary className="overviewProductSectionHeader overviewProductSummary">
             <span>Plain language</span>
             <h2>{explanationTitle}</h2>
             <p>{explanationBody}</p>
-          </div>
+          </summary>
           <div className="overviewProductExplainerGrid">
             {plainLanguageCards.map((card) => (
               <article key={card.title} className="overviewProductExplainerCard">
@@ -791,7 +850,7 @@ export default function HomePage() {
               </article>
             ))}
           </div>
-        </section>
+        </details>
 
         <div className="workspaceBannerStack">
           {error ? <div className="banner error">{error}</div> : null}

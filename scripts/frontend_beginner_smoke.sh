@@ -109,6 +109,7 @@ from pathlib import Path
 html = Path(sys.argv[1]).read_text(encoding="utf-8")
 required_order = [
     'data-testid="workspace-product-hero"',
+    'data-testid="workspace-quick-actions"',
     'data-testid="workspace-primary-task-card"',
     'data-testid="workspace-scenario-card"',
     'data-testid="ops-overview-disclosure"',

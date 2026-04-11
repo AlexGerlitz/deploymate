@@ -251,6 +251,12 @@ Updated: 2026-04-11
   - issue: the overview story was behaviorally clearer, but still felt too much like an admin/status dashboard with several similarly weighted cards
   - fix: `/app` now opens with a large product statement, one focused next-step panel, a compact signal strip, and then the three-step path; ops/admin depth stays below the first-pass path
   - guardrail: `smoke:beginner` now requires the product hero/signal strip and checks that hero -> next task -> three-step path render before operations depth
+- The overview first screen now reduces scroll friction:
+  - screen: `/app`
+  - issue: after the product-entry pass, the user still had to scroll down to understand the three-step usage model
+  - fix: the hero now includes a top quick-action rail for `Connect server`, `Deploy app`, and `Review health`, using the same real enabled/blocked state as the beginner path
+  - fix: the longer three-step explanation and plain-language copy are now collapsed details, so the first screen stays action-first instead of reading-first
+  - guardrail: `smoke:beginner` now requires the quick-action rail and checks it renders before the deeper path/ops sections
 - The healthy runtime happy path is now reinforced in workflow as well as detail:
   - on the primary healthy runtime card in `deployment-workflow`, `Open app` now comes first and uses the primary action styling
   - `smoke:runtime` now runs a healthy-only workflow fixture so the safe verify path is checked in live queue before detail review
@@ -1092,11 +1098,13 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:runtime` после fresh rollout detail verification checklist slice -> ok
 - `npm --prefix frontend run build` после overview product-entry hierarchy slice -> ok
 - `npm --prefix frontend run smoke:beginner` после overview product-entry hierarchy slice -> ok
+- `npm --prefix frontend run build` после overview quick-action rail slice -> ok
+- `npm --prefix frontend run smoke:beginner` после overview quick-action rail slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:
 
-- текущий пакет по scaffold + server-review + runtime detail handoff + richer backend mutation trace + stronger restore preparation guardrails + structured restore preparation guidance + DeployMate-specific feature scaffold + import-review workspace + restore/import-review handoff + approval trail layer + preparation handoff layer + primary-action UX package + `/app` scenario-entry layer + recovery sequencing layer + upgrade inbox UX package + users dual-path UX package + dedicated deployment workflow split + deployment detail intent-first layer + template lifecycle bridge + create/redeploy consistency layer + redeploy-review guardrails + shared risky-action language layer + shared reviewer-facing rollout copy layer + overview product-entry hierarchy находится в рабочем состоянии
+- текущий пакет по scaffold + server-review + runtime detail handoff + richer backend mutation trace + stronger restore preparation guardrails + structured restore preparation guidance + DeployMate-specific feature scaffold + import-review workspace + restore/import-review handoff + approval trail layer + preparation handoff layer + primary-action UX package + `/app` scenario-entry layer + recovery sequencing layer + upgrade inbox UX package + users dual-path UX package + dedicated deployment workflow split + deployment detail intent-first layer + template lifecycle bridge + create/redeploy consistency layer + redeploy-review guardrails + shared risky-action language layer + shared reviewer-facing rollout copy layer + overview product-entry hierarchy + overview quick-action rail находится в рабочем состоянии
 
 ## Best Next Step
 
