@@ -55,6 +55,34 @@ const smokeWorkflowFixture =
           ? `Server "${smokeServers[0].name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`
           : "",
       }
+    : smokeMode && smokeWorkflowScenario === "member-waiting-for-admin-target"
+      ? {
+          deployments: [],
+          servers: [],
+          templates: [],
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+        }
+      : smokeMode && !smokeUser.is_admin
+        ? {
+            deployments: smokeDeployments,
+            servers: [],
+            templates: [],
+            form: {
+              image: "",
+              name: "",
+              internal_port: "",
+              external_port: "",
+              server_id: "",
+            },
+            workflowMessage: "",
+          }
     : {
         deployments: smokeDeployments,
         servers: smokeServers,
@@ -125,7 +153,8 @@ function DeploymentWorkflowPageContent() {
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const canAccessServers = Boolean(currentUser?.is_admin);
   const serverAccessBlocked = !canAccessServers && !localDeploymentsEnabled;
-  const waitingForAdminTarget = serverAccessBlocked && deployments.length === 0;
+  const memberHasLiveDeployments = serverAccessBlocked && deployments.length > 0;
+  const waitingForAdminTarget = serverAccessBlocked && !memberHasLiveDeployments;
 
   const deploymentLimitReached =
     currentUser &&
@@ -149,8 +178,8 @@ function DeploymentWorkflowPageContent() {
     return [
       deployment.image,
       deployment.container_name,
-      deployment.server_name,
-      deployment.server_host,
+      canAccessServers ? deployment.server_name : null,
+      canAccessServers ? deployment.server_host : null,
       deployment.status,
     ]
       .filter(Boolean)
@@ -550,7 +579,7 @@ function DeploymentWorkflowPageContent() {
 
   useEffect(() => {
     if (serverAccessBlocked) {
-      if (filteredDeployments.length > 0 && workflowTab !== "live") {
+      if (memberHasLiveDeployments && workflowTab !== "live") {
         setWorkflowTab("live");
       }
       return;
@@ -564,7 +593,7 @@ function DeploymentWorkflowPageContent() {
     if (workflowState.mode === "prerequisite" && workflowTab === "live") {
       setWorkflowTab("create");
     }
-  }, [filteredDeployments.length, serverAccessBlocked, workflowState.mode, workflowTab]);
+  }, [memberHasLiveDeployments, serverAccessBlocked, workflowState.mode, workflowTab]);
 
   useEffect(() => {
     if (requestedTemplateSource !== "deployment-detail") {
@@ -1264,11 +1293,11 @@ function DeploymentWorkflowPageContent() {
     templateFormPreflight,
   });
   const memberWorkflowNextStep = serverAccessBlocked
-    ? filteredDeployments.length > 0
+    ? memberHasLiveDeployments
       ? {
-          focus: "Live apps are still available",
+          focus: "Live apps are available for review",
           nextStep:
-            "Review the running deployments first while the saved server target stays with admins.",
+            "Review the deployments that already exist. Creating new remote deployments and choosing saved server targets stay with admins.",
           primaryAction: "Open live deployments",
           secondaryAction: "Copy next step",
           tone: "info",
@@ -1283,7 +1312,7 @@ function DeploymentWorkflowPageContent() {
         }
     : workflowNextStep;
   const pagePrimaryAction =
-    serverAccessBlocked && filteredDeployments.length === 0
+    serverAccessBlocked && !memberHasLiveDeployments
       ? { kind: "link", href: "/app", label: "Back to overview" }
       : serverAccessBlocked
         ? { kind: "button", tab: "live", label: "Open live deployments" }
@@ -1449,6 +1478,48 @@ function DeploymentWorkflowPageContent() {
               <Link href="/app/server-review" className="landingButton primaryButton">
                 Open server review
               </Link>
+              <Link href="/app" className="landingButton secondaryButton">
+                Back to overview
+              </Link>
+            </div>
+          </article>
+        ) : memberHasLiveDeployments ? (
+          <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-member-live-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2 data-testid="deployment-workflow-member-live-title">
+                  Review live deployments with admin-managed targets
+                </h2>
+                <p className="formHint">
+                  Existing deployments can be reviewed here. Creating new remote deployments and choosing saved server targets stay with admins.
+                </p>
+              </div>
+            </div>
+            <div className="workspaceReviewerGrid">
+              <article className="workspaceReviewerCard">
+                <span>1. Review live apps</span>
+                <strong>Open one deployment</strong>
+                <p>Start from the live queue and open detail before asking for a rollout change.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>2. Keep targets hidden</span>
+                <strong>Admin-managed target</strong>
+                <p>Server inventory names, hosts, and target selection stay outside the member workflow.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>3. Ask for changes</span>
+                <strong>Bring a clear review note</strong>
+                <p>Use runtime detail and handoff tools to explain what needs an admin decision.</p>
+              </article>
+            </div>
+            <div className="formActions">
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                onClick={() => setWorkflowTab("live")}
+              >
+                Open live deployments
+              </button>
               <Link href="/app" className="landingButton secondaryButton">
                 Back to overview
               </Link>

@@ -36,6 +36,7 @@ Run this in a remote-only setup where server inventory stays admin-managed.
    Expected: blocked/admin-managed state only, with no server create or edit controls.
 3. Open `/app/deployment-workflow`.
    Expected: blocked/member-safe state until admin Step 1 is complete, or live review only if deployments already exist.
+   Existing deployments should read as review-only work, not as a false instruction to wait for admin setup again.
 
 ## What To Record
 

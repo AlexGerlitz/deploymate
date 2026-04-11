@@ -145,6 +145,18 @@ run_beginner_member_smoke() {
       exit 1
     fi
 
+    if ! grep -Eq 'data-testid="deployment-workflow-member-live-card"' "$workflow_html"; then
+      echo "[frontend-beginner-member-smoke] member remote-only live path lost the live-review guidance card" >&2
+      rm -f "$member_html" "$workflow_html"
+      exit 1
+    fi
+
+    if grep -Eq 'data-testid="deployment-workflow-member-blocked-card"' "$workflow_html"; then
+      echo "[frontend-beginner-member-smoke] member remote-only live path still renders the waiting-for-admin card" >&2
+      rm -f "$member_html" "$workflow_html"
+      exit 1
+    fi
+
     if grep -Eq 'Ops Batch|ops-batch\.demo\.example\.com' "$workflow_html"; then
       echo "[frontend-beginner-member-smoke] member remote-only workflow leaked admin-managed server identity" >&2
       rm -f "$member_html" "$workflow_html"
@@ -216,6 +228,57 @@ run_beginner_member_smoke() {
   )
 }
 
+run_beginner_member_waiting_smoke() {
+  (
+    set -euo pipefail
+    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+
+    export PORT="${FRONTEND_SMOKE_BEGINNER_MEMBER_WAITING_PORT:-3008}"
+    export BASE_URL="http://127.0.0.1:${PORT}"
+    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_MEMBER_WAITING_LOG:-/tmp/deploymate-frontend-beginner-member-waiting-smoke.log}"
+    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_MEMBER_WAITING_DIST_DIR:-.next-smoke-beginner-member-waiting-${PORT}}"
+    export FRONTEND_SMOKE_PORT="$PORT"
+    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
+    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
+    export FRONTEND_SMOKE_REUSE_SERVER=0
+    export NEXT_PUBLIC_SMOKE_USER_ROLE=member
+    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
+    export NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=member-waiting-for-admin-target
+
+    cleanup_member_waiting() {
+      stop_frontend_smoke_server
+    }
+
+    trap cleanup_member_waiting EXIT
+
+    start_frontend_smoke_server
+    wait_for_frontend_smoke_url "/app"
+
+    waiting_html="$(mktemp)"
+    curl -sS "${BASE_URL}/app/deployment-workflow" > "$waiting_html"
+
+    if ! grep -Eq 'data-testid="deployment-workflow-member-blocked-card"' "$waiting_html"; then
+      echo "[frontend-beginner-member-waiting-smoke] member waiting path lost the blocked guidance card" >&2
+      rm -f "$waiting_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-button"[^>]*>Back to overview<' "$waiting_html"; then
+      echo "[frontend-beginner-member-waiting-smoke] member waiting path lost the overview primary action" >&2
+      rm -f "$waiting_html"
+      exit 1
+    fi
+
+    if grep -Eq 'data-testid="deployment-workflow-member-live-card"|data-testid="create-deployment-card"|data-testid="templates-card"|data-testid="runtime-deployment-card-' "$waiting_html"; then
+      echo "[frontend-beginner-member-waiting-smoke] member waiting path leaked live or create surfaces" >&2
+      rm -f "$waiting_html"
+      exit 1
+    fi
+
+    rm -f "$waiting_html"
+  )
+}
+
 run_beginner_first_deploy_smoke() {
   (
     set -euo pipefail
@@ -275,11 +338,13 @@ run_beginner_first_deploy_smoke() {
 
 run_beginner_admin_smoke
 run_beginner_member_smoke
+run_beginner_member_waiting_smoke
 run_beginner_first_deploy_smoke
 run_beginner_export_payload_smoke
 
 echo "[frontend-beginner-smoke] first-time admin path rendered"
-echo "[frontend-beginner-smoke] member remote-only blocked path rendered"
+echo "[frontend-beginner-smoke] member remote-only live review path rendered"
+echo "[frontend-beginner-smoke] member remote-only waiting path rendered"
 echo "[frontend-beginner-smoke] first deploy after server review rendered"
 echo "[frontend-beginner-smoke] member export payload sanitized"
 echo "[frontend-beginner-smoke] complete"

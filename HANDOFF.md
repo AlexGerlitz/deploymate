@@ -184,6 +184,11 @@ Updated: 2026-04-11
   - issue: once the backend hid `server_id`, member runtime detail could mistake an admin-managed remote runtime for a local target and show dead mutation/template controls
   - fix: API responses include a non-sensitive `server_managed_by_admin` marker, and runtime detail uses it to hide redeploy/delete/local-template save, skip live diagnostics/logs/health calls, and show clear admin-managed live-check/template notices
   - guardrail: `smoke:beginner` now renders a redacted `admin-managed-runtime` detail fixture and fails if mutation controls, local template save, local-runtime copy, or server identity returns
+- The member deployment workflow now separates two remote-only states:
+  - if member already has deployments, `/app/deployment-workflow` frames the page as live review with admin-managed targets instead of saying Step 2 is still waiting
+  - member live-search no longer matches hidden admin-managed server names/hosts
+  - if member has no deployments, the page still stays blocked on admin Step 1 and keeps create/templates/live cards out of the HTML
+  - guardrail: `smoke:beginner` now checks both the live-review member path and the waiting-for-admin member path
 - Local frontend smoke for the beginner path passed after this slice:
   - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`
@@ -991,6 +996,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run build` после shared reviewer-facing rollout copy layer -> ok
 - `FRONTEND_SMOKE_PORT=3006 npm --prefix frontend run smoke:runtime` после shared reviewer-facing rollout copy layer -> ok
 - `git diff --check` после shared reviewer-facing rollout copy layer -> ok
+- `npm --prefix frontend run build` после member live/waiting deployment workflow split -> ok
+- `npm --prefix frontend run smoke:beginner` после member live/waiting deployment workflow split -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

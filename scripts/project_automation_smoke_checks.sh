@@ -150,8 +150,8 @@ automation_smoke_beginner_member_checks() {
 /app/server-review|beginner member server review blocked title|data-testid="server-review-blocked-title"
 /app/server-review|beginner member server review blocked banner|data-testid="server-review-blocked-banner"
 /app/deployment-workflow|beginner member workflow title|data-testid="deployment-workflow-title"
-/app/deployment-workflow|beginner member blocked card|data-testid="deployment-workflow-member-blocked-card"
-/app/deployment-workflow|beginner member blocked copy|Server target is admin-managed
+/app/deployment-workflow|beginner member live review card|data-testid="deployment-workflow-member-live-card"
+/app/deployment-workflow|beginner member live review copy|Review live deployments with admin-managed targets
 EOF
 }
 
