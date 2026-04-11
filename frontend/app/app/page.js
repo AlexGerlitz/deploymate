@@ -113,6 +113,7 @@ export default function HomePage() {
         : deployments.length === 0
           ? "Next best step: choose which app to run on that server."
           : "Next best step: open your app list and continue from one running service.";
+  const waitingForAdminTarget = overviewPrimaryPath.reason === "admin-target-needed";
   const stepOneIsPrimary =
     overviewPrimaryPath.reason === "server-setup" ||
     overviewPrimaryPath.reason === "admin-target-needed";
@@ -161,24 +162,31 @@ export default function HomePage() {
       href: canAccessServers ? "/app/server-review" : "/app/deployment-workflow",
       actionLabel: canAccessServers ? "Open server setup" : memberServerCopy?.stepAction || "Open deployment workflow",
       primary: stepOneIsPrimary,
+      disabled: false,
     },
     {
       key: "step-2",
       step: "Step 2",
       title: "Choose your app",
-      detail: "Paste the app image you want to run, or pick a saved setup if you already have one.",
+      detail: waitingForAdminTarget
+        ? "This step opens after an admin confirms one saved server target for the workspace."
+        : "Paste the app image you want to run, or pick a saved setup if you already have one.",
       href: "/app/deployment-workflow",
-      actionLabel: "Choose app to run",
+      actionLabel: waitingForAdminTarget ? "Opens after Step 1" : "Choose app to run",
       primary: !stepOneIsPrimary,
+      disabled: waitingForAdminTarget,
     },
     {
       key: "step-3",
       step: "Step 3",
       title: "Start it and check status",
-      detail: "Start the app, then open live status to confirm it is running, healthy, and reachable.",
+      detail: waitingForAdminTarget
+        ? "This step opens after the first deployment exists and DeployMate has live runtime state to review."
+        : "Start the app, then open live status to confirm it is running, healthy, and reachable.",
       href: "/app/deployment-workflow",
-      actionLabel: "See running apps",
+      actionLabel: waitingForAdminTarget ? "Opens after deploy" : "See running apps",
       primary: false,
+      disabled: waitingForAdminTarget,
     },
   ];
   const plainLanguageCards = [
@@ -628,13 +636,24 @@ export default function HomePage() {
                       <span className="stepNumber">{card.step}</span>
                       <h3>{card.title}</h3>
                       <p>{card.detail}</p>
-                      <Link
-                        href={card.href}
-                        className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
-                        data-testid={`workspace-scenario-action-${card.key}`}
-                      >
-                        {card.actionLabel}
-                      </Link>
+                      {card.disabled ? (
+                        <button
+                          type="button"
+                          disabled
+                          className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                          data-testid={`workspace-scenario-action-${card.key}`}
+                        >
+                          {card.actionLabel}
+                        </button>
+                      ) : (
+                        <Link
+                          href={card.href}
+                          className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                          data-testid={`workspace-scenario-action-${card.key}`}
+                        >
+                          {card.actionLabel}
+                        </Link>
+                      )}
                     </article>
                   ))}
                 </div>
@@ -668,16 +687,32 @@ export default function HomePage() {
                   </div>
                   <div className="workspaceStatusCard workspaceGlanceItem">
                     <span>Step 2</span>
-                    <strong>{deployments.length === 0 ? "Choose first app" : "Choose next app"}</strong>
+                    <strong>
+                      {waitingForAdminTarget
+                        ? "Blocked until Step 1"
+                        : deployments.length === 0
+                          ? "Choose first app"
+                          : "Choose next app"}
+                    </strong>
                     <p>
-                      Use the deployment workflow to choose the image or saved setup you want to run.
+                      {waitingForAdminTarget
+                        ? "This stays blocked until an admin confirms one saved server target for the workspace."
+                        : "Use the deployment workflow to choose the image or saved setup you want to run."}
                     </p>
                   </div>
                   <div className="workspaceStatusCard workspaceGlanceItem">
                     <span>Step 3</span>
-                    <strong>{deployments.length === 0 ? "Check health after deploy" : "Review live health"}</strong>
+                    <strong>
+                      {waitingForAdminTarget
+                        ? "Opens after first deploy"
+                        : deployments.length === 0
+                          ? "Check health after deploy"
+                          : "Review live health"}
+                    </strong>
                     <p>
-                      Open the live runtime list or deployment detail and confirm the app is healthy before the next change.
+                      {waitingForAdminTarget
+                        ? "Live review starts only after the first deployment exists."
+                        : "Open the live runtime list or deployment detail and confirm the app is healthy before the next change."}
                     </p>
                   </div>
                   <div className="workspaceStatusCard workspaceGlanceItem">

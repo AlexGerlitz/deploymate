@@ -757,8 +757,12 @@ function ServerReviewPageContent() {
               <p>One saved server target has to be confirmed before this path opens for remote rollout.</p>
             </div>
             <div className="serverReviewMiniStep">
-              <strong>2. Return to Step 2</strong>
-              <p>Once the target is ready, use Deployment Workflow to choose what app should run.</p>
+              <strong>{localDeploymentsEnabled ? "2. Return to Step 2" : "2. Wait for the target"}</strong>
+              <p>
+                {localDeploymentsEnabled
+                  ? "Once the target is ready, use Deployment Workflow to choose what app should run."
+                  : "Do not jump ahead to rollout setup before one admin-managed target is actually confirmed."}
+              </p>
             </div>
             <div className="serverReviewMiniStep">
               <strong>3. Keep the next click obvious</strong>
@@ -766,16 +770,22 @@ function ServerReviewPageContent() {
             </div>
           </div>
           <div className="formActions">
-            <Link href="/app" className="linkButton" data-testid="server-review-blocked-overview-link">
+            <Link
+              href="/app"
+              className={localDeploymentsEnabled ? "linkButton" : "landingButton primaryButton"}
+              data-testid="server-review-blocked-overview-link"
+            >
               Back to overview
             </Link>
-            <Link
-              href="/app/deployment-workflow"
-              className="landingButton primaryButton"
-              data-testid="server-review-blocked-workflow-link"
-            >
-              Open deployment workflow
-            </Link>
+            {localDeploymentsEnabled ? (
+              <Link
+                href="/app/deployment-workflow"
+                className="landingButton primaryButton"
+                data-testid="server-review-blocked-workflow-link"
+              >
+                Open deployment workflow
+              </Link>
+            ) : null}
           </div>
         </article>
       </main>
