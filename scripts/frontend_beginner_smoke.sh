@@ -117,6 +117,7 @@ run_beginner_admin_server_ready_smoke() {
     export FRONTEND_SMOKE_REUSE_SERVER=0
     export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
     export NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-server-ready-first-deploy
+    export NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=first-deploy-after-overview
 
     cleanup_admin_server_ready() {
       stop_frontend_smoke_server
@@ -132,6 +133,12 @@ run_beginner_admin_server_ready_smoke() {
 
     if ! grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Launch first deployment<' "$overview_html"; then
       echo "[frontend-beginner-admin-server-ready-smoke] overview did not point the ready-server admin to first deployment" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'href="/app/deployment-workflow\?server=smoke-server&amp;source=overview-first-deploy"' "$overview_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] overview did not preserve the ready server into the first-deploy link" >&2
       rm -f "$overview_html"
       exit 1
     fi
@@ -154,7 +161,28 @@ run_beginner_admin_server_ready_smoke() {
       exit 1
     fi
 
-    rm -f "$overview_html"
+    workflow_html="$(mktemp)"
+    curl -sS "${BASE_URL}/app/deployment-workflow?server=smoke-server&source=overview-first-deploy" > "$workflow_html"
+
+    if ! grep -Eq 'selected from Overview' "$workflow_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] workflow lost the overview-to-first-deploy bridge copy" >&2
+      rm -f "$overview_html" "$workflow_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-button">Create deployment<' "$workflow_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] workflow did not keep create deployment as the main next step" >&2
+      rm -f "$overview_html" "$workflow_html"
+      exit 1
+    fi
+
+    if grep -Eq 'Image is required\.' "$workflow_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] workflow showed a premature validation error after the overview bridge" >&2
+      rm -f "$overview_html" "$workflow_html"
+      exit 1
+    fi
+
+    rm -f "$overview_html" "$workflow_html"
   )
 }
 

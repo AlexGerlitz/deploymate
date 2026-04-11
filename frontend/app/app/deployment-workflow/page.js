@@ -55,6 +55,22 @@ const smokeWorkflowFixture =
           ? `Server "${smokeServers[0].name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`
           : "",
       }
+    : smokeMode && smokeWorkflowScenario === "first-deploy-after-overview"
+      ? {
+          deployments: [],
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: smokeServers[0]?.id || "",
+          },
+          workflowMessage: smokeServers[0]
+            ? `Server "${smokeServers[0].name}" is already selected from Overview. Continue with the first deployment while that target is still understood.`
+            : "",
+        }
     : smokeMode && smokeWorkflowScenario === "member-waiting-for-admin-target"
       ? {
           deployments: [],
@@ -267,6 +283,9 @@ function DeploymentWorkflowPageContent() {
   const requestedTemplateSource = searchParams.get("template_source") || "";
   const requestedServerId = searchParams.get("server") || "";
   const requestedSource = searchParams.get("source") || "";
+  const requestedFromOverview = requestedSource === "overview-first-deploy";
+  const requestedFromServerReview = requestedSource === "server-review";
+  const requestedWithServerContext = requestedFromServerReview || requestedFromOverview;
   const selectedCreateServer =
     servers.find((server) => server.id === form.server_id) || null;
   const selectedServerLabel = selectedCreateServer
@@ -625,12 +644,19 @@ function DeploymentWorkflowPageContent() {
     });
     setWorkflowTab("create");
 
-    if (requestedSource === "server-review") {
+    if (requestedFromServerReview) {
       setWorkflowMessage(
         `Server "${targetServer.name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`,
       );
+      return;
     }
-  }, [requestedServerId, requestedSource, servers]);
+
+    if (requestedFromOverview) {
+      setWorkflowMessage(
+        `Server "${targetServer.name}" is already selected from Overview. Continue with the first deployment while that target is still understood.`,
+      );
+    }
+  }, [requestedFromOverview, requestedFromServerReview, requestedServerId, servers]);
 
   useEffect(() => {
     if (!requestedTemplateId || templates.length === 0) {
@@ -1424,7 +1450,7 @@ function DeploymentWorkflowPageContent() {
             {workflowMessage}
           </div>
         ) : null}
-        {requestedSource === "server-review" && selectedCreateServer ? (
+        {requestedWithServerContext && selectedCreateServer ? (
           <article className="card formCard">
             <div className="sectionHeader">
               <div>
@@ -1918,8 +1944,10 @@ function DeploymentWorkflowPageContent() {
                   : selectedCreateServer
                     ? `The app image is set and "${selectedCreateServer.name}" is already selected. Create now if the defaults are enough, or only open advanced setup for ports, env vars, or template save.`
                     : "The app image is set. Create now if the defaults are enough, or open advanced setup only for ports, env vars, server target, and template save."
-                : selectedCreateServer && requestedSource === "server-review"
-                  ? `Server "${selectedCreateServer.name}" is already selected from Step 1. Set the image next and keep the rest closed unless the rollout really needs more.`
+                : selectedCreateServer && requestedWithServerContext
+                  ? requestedFromOverview
+                    ? `Overview already handed you "${selectedCreateServer.name}". Set the image next and keep the rest closed unless the rollout really needs more.`
+                    : `Server "${selectedCreateServer.name}" is already selected from Step 1. Set the image next and keep the rest closed unless the rollout really needs more.`
                   : serverAccessBlocked
                     ? "Set the image first. Members cannot choose a saved server target here, so keep everything else focused on the rollout itself."
                     : "Set the image first. Everything else is optional and can stay closed until you actually need it."}

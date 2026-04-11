@@ -196,6 +196,10 @@ Updated: 2026-04-11
 - The admin overview now has an explicit server-ready/no-deployments guardrail:
   - if one server is already connected and no deployments exist, `/app` points to first deployment instead of server setup
   - guardrail: `smoke:beginner` now checks that the hero CTA is `Launch first deployment`, Step 2 is active, and `Add first server target` does not return as the primary action
+- The admin first-deploy bridge now keeps target context from overview into workflow:
+  - if overview knows exactly one ready server and no deployments exist, `/app` links into `deployment-workflow` with that target already selected
+  - `deployment-workflow` now explains when the first-deploy target came from Overview, not only from Server Review
+  - guardrail: `smoke:beginner` now follows the overview link, checks the preserved `server` query, and fails if Step 2 loses the selected target or shows a premature image error
 - Local frontend smoke for the beginner path passed after this slice:
   - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`
@@ -1009,6 +1013,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:beginner` после member overview live-review split -> ok
 - `npm --prefix frontend run build` после admin server-ready overview guardrail -> ok
 - `npm --prefix frontend run smoke:beginner` после admin server-ready overview guardrail -> ok
+- `npm --prefix frontend run build` после overview-to-workflow first-deploy bridge -> ok
+- `npm --prefix frontend run smoke:beginner` после overview-to-workflow first-deploy bridge -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

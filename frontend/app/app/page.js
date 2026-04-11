@@ -98,6 +98,23 @@ export default function HomePage() {
     failedDeployments: opsSnapshot.deployments.failed,
     serversTotal: opsSnapshot.servers.total,
   });
+  const singleServerFirstDeployTarget =
+    canAccessServers &&
+    !localDeploymentsEnabled &&
+    opsSnapshot.deployments.total === 0 &&
+    servers.length === 1
+      ? servers[0]
+      : null;
+  const firstDeployWorkflowHref = singleServerFirstDeployTarget
+    ? `/app/deployment-workflow?${new URLSearchParams({
+        server: singleServerFirstDeployTarget.id,
+        source: "overview-first-deploy",
+      }).toString()}`
+    : "/app/deployment-workflow";
+  const overviewPrimaryHref =
+    overviewPrimaryPath.reason === "first-deploy" && singleServerFirstDeployTarget
+      ? firstDeployWorkflowHref
+      : overviewPrimaryPath.href;
   const memberServerCopy = canAccessServers
     ? null
     : localDeploymentsEnabled
@@ -222,7 +239,7 @@ export default function HomePage() {
             ? "New remote deployments need an admin-managed target. Review the live apps that already exist instead."
             : "This step opens after Step 1 is done and one server is already connected."
         : "Paste the app image you want to run, or pick a saved setup if you already have one.",
-      href: "/app/deployment-workflow",
+      href: singleServerFirstDeployTarget ? firstDeployWorkflowHref : "/app/deployment-workflow",
       actionLabel: stepTwoBlocked
         ? memberNewDeploymentBlocked
           ? "Ask admin for new deploy"
@@ -650,7 +667,7 @@ export default function HomePage() {
             </div>
             <div className="buttonRow workspaceHeroActions">
               <Link
-                href={overviewPrimaryPath.href}
+                href={overviewPrimaryHref}
                 className="landingButton primaryButton"
                 data-testid="workspace-hero-primary-action"
               >
@@ -681,7 +698,7 @@ export default function HomePage() {
                   <p className="formHint">{overviewPrimaryPath.detail}</p>
                   <div className="formActions">
                     <Link
-                      href={overviewPrimaryPath.href}
+                      href={overviewPrimaryHref}
                       className="landingButton primaryButton"
                       data-testid="workspace-primary-task-action"
                     >

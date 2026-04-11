@@ -23,6 +23,7 @@ Use it before rewriting first-pass copy or changing the main beginner screens.
 3. Open `/app/deployment-workflow`.
    Ask: after Step 1, is the next rollout action obvious without scanning jargon-heavy controls?
    Expected: one main next-step card and one clear primary action.
+   If overview already knew the only ready server, expected: that target is preselected when Step 2 opens.
 4. If a deployment already exists, open one deployment detail page.
    Ask: does the page answer what is running, whether it is healthy, and what to do next?
 
