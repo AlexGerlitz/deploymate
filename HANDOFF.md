@@ -201,6 +201,11 @@ Updated: 2026-04-11
   - issue: the success banner pointed to runtime detail correctly, but the detail page still immediately offered `Prepare rollout change` as the secondary path even when the rollout had just been created and still needed first verification
   - fix: workflow success links now carry explicit `workflow-success` context, and healthy runtime detail uses that context to show a fresh-rollout review banner plus `Review runtime overview` instead of early change-prep
   - guardrail: `smoke:runtime` now loads healthy runtime detail with `?source=workflow-success` and fails if the fresh-rollout bridge banner or review-first secondary action disappears
+- The fresh-rollout detail path now closes the verification loop more explicitly:
+  - screen: healthy `/deployments/*?source=workflow-success` and success banners on `/app/deployment-workflow`
+  - issue: even after the first bridge, a fresh rollout still landed on a fairly generic overview, and smoke did not yet prove that create/template success links were preserving the workflow-success context
+  - fix: fresh rollout detail now shows a dedicated `verify app / health / activity` checklist in overview, create success got its own smoke fixture, and both create/template success links are now held to the `workflow-success` href contract
+  - guardrail: `smoke:runtime` now fails if the fresh-rollout checklist disappears or if either success path stops linking into detail with `?source=workflow-success`
 - The member-safe pass found one blocked-path leak:
   - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
   - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
@@ -1077,6 +1082,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:runtime` после template deploy success consistency slice -> ok
 - `npm --prefix frontend run build` после fresh rollout detail verify-first bridge slice -> ok
 - `npm --prefix frontend run smoke:runtime` после fresh rollout detail verify-first bridge slice -> ok
+- `npm --prefix frontend run build` после fresh rollout detail verification checklist slice -> ok
+- `npm --prefix frontend run smoke:runtime` после fresh rollout detail verification checklist slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

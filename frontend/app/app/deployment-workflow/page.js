@@ -56,6 +56,13 @@ const smokeTemplateCreatedDeployment = {
   container_id: "container-template-success-1",
   created_at: "2026-04-02T00:25:00Z",
 };
+const smokeCreatedDeployment = {
+  ...smokeDeployments[0],
+  id: "fresh-success-deployment",
+  container_name: "fresh-success-runtime",
+  container_id: "container-fresh-success-1",
+  created_at: "2026-04-02T00:24:00Z",
+};
 const smokeFailedQueueReviewDeployments = smokeReviewWorkerDeployment
   ? [
       smokeReviewWorkerDeployment,
@@ -172,6 +179,26 @@ const smokeWorkflowFixture =
           templateDeploySuccess:
             "Deployment created from template. Open runtime detail next while this rollout is still fresh.",
           templateCreatedDeployment: smokeTemplateCreatedDeployment,
+        }
+    : smokeMode && smokeWorkflowScenario === "create-deploy-success"
+      ? {
+          deployments: smokeDeployments,
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "create",
+          submitSuccess:
+            "Deployment created. Open runtime detail next while this rollout is still fresh.",
+          createdDeployment: smokeCreatedDeployment,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
         }
     : smokeMode && smokeWorkflowScenario === "first-deploy-after-overview"
       ? {
@@ -2393,7 +2420,7 @@ function DeploymentWorkflowPageContent() {
             </div>
           ) : null}
           {submitSuccess ? (
-            <div className="banner success">
+            <div className="banner success" data-testid="create-deployment-success-banner">
               <div>{submitSuccess}</div>
               {createdDeployment?.container_name || createdDeployment?.image ? (
                 <div className="formHint">

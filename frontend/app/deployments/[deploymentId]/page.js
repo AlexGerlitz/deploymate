@@ -837,6 +837,8 @@ export default function DeploymentDetailsPage({ params }) {
   const exportActivity = runtimeExportPayload.activity;
   const attentionItems = runtimeExportPayload.attentionItems;
   const requestedSource = searchParams.get("source") || "";
+  const freshRolloutLatestEvent =
+    Array.isArray(exportActivity) && exportActivity.length > 0 ? exportActivity[0] : null;
   const freshRolloutReview =
     requestedSource === "workflow-success" &&
     deployment?.status === "running" &&
@@ -941,7 +943,9 @@ export default function DeploymentDetailsPage({ params }) {
       ? "Deployment is failed and needs a deliberate redeploy."
       : health?.status && health.status !== "healthy"
         ? `Health is currently ${health.status}.`
-        : "Runtime surface is stable enough for review.");
+        : freshRolloutReview
+          ? "Fresh rollout is ready for first verification."
+          : "Runtime surface is stable enough for review.");
   const runtimeDecisionState = buildRuntimeDecisionState(
     deployment,
     health,
@@ -954,17 +958,30 @@ export default function DeploymentDetailsPage({ params }) {
     ? `${deployment.container_name || deployment.image || deploymentId}. ${detailPriority}`
     : "Review what is running, whether it is healthy, and what should happen next.";
   const runtimeOverviewTitle =
-    deployment?.status === "failed" ||
-    (health?.status && health.status !== "healthy") ||
-    attentionItems.length > 0
+    freshRolloutReview
+      ? "What to confirm before this rollout counts as done"
+      : deployment?.status === "failed" ||
+      (health?.status && health.status !== "healthy") ||
+      attentionItems.length > 0
       ? "Why this runtime still needs review"
       : "Why this runtime looks stable enough";
   const runtimeOverviewBody =
-    deployment?.status === "failed" ||
-    (health?.status && health.status !== "healthy") ||
-    attentionItems.length > 0
+    freshRolloutReview
+      ? "A successful deploy is not finished yet. Use the app, health, and activity signals below to verify this rollout before another change competes for attention."
+      : deployment?.status === "failed" ||
+      (health?.status && health.status !== "healthy") ||
+      attentionItems.length > 0
       ? "These signals explain why runtime review still comes before the next rollout change."
       : "These signals explain why the runtime currently looks stable enough for a deliberate change instead of reactive cleanup.";
+  const freshRolloutHealthSummary =
+    health?.status === "healthy"
+      ? `Latest health check passed${health?.response_time_ms || health?.response_time_ms === 0 ? ` in ${health.response_time_ms} ms` : ""}.`
+      : health?.status
+        ? `Current health status is ${health.status}.`
+        : "Health status has not been recorded yet.";
+  const freshRolloutActivitySummary = freshRolloutLatestEvent?.title
+    ? `Latest recorded event: "${freshRolloutLatestEvent.title}" at ${formatDate(freshRolloutLatestEvent.created_at)}.`
+    : "No runtime activity has been recorded yet.";
   const detailGlanceItems = [
     {
       label: "Endpoint",
@@ -1880,6 +1897,55 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               </div>
             </div>
+
+            {freshRolloutReview ? (
+              <article className="card compactCard" data-testid="runtime-detail-fresh-rollout-checklist-card">
+                <div className="sectionHeader">
+                  <div>
+                    <h2 data-testid="runtime-detail-fresh-rollout-checklist-title">
+                      Verify this rollout before you move on
+                    </h2>
+                    <p className="formHint">
+                      Treat the first review as part of deployment completion. Check the app, health, and latest activity once while the rollout context is still fresh.
+                    </p>
+                  </div>
+                </div>
+                <div className="workspaceReviewerGrid">
+                  <article
+                    className="workspaceReviewerCard"
+                    data-testid="runtime-detail-fresh-rollout-checklist-app"
+                  >
+                    <span>1. App</span>
+                    <strong>{deploymentUrl ? "Open the live app" : "Stay in runtime review"}</strong>
+                    <p>
+                      {deploymentUrl
+                        ? "Use the primary action once, then come back here before opening change tools."
+                        : "There is no public URL for this rollout, so the first verification stays on this page."}
+                    </p>
+                  </article>
+                  <article
+                    className="workspaceReviewerCard"
+                    data-testid="runtime-detail-fresh-rollout-checklist-health"
+                  >
+                    <span>2. Health</span>
+                    <strong>{health?.status || "unknown"}</strong>
+                    <p>{freshRolloutHealthSummary}</p>
+                  </article>
+                  <article
+                    className="workspaceReviewerCard"
+                    data-testid="runtime-detail-fresh-rollout-checklist-activity"
+                  >
+                    <span>3. Activity</span>
+                    <strong>{freshRolloutLatestEvent?.title || "No activity yet"}</strong>
+                    <p>
+                      {freshRolloutLatestEvent
+                        ? `${freshRolloutActivitySummary} If that event looks wrong, open diagnostics before another rollout change.`
+                        : "Wait for one meaningful runtime event before assuming this rollout is settled."}
+                    </p>
+                  </article>
+                </div>
+              </article>
+            ) : null}
 
             <article className="card compactCard" data-testid="runtime-detail-risk-breakdown-card">
               <div className="sectionHeader">
