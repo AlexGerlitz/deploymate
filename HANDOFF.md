@@ -166,6 +166,11 @@ Updated: 2026-04-11
   - issue: the card no longer exposed delete first, but its main CTA still said `View details`, which left the safest next step too vague during a failed rollout
   - fix: failed focus cards now make `Review runtime issues` the primary action and keep the inline warning aligned with that same review-first wording
   - guardrail: `smoke:runtime` now fails if the failed focus card loses its primary `Review runtime issues` CTA
+- The live queue now uses one action hierarchy across focus and secondary cards:
+  - screen: `/app/deployment-workflow`
+  - issue: focus cards had started using review-first/open-first actions, but secondary cards still collapsed everything into low-emphasis `View details` and `Open app` links
+  - fix: runtime cards now follow one status-based matrix everywhere in the queue: failed cards make `Review runtime issues` primary, healthy cards with a URL make `Open app` primary, and detail review stays visibly secondary when the app is already reachable
+  - guardrail: `smoke:runtime` now checks healthy secondary cards, healthy focus cards, and a failed-secondary smoke scenario so queue action hierarchy stays aligned
 - The member-safe pass found one blocked-path leak:
   - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
   - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
@@ -1028,6 +1033,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:runtime` после healthy workflow open-app priority slice -> ok
 - `npm --prefix frontend run build` после failed workflow review-first CTA slice -> ok
 - `npm --prefix frontend run smoke:runtime` после failed workflow review-first CTA slice -> ok
+- `npm --prefix frontend run build` после deployment workflow runtime queue consistency package -> ok
+- `npm --prefix frontend run smoke:runtime` после deployment workflow runtime queue consistency package -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

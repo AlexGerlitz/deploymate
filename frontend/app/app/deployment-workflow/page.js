@@ -38,6 +38,23 @@ const localDeploymentsEnabled =
   process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
 const smokeWorkflowScenario =
   process.env.NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO || "default";
+const smokeReviewWorkerDeployment =
+  smokeDeployments.find((deployment) => deployment.id === "review-worker") || null;
+const smokeRunningDeployments = smokeDeployments.filter((deployment) => deployment.status === "running");
+const smokeFailedQueueReviewDeployments = smokeReviewWorkerDeployment
+  ? [
+      smokeReviewWorkerDeployment,
+      {
+        ...smokeReviewWorkerDeployment,
+        id: "review-worker-shadow",
+        container_name: "review-worker-shadow",
+        container_id: "container-review-2",
+        created_at: "2026-04-02T02:18:00Z",
+        error: "Container restarted again before readiness recovered.",
+      },
+      ...smokeRunningDeployments,
+    ]
+  : smokeRunningDeployments;
 const smokeWorkflowFixture =
   smokeMode && smokeWorkflowScenario === "first-deploy-after-server-review"
     ? {
@@ -58,6 +75,20 @@ const smokeWorkflowFixture =
     : smokeMode && smokeWorkflowScenario === "healthy-live-review"
       ? {
           deployments: smokeDeployments.filter((deployment) => deployment.status === "running"),
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+        }
+    : smokeMode && smokeWorkflowScenario === "failed-live-review"
+      ? {
+          deployments: smokeFailedQueueReviewDeployments,
           servers: smokeServers,
           templates: smokeTemplates,
           form: {
@@ -126,6 +157,24 @@ const smokeWorkflowFixture =
         },
         workflowMessage: "",
       };
+
+function buildRuntimeCardActionState(deployment) {
+  const runtimeUrl = buildDeploymentUrl(deployment);
+  const failed = deployment?.status === "failed";
+
+  return {
+    runtimeUrl,
+    detailsClassName: failed
+      ? "landingButton primaryButton"
+      : runtimeUrl
+        ? "secondaryButton"
+        : "linkButton",
+    detailsLabel: failed ? "Review runtime issues" : "View details",
+    openAppClassName: failed ? "linkButton" : "landingButton primaryButton",
+    showOpenAppPrimary: Boolean(runtimeUrl) && !failed,
+    showOpenAppSecondary: Boolean(runtimeUrl) && failed,
+  };
+}
 
 function DeploymentWorkflowPageContent() {
   const router = useRouter();
@@ -289,9 +338,9 @@ function DeploymentWorkflowPageContent() {
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     filteredDeployments[0] ||
     null;
-  const primaryRuntimeUrl = primaryRuntimeDeployment
-    ? buildDeploymentUrl(primaryRuntimeDeployment)
-    : "";
+  const primaryRuntimeActionState = primaryRuntimeDeployment
+    ? buildRuntimeCardActionState(primaryRuntimeDeployment)
+    : null;
   const secondaryRuntimeDeployments = primaryRuntimeDeployment
     ? filteredDeployments.filter((deployment) => deployment.id !== primaryRuntimeDeployment.id)
     : [];
@@ -1808,12 +1857,12 @@ function DeploymentWorkflowPageContent() {
                 <span>{buildDeploymentUrl(primaryRuntimeDeployment) || "-"}</span>
               </div>
               <div className="actions">
-                {primaryRuntimeUrl && primaryRuntimeDeployment.status !== "failed" ? (
+                {primaryRuntimeActionState?.showOpenAppPrimary ? (
                   <a
-                    href={primaryRuntimeUrl}
+                    href={primaryRuntimeActionState.runtimeUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="landingButton primaryButton"
+                    className={primaryRuntimeActionState.openAppClassName}
                     data-testid={`runtime-deployment-open-app-link-${primaryRuntimeDeployment.id}`}
                   >
                     Open app
@@ -1821,23 +1870,17 @@ function DeploymentWorkflowPageContent() {
                 ) : null}
                 <Link
                   href={`/deployments/${primaryRuntimeDeployment.id}`}
-                  className={
-                    primaryRuntimeDeployment.status === "failed"
-                      ? "landingButton primaryButton"
-                      : primaryRuntimeUrl
-                        ? "secondaryButton"
-                        : "linkButton"
-                  }
+                  className={primaryRuntimeActionState?.detailsClassName || "linkButton"}
                   data-testid={`runtime-deployment-details-link-${primaryRuntimeDeployment.id}`}
                 >
-                  {primaryRuntimeDeployment.status === "failed" ? "Review runtime issues" : "View details"}
+                  {primaryRuntimeActionState?.detailsLabel || "View details"}
                 </Link>
-                {primaryRuntimeUrl && primaryRuntimeDeployment.status === "failed" ? (
+                {primaryRuntimeActionState?.showOpenAppSecondary ? (
                   <a
-                    href={primaryRuntimeUrl}
+                    href={primaryRuntimeActionState.runtimeUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="linkButton"
+                    className={primaryRuntimeActionState.openAppClassName}
                     data-testid={`runtime-deployment-open-app-link-${primaryRuntimeDeployment.id}`}
                   >
                     Open app
@@ -1873,47 +1916,63 @@ function DeploymentWorkflowPageContent() {
                 </div>
               </div>
               <div className="timeline">
-                {secondaryRuntimeDeployments.map((deployment) => (
-                  <div className="timelineItem" key={deployment.id}>
-                    <div className="row">
-                      <span className="label">Deployment</span>
-                      <span>{deployment.container_name || deployment.image || "Unnamed deployment"}</span>
-                    </div>
-                    <div className="row">
-                      <span className="label">Status</span>
-                      <span className={`status ${deployment.status || "unknown"}`}>
-                        {deployment.status || "unknown"}
-                      </span>
-                    </div>
-                    <div className="row">
-                      <span className="label">Endpoint</span>
-                      <span>{buildDeploymentUrl(deployment) || "Internal only"}</span>
-                    </div>
-                    <div className="row">
-                      <span className="label">Created</span>
-                      <span>{formatDate(deployment.created_at)}</span>
-                    </div>
-                    <div className="actions">
-                      <Link
-                        href={`/deployments/${deployment.id}`}
-                        className="linkButton"
-                        data-testid={`runtime-deployment-details-link-${deployment.id}`}
-                      >
-                        View details
-                      </Link>
-                      {buildDeploymentUrl(deployment) ? (
-                        <a
-                          href={buildDeploymentUrl(deployment)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="linkButton"
+                {secondaryRuntimeDeployments.map((deployment) => {
+                  const runtimeActionState = buildRuntimeCardActionState(deployment);
+
+                  return (
+                    <div className="timelineItem" key={deployment.id}>
+                      <div className="row">
+                        <span className="label">Deployment</span>
+                        <span>{deployment.container_name || deployment.image || "Unnamed deployment"}</span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Status</span>
+                        <span className={`status ${deployment.status || "unknown"}`}>
+                          {deployment.status || "unknown"}
+                        </span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Endpoint</span>
+                        <span>{runtimeActionState.runtimeUrl || "Internal only"}</span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Created</span>
+                        <span>{formatDate(deployment.created_at)}</span>
+                      </div>
+                      <div className="actions">
+                        {runtimeActionState.showOpenAppPrimary ? (
+                          <a
+                            href={runtimeActionState.runtimeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={runtimeActionState.openAppClassName}
+                            data-testid={`runtime-deployment-open-app-link-${deployment.id}`}
+                          >
+                            Open app
+                          </a>
+                        ) : null}
+                        <Link
+                          href={`/deployments/${deployment.id}`}
+                          className={runtimeActionState.detailsClassName}
+                          data-testid={`runtime-deployment-details-link-${deployment.id}`}
                         >
-                          Open app
-                        </a>
-                      ) : null}
+                          {runtimeActionState.detailsLabel}
+                        </Link>
+                        {runtimeActionState.showOpenAppSecondary ? (
+                          <a
+                            href={runtimeActionState.runtimeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={runtimeActionState.openAppClassName}
+                            data-testid={`runtime-deployment-open-app-link-${deployment.id}`}
+                          >
+                            Open app
+                          </a>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </article>
           ) : null}
