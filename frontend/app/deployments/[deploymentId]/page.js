@@ -88,7 +88,7 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
     `Server: ${
       canAccessServers && deployment.server_name && deployment.server_host
         ? `${deployment.server_name} (${deployment.server_host})`
-        : deployment.server_id
+        : deployment.server_id || deployment.server_managed_by_admin
           ? "Managed by an admin"
           : "Local"
     }`,
@@ -102,7 +102,7 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
     `Diagnostics target: ${
       canAccessServers
         ? diagnostics?.server_target || "n/a"
-        : deployment.server_id
+        : deployment.server_id || deployment.server_managed_by_admin
           ? "Managed by an admin"
           : "n/a"
     }`,
@@ -164,7 +164,7 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
       ? diagnostics?.server_target
         ? `The deployment is tied to ${diagnostics.server_target} for diagnostics and runtime review.`
         : "No diagnostics target is available yet."
-      : deployment.server_id
+      : deployment.server_id || deployment.server_managed_by_admin
         ? "The deployment runs on an admin-managed server target."
         : "No diagnostics target is available yet.",
     latestEvent?.title
@@ -363,7 +363,7 @@ function buildRedeployImpactSummary({
       canAccessServers
         ? diagnostics?.server_target ||
           (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
-        : deployment.server_id
+        : deployment.server_id || deployment.server_managed_by_admin
           ? "Managed by an admin"
           : "Local Docker target"
     }`,
@@ -552,11 +552,33 @@ export default function DeploymentDetailsPage({ params }) {
   const { deploymentId } = use(params);
   const router = useRouter();
   const smokeDetailDeployment = smokeMode
-    ? smokeDeployments.find((item) => item.id === deploymentId) || smokeDeployment
+    ? deploymentId === "admin-managed-runtime"
+      ? {
+          ...smokeDeployment,
+          id: "admin-managed-runtime",
+          server_id: null,
+          server_name: null,
+          server_host: null,
+          server_managed_by_admin: true,
+        }
+      : smokeDeployments.find((item) => item.id === deploymentId) || smokeDeployment
     : null;
   const smokeDetailIsFailed = smokeDetailDeployment?.status === "failed";
+  const smokeDetailIsAdminManaged = Boolean(smokeDetailDeployment?.server_managed_by_admin);
   const smokeDetailHealth =
-    smokeMode && smokeDetailIsFailed
+    smokeMode && smokeDetailIsAdminManaged
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          url: null,
+          status: "unavailable",
+          status_code: null,
+          error:
+            "Live health checks stay with admins for this admin-managed remote runtime.",
+          checked_at: smokeDetailDeployment.created_at,
+          response_time_ms: null,
+        }
+      : smokeMode && smokeDetailIsFailed
       ? {
           deployment_id: smokeDetailDeployment.id,
           container_name: smokeDetailDeployment.container_name,
@@ -569,7 +591,9 @@ export default function DeploymentDetailsPage({ params }) {
         }
       : smokeHealth;
   const smokeDetailDiagnostics =
-    smokeMode && smokeDetailIsFailed
+    smokeMode && smokeDetailIsAdminManaged
+      ? null
+      : smokeMode && smokeDetailIsFailed
       ? {
           deployment_id: smokeDetailDeployment.id,
           container_name: smokeDetailDeployment.container_name,
@@ -637,7 +661,9 @@ export default function DeploymentDetailsPage({ params }) {
   const [deployment, setDeployment] = useState(smokeMode ? smokeDetailDeployment : null);
   const [logs, setLogs] = useState(
     smokeMode
-      ? smokeDetailIsFailed
+      ? smokeDetailIsAdminManaged
+        ? "Live logs stay with admins for this admin-managed remote runtime."
+        : smokeDetailIsFailed
         ? smokeDetailDeployment.error || "Readiness failed before the worker stayed online."
         : "nginx entered RUNNING state"
       : "",
@@ -680,19 +706,26 @@ export default function DeploymentDetailsPage({ params }) {
   });
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const canAccessServers = Boolean(currentUser?.is_admin);
-  const canMutateRuntime = canAccessServers || !deployment?.server_id;
+  const runtimeServerAccessBlocked = Boolean(deployment?.server_managed_by_admin) && !canAccessServers;
+  const canMutateRuntime =
+    canAccessServers || (!deployment?.server_id && !runtimeServerAccessBlocked);
   const deploymentUrl = buildDeploymentUrl(deployment);
   const runtimeServerLabel = formatAccessibleServerLabel({
     canAccessServers,
     serverName: deployment?.server_name,
     serverHost: deployment?.server_host,
     serverId: deployment?.server_id,
+    serverManagedByAdmin: runtimeServerAccessBlocked,
   });
   const runtimeOverviewMetaText = deployment?.server_id
     ? canAccessServers
       ? `Server ${runtimeServerLabel}`
       : "Target admin-managed"
-    : "Target local";
+    : runtimeServerAccessBlocked
+      ? "Target admin-managed"
+      : "Target local";
+  const adminManagedRuntimeMessage =
+    "Live server checks for this runtime are admin-managed. You can review safe handoff context here, but diagnostics, logs, health checks, redeploy, and delete stay with admins.";
   const rawAttentionItems = buildAttentionItems(deployment, health, diagnostics);
   const runtimeExportPayload = buildAccessControlledRuntimeExportPayload({
     deployment,
@@ -790,9 +823,9 @@ export default function DeploymentDetailsPage({ params }) {
           canAccessServers
             ? diagnostics?.server_target ||
               (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
-            : deployment.server_id
-              ? "Managed by an admin"
-              : "Local Docker target"
+        : deployment.server_id || deployment.server_managed_by_admin
+          ? "Managed by an admin"
+          : "Local Docker target"
         }`,
         deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
         "",
@@ -969,6 +1002,33 @@ export default function DeploymentDetailsPage({ params }) {
           : [{ key: "", value: "" }],
       );
 
+      if (deploymentData.server_managed_by_admin) {
+        setLogs("Live logs stay with admins for this admin-managed remote runtime.");
+        setHealth({
+          deployment_id: deploymentData.id,
+          container_name: deploymentData.container_name,
+          url: null,
+          status: "unavailable",
+          status_code: null,
+          error: "Live health checks stay with admins for this admin-managed remote runtime.",
+          checked_at: null,
+          response_time_ms: null,
+        });
+        setDiagnostics(null);
+        setDiagnosticsError("");
+
+        const activityResponse = await fetch(`${apiBaseUrl}/deployments/${deploymentId}/activity`, {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const activityData = await readJsonOrError(
+          activityResponse,
+          "Failed to load deployment activity.",
+        );
+        setActivity(Array.isArray(activityData) ? activityData : []);
+        return;
+      }
+
       const [logsResult, healthResult, activityResult, diagnosticsResult] = await Promise.allSettled([
         fetch(`${apiBaseUrl}/deployments/${deploymentId}/logs`, {
           cache: "no-store",
@@ -1096,7 +1156,7 @@ export default function DeploymentDetailsPage({ params }) {
         return;
       }
 
-      if (!deployment?.server_id) {
+      if (!deployment?.server_id || runtimeServerAccessBlocked) {
         setSuggestedPorts([]);
         setSuggestedPortsLoading(false);
         return;
@@ -1121,7 +1181,7 @@ export default function DeploymentDetailsPage({ params }) {
     }
 
     loadSuggestedPorts();
-  }, [deployment?.server_id]);
+  }, [deployment?.server_id, runtimeServerAccessBlocked]);
 
   function updateFormField(event) {
     const { name, value } = event.target;
@@ -1517,6 +1577,14 @@ export default function DeploymentDetailsPage({ params }) {
                 Change it now
               </Link>
               .
+            </div>
+          ) : null}
+          {runtimeServerAccessBlocked ? (
+            <div
+              className="banner subtle"
+              data-testid="runtime-detail-admin-managed-live-checks-banner"
+            >
+              {adminManagedRuntimeMessage}
             </div>
           ) : null}
           {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
@@ -2253,12 +2321,26 @@ export default function DeploymentDetailsPage({ params }) {
             <article className="card compactCard" data-testid="runtime-detail-template-card">
               <div className="sectionHeader">
                 <div>
-                  <h2>Save as template</h2>
+                  <h2>
+                    {runtimeServerAccessBlocked
+                      ? "Template handoff is admin-managed"
+                      : "Save as template"}
+                  </h2>
                   <p className="formHint">
-                    Turn the current deployment settings into a reusable preset, then continue template review and reuse inside the deployment workflow.
+                    {runtimeServerAccessBlocked
+                      ? "This runtime belongs to an admin-managed remote target, so reusable rollout setup stays with admins until server sharing rules exist."
+                      : "Turn the current deployment settings into a reusable preset, then continue template review and reuse inside the deployment workflow."}
                   </p>
                 </div>
               </div>
+              {runtimeServerAccessBlocked ? (
+                <div
+                  className="banner subtle"
+                  data-testid="runtime-detail-template-admin-managed-banner"
+                >
+                  Ask an admin to create or share a reusable setup for this remote target. This keeps hidden server inventory from becoming a local template by mistake.
+                </div>
+              ) : (
               <div className="form">
                 <label className="field">
                   <span>Template name</span>
@@ -2273,13 +2355,14 @@ export default function DeploymentDetailsPage({ params }) {
                   </span>
                 </label>
                 <div className="formActions">
-                  <button
-                    type="button"
-                    onClick={handleSaveTemplate}
-                    disabled={templateSaving || !templateName.trim() || !form.image.trim()}
-                  >
-                    {templateSaving ? "Saving template..." : "Save as template"}
-                  </button>
+	                  <button
+	                    type="button"
+	                    onClick={handleSaveTemplate}
+	                    disabled={templateSaving || !templateName.trim() || !form.image.trim()}
+	                    data-testid="runtime-detail-save-template-button"
+	                  >
+	                    {templateSaving ? "Saving template..." : "Save as template"}
+	                  </button>
                   {savedTemplate?.id ? (
                     <Link
                       href={`/app/deployment-workflow?template=${savedTemplate.id}&template_action=preview&template_source=deployment-detail#templates`}
@@ -2288,9 +2371,10 @@ export default function DeploymentDetailsPage({ params }) {
                       Open in workflow
                     </Link>
                   ) : null}
-                </div>
-              </div>
-	              {savedTemplate?.id ? (
+	                </div>
+	              </div>
+              )}
+		              {savedTemplate?.id ? (
 	                <div className="banner subtle" data-testid="runtime-detail-template-bridge-banner">
 	                  Template "{savedTemplate.template_name}" is now part of the deployment workflow. Open it there to preview, reuse, or edit it in the main rollout screen.
 	                </div>
@@ -2344,9 +2428,9 @@ export default function DeploymentDetailsPage({ params }) {
                   <span>
                     {canAccessServers
                       ? diagnostics?.server_target || "N/A"
-                      : deployment.server_id
-                        ? "Managed by an admin"
-                        : "N/A"}
+                    : deployment.server_id || runtimeServerAccessBlocked
+                      ? "Managed by an admin"
+                      : "N/A"}
                   </span>
                   {canAccessServers && diagnostics?.server_target ? (
                     <button
@@ -2427,7 +2511,7 @@ export default function DeploymentDetailsPage({ params }) {
                     <span>
                       {canAccessServers
                         ? diagnostics.server_target || "N/A"
-                        : deployment.server_id
+                        : deployment.server_id || runtimeServerAccessBlocked
                           ? "Managed by an admin"
                           : "N/A"}
                     </span>

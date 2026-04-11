@@ -180,6 +180,10 @@ Updated: 2026-04-11
   - issue: owned legacy/admin-managed remote deployments and templates could still expose `server_id`, `server_name`, `server_host`, or SSH target text through API reads/exports/activity, and member API calls could still reach remote runtime live actions
   - fix: non-admin API reads/exports redact admin-managed server inventory fields, activity/notifications redact matching server identity text, and remote runtime diagnostics/logs/health/redeploy/delete now return admin-only `403`
   - guardrail: `tests.test_member_ownership_isolation` now covers owned remote deployment/template reads, ops exports, notifications/activity redaction, and blocked remote live/mutation actions
+- The frontend now understands backend-redacted admin-managed runtimes:
+  - issue: once the backend hid `server_id`, member runtime detail could mistake an admin-managed remote runtime for a local target and show dead mutation/template controls
+  - fix: API responses include a non-sensitive `server_managed_by_admin` marker, and runtime detail uses it to hide redeploy/delete/local-template save, skip live diagnostics/logs/health calls, and show clear admin-managed live-check/template notices
+  - guardrail: `smoke:beginner` now renders a redacted `admin-managed-runtime` detail fixture and fails if mutation controls, local template save, local-runtime copy, or server identity returns
 - Local frontend smoke for the beginner path passed after this slice:
   - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`

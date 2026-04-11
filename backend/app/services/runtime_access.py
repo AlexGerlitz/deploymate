@@ -31,11 +31,13 @@ def ensure_remote_runtime_action_allowed(record: dict, user: dict, *, action: st
 def sanitize_remote_target_fields(record: dict, user: dict) -> dict:
     sanitized = dict(record)
     if not is_admin_managed_remote_record(record, user):
+        sanitized.setdefault("server_managed_by_admin", False)
         return sanitized
 
     sanitized["server_id"] = None
     sanitized["server_name"] = None
     sanitized["server_host"] = None
+    sanitized["server_managed_by_admin"] = True
     return sanitized
 
 

@@ -35,6 +35,7 @@ class DeploymentResponse(BaseModel):
     server_id: Optional[str] = None
     server_name: Optional[str] = None
     server_host: Optional[str] = None
+    server_managed_by_admin: bool = False
     env: Dict[str, str] = Field(default_factory=dict)
 
 
@@ -58,6 +59,7 @@ class DeploymentTemplateResponse(BaseModel):
     server_id: Optional[str] = None
     server_name: Optional[str] = None
     server_host: Optional[str] = None
+    server_managed_by_admin: bool = False
     env: Dict[str, str] = Field(default_factory=dict)
     created_at: str
     updated_at: Optional[str] = None

@@ -279,6 +279,7 @@ class MemberOwnershipIsolationTests(unittest.TestCase):
         self.assertIsNone(detail["server_id"])
         self.assertIsNone(detail["server_name"])
         self.assertIsNone(detail["server_host"])
+        self.assertTrue(detail["server_managed_by_admin"])
 
         list_response = self.client.get("/deployments")
         self.assertEqual(list_response.status_code, 200)
@@ -286,6 +287,7 @@ class MemberOwnershipIsolationTests(unittest.TestCase):
         self.assertIsNone(remote_item["server_id"])
         self.assertIsNone(remote_item["server_name"])
         self.assertIsNone(remote_item["server_host"])
+        self.assertTrue(remote_item["server_managed_by_admin"])
 
         server_query_response = self.client.get("/deployments?q=Admin%20VPS")
         self.assertEqual(server_query_response.status_code, 200)
@@ -298,6 +300,7 @@ class MemberOwnershipIsolationTests(unittest.TestCase):
         self.assertIsNone(remote_export["server_id"])
         self.assertIsNone(remote_export["server_name"])
         self.assertIsNone(remote_export["server_host"])
+        self.assertTrue(remote_export["server_managed_by_admin"])
 
         deployments_csv_response = self.client.get("/ops/exports/deployments?format=csv")
         self.assertEqual(deployments_csv_response.status_code, 200)
@@ -312,6 +315,7 @@ class MemberOwnershipIsolationTests(unittest.TestCase):
         self.assertIsNone(remote_template["server_id"])
         self.assertIsNone(remote_template["server_name"])
         self.assertIsNone(remote_template["server_host"])
+        self.assertTrue(remote_template["server_managed_by_admin"])
 
         template_query_response = self.client.get("/deployment-templates?q=Admin%20VPS")
         self.assertEqual(template_query_response.status_code, 200)
@@ -324,6 +328,7 @@ class MemberOwnershipIsolationTests(unittest.TestCase):
         self.assertIsNone(remote_template_export["server_id"])
         self.assertIsNone(remote_template_export["server_name"])
         self.assertIsNone(remote_template_export["server_host"])
+        self.assertTrue(remote_template_export["server_managed_by_admin"])
 
     def test_member_remote_runtime_live_actions_are_admin_only(self):
         self.deployments.append(

@@ -48,6 +48,7 @@ export function formatAccessibleServerLabel({
   serverName,
   serverHost,
   serverId,
+  serverManagedByAdmin = false,
   localLabel = "Local",
   managedLabel = "Managed by an admin",
 }) {
@@ -61,7 +62,7 @@ export function formatAccessibleServerLabel({
     }
   }
 
-  return serverId ? managedLabel : localLabel;
+  return serverId || serverManagedByAdmin ? managedLabel : localLabel;
 }
 
 function redactRuntimeInventoryText(value, sensitiveValues) {
@@ -108,10 +109,15 @@ function sanitizeRuntimeDeploymentForExport(deployment, sensitiveValues) {
     return null;
   }
 
-  const { server_id: serverId, server_name: _serverName, server_host: _serverHost, ...safeDeployment } = deployment;
+  const {
+    server_id: serverId,
+    server_name: _serverName,
+    server_host: _serverHost,
+    ...safeDeployment
+  } = deployment;
   return {
     ...redactRuntimeInventoryObject(safeDeployment, sensitiveValues),
-    target: serverId ? "Managed by an admin" : "Local",
+    target: serverId || deployment.server_managed_by_admin ? "Managed by an admin" : "Local",
   };
 }
 
@@ -122,7 +128,8 @@ function sanitizeRuntimeDiagnosticsForExport(diagnostics, deployment, sensitiveV
 
   return {
     ...redactRuntimeInventoryObject(diagnostics, sensitiveValues),
-    server_target: deployment?.server_id ? "Managed by an admin" : null,
+    server_target:
+      deployment?.server_id || deployment?.server_managed_by_admin ? "Managed by an admin" : null,
   };
 }
 
@@ -157,7 +164,12 @@ export function buildAccessControlledRuntimeExportPayload({
       Array.isArray(attentionItems) ? attentionItems : [],
       sensitiveValues,
     ),
-    suggestedPorts: [],
+    suggestedPorts:
+      deployment?.server_id || deployment?.server_managed_by_admin
+        ? []
+        : Array.isArray(suggestedPorts)
+          ? suggestedPorts
+          : [],
   };
 }
 

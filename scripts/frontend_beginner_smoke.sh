@@ -153,40 +153,66 @@ run_beginner_member_smoke() {
 
     detail_html="$(mktemp)"
     failed_detail_html="$(mktemp)"
+    admin_managed_detail_html="$(mktemp)"
     curl -sS "${BASE_URL}/deployments/smoke-deployment" > "$detail_html"
     curl -sS "${BASE_URL}/deployments/review-worker" > "$failed_detail_html"
-    if grep -Eq 'data-testid="runtime-detail-tab-change"|data-testid="runtime-detail-redeploy-review-button"|data-testid="runtime-detail-delete-review-button"|data-testid="runtime-detail-delete-confirm-button"' "$detail_html" "$failed_detail_html"; then
+    curl -sS "${BASE_URL}/deployments/admin-managed-runtime" > "$admin_managed_detail_html"
+    if grep -Eq 'data-testid="runtime-detail-tab-change"|data-testid="runtime-detail-redeploy-review-button"|data-testid="runtime-detail-delete-review-button"|data-testid="runtime-detail-delete-confirm-button"' "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"; then
       echo "[frontend-beginner-member-smoke] member runtime detail leaked mutation or destructive controls" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html"
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
       exit 1
     fi
 
     if grep -Eq 'Smoke VPS' "$detail_html"; then
       echo "[frontend-beginner-member-smoke] member healthy runtime detail leaked admin-managed server label" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html"
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
       exit 1
     fi
 
     if grep -Eq 'Ops Batch|ops-batch\.demo\.example\.com' "$failed_detail_html"; then
       echo "[frontend-beginner-member-smoke] member failed runtime detail leaked admin-managed server identity" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html"
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="runtime-detail-admin-managed-live-checks-banner"' "$admin_managed_detail_html"; then
+      echo "[frontend-beginner-member-smoke] member admin-managed runtime detail lost the live-checks boundary notice" >&2
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="runtime-detail-template-admin-managed-banner"' "$admin_managed_detail_html"; then
+      echo "[frontend-beginner-member-smoke] member admin-managed runtime detail lost the template boundary notice" >&2
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
+      exit 1
+    fi
+
+    if grep -Eq 'data-testid="runtime-detail-save-template-button"' "$admin_managed_detail_html"; then
+      echo "[frontend-beginner-member-smoke] member admin-managed runtime detail exposed local template save" >&2
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
+      exit 1
+    fi
+
+    if grep -Eq 'Smoke VPS|smoke\.example\.com|deploy@|For local deploys' "$admin_managed_detail_html"; then
+      echo "[frontend-beginner-member-smoke] member admin-managed runtime detail leaked server identity or local-runtime copy" >&2
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
       exit 1
     fi
 
     if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Open running app<' "$detail_html"; then
       echo "[frontend-beginner-member-smoke] member healthy runtime detail lost the safe open-app next step" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html"
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
       exit 1
     fi
 
     if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Review runtime issues<' "$failed_detail_html"; then
       echo "[frontend-beginner-member-smoke] member failed runtime detail lost the review-first next step" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html"
+      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
       exit 1
     fi
 
     rm -f "$member_html"
-    rm -f "$workflow_html" "$detail_html" "$failed_detail_html"
+    rm -f "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
   )
 }
 
