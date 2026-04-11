@@ -60,9 +60,9 @@ automation_smoke_runtime_checks() {
   cat <<'EOF'
 /app|runtime page title|data-testid="runtime-page-title"
 /app|runtime smoke banner|data-testid="runtime-smoke-banner"
-/app|workspace scenario card|data-testid="workspace-scenario-card"
+/app|workspace action surface|data-testid="workspace-action-surface"
 /app|workspace scenario title|data-testid="workspace-scenario-title"
-/app|workspace scenario grid|data-testid="workspace-scenario-grid"
+/app|workspace quick actions|data-testid="workspace-quick-actions"
 /app|workspace scenario server action|data-testid="workspace-scenario-action-step-1"
 /app|workspace scenario deploy action|data-testid="workspace-scenario-action-step-2"
 /app|workspace scenario runtime action|data-testid="workspace-scenario-action-step-3"
@@ -120,20 +120,14 @@ EOF
 automation_smoke_beginner_admin_checks() {
   cat <<'EOF'
 /app|beginner overview title|data-testid="runtime-page-title"
-/app|beginner overview product hero|data-testid="workspace-product-hero"
+/app|beginner overview action surface|data-testid="workspace-action-surface"
 /app|beginner overview quick actions|data-testid="workspace-quick-actions"
-/app|beginner overview quick action step 1|data-testid="workspace-quick-action-step-1"
-/app|beginner overview quick action step 2 disabled|(<button[^>]*data-testid="workspace-quick-action-step-2"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-quick-action-step-2")
-/app|beginner overview quick action step 3 disabled|(<button[^>]*data-testid="workspace-quick-action-step-3"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-quick-action-step-3")
-/app|beginner overview signal strip|data-testid="workspace-product-signals"
+/app|beginner overview primary card|data-testid="workspace-primary-task-card"
 /app|beginner overview guide title|data-testid="workspace-scenario-title"
-/app|beginner overview primary hero action|data-testid="workspace-hero-primary-action"
-/app|beginner overview primary task card|data-testid="workspace-primary-task-card"
-/app|beginner overview primary task action|data-testid="workspace-primary-task-action"
 /app|beginner overview step 1 action|data-testid="workspace-scenario-action-step-1"
 /app|beginner overview step 2 blocked|(<button[^>]*data-testid="workspace-scenario-action-step-2"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-2")
 /app|beginner overview step 3 blocked|(<button[^>]*data-testid="workspace-scenario-action-step-3"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-3")
-/app|beginner overview path copy|One path, three steps
+/app|beginner overview board copy|Choose the next step\.
 /app/server-review|beginner server review title|data-testid="server-review-page-title"
 /app/server-review|beginner server review step framing|Step 1: Connect and verify one server
 /app/server-review|beginner server review create card|data-testid="server-review-create-card"
@@ -150,8 +144,8 @@ automation_smoke_beginner_member_checks() {
   cat <<'EOF'
 /app|beginner member overview title|data-testid="runtime-page-title"
 /app|beginner member guide title|data-testid="workspace-scenario-title"
-/app|beginner member blocked copy|Wait for the server target
-/app|beginner member blocked status|Blocked until Step 1
+/app|beginner member blocked copy|Wait for the server target|Review the deployments that already exist
+/app|beginner member blocked status|Locked
 /app/server-review|beginner member server review blocked card|data-testid="server-review-blocked-card"
 /app/server-review|beginner member server review blocked title|data-testid="server-review-blocked-title"
 /app/server-review|beginner member server review blocked banner|data-testid="server-review-blocked-banner"

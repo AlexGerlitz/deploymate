@@ -263,6 +263,12 @@ Updated: 2026-04-11
   - fix: the top layer is now a three-card glass grid with equal step cards, soft state tints, clearer `Start here / Ready / Locked` status labels, and a lighter current-step action treatment instead of a black active slab
   - fix: the top surfaces now use a restrained glass treatment with soft neutral/ice/sage tones, while the rest of the page stays quiet and readable
   - guardrail: the existing beginner smoke still holds the quick-action layer above the deeper overview/ops sections, and live browser smoke now validates the desktop grid/collapsed-detail shape before handoff
+- The product shell is now moving out of the page body and into a shared top bar:
+  - screen: `/app`, `/app/server-review`, `/app/deployment-workflow`, `/deployments/*`, `/change-password`
+  - issue: `/app` kept turning into a giant hero with secondary explanation blocks, while account/help controls were not anchored as one shared product shell
+  - fix: workspace routes now use one fixed top bar with a centered DeployMate badge, right-side `Help`, `Profile`, and `Logout`, while `/login` stays clean and separate
+  - fix: `/app` itself now starts as one full-width action board for `Step 1 / Step 2 / Step 3` instead of hero + signal strip + next panel; deeper ops/admin sections stay below the fold
+  - guardrail: `smoke:beginner` now checks the new action-surface structure and no longer depends on the old hero/next-panel markup
 - The healthy runtime happy path is now reinforced in workflow as well as detail:
   - on the primary healthy runtime card in `deployment-workflow`, `Open app` now comes first and uses the primary action styling
   - `smoke:runtime` now runs a healthy-only workflow fixture so the safe verify path is checked in live queue before detail review
@@ -1108,11 +1114,13 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:beginner` после overview quick-action rail slice -> ok
 - `npm --prefix frontend run build` после overview glass step-grid slice -> ok
 - `npm --prefix frontend run smoke:beginner` после overview glass step-grid slice -> ok
+- `npm --prefix frontend run build` после workspace shell + action-board slice -> ok
+- `npm --prefix frontend run smoke:beginner` после workspace shell + action-board slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:
 
-- текущий пакет по scaffold + server-review + runtime detail handoff + richer backend mutation trace + stronger restore preparation guardrails + structured restore preparation guidance + DeployMate-specific feature scaffold + import-review workspace + restore/import-review handoff + approval trail layer + preparation handoff layer + primary-action UX package + `/app` scenario-entry layer + recovery sequencing layer + upgrade inbox UX package + users dual-path UX package + dedicated deployment workflow split + deployment detail intent-first layer + template lifecycle bridge + create/redeploy consistency layer + redeploy-review guardrails + shared risky-action language layer + shared reviewer-facing rollout copy layer + overview product-entry hierarchy + overview quick-action rail + overview glass step-grid polish находится в рабочем состоянии
+- текущий пакет по scaffold + server-review + runtime detail handoff + richer backend mutation trace + stronger restore preparation guardrails + structured restore preparation guidance + DeployMate-specific feature scaffold + import-review workspace + restore/import-review handoff + approval trail layer + preparation handoff layer + primary-action UX package + `/app` scenario-entry layer + recovery sequencing layer + upgrade inbox UX package + users dual-path UX package + dedicated deployment workflow split + deployment detail intent-first layer + template lifecycle bridge + create/redeploy consistency layer + redeploy-review guardrails + shared risky-action language layer + shared reviewer-facing rollout copy layer + overview product-entry hierarchy + overview quick-action rail + overview glass step-grid polish + workspace shell + action-board slice находится в рабочем состоянии
 
 ## Best Next Step
 

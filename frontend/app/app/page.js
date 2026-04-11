@@ -111,10 +111,6 @@ export default function HomePage() {
         source: "overview-first-deploy",
       }).toString()}`
     : "/app/deployment-workflow";
-  const overviewPrimaryHref =
-    overviewPrimaryPath.reason === "first-deploy" && singleServerFirstDeployTarget
-      ? firstDeployWorkflowHref
-      : overviewPrimaryPath.href;
   const memberServerCopy = canAccessServers
     ? null
     : localDeploymentsEnabled
@@ -140,17 +136,6 @@ export default function HomePage() {
             : "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
           stepAction: memberHasLiveDeployments ? "Open live review" : "Review rollout status",
         };
-  const beginnerStatusSummary = canAccessServers
-    ? servers.length === 0
-      ? "No server connected yet. Start with Step 1."
-      : deployments.length === 0
-        ? `${servers.length} server target${servers.length === 1 ? "" : "s"} connected. No deployments yet.`
-        : `${opsSnapshot.deployments.running} running · ${opsSnapshot.deployments.failed} failed · ${servers.length} server target${servers.length === 1 ? "" : "s"} saved.`
-    : localDeploymentsEnabled
-      ? "Server inventory is admin-managed. Use the deployment workflow to continue."
-      : memberHasLiveDeployments
-        ? `${opsSnapshot.deployments.total} deployment${opsSnapshot.deployments.total === 1 ? "" : "s"} available for live review. Server target stays admin-managed.`
-      : "Server target is admin-managed. Return to the deployment workflow once it is confirmed.";
   const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
     ? "Next best step: connect and verify one server."
     : overviewPrimaryPath.reason === "incident"
@@ -173,48 +158,6 @@ export default function HomePage() {
   const stepOneIsPrimary =
     overviewPrimaryPath.reason === "server-setup" ||
     overviewPrimaryPath.reason === "admin-target-needed";
-  const heroHeadline = canAccessServers
-    ? servers.length === 0
-      ? "DeployMate helps you run one app on one server in three simple steps."
-      : deployments.length === 0
-        ? "Step 1 is done. Now choose one app to run on that server."
-        : "Your app is already running. Check health first, then make the next change."
-    : localDeploymentsEnabled
-      ? "DeployMate still gives you a simple path even when admins manage saved servers."
-      : memberHasLiveDeployments
-        ? "You can review existing deployments while admins manage the server target."
-      : "Your deployment target is admin-managed. Confirm it with an admin, then continue.";
-  const heroSupportText = canAccessServers
-    ? servers.length === 0
-      ? "In plain language: tell DeployMate which machine to use, choose the app image to start, and then check whether the app stays healthy."
-      : deployments.length === 0
-        ? "You already connected the machine. Stay on the main path now: choose one app image or one saved setup and start it."
-        : "Stay on the main path: open the app workspace, review what is healthy, and only then decide what to change next."
-    : localDeploymentsEnabled
-      ? "Members can still choose what to run and review health while admins keep the saved server list up to date."
-      : memberHasLiveDeployments
-        ? "Use Deployment Workflow to inspect live apps. Ask an admin before a new remote rollout or target change."
-      : "Members do not manage saved server targets here. Ask an admin to confirm the target, then return to the workflow.";
-  const explanationTitle = canAccessServers
-    ? servers.length === 0
-      ? "What DeployMate means in plain language"
-      : "What this app is helping you do"
-    : localDeploymentsEnabled
-      ? "What changes when admins manage saved servers"
-      : memberHasLiveDeployments
-        ? "What you can review without server access"
-      : "What happens after an admin confirms the target";
-  const explanationBody = canAccessServers
-    ? servers.length === 0
-      ? "You do not need to learn the whole workspace first. Just understand the three-step path and take the next step."
-      : deployments.length === 0
-        ? "This workspace is already past the server step. The next decision is simply what app to run first."
-        : "You already have a running runtime story. Open the workflow to review status and keep the next action deliberate."
-    : localDeploymentsEnabled
-      ? "Admins keep the saved server list, but you can still understand the path: choose what to run, start it, and check health."
-      : memberHasLiveDeployments
-        ? "Server inventory stays controlled, but the live runtime review path is open for deployments that already exist."
-      : "Once an admin confirms the saved server target, use Deployment Workflow to create or review the rollout.";
   const beginnerSteps = [
     {
       key: "step-1",
@@ -267,91 +210,28 @@ export default function HomePage() {
       disabled: stepThreeBlocked,
     },
   ];
-  const productQuickActions = beginnerSteps.map((card) => {
-    const quickLabelByStep = {
-      "step-1": "Connect server",
-      "step-2": "Deploy app",
-      "step-3": "Review health",
-    };
-    const quickDetailByStep = {
-      "step-1": canAccessServers
-        ? servers.length === 0
-          ? "Save one target so DeployMate can reach your machine."
-          : `${servers.length} target${servers.length === 1 ? "" : "s"} already saved for rollout.`
-        : "Admins manage the saved server target for this workspace.",
-      "step-2": stepTwoBlocked
-        ? memberNewDeploymentBlocked
-          ? "New remote deploys open when an admin confirms the target."
-          : "This unlocks as soon as one server target is connected."
-        : "Pick the image or saved setup you want to run next.",
-      "step-3": stepThreeBlocked
-        ? "This opens after the first deployment is live."
-        : memberHasLiveDeployments
-          ? "Open runtime status and live detail without server inventory controls."
-          : "Check the app, runtime health, and activity after deploy.",
-    };
-
-    return {
-      ...card,
-      quickLabel: quickLabelByStep[card.key],
-      quickState: card.primary ? "Start here" : card.disabled ? "Locked" : "Ready",
-      quickDetail: quickDetailByStep[card.key],
-    };
-  });
-  const plainLanguageCards = [
-    {
-      title: "What “server” means here",
-      detail: canAccessServers
-        ? "It is simply the machine where your app will run. Step 1 only tells DeployMate how to reach that machine."
-        : localDeploymentsEnabled
-          ? "Admins keep the saved server list, but your rollout path still starts by choosing what to run."
+  const workspaceBoardSteps = beginnerSteps.map((card) => ({
+    ...card,
+    boardTitle:
+      card.key === "step-1"
+        ? canAccessServers
+          ? "Connect server"
+          : card.title
+        : card.key === "step-2"
+          ? "Deploy app"
           : memberHasLiveDeployments
-            ? "The server target stays admin-managed. Your current job is reviewing existing live apps without changing target controls."
-          : "The remote machine is confirmed by an admin first, then you continue in the rollout workflow.",
-    },
-    {
-      title: "What “choose your app” means",
-      detail: memberNewDeploymentBlocked
-        ? "For a new remote deployment, ask an admin to confirm the target and rollout change. Existing deployments stay available for review."
-        : "Usually this is a container image like `nginx:latest`, or one saved template that already remembers the image, ports, and env vars.",
-    },
-    {
-      title: "What “healthy” means",
-      detail:
-        "After the app starts, DeployMate shows whether it is running and whether the health checks and runtime details look good enough to keep going.",
-    },
-  ];
+            ? "Review live apps"
+            : "Review health",
+    boardState: card.primary ? "Current" : card.disabled ? "Locked" : "Ready",
+    boardDestination: card.href.includes("/app/server-review")
+      ? "Opens Server review"
+      : card.href.includes("/app/deployment-workflow")
+        ? "Opens Deployment workflow"
+        : "Opens workspace",
+  }));
   const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
     opsSnapshot.attention_items.length === 1 ? "" : "s"
   }`;
-  const productSignalCards = [
-    {
-      label: "Server",
-      value: canAccessServers
-        ? servers.length === 0
-          ? "Not connected"
-          : "Ready"
-        : "Admin-managed",
-      detail: canAccessServers
-        ? servers.length === 0
-          ? "Step 1 is the only setup that matters right now."
-          : `${servers.length} target${servers.length === 1 ? "" : "s"} saved.`
-        : "Server details stay with admins.",
-    },
-    {
-      label: "Apps",
-      value: opsSnapshot.deployments.total === 0 ? "None yet" : `${opsSnapshot.deployments.total}`,
-      detail:
-        opsSnapshot.deployments.total === 0
-          ? "Create the first deployment before runtime review opens."
-          : `${opsSnapshot.deployments.running} running, ${opsSnapshot.deployments.failed} failed.`,
-    },
-    {
-      label: "Next action",
-      value: overviewPrimaryPath.label,
-      detail: overviewPrimaryPath.title,
-    },
-  ];
 
   async function fetchCurrentUser() {
     const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -595,17 +475,6 @@ export default function HomePage() {
     };
   }, [authChecked]);
 
-  async function handleLogout() {
-    try {
-      await fetch(`${apiBaseUrl}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } finally {
-      router.replace("/login");
-    }
-  }
-
   function clearOpsMessages() {
     setOpsActionMessage("");
     setOpsActionError("");
@@ -710,133 +579,46 @@ export default function HomePage() {
   }
 
   return (
-    <main className="page workspaceProductPage">
-      <div className="container workspaceProductContainer">
-        <section className="overviewProductHero" data-testid="workspace-product-hero">
-          <div className="overviewProductHeroCopy">
-            <span className="overviewProductEyebrow">DeployMate</span>
-            <h1 data-testid="runtime-page-title">Deploy Docker apps on your own server.</h1>
-            <p className="overviewProductLead">{heroHeadline}</p>
-            <p className="overviewProductSupport">{heroSupportText}</p>
-            <div
-              className="overviewProductQuickGrid"
-              data-testid="workspace-quick-actions"
-              aria-label="How to use DeployMate"
-            >
-              {productQuickActions.map((card) => {
-                const quickCardClassName = `overviewProductQuickCard ${
-                  card.primary ? "isPrimary" : card.disabled ? "isLocked" : "isReady"
-                }`;
-                const quickActionButtonClassName = `landingButton secondaryButton overviewProductQuickButton ${
-                  card.primary ? "isCurrent" : ""
-                }`;
-
-                const quickActionNode = card.disabled ? (
-                  <button
-                    type="button"
-                    disabled
-                    className={quickActionButtonClassName}
-                    data-testid={`workspace-quick-action-${card.key}`}
-                  >
-                    {card.actionLabel}
-                  </button>
-                ) : (
-                  <Link
-                    href={card.href}
-                    className={quickActionButtonClassName}
-                    data-testid={`workspace-quick-action-${card.key}`}
-                  >
-                    {card.actionLabel}
-                  </Link>
-                );
-
-                return (
-                  <article key={card.key} className={quickCardClassName} data-testid={`workspace-quick-card-${card.key}`}>
-                    <div className="overviewProductQuickHeader">
-                      <span className="overviewProductQuickStep">{card.step}</span>
-                      <span className="overviewProductQuickStateBadge">{card.quickState}</span>
-                    </div>
-                    <div className="overviewProductQuickCopy">
-                      <h3>{card.quickLabel}</h3>
-                      <p>{card.quickDetail}</p>
-                    </div>
-                    <div className="overviewProductQuickFooter">{quickActionNode}</div>
-                  </article>
-                );
-              })}
-            </div>
-            <div className="overviewProductActions">
-              <Link
-                href={overviewPrimaryHref}
-                className="landingButton primaryButton overviewProductPrimaryButton"
-                data-testid="workspace-hero-primary-action"
-              >
-                {overviewPrimaryPath.label}
-              </Link>
-              <button type="button" onClick={handleLogout} className="overviewProductTextButton">
-                Logout
-              </button>
-            </div>
+    <main className="page workspaceActionPage">
+      <div className="container workspaceActionContainer">
+        <section className="workspaceActionSurface" data-testid="workspace-action-surface">
+          <div className="workspaceActionSurfaceHeader" data-testid="workspace-scenario-card">
+            <span className="workspaceActionSurfaceEyebrow">Main workspace</span>
+            <h1 data-testid="runtime-page-title">Choose the next step.</h1>
+            <p>{beginnerNextStep}</p>
+            <p data-testid="workspace-scenario-title">Step 1, Step 2, Step 3.</p>
           </div>
 
-          <aside className="overviewProductNextPanel" data-testid="workspace-primary-task-card">
-            <span>Next</span>
-            <strong>{overviewPrimaryPath.title}</strong>
-            <p>{overviewPrimaryPath.detail}</p>
-            <Link
-              href={overviewPrimaryHref}
-              className="landingButton primaryButton overviewProductPrimaryButton"
-              data-testid="workspace-primary-task-action"
-            >
-              {overviewPrimaryPath.label}
-            </Link>
-          </aside>
-        </section>
-
-        <section className="overviewProductSignals" data-testid="workspace-product-signals">
-          {productSignalCards.map((signal) => (
-            <article key={signal.label} className="overviewProductSignal">
-              <span>{signal.label}</span>
-              <strong>{signal.value}</strong>
-              <p>{signal.detail}</p>
-            </article>
-          ))}
-        </section>
-
-        <details className="overviewProductDetails overviewProductPathSection" data-testid="workspace-scenario-card">
-          <summary className="overviewProductSectionHeader overviewProductSummary">
-            <span>First pass</span>
-            <h2 data-testid="workspace-scenario-title">One path, three steps</h2>
-            <p>{beginnerNextStep}</p>
-          </summary>
-          <div className="overviewProductPath" data-testid="workspace-scenario-grid">
-            {beginnerSteps.map((card) => (
+          <div className="workspaceActionGrid" data-testid="workspace-quick-actions">
+            {workspaceBoardSteps.map((card) => (
               <article
                 key={card.key}
-                className={`overviewProductStep ${card.primary ? "isPrimary" : card.disabled ? "isLocked" : "isReady"}`}
+                className={`workspaceActionCard ${card.primary ? "isPrimary" : card.disabled ? "isLocked" : "isReady"}`}
                 data-testid={`workspace-scenario-item-${card.key}`}
               >
-                <div className="overviewProductStepMeta">
-                  <span className="overviewProductStepNumber">{card.step}</span>
-                  <span className="overviewProductStepState">
-                    {card.primary
-                      ? "Current"
-                      : card.disabled
-                        ? card.key === "step-2" && waitingForAdminTarget
-                          ? "Blocked until Step 1"
-                          : card.actionLabel
-                        : "Ready"}
-                  </span>
+                <div className="workspaceActionCardHeader">
+                  <span className="workspaceActionCardIcon">{card.step.replace("Step ", "0")}</span>
+                  <span className="workspaceActionCardState">{card.boardState}</span>
                 </div>
-                <div className="overviewProductStepCopy">
-                  <h3>{card.title}</h3>
+
+                {card.primary ? (
+                  <span className="workspaceActionPrimaryMarker" data-testid="workspace-primary-task-card">
+                    Current step
+                  </span>
+                ) : null}
+
+                <div className="workspaceActionCardCopy">
+                  <h2>{card.boardTitle}</h2>
                   <p>{card.detail}</p>
                 </div>
+
+                <div className="workspaceActionCardMeta">{card.boardDestination}</div>
+
                 {card.disabled ? (
                   <button
                     type="button"
                     disabled
-                    className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                    className="landingButton secondaryButton workspaceActionButton"
                     data-testid={`workspace-scenario-action-${card.key}`}
                   >
                     {card.actionLabel}
@@ -844,7 +626,7 @@ export default function HomePage() {
                 ) : (
                   <Link
                     href={card.href}
-                    className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
+                    className="landingButton secondaryButton workspaceActionButton"
                     data-testid={`workspace-scenario-action-${card.key}`}
                   >
                     {card.actionLabel}
@@ -853,23 +635,7 @@ export default function HomePage() {
               </article>
             ))}
           </div>
-        </details>
-
-        <details className="overviewProductDetails overviewProductExplainer">
-          <summary className="overviewProductSectionHeader overviewProductSummary">
-            <span>Plain language</span>
-            <h2>{explanationTitle}</h2>
-            <p>{explanationBody}</p>
-          </summary>
-          <div className="overviewProductExplainerGrid">
-            {plainLanguageCards.map((card) => (
-              <article key={card.title} className="overviewProductExplainerCard">
-                <span>{card.title}</span>
-                <p>{card.detail}</p>
-              </article>
-            ))}
-          </div>
-        </details>
+        </section>
 
         <div className="workspaceBannerStack">
           {error ? <div className="banner error">{error}</div> : null}

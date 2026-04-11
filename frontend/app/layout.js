@@ -1,6 +1,7 @@
 import "./globals.css";
 import Link from "next/link";
 import { Manrope, Space_Grotesk } from "next/font/google";
+import WorkspaceChrome from "./workspace-chrome";
 const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -18,26 +19,29 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const footer = (
+    <footer className="siteFooter">
+      <div className="container siteFooterInner">
+        <div className="siteFooterLinks" aria-label="Footer links">
+          <Link href="/" className="siteFooterLink">
+            Home
+          </Link>
+          <Link href="/login" className="siteFooterLink">
+            Open app
+          </Link>
+        </div>
+
+        <div className="siteFooterMeta">
+          <span>DeployMate</span>
+        </div>
+      </div>
+    </footer>
+  );
+
   return (
     <html lang="en">
       <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
-        {children}
-        <footer className="siteFooter">
-          <div className="container siteFooterInner">
-            <div className="siteFooterLinks" aria-label="Footer links">
-              <Link href="/" className="siteFooterLink">
-                Home
-              </Link>
-              <Link href="/login" className="siteFooterLink">
-                Open app
-              </Link>
-            </div>
-
-            <div className="siteFooterMeta">
-              <span>DeployMate</span>
-            </div>
-          </div>
-        </footer>
+        <WorkspaceChrome footer={footer}>{children}</WorkspaceChrome>
       </body>
     </html>
   );

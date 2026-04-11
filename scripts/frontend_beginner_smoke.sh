@@ -108,10 +108,8 @@ from pathlib import Path
 
 html = Path(sys.argv[1]).read_text(encoding="utf-8")
 required_order = [
-    'data-testid="workspace-product-hero"',
+    'data-testid="workspace-action-surface"',
     'data-testid="workspace-quick-actions"',
-    'data-testid="workspace-primary-task-card"',
-    'data-testid="workspace-scenario-card"',
     'data-testid="ops-overview-disclosure"',
 ]
 positions = []
@@ -157,7 +155,7 @@ run_beginner_admin_server_ready_smoke() {
     overview_html="$(mktemp)"
     curl -sS "${BASE_URL}/app" > "$overview_html"
 
-    if ! grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Launch first deployment<' "$overview_html"; then
+    if ! grep -Eq 'data-testid="workspace-scenario-action-step-2"[^>]*>Choose app to run<' "$overview_html"; then
       echo "[frontend-beginner-admin-server-ready-smoke] overview did not point the ready-server admin to first deployment" >&2
       rm -f "$overview_html"
       exit 1
@@ -169,13 +167,7 @@ run_beginner_admin_server_ready_smoke() {
       exit 1
     fi
 
-    if ! grep -Eq 'data-testid="workspace-scenario-action-step-2"[^>]*>Choose app to run<' "$overview_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] Step 2 was not the active first-deploy action" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
-
-    if grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Add first server target<|data-testid="workspace-primary-task-action"[^>]*>Add first server target<' "$overview_html"; then
+    if grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Add first server target<' "$overview_html"; then
       echo "[frontend-beginner-admin-server-ready-smoke] overview regressed to server setup after a server was ready" >&2
       rm -f "$overview_html"
       exit 1
@@ -367,7 +359,7 @@ run_beginner_member_overview_live_smoke() {
     overview_html="$(mktemp)"
     curl -sS "${BASE_URL}/app" > "$overview_html"
 
-    if ! grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Review deployments<' "$overview_html"; then
+    if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Open live review<' "$overview_html"; then
       echo "[frontend-beginner-member-overview-live-smoke] member overview live path lost the review primary action" >&2
       rm -f "$overview_html"
       exit 1
@@ -426,7 +418,7 @@ run_beginner_member_waiting_smoke() {
     curl -sS "${BASE_URL}/app" > "$overview_html"
     curl -sS "${BASE_URL}/app/deployment-workflow" > "$waiting_html"
 
-    if ! grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Review rollout status<' "$overview_html"; then
+    if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Review rollout status<' "$overview_html"; then
       echo "[frontend-beginner-member-waiting-smoke] member waiting overview lost the explicit rollout-status action" >&2
       rm -f "$overview_html" "$waiting_html"
       exit 1
