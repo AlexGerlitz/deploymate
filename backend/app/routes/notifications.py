@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from app.db import list_deployment_records, list_notifications
 from app.schemas import NotificationResponse
 from app.services.auth import require_auth, user_is_admin
+from app.services.runtime_access import sanitize_notifications_for_user
 
 
 router = APIRouter(dependencies=[Depends(require_auth)])
@@ -21,12 +22,13 @@ def get_notifications(
     notifications = list_notifications(limit=max(limit, 200))
     if user_is_admin(user):
         visible_deployment_ids = None
+        deployments_by_id = {}
     else:
-        visible_deployment_ids = {
-            item["id"]
-            for item in list_deployment_records()
-            if item.get("owner_user_id") == user["id"]
-        }
+        visible_deployments = [
+            item for item in list_deployment_records() if item.get("owner_user_id") == user["id"]
+        ]
+        deployments_by_id = {item["id"]: item for item in visible_deployments}
+        visible_deployment_ids = set(deployments_by_id)
     normalized_query = q.strip().lower()
     normalized_category = category.strip().lower()
 
@@ -50,7 +52,8 @@ def get_notifications(
     for item in notifications:
         if visible_deployment_ids is not None and item.get("deployment_id") not in visible_deployment_ids:
             continue
-        inferred_category = infer_activity_category(item)
+        sanitized_item = sanitize_notifications_for_user([item], deployments_by_id, user)[0]
+        inferred_category = infer_activity_category(sanitized_item)
         if level != "all" and item.get("level") != level:
             continue
         if normalized_category and normalized_category != "all" and inferred_category != normalized_category:
@@ -60,14 +63,14 @@ def get_notifications(
                 filter(
                     None,
                     [
-                        item.get("title"),
-                        item.get("message"),
-                        item.get("deployment_id"),
+                        sanitized_item.get("title"),
+                        sanitized_item.get("message"),
+                        sanitized_item.get("deployment_id"),
                         inferred_category,
                     ],
                 )
             ).lower()
             if normalized_query not in haystack:
                 continue
-        filtered.append(NotificationResponse(**item, category=inferred_category))
+        filtered.append(NotificationResponse(**sanitized_item, category=inferred_category))
     return filtered[:limit]

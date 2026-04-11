@@ -176,6 +176,10 @@ Updated: 2026-04-11
   - issue: the visual UI was generic, but downloadable incident JSON/markdown and copy/export payloads could still be built from raw deployment/diagnostics/activity objects
   - fix: member export payloads now strip server inventory fields, replace admin-managed targets with generic labels, redact matching activity/attention text, and omit remote suggested ports
   - guardrail: `smoke:beginner` now imports the payload sanitizer directly and fails if member exports contain raw server inventory keys, server names, SSH targets, server ids, or suggested ports
+- The backend now enforces the same member boundary instead of relying on frontend sanitizers:
+  - issue: owned legacy/admin-managed remote deployments and templates could still expose `server_id`, `server_name`, `server_host`, or SSH target text through API reads/exports/activity, and member API calls could still reach remote runtime live actions
+  - fix: non-admin API reads/exports redact admin-managed server inventory fields, activity/notifications redact matching server identity text, and remote runtime diagnostics/logs/health/redeploy/delete now return admin-only `403`
+  - guardrail: `tests.test_member_ownership_isolation` now covers owned remote deployment/template reads, ops exports, notifications/activity redaction, and blocked remote live/mutation actions
 - Local frontend smoke for the beginner path passed after this slice:
   - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`

@@ -20,6 +20,10 @@ from app.services.deployment_observability import (
     probe_http_endpoint,
 )
 from app.services.deployments import ensure_docker_is_available
+from app.services.runtime_access import (
+    ensure_remote_runtime_action_allowed,
+    sanitize_activity_events_for_user,
+)
 
 
 router = APIRouter(dependencies=[Depends(require_auth)])
@@ -75,11 +79,11 @@ def _get_user_deployment_or_404(deployment_id: str, user: dict) -> dict:
 
 @router.get("/deployments/{deployment_id}/activity", response_model=List[NotificationResponse])
 def get_deployment_activity(deployment_id: str, user=Depends(require_auth)) -> List[NotificationResponse]:
-    _get_user_deployment_or_404(deployment_id, user)
+    deployment = _get_user_deployment_or_404(deployment_id, user)
     activity = list_deployment_activity(deployment_id)
     return [
         NotificationResponse(**item, category=_infer_activity_category(item.get("title"), item.get("message")))
-        for item in activity
+        for item in sanitize_activity_events_for_user(activity, deployment, user)
     ]
 
 
@@ -92,12 +96,14 @@ def get_deployment_diagnostics(
     user=Depends(require_auth),
 ) -> DeploymentDiagnosticsResponse:
     deployment = _get_user_deployment_or_404(deployment_id, user)
+    ensure_remote_runtime_action_allowed(deployment, user, action="Remote runtime diagnostics")
     return _build_deployment_diagnostics(deployment)
 
 
 @router.get("/deployments/{deployment_id}/logs", response_model=DeploymentLogsResponse)
 def get_deployment_logs(deployment_id: str, user=Depends(require_auth)) -> DeploymentLogsResponse:
     deployment = _get_user_deployment_or_404(deployment_id, user)
+    ensure_remote_runtime_action_allowed(deployment, user, action="Remote runtime logs")
     container_name = deployment["container_name"]
 
     if deployment.get("status") != "running" or not deployment.get("container_id"):
@@ -151,4 +157,5 @@ def get_deployment_logs(deployment_id: str, user=Depends(require_auth)) -> Deplo
 @router.get("/deployments/{deployment_id}/health", response_model=DeploymentHealthResponse)
 def get_deployment_health(deployment_id: str, user=Depends(require_auth)) -> DeploymentHealthResponse:
     deployment = _get_user_deployment_or_404(deployment_id, user)
+    ensure_remote_runtime_action_allowed(deployment, user, action="Remote runtime health checks")
     return _build_deployment_health_response(deployment)

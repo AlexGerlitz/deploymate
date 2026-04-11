@@ -20,6 +20,10 @@ from app.schemas import (
 )
 from app.services.auth import require_auth, user_is_admin
 from app.services.deployments import local_docker_runtime_enabled
+from app.services.runtime_access import (
+    sanitize_notifications_for_user,
+    sanitize_remote_target_fields,
+)
 from app.services.server_credentials import SERVER_CREDENTIALS_KEY_ENV
 
 
@@ -111,18 +115,24 @@ def _sanitize_server_export(item: dict) -> dict:
     }
 
 
-def _visible_deployments_for_user(user: dict) -> list[dict]:
+def _visible_deployments_for_user(user: dict, *, sanitize: bool = False) -> list[dict]:
     deployments = list_deployment_records()
     if user_is_admin(user):
         return deployments
-    return [item for item in deployments if item.get("owner_user_id") == user["id"]]
+    visible = [item for item in deployments if item.get("owner_user_id") == user["id"]]
+    if sanitize:
+        return [sanitize_remote_target_fields(item, user) for item in visible]
+    return visible
 
 
-def _visible_templates_for_user(user: dict) -> list[dict]:
+def _visible_templates_for_user(user: dict, *, sanitize: bool = False) -> list[dict]:
     templates = list_deployment_templates()
     if user_is_admin(user):
         return templates
-    return [item for item in templates if item.get("owner_user_id") == user["id"]]
+    visible = [item for item in templates if item.get("owner_user_id") == user["id"]]
+    if sanitize:
+        return [sanitize_remote_target_fields(item, user) for item in visible]
+    return visible
 
 
 def _visible_notifications_for_user(
@@ -135,13 +145,13 @@ def _visible_notifications_for_user(
     if user_is_admin(user):
         return notifications[:limit]
 
-    visible_deployment_ids = {
-        item["id"] for item in (deployments or _visible_deployments_for_user(user))
-    }
+    visible_deployments = deployments or _visible_deployments_for_user(user)
+    deployments_by_id = {item["id"]: item for item in visible_deployments}
+    visible_deployment_ids = set(deployments_by_id)
     filtered = [
         item for item in notifications if item.get("deployment_id") in visible_deployment_ids
     ]
-    return filtered[:limit]
+    return sanitize_notifications_for_user(filtered[:limit], deployments_by_id, user)
 
 
 def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOverviewResponse:
@@ -364,7 +374,10 @@ def export_deployments(
     format: str = Query(default="json", pattern="^(json|csv)$"),
     user=Depends(require_auth),
 ):
-    items = _collection_or_503(lambda: _visible_deployments_for_user(user), label="Deployments")
+    items = _collection_or_503(
+        lambda: _visible_deployments_for_user(user, sanitize=True),
+        label="Deployments",
+    )
     if format == "csv":
         return _csv_response(
             "deploymate-deployments.csv",
@@ -415,7 +428,10 @@ def export_templates(
     format: str = Query(default="json", pattern="^(json|csv)$"),
     user=Depends(require_auth),
 ):
-    items = _collection_or_503(lambda: _visible_templates_for_user(user), label="Templates")
+    items = _collection_or_503(
+        lambda: _visible_templates_for_user(user, sanitize=True),
+        label="Templates",
+    )
     if format == "csv":
         return _csv_response(
             "deploymate-templates.csv",

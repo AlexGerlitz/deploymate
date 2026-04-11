@@ -30,6 +30,7 @@ from app.services.deployment_templates import (
     validate_template_payload as _service_validate_template_payload,
 )
 from app.services.deployments import ensure_runtime_target_allowed
+from app.services.runtime_access import sanitize_remote_target_fields
 
 
 router = APIRouter(dependencies=[Depends(require_auth)])
@@ -96,7 +97,9 @@ def list_templates(
     return _service_list_templates(
         state=state,
         q=q,
-        list_deployment_templates_fn=lambda: _list_user_templates(user),
+        list_deployment_templates_fn=lambda: [
+            sanitize_remote_target_fields(item, user) for item in _list_user_templates(user)
+        ],
     )
 
 
@@ -127,7 +130,10 @@ def update_template_endpoint(
         template_id,
         payload,
         user,
-        get_deployment_template_or_404_fn=lambda current_id: _get_user_template_or_404(current_id, user),
+        get_deployment_template_or_404_fn=lambda current_id: sanitize_remote_target_fields(
+            _get_user_template_or_404(current_id, user),
+            user,
+        ),
         validate_template_payload_fn=_validate_template_payload_for_user,
         update_deployment_template_fn=update_deployment_template,
     )
@@ -146,7 +152,10 @@ def duplicate_template(
         template_id,
         user,
         payload,
-        get_deployment_template_or_404_fn=lambda current_id: _get_user_template_or_404(current_id, user),
+        get_deployment_template_or_404_fn=lambda current_id: sanitize_remote_target_fields(
+            _get_user_template_or_404(current_id, user),
+            user,
+        ),
         insert_deployment_template_fn=insert_deployment_template,
     )
 
@@ -167,7 +176,10 @@ def deploy_from_template(
     return _service_deploy_from_template(
         template_id,
         user,
-        get_deployment_template_or_404_fn=lambda current_id: _get_user_template_or_404(current_id, user),
+        get_deployment_template_or_404_fn=lambda current_id: sanitize_remote_target_fields(
+            _get_user_template_or_404(current_id, user),
+            user,
+        ),
         create_deployment_fn=create_deployment_adapter,
         mark_deployment_template_used_fn=mark_deployment_template_used,
     )
@@ -180,6 +192,9 @@ def deploy_from_template(
 def delete_template(template_id: str, user=Depends(require_auth)) -> DeploymentTemplateResponse:
     return _service_delete_template(
         template_id,
-        get_deployment_template_or_404_fn=lambda current_id: _get_user_template_or_404(current_id, user),
+        get_deployment_template_or_404_fn=lambda current_id: sanitize_remote_target_fields(
+            _get_user_template_or_404(current_id, user),
+            user,
+        ),
         delete_deployment_template_record_fn=delete_deployment_template_record,
     )
