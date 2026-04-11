@@ -24,6 +24,7 @@ import {
   smokeDeployments,
   smokeDiagnostics,
   smokeHealth,
+  smokeInternalRuntimeDeployment,
   smokeMode,
   smokeUser,
 } from "../../lib/smoke-fixtures";
@@ -473,15 +474,15 @@ function buildRuntimeDecisionState(
     label: "Ready",
     focus: deploymentUrl
       ? "Runtime is healthy. Open the app once before changing it"
-      : "Runtime looks stable enough to keep as-is",
+      : "Runtime is private. Review the stable service before changing it",
     why:
       deploymentUrl
         ? "No active runtime warnings are leading the page right now. The safest next step is verifying the live app before opening change tools."
-        : "No active runtime warnings are leading the page right now, so redeploy, handoff, and template actions can stay deliberate instead of reactive.",
+        : "No active runtime warnings are leading the page right now. Because there is no public URL to click from here, the safest next step is reviewing the stable runtime before opening change tools.",
     nextStep:
       deploymentUrl
         ? "Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional."
-        : "Keep the current rollout stable, or prepare one explicit change in the redeploy form when you are ready to change image, ports, or env vars on purpose.",
+        : "Review the current runtime overview, port mapping, health, and recent activity first. Prepare a rollout change only after that review is intentional.",
     primaryHref: deploymentUrl || "#runtime-detail-overview",
     primaryExternal: Boolean(deploymentUrl),
     primaryAction: deploymentUrl ? "Open running app" : "Review stable runtime",
@@ -552,7 +553,9 @@ export default function DeploymentDetailsPage({ params }) {
   const { deploymentId } = use(params);
   const router = useRouter();
   const smokeDetailDeployment = smokeMode
-    ? deploymentId === "admin-managed-runtime"
+    ? deploymentId === "internal-runtime"
+      ? smokeInternalRuntimeDeployment
+      : deploymentId === "admin-managed-runtime"
       ? {
           ...smokeDeployment,
           id: "admin-managed-runtime",
@@ -565,6 +568,7 @@ export default function DeploymentDetailsPage({ params }) {
     : null;
   const smokeDetailIsFailed = smokeDetailDeployment?.status === "failed";
   const smokeDetailIsAdminManaged = Boolean(smokeDetailDeployment?.server_managed_by_admin);
+  const smokeDetailIsInternalOnly = smokeDetailDeployment?.id === smokeInternalRuntimeDeployment.id;
   const smokeDetailHealth =
     smokeMode && smokeDetailIsAdminManaged
       ? {
@@ -577,6 +581,17 @@ export default function DeploymentDetailsPage({ params }) {
             "Live health checks stay with admins for this admin-managed remote runtime.",
           checked_at: smokeDetailDeployment.created_at,
           response_time_ms: null,
+        }
+      : smokeMode && smokeDetailIsInternalOnly
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          url: null,
+          status: "healthy",
+          status_code: 200,
+          error: null,
+          checked_at: smokeDetailDeployment.created_at,
+          response_time_ms: 31,
         }
       : smokeMode && smokeDetailIsFailed
       ? {
@@ -632,6 +647,43 @@ export default function DeploymentDetailsPage({ params }) {
             },
           ],
         }
+      : smokeMode && smokeDetailIsInternalOnly
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          current_status: smokeDetailDeployment.status,
+          server_target: `deploy@${smokeDetailDeployment.server_host}:22`,
+          checked_at: smokeDetailDeployment.created_at,
+          url: null,
+          health: smokeDetailHealth,
+          activity: {
+            total_events: 2,
+            success_events: 2,
+            error_events: 0,
+            recent_failure_count: 0,
+            recent_failure_titles: [],
+            last_event_title: "Internal health check passed",
+            last_event_level: "success",
+            last_event_at: smokeDetailDeployment.created_at,
+          },
+          log_excerpt: "internal-api entered RUNNING state without a public endpoint.",
+          items: [
+            {
+              key: "deployment_status",
+              label: "Deployment status",
+              status: "ok",
+              summary: "Current status is running.",
+              details: null,
+            },
+            {
+              key: "health",
+              label: "Internal health",
+              status: "ok",
+              summary: "Internal health checks are stable even though no public URL is assigned yet.",
+              details: "Service is reachable through the runtime target and mapped internal port.",
+            },
+          ],
+        }
       : smokeDiagnostics;
   const smokeDetailActivity =
     smokeMode && smokeDetailIsFailed
@@ -655,6 +707,27 @@ export default function DeploymentDetailsPage({ params }) {
             category: "deploy",
           },
         ]
+      : smokeMode && smokeDetailIsInternalOnly
+      ? [
+          {
+            id: "internal-runtime-activity-2",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Internal health check passed",
+            message: "internal-api responded on the mapped internal port without exposing a public URL.",
+            created_at: smokeDetailDeployment.created_at,
+            category: "health",
+          },
+          {
+            id: "internal-runtime-activity-1",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Deployment succeeded",
+            message: "Deployment internal-runtime is running as an internal-only service.",
+            created_at: "2026-04-02T00:18:00Z",
+            category: "deploy",
+          },
+        ]
       : smokeActivity;
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
@@ -663,6 +736,8 @@ export default function DeploymentDetailsPage({ params }) {
     smokeMode
       ? smokeDetailIsAdminManaged
         ? "Live logs stay with admins for this admin-managed remote runtime."
+        : smokeDetailIsInternalOnly
+        ? "internal-api entered RUNNING state without exposing a public URL."
         : smokeDetailIsFailed
         ? smokeDetailDeployment.error || "Readiness failed before the worker stayed online."
         : "nginx entered RUNNING state"
@@ -888,7 +963,9 @@ export default function DeploymentDetailsPage({ params }) {
           ? "Review runtime issues"
           : deployment?.status === "failed"
             ? "Redeploy deliberately"
-            : "Keep current rollout stable",
+            : deploymentUrl
+              ? "Open running app"
+              : "Review stable runtime",
       detail: detailPriority,
     },
   ];

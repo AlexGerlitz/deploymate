@@ -171,6 +171,11 @@ Updated: 2026-04-11
   - issue: focus cards had started using review-first/open-first actions, but secondary cards still collapsed everything into low-emphasis `View details` and `Open app` links
   - fix: runtime cards now follow one status-based matrix everywhere in the queue: failed cards make `Review runtime issues` primary, healthy cards with a URL make `Open app` primary, and detail review stays visibly secondary when the app is already reachable
   - guardrail: `smoke:runtime` now checks healthy secondary cards, healthy focus cards, and a failed-secondary smoke scenario so queue action hierarchy stays aligned
+- The internal-only runtime path now follows the same review-first story:
+  - screen: `/app/deployment-workflow` and `/deployments/internal-runtime`
+  - issue: healthy runtimes without a public URL still fell back to vague `View details` language in the queue, while detail copy said the runtime was stable without making the review step explicit enough
+  - fix: no-public-URL runtime cards now make detail review the primary action, running internal-only cards use `Review stable runtime`, and internal-only detail now explains that overview/ports/health/activity review comes before rollout changes
+  - guardrail: `smoke:runtime` now checks an internal-only detail fixture plus focus/secondary workflow cards so private-runtime review cannot regress back into ambiguous queue copy
 - The member-safe pass found one blocked-path leak:
   - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
   - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
@@ -1035,6 +1040,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:runtime` после failed workflow review-first CTA slice -> ok
 - `npm --prefix frontend run build` после deployment workflow runtime queue consistency package -> ok
 - `npm --prefix frontend run smoke:runtime` после deployment workflow runtime queue consistency package -> ok
+- `npm --prefix frontend run build` после internal-only runtime review path package -> ok
+- `npm --prefix frontend run smoke:runtime` после internal-only runtime review path package -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

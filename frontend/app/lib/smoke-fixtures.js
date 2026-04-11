@@ -151,6 +151,25 @@ export const smokeDeployments = [
   },
 ];
 
+export const smokeInternalRuntimeDeployment = {
+  id: "internal-runtime",
+  status: "running",
+  image: "ghcr.io/deploymate/internal-api:2026.04.02",
+  container_name: "internal-api",
+  container_id: "container-internal-1",
+  created_at: "2026-04-02T00:20:00Z",
+  error: null,
+  internal_port: 9000,
+  external_port: null,
+  server_id: "ops-batch",
+  server_name: "Ops Batch",
+  server_host: "ops-batch.demo.example.com",
+  env: {
+    APP_ENV: "production",
+    SERVICE_VISIBILITY: "internal",
+  },
+};
+
 export const smokeDeployment = smokeDeployments[0];
 
 export const smokeServers = [

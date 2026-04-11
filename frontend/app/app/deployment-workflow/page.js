@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   smokeDeployments,
+  smokeInternalRuntimeDeployment,
   smokeMode,
   smokeServers,
   smokeTemplates,
@@ -41,6 +42,13 @@ const smokeWorkflowScenario =
 const smokeReviewWorkerDeployment =
   smokeDeployments.find((deployment) => deployment.id === "review-worker") || null;
 const smokeRunningDeployments = smokeDeployments.filter((deployment) => deployment.status === "running");
+const smokeInternalRuntimeShadowDeployment = {
+  ...smokeInternalRuntimeDeployment,
+  id: "internal-runtime-shadow",
+  container_name: "internal-api-shadow",
+  container_id: "container-internal-2",
+  created_at: "2026-04-02T00:22:00Z",
+};
 const smokeFailedQueueReviewDeployments = smokeReviewWorkerDeployment
   ? [
       smokeReviewWorkerDeployment,
@@ -75,6 +83,24 @@ const smokeWorkflowFixture =
     : smokeMode && smokeWorkflowScenario === "healthy-live-review"
       ? {
           deployments: smokeDeployments.filter((deployment) => deployment.status === "running"),
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+        }
+    : smokeMode && smokeWorkflowScenario === "internal-only-live-review"
+      ? {
+          deployments: [
+            smokeInternalRuntimeDeployment,
+            smokeInternalRuntimeShadowDeployment,
+            smokeDeployments[0],
+          ],
           servers: smokeServers,
           templates: smokeTemplates,
           form: {
@@ -161,15 +187,16 @@ const smokeWorkflowFixture =
 function buildRuntimeCardActionState(deployment) {
   const runtimeUrl = buildDeploymentUrl(deployment);
   const failed = deployment?.status === "failed";
+  const stableWithoutPublicUrl = deployment?.status === "running" && !runtimeUrl;
 
   return {
     runtimeUrl,
-    detailsClassName: failed
-      ? "landingButton primaryButton"
-      : runtimeUrl
-        ? "secondaryButton"
-        : "linkButton",
-    detailsLabel: failed ? "Review runtime issues" : "View details",
+    detailsClassName: failed || !runtimeUrl ? "landingButton primaryButton" : "secondaryButton",
+    detailsLabel: failed
+      ? "Review runtime issues"
+      : stableWithoutPublicUrl
+        ? "Review stable runtime"
+        : "View details",
     openAppClassName: failed ? "linkButton" : "landingButton primaryButton",
     showOpenAppPrimary: Boolean(runtimeUrl) && !failed,
     showOpenAppSecondary: Boolean(runtimeUrl) && failed,
