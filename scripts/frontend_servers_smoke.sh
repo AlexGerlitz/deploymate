@@ -64,7 +64,52 @@ frontend_smoke_assert_checks "frontend-servers-smoke" "$BASE_URL" automation_smo
   rm -f "$member_html"
 )
 
+(
+  set -euo pipefail
+  source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+  source "${SCRIPT_DIR}/lib/frontend_smoke_checks.sh"
+
+  export PORT="${FRONTEND_SMOKE_PENDING_PORT:-3003}"
+  export BASE_URL="http://127.0.0.1:${PORT}"
+  export SERVER_LOG="${FRONTEND_SMOKE_PENDING_LOG:-/tmp/deploymate-frontend-servers-pending-smoke.log}"
+  export DIST_DIR="${FRONTEND_SMOKE_PENDING_DIST_DIR:-.next-smoke-pending-${PORT}}"
+  export FRONTEND_SMOKE_PORT="$PORT"
+  export FRONTEND_SMOKE_LOG="$SERVER_LOG"
+  export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
+  export FRONTEND_SMOKE_REUSE_SERVER=0
+  export NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO=pending
+
+  cleanup_pending() {
+    stop_frontend_smoke_server
+  }
+
+  trap cleanup_pending EXIT
+
+  start_frontend_smoke_server
+  wait_for_frontend_smoke_url "/app"
+
+  pending_html="$(mktemp)"
+  curl -sS "${BASE_URL}/app/server-review" > "$pending_html"
+
+  if ! grep -Eq 'Check server readiness' "$pending_html"; then
+    echo "[frontend-servers-pending-smoke] pending path did not show the main readiness action" >&2
+    rm -f "$pending_html"
+    exit 1
+  fi
+
+  queue_pos="$(grep -bo 'data-testid=\"server-review-live-queue\"' "$pending_html" | head -n1 | cut -d: -f1)"
+  create_pos="$(grep -bo 'data-testid=\"server-review-create-card\"' "$pending_html" | head -n1 | cut -d: -f1)"
+  if [ -z "$queue_pos" ] || [ -z "$create_pos" ] || [ "$queue_pos" -ge "$create_pos" ]; then
+    echo "[frontend-servers-pending-smoke] create form still appears before the live check queue" >&2
+    rm -f "$pending_html"
+    exit 1
+  fi
+
+  rm -f "$pending_html"
+)
+
 echo "[frontend-servers-smoke] server management surface rendered"
 echo "[frontend-servers-smoke] diagnostics surface rendered"
 echo "[frontend-servers-smoke] member blocked surface rendered"
+echo "[frontend-servers-smoke] pending server review path rendered"
 echo "[frontend-servers-smoke] complete"

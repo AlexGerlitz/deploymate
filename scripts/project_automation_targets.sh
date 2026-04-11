@@ -41,13 +41,31 @@ automation_classify_release_path() {
 automation_frontend_smoke_targets_for_path() {
   local path="$1"
   case "$path" in
+    frontend/app/app/page.js)
+      printf '%s\n' beginner
+      printf '%s\n' ops
+      ;;
+    frontend/app/app/server-review/*)
+      printf '%s\n' beginner
+      printf '%s\n' servers
+      ;;
+    frontend/app/app/deployment-workflow/*)
+      printf '%s\n' beginner
+      printf '%s\n' runtime
+      ;;
+    frontend/app/lib/runtime-workspace-utils.js|frontend/app/lib/smoke-fixtures.js)
+      printf '%s\n' beginner
+      printf '%s\n' ops
+      printf '%s\n' runtime
+      printf '%s\n' servers
+      ;;
     frontend/app/login/*|frontend/app/register/*|frontend/app/change-password/*|frontend/app/lib/auth-form-helpers.js)
       printf '%s\n' auth
       ;;
-    frontend/app/app/page.js|frontend/app/app/admin-ui.js|frontend/app/app/users/page.js|frontend/app/app/upgrade-requests/page.js|frontend/app/lib/admin-*.js|frontend/app/lib/admin-page-*.js|frontend/app/lib/admin-smoke-fixtures.js)
+    frontend/app/app/admin-ui.js|frontend/app/app/users/page.js|frontend/app/app/upgrade-requests/page.js|frontend/app/lib/admin-*.js|frontend/app/lib/admin-page-*.js|frontend/app/lib/admin-smoke-fixtures.js)
       printf '%s\n' ops
       ;;
-    frontend/app/deployments/*|frontend/app/lib/smoke-fixtures.js)
+    frontend/app/deployments/*)
       printf '%s\n' runtime
       ;;
     frontend/app/page.js|frontend/app/layout.js|frontend/app/globals.css|frontend/app/commercial-license/page.js|frontend/app/upgrade/page.js|frontend/app/lib/public-contact.js)

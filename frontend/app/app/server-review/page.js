@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { readJsonOrError } from "../../lib/admin-page-utils";
-import { smokeMode, smokeUser } from "../../lib/smoke-fixtures";
+import { smokeMode, smokeServers, smokeUser } from "../../lib/smoke-fixtures";
 import {
   AdminFeedbackBanners,
   AdminSurfaceQueue,
@@ -28,6 +28,19 @@ const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const localDeploymentsEnabled =
   process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
+const smokeServerReviewScenario =
+  process.env.NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO || "empty";
+const smokeServerReviewFixture =
+  smokeMode && smokeServerReviewScenario === "pending"
+    ? {
+        servers: [smokeServers[0]],
+        successMessage:
+          'Loaded 1 saved server target. Finish the check before adding another server.',
+      }
+    : {
+        servers: [],
+        successMessage: "Start here: save one server target, then run one check.",
+      };
 
 function buildServerMeta(server, diagnostics, suggestedPorts) {
   const target = `${server.username}@${server.host}:${server.port}`;
@@ -144,12 +157,14 @@ function ServerReviewPageContent() {
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("Start here: save one server target, then run one check.");
-  const [servers, setServers] = useState([]);
+  const [success, setSuccess] = useState(smokeMode ? smokeServerReviewFixture.successMessage : "Start here: save one server target, then run one check.");
+  const [servers, setServers] = useState(smokeMode ? smokeServerReviewFixture.servers : []);
   const [serverTestResults, setServerTestResults] = useState({});
   const [serverDiagnostics, setServerDiagnostics] = useState({});
   const [serverSuggestedPorts, setServerSuggestedPorts] = useState({});
-  const [selectedItemId, setSelectedItemId] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState(
+    smokeMode ? smokeServerReviewFixture.servers[0]?.id || "" : "",
+  );
   const [actionNote, setActionNote] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -327,6 +342,137 @@ function ServerReviewPageContent() {
   const emptyQueueText = noServers
     ? "No server saved yet. Start with the form above, save one server, then come back here for the first check."
     : "No saved servers match the current filters.";
+  const createServerCard = (
+    <article
+      className={`card formCard workspaceGuidePanel serverReviewCreateCard serverReviewReveal ${noServers ? "" : "isSecondary"}`.trim()}
+      data-testid="server-review-create-card"
+    >
+      <div className="serverReviewCreateLayout">
+        <div
+          id="server-review-create-server-section"
+          className={`workspaceGlancePanel serverReviewCreatePanel ${noServers ? "" : "isSecondary"}`.trim()}
+        >
+          <div className="workspaceGlanceHeader">
+            <span className="eyebrow">{createSectionEyebrow}</span>
+            <strong>{createSectionTitle}</strong>
+          </div>
+          <p className="formHint serverReviewSubtleCopy">
+            {createSectionCopy}
+          </p>
+          <form className="form" onSubmit={handleCreateServer} data-testid="server-review-create-server">
+            <label className="field">
+              <span>Name</span>
+              <input
+                name="name"
+                value={serverForm.name}
+                onChange={updateServerFormField}
+                placeholder="prod-vps"
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-name"
+              />
+              <span className="fieldHint">
+                Pick a label you will recognize later, like `production-vps` or `main-server`.
+              </span>
+            </label>
+            <label className="field">
+              <span>Host</span>
+              <input
+                name="host"
+                value={serverForm.host}
+                onChange={updateServerFormField}
+                placeholder="203.0.113.10"
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-host"
+              />
+              <span className="fieldHint">
+                Use the IP address or hostname DeployMate should dial over SSH.
+              </span>
+            </label>
+            <label className="field">
+              <span>Port</span>
+              <input
+                name="port"
+                type="number"
+                min="1"
+                max="65535"
+                value={serverForm.port}
+                onChange={updateServerFormField}
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-port"
+              />
+              <span className="fieldHint">
+                Leave this at `22` unless your server uses a different SSH port.
+              </span>
+            </label>
+            <label className="field">
+              <span>Username</span>
+              <input
+                name="username"
+                value={serverForm.username}
+                onChange={updateServerFormField}
+                placeholder="deploy"
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-username"
+              />
+              <span className="fieldHint">
+                This is the SSH user DeployMate should sign in as on that machine.
+              </span>
+            </label>
+            <label className="field">
+              <span>SSH key</span>
+              <textarea
+                name="ssh_key"
+                rows={6}
+                value={serverForm.ssh_key}
+                onChange={updateServerFormField}
+                placeholder="Paste your SSH private key content here"
+                disabled={serverSubmitting}
+                required
+                data-testid="server-review-create-ssh-key"
+              />
+              <span className="fieldHint">
+                Paste the private SSH key DeployMate should use for this server.
+              </span>
+            </label>
+            <div className="formActions">
+              <button
+                type="submit"
+                className={noServers ? "landingButton primaryButton" : "secondaryButton serverReviewCreateSecondaryAction"}
+                disabled={serverSubmitting}
+                data-testid="server-review-create-submit"
+              >
+                {serverSubmitting ? "Saving..." : createSubmitLabel}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <aside className="serverReviewSoftPanel serverReviewNextPanel">
+          <span className="serverReviewPanelLabel">{nextPanelLabel}</span>
+          <h2>{nextPanelTitle}</h2>
+          <p className="formHint">{nextPanelCopy}</p>
+          <div className="serverReviewMiniSteps">
+            <div className="serverReviewMiniStep">
+              <strong>1. Save one server target</strong>
+              <p>Add one SSH machine DeployMate can reach.</p>
+            </div>
+            <div className="serverReviewMiniStep">
+              <strong>2. Run one check</strong>
+              <p>Use sign-in check or the full readiness check.</p>
+            </div>
+            <div className="serverReviewMiniStep">
+              <strong>3. Go to Step 2</strong>
+              <p>Only then choose what app to run on that server.</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </article>
+  );
 
   function focusCreateServer() {
     const createSection = document.getElementById("server-review-create-server-section");
@@ -872,137 +1018,9 @@ function ServerReviewPageContent() {
         successTestId="server-review-success"
       />
 
-      <article
-        className={`card formCard workspaceGuidePanel serverReviewCreateCard serverReviewReveal ${noServers ? "" : "isSecondary"}`.trim()}
-        data-testid="server-review-create-card"
-      >
-        <div className="serverReviewCreateLayout">
-          <div
-            id="server-review-create-server-section"
-            className={`workspaceGlancePanel serverReviewCreatePanel ${noServers ? "" : "isSecondary"}`.trim()}
-          >
-            <div className="workspaceGlanceHeader">
-              <span className="eyebrow">{createSectionEyebrow}</span>
-              <strong>{createSectionTitle}</strong>
-            </div>
-            <p className="formHint serverReviewSubtleCopy">
-              {createSectionCopy}
-            </p>
-            <form className="form" onSubmit={handleCreateServer} data-testid="server-review-create-server">
-              <label className="field">
-                <span>Name</span>
-                <input
-                  name="name"
-                  value={serverForm.name}
-                  onChange={updateServerFormField}
-                  placeholder="prod-vps"
-                  disabled={serverSubmitting}
-                  required
-                  data-testid="server-review-create-name"
-                />
-                <span className="fieldHint">
-                  Pick a label you will recognize later, like `production-vps` or `main-server`.
-                </span>
-              </label>
-              <label className="field">
-                <span>Host</span>
-                <input
-                  name="host"
-                  value={serverForm.host}
-                  onChange={updateServerFormField}
-                  placeholder="203.0.113.10"
-                  disabled={serverSubmitting}
-                  required
-                  data-testid="server-review-create-host"
-                />
-                <span className="fieldHint">
-                  Use the IP address or hostname DeployMate should dial over SSH.
-                </span>
-              </label>
-              <label className="field">
-                <span>Port</span>
-                <input
-                  name="port"
-                  type="number"
-                  min="1"
-                  max="65535"
-                  value={serverForm.port}
-                  onChange={updateServerFormField}
-                  disabled={serverSubmitting}
-                  required
-                  data-testid="server-review-create-port"
-                />
-                <span className="fieldHint">
-                  Leave this at `22` unless your server uses a different SSH port.
-                </span>
-              </label>
-              <label className="field">
-                <span>Username</span>
-                <input
-                  name="username"
-                  value={serverForm.username}
-                  onChange={updateServerFormField}
-                  placeholder="deploy"
-                  disabled={serverSubmitting}
-                  required
-                  data-testid="server-review-create-username"
-                />
-                <span className="fieldHint">
-                  This is the SSH user DeployMate should sign in as on that machine.
-                </span>
-              </label>
-              <label className="field">
-                <span>SSH key</span>
-                <textarea
-                  name="ssh_key"
-                  rows={6}
-                  value={serverForm.ssh_key}
-                  onChange={updateServerFormField}
-                  placeholder="Paste your SSH private key content here"
-                  disabled={serverSubmitting}
-                  required
-                  data-testid="server-review-create-ssh-key"
-                />
-                <span className="fieldHint">
-                  Paste the private SSH key DeployMate should use for this server.
-                </span>
-              </label>
-              <div className="formActions">
-                <button
-                  type="submit"
-                  className={noServers ? "landingButton primaryButton" : "secondaryButton serverReviewCreateSecondaryAction"}
-                  disabled={serverSubmitting}
-                  data-testid="server-review-create-submit"
-                >
-                  {serverSubmitting ? "Saving..." : createSubmitLabel}
-                </button>
-              </div>
-            </form>
-          </div>
+      {noServers ? createServerCard : null}
 
-          <aside className="serverReviewSoftPanel serverReviewNextPanel">
-            <span className="serverReviewPanelLabel">{nextPanelLabel}</span>
-            <h2>{nextPanelTitle}</h2>
-            <p className="formHint">{nextPanelCopy}</p>
-            <div className="serverReviewMiniSteps">
-              <div className="serverReviewMiniStep">
-                <strong>1. Save one server target</strong>
-                <p>Add one SSH machine DeployMate can reach.</p>
-              </div>
-              <div className="serverReviewMiniStep">
-                <strong>2. Run one check</strong>
-                <p>Use sign-in check or the full readiness check.</p>
-              </div>
-              <div className="serverReviewMiniStep">
-                <strong>3. Go to Step 2</strong>
-                <p>Only then choose what app to run on that server.</p>
-              </div>
-            </div>
-          </aside>
-        </div>
-      </article>
-
-      <div id="server-review-live-queue" className="serverReviewQueueStack">
+      <div id="server-review-live-queue" className="serverReviewQueueStack" data-testid="server-review-live-queue">
         <article className="card formCard serverReviewToolbarCard serverReviewReveal">
           <div className="serverReviewToolbarHeader">
             <div>
@@ -1283,6 +1301,8 @@ function ServerReviewPageContent() {
           ))}
         </AdminSurfaceQueue>
       </div>
+
+      {!noServers ? createServerCard : null}
     </main>
   );
 }

@@ -35,6 +35,38 @@ const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const localDeploymentsEnabled =
   process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
+const smokeWorkflowScenario =
+  process.env.NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO || "default";
+const smokeWorkflowFixture =
+  smokeMode && smokeWorkflowScenario === "first-deploy-after-server-review"
+    ? {
+        deployments: [],
+        servers: smokeServers,
+        templates: smokeTemplates,
+        form: {
+          image: "",
+          name: "",
+          internal_port: "",
+          external_port: "",
+          server_id: smokeServers[0]?.id || "",
+        },
+        workflowMessage: smokeServers[0]
+          ? `Server "${smokeServers[0].name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`
+          : "",
+      }
+    : {
+        deployments: smokeDeployments,
+        servers: smokeServers,
+        templates: smokeTemplates,
+        form: {
+          image: "",
+          name: "",
+          internal_port: "",
+          external_port: "",
+          server_id: "",
+        },
+        workflowMessage: "",
+      };
 
 function DeploymentWorkflowPageContent() {
   const router = useRouter();
@@ -43,9 +75,9 @@ function DeploymentWorkflowPageContent() {
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
-  const [deployments, setDeployments] = useState(smokeMode ? smokeDeployments : []);
-  const [servers, setServers] = useState(smokeMode ? smokeServers : []);
-  const [templates, setTemplates] = useState(smokeMode ? smokeTemplates : []);
+  const [deployments, setDeployments] = useState(smokeMode ? smokeWorkflowFixture.deployments : []);
+  const [servers, setServers] = useState(smokeMode ? smokeWorkflowFixture.servers : []);
+  const [templates, setTemplates] = useState(smokeMode ? smokeWorkflowFixture.templates : []);
   const [loading, setLoading] = useState(!smokeMode);
   const [serversLoading, setServersLoading] = useState(!smokeMode);
   const [templatesLoading, setTemplatesLoading] = useState(!smokeMode);
@@ -76,17 +108,17 @@ function DeploymentWorkflowPageContent() {
   const [templateFilter, setTemplateFilter] = useState("all");
   const [templatePreviewId, setTemplatePreviewId] = useState(smokeMode ? "smoke-template" : "");
   const [editingTemplateId, setEditingTemplateId] = useState("");
-  const [workflowMessage, setWorkflowMessage] = useState("");
+  const [workflowMessage, setWorkflowMessage] = useState(smokeMode ? smokeWorkflowFixture.workflowMessage : "");
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
   const [workflowTab, setWorkflowTab] = useState("create");
   const [createAdvancedOpen, setCreateAdvancedOpen] = useState(false);
   const [form, setForm] = useState({
-    image: "",
-    name: "",
-    internal_port: "",
-    external_port: "",
-    server_id: "",
+    image: smokeMode ? smokeWorkflowFixture.form.image : "",
+    name: smokeMode ? smokeWorkflowFixture.form.name : "",
+    internal_port: smokeMode ? smokeWorkflowFixture.form.internal_port : "",
+    external_port: smokeMode ? smokeWorkflowFixture.form.external_port : "",
+    server_id: smokeMode ? smokeWorkflowFixture.form.server_id : "",
   });
   const [templateName, setTemplateName] = useState("");
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
@@ -1196,6 +1228,15 @@ function DeploymentWorkflowPageContent() {
     ignoreTemplateId: editingTemplateId,
     canAccessServers,
   });
+  const rolloutDraftStarted = Boolean(
+    form.image.trim() ||
+      form.name.trim() ||
+      form.internal_port.trim() ||
+      form.external_port.trim() ||
+      templateName.trim() ||
+      editingTemplateId ||
+      envRows.some((row) => row.key.trim() || row.value.trim()),
+  );
   const createDeploymentBlocked =
     submitting ||
     deploymentLimitReached ||
@@ -1663,14 +1704,21 @@ function DeploymentWorkflowPageContent() {
                     Open app
                   </a>
                 ) : null}
-                <button
-                  type="button"
-                  className="dangerButton"
-                  onClick={() => handleDelete(primaryRuntimeDeployment.id)}
-                  disabled={deletingDeploymentId === primaryRuntimeDeployment.id}
-                >
-                  {deletingDeploymentId === primaryRuntimeDeployment.id ? "Deleting..." : "Delete"}
-                </button>
+                {primaryRuntimeDeployment.status === "failed" ? (
+                  <div className="banner subtle inlineBanner">
+                    Review details before deleting this failed runtime.
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="dangerButton"
+                    data-testid={`runtime-deployment-delete-button-${primaryRuntimeDeployment.id}`}
+                    onClick={() => handleDelete(primaryRuntimeDeployment.id)}
+                    disabled={deletingDeploymentId === primaryRuntimeDeployment.id}
+                  >
+                    {deletingDeploymentId === primaryRuntimeDeployment.id ? "Deleting..." : "Delete"}
+                  </button>
+                )}
               </div>
             </article>
           ) : null}
@@ -1733,7 +1781,8 @@ function DeploymentWorkflowPageContent() {
         </div>
         </section>
 
-        <section hidden={workflowTab !== "create" || serverAccessBlocked}>
+        {!serverAccessBlocked ? (
+        <section hidden={workflowTab !== "create"}>
         <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
           <h2 data-testid="create-deployment-title">Step 2A: Start one app</h2>
           <p className="formHint">
@@ -1992,8 +2041,10 @@ function DeploymentWorkflowPageContent() {
           </form>
 
           {submitError ? <div className="banner error">{submitError}</div> : null}
-          {templateFormPreflight.errors.length > 0 ? (
-            <div className="banner error">{templateFormPreflight.errors[0]}</div>
+          {rolloutDraftStarted && templateFormPreflight.errors.length > 0 ? (
+            <div className="banner error" data-testid="create-preflight-error-banner">
+              {templateFormPreflight.errors[0]}
+            </div>
           ) : null}
           {templateFormPreflight.warnings.length > 0 ? (
             <div className="banner subtle">
@@ -2058,6 +2109,7 @@ function DeploymentWorkflowPageContent() {
           ) : null}
         </article>
         </section>
+        ) : null}
 
         {waitingForAdminTarget ? (
           <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-member-waiting-card">
@@ -2089,7 +2141,8 @@ function DeploymentWorkflowPageContent() {
           </article>
         ) : null}
 
-        <section hidden={workflowTab !== "templates" || serverAccessBlocked}>
+        {!serverAccessBlocked ? (
+        <section hidden={workflowTab !== "templates"}>
         <article className="card formCard" data-testid="templates-card" id="templates">
           <div className="sectionHeader" data-testid="templates-section-header">
             <div>
@@ -2381,6 +2434,7 @@ function DeploymentWorkflowPageContent() {
           ) : null}
         </article>
         </section>
+        ) : null}
       </div>
     </main>
   );

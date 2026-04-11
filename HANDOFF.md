@@ -87,6 +87,9 @@ Updated: 2026-04-11
   - first-time admin path: `/app -> /app/server-review -> /app/deployment-workflow`
   - member path under admin-managed server inventory
   - confirm that the next click is still obvious after login, after saving a server, and after the first deploy
+- Для следующего прохода уже есть явный артефакт и guardrail:
+  - manual checklist: [docs/beginner-walkthrough.md](/Users/alexgerlitz/deploymate/docs/beginner-walkthrough.md)
+  - local smoke: `npm --prefix frontend run smoke:beginner`
 - После walkthrough уже добивать remaining clarity gaps instead of blindly rewriting copy.
 - Параллельно не ослаблять новый release contract и не превращать его во временный workaround.
 - Следующий стратегический слой после beginner clarity уже зафиксирован:
@@ -131,7 +134,40 @@ Updated: 2026-04-11
   - `/app` no longer presents Step 2 and Step 3 as if they were already open before admin Step 1 is complete
   - `/app/server-review` no longer shows a false remote-only CTA into `Deployment Workflow`
   - `/app/deployment-workflow` now opens the live lane directly when a blocked member already has deployments to review
+- The first-time admin overview is now stricter too:
+  - when no server is connected yet, `/app` no longer renders Step 2 as if app choice were already open
+  - `/app` also no longer renders Step 3 as if live runtime review already existed before the first deploy
+  - the new `smoke:beginner` guardrail now checks those blocked-step states directly
+- `server-review` is now stricter in the first saved-but-unconfirmed state too:
+  - once one server already exists, the live check queue now appears before the `add another server` form
+  - the page now stops competing with its own main action when the right next move is `run one check`
+  - `smoke:servers` now includes a pending-server fixture pass to hold that ordering in place
+- `deployment-workflow` is now stricter in the first-deploy-after-server-review state too:
+  - when Step 1 is already done and no deployment exists yet, the main CTA stays `Create deployment`
+  - an empty first draft no longer gets mislabeled as the primary blocker just because `Image` is still blank
+  - `smoke:beginner` now includes a server-ready first-deploy fixture so templates do not hijack the main lane again
+- The first manual walkthrough pass found one remaining Step 2 hesitation:
+  - screen: `/app/deployment-workflow` after coming from `Server Review`
+  - issue: the empty first draft still showed `Image is required.` before the user typed anything
+  - fix: preflight errors now wait until the user has actually started a rollout draft
+  - guardrail: the first-deploy beginner smoke now fails if that premature error comes back
+- The first Step 3 runtime walkthrough pass found one remaining healthy-detail hesitation:
+  - screen: `/deployments/smoke-deployment` with a running and healthy runtime
+  - issue: the primary action still pushed `Prepare rollout change` even though the safer next step was to open the running app and verify it
+  - fix: healthy runtimes with a live endpoint now make `Open running app` primary and keep rollout changes secondary
+  - guardrail: `smoke:runtime` now fails if a healthy runtime detail makes `Prepare rollout change` the main next-step action again
+- The failed-runtime walkthrough path is now review-first too:
+  - screen: `/app/deployment-workflow -> /deployments/review-worker`
+  - issue: the workflow queue exposed delete before the failed runtime had been reviewed, and smoke detail did not represent the failed deployment
+  - fix: failed cards now point to detail review before delete, and smoke detail resolves `review-worker` as a failed runtime
+  - guardrail: `smoke:runtime` now fails if the failed queue exposes early delete or if failed detail stops making `Review runtime issues` primary
+- The member-safe pass found one blocked-path leak:
+  - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
+  - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
+  - fix: member remote-only workflow no longer renders blocked create/templates lanes, and admin-managed runtime detail no longer renders redeploy/delete controls
+  - guardrail: `smoke:beginner` now checks that member workflow/detail HTML stays free of those controls while preserving `Open running app` and `Review runtime issues`
 - Local frontend smoke for the beginner path passed after this slice:
+  - `scripts/frontend_beginner_smoke.sh`
   - `scripts/frontend_servers_smoke.sh`
   - `scripts/frontend_runtime_smoke.sh`
 - The remaining question is no longer "do we have the right frame?" but "does a real beginner now follow it without hesitation?"

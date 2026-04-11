@@ -30,6 +30,14 @@ Meaning:
 - ignore secondary layers unless they directly block the core path
 - propose the next highest-value step for clarity
 
+### `прогони новичка`
+
+Meaning:
+- reread [PROJECT-RULES.md](PROJECT-RULES.md) and [docs/beginner-walkthrough.md](docs/beginner-walkthrough.md)
+- evaluate the first-time admin path: `/app -> /app/server-review -> /app/deployment-workflow`
+- evaluate the member path in an admin-managed remote-only setup
+- report hesitation points, false primary CTAs, and one smallest recommended fix
+
 ### `режим недели`
 
 Meaning:

@@ -19,6 +19,7 @@ import {
 import {
   smokeActivity,
   smokeDeployment,
+  smokeDeployments,
   smokeDiagnostics,
   smokeHealth,
   smokeMode,
@@ -396,7 +397,15 @@ function buildRedeployImpactSummary({
   return lines.join("\n");
 }
 
-function buildRuntimeDecisionState(deployment, health, diagnostics, attentionItems, activity) {
+function buildRuntimeDecisionState(
+  deployment,
+  health,
+  diagnostics,
+  attentionItems,
+  activity,
+  options = {},
+) {
+  const { canMutateRuntime = true } = options;
   const latestEvent = Array.isArray(activity) && activity.length > 0 ? activity[0] : null;
   const recentFailureCount = diagnostics?.activity?.recent_failure_count || 0;
   const errorCount = attentionItems.filter((item) => item.status === "error").length;
@@ -468,18 +477,27 @@ function buildRuntimeDecisionState(deployment, health, diagnostics, attentionIte
     };
   }
 
+  const deploymentUrl = buildDeploymentUrl(deployment);
+
   return {
     tone: "healthy",
     label: "Ready",
-    focus: "Runtime looks stable enough for a deliberate change",
+    focus: deploymentUrl
+      ? "Runtime is healthy. Open the app once before changing it"
+      : "Runtime looks stable enough to keep as-is",
     why:
-      "No active runtime warnings are leading the page right now, so redeploy, handoff, and template actions can stay deliberate instead of reactive.",
+      deploymentUrl
+        ? "No active runtime warnings are leading the page right now. The safest next step is verifying the live app before opening change tools."
+        : "No active runtime warnings are leading the page right now, so redeploy, handoff, and template actions can stay deliberate instead of reactive.",
     nextStep:
-      "Keep the current rollout stable, or prepare one explicit change in the redeploy form when you are ready to change image, ports, or env vars on purpose.",
-    primaryHref: "#runtime-detail-redeploy",
-    primaryAction: "Prepare rollout change",
-    secondaryHref: "#runtime-detail-handoff-tools",
-    secondaryAction: "Open handoff tools",
+      deploymentUrl
+        ? "Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional."
+        : "Keep the current rollout stable, or prepare one explicit change in the redeploy form when you are ready to change image, ports, or env vars on purpose.",
+    primaryHref: deploymentUrl || "#runtime-detail-overview",
+    primaryExternal: Boolean(deploymentUrl),
+    primaryAction: deploymentUrl ? "Open running app" : "Review stable runtime",
+    secondaryHref: canMutateRuntime ? "#runtime-detail-redeploy" : "#runtime-detail-handoff-tools",
+    secondaryAction: canMutateRuntime ? "Prepare rollout change" : "Open handoff tools",
     badges: [
       { label: "health", value: health?.status || "unknown", tone: "healthy" },
       { label: "attention", value: `${attentionItems.length}`, tone: "healthy" },
@@ -544,13 +562,100 @@ function buildChangeReadinessState(redeployPreflight, redeployChangeRows, form, 
 export default function DeploymentDetailsPage({ params }) {
   const { deploymentId } = use(params);
   const router = useRouter();
+  const smokeDetailDeployment = smokeMode
+    ? smokeDeployments.find((item) => item.id === deploymentId) || smokeDeployment
+    : null;
+  const smokeDetailIsFailed = smokeDetailDeployment?.status === "failed";
+  const smokeDetailHealth =
+    smokeMode && smokeDetailIsFailed
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          url: buildDeploymentUrl(smokeDetailDeployment),
+          status: "unhealthy",
+          status_code: null,
+          error: smokeDetailDeployment.error || "Deployment failed before health checks completed.",
+          checked_at: smokeDetailDeployment.created_at,
+          response_time_ms: null,
+        }
+      : smokeHealth;
+  const smokeDetailDiagnostics =
+    smokeMode && smokeDetailIsFailed
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          current_status: smokeDetailDeployment.status,
+          server_target: smokeDetailDeployment.server_host
+            ? `deploy@${smokeDetailDeployment.server_host}:22`
+            : "Managed by an admin",
+          checked_at: smokeDetailDeployment.created_at,
+          url: buildDeploymentUrl(smokeDetailDeployment),
+          health: smokeDetailHealth,
+          activity: {
+            total_events: 2,
+            success_events: 1,
+            error_events: 1,
+            recent_failure_count: 1,
+            recent_failure_titles: ["Review worker readiness failed"],
+            last_event_title: "Review worker readiness failed",
+            last_event_level: "error",
+            last_event_at: smokeDetailDeployment.created_at,
+          },
+          log_excerpt: smokeDetailDeployment.error || "Readiness failed before the worker stayed online.",
+          items: [
+            {
+              key: "deployment_status",
+              label: "Deployment status",
+              status: "error",
+              summary: "Current status is failed.",
+              details: smokeDetailDeployment.error || null,
+            },
+            {
+              key: "health",
+              label: "HTTP health",
+              status: "error",
+              summary: smokeDetailDeployment.error || "Health checks did not complete.",
+              details: buildDeploymentUrl(smokeDetailDeployment) || null,
+            },
+          ],
+        }
+      : smokeDiagnostics;
+  const smokeDetailActivity =
+    smokeMode && smokeDetailIsFailed
+      ? [
+          {
+            id: "review-worker-activity-2",
+            deployment_id: smokeDetailDeployment.id,
+            level: "error",
+            title: "Review worker readiness failed",
+            message: smokeDetailDeployment.error || "The worker failed before health checks passed.",
+            created_at: smokeDetailDeployment.created_at,
+            category: "health",
+          },
+          {
+            id: "review-worker-activity-1",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Deployment request accepted",
+            message: "DeployMate started the review-worker rollout before readiness failed.",
+            created_at: "2026-04-02T02:09:30Z",
+            category: "deploy",
+          },
+        ]
+      : smokeActivity;
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
-  const [deployment, setDeployment] = useState(smokeMode ? smokeDeployment : null);
-  const [logs, setLogs] = useState(smokeMode ? "nginx entered RUNNING state" : "");
-  const [health, setHealth] = useState(smokeMode ? smokeHealth : null);
-  const [diagnostics, setDiagnostics] = useState(smokeMode ? smokeDiagnostics : null);
-  const [activity, setActivity] = useState(smokeMode ? smokeActivity : []);
+  const [deployment, setDeployment] = useState(smokeMode ? smokeDetailDeployment : null);
+  const [logs, setLogs] = useState(
+    smokeMode
+      ? smokeDetailIsFailed
+        ? smokeDetailDeployment.error || "Readiness failed before the worker stayed online."
+        : "nginx entered RUNNING state"
+      : "",
+  );
+  const [health, setHealth] = useState(smokeMode ? smokeDetailHealth : null);
+  const [diagnostics, setDiagnostics] = useState(smokeMode ? smokeDetailDiagnostics : null);
+  const [activity, setActivity] = useState(smokeMode ? smokeDetailActivity : []);
   const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -586,6 +691,7 @@ export default function DeploymentDetailsPage({ params }) {
   });
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const canAccessServers = Boolean(currentUser?.is_admin);
+  const canMutateRuntime = canAccessServers || !deployment?.server_id;
   const deploymentUrl = buildDeploymentUrl(deployment);
   const attentionItems = buildAttentionItems(deployment, health, diagnostics);
   const runtimeSummaryText = buildRuntimeSummaryText(
@@ -694,6 +800,7 @@ export default function DeploymentDetailsPage({ params }) {
     diagnostics,
     attentionItems,
     activity,
+    { canMutateRuntime },
   );
   const runtimeHeroLead = deployment
     ? `${deployment.container_name || deployment.image || deploymentId}. ${detailPriority}`
@@ -740,6 +847,26 @@ export default function DeploymentDetailsPage({ params }) {
       detail: detailPriority,
     },
   ];
+  const renderRuntimeDecisionPrimaryAction = (className, testId) =>
+    runtimeDecisionState.primaryExternal ? (
+      <a
+        href={runtimeDecisionState.primaryHref}
+        target="_blank"
+        rel="noreferrer"
+        className={className}
+        data-testid={testId}
+      >
+        {runtimeDecisionState.primaryAction}
+      </a>
+    ) : (
+      <Link
+        href={runtimeDecisionState.primaryHref}
+        className={className}
+        data-testid={testId}
+      >
+        {runtimeDecisionState.primaryAction}
+      </Link>
+    );
   const redeployPreflight = buildRedeployValidation(form, envRows);
   const redeployChangeRows = buildRedeployChangeRows(deployment, form, envRows);
   const changeReadinessState = buildChangeReadinessState(
@@ -1306,17 +1433,16 @@ export default function DeploymentDetailsPage({ params }) {
               </p>
             </div>
             <div className="buttonRow workspaceHeroActions" data-testid="runtime-detail-header-actions">
-              <Link
-                href={runtimeDecisionState.primaryHref}
-                className="landingButton primaryButton workspacePrimaryAction"
-                data-testid="runtime-detail-open-redeploy-button"
-              >
-                {runtimeDecisionState.primaryAction}
-              </Link>
+              {renderRuntimeDecisionPrimaryAction(
+                "landingButton primaryButton workspacePrimaryAction",
+                runtimeDecisionState.primaryAction === "Prepare rollout change"
+                  ? "runtime-detail-open-redeploy-button"
+                  : "runtime-detail-hero-primary-action",
+              )}
               <Link href="/app/deployment-workflow" className="linkButton workspaceSecondaryAction">
                 Back to deployment workflow
               </Link>
-              {deploymentUrl ? (
+              {deploymentUrl && !runtimeDecisionState.primaryExternal ? (
                 <a
                   href={deploymentUrl}
                   target="_blank"
@@ -1407,13 +1533,10 @@ export default function DeploymentDetailsPage({ params }) {
                   <strong>{runtimeDecisionState.focus}</strong>
                   <p>{runtimeDecisionState.why}</p>
                   <div className="actionCluster">
-                    <Link
-                      href={runtimeDecisionState.primaryHref}
-                      className="landingButton primaryButton"
-                      data-testid="runtime-detail-main-next-step-action-focus"
-                    >
-                      {runtimeDecisionState.primaryAction}
-                    </Link>
+                    {renderRuntimeDecisionPrimaryAction(
+                      "landingButton primaryButton",
+                      "runtime-detail-main-next-step-action-focus",
+                    )}
                     <Link
                       href={runtimeDecisionState.secondaryHref}
                       className="secondaryButton"
@@ -1477,14 +1600,16 @@ export default function DeploymentDetailsPage({ params }) {
               >
                 Review runtime
               </button>
-              <button
-                type="button"
-                className={detailTab === "change" ? "active" : ""}
-                onClick={() => setDetailTab("change")}
-                data-testid="runtime-detail-tab-change"
-              >
-                Prepare change
-              </button>
+              {canMutateRuntime ? (
+                <button
+                  type="button"
+                  className={detailTab === "change" ? "active" : ""}
+                  onClick={() => setDetailTab("change")}
+                  data-testid="runtime-detail-tab-change"
+                >
+                  Prepare change
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={detailTab === "share" ? "active" : ""}
@@ -1594,6 +1719,7 @@ export default function DeploymentDetailsPage({ params }) {
             </article>
             </section>
 
+        {canMutateRuntime ? (
         <section hidden={detailTab !== "change"}>
         <article className="card formCard" data-testid="runtime-detail-change-readiness-card">
           <div className="sectionHeader">
@@ -1844,6 +1970,7 @@ export default function DeploymentDetailsPage({ params }) {
           {redeploySuccess ? <div className="banner success">{redeploySuccess}</div> : null}
         </article>
         </section>
+        ) : null}
 
             <section hidden={detailTab !== "share"}>
             <AdminDisclosureSection
@@ -1855,7 +1982,11 @@ export default function DeploymentDetailsPage({ params }) {
             <div id="runtime-detail-handoff-tools" />
             <AdminDisclosureSection
               title="Share and safety controls"
-              subtitle="Handoff actions, refresh, session exit, and deletion stay here so the main runtime path stays focused on review and rollout."
+              subtitle={
+                canMutateRuntime
+                  ? "Handoff actions, refresh, session exit, and deletion stay here so the main runtime path stays focused on review and rollout."
+                  : "Handoff actions, refresh, and session controls stay here while destructive runtime actions remain admin-managed."
+              }
               badge={deployment?.status || "unknown"}
               testId="runtime-detail-utility-disclosure"
             >
@@ -1935,18 +2066,20 @@ export default function DeploymentDetailsPage({ params }) {
                 <button type="button" className="secondaryButton" onClick={handleLogout}>
                   Logout
                 </button>
-                <button
-                  type="button"
-                  className="dangerButton"
-                  onClick={() => setDeleteReviewOpen((current) => !current)}
-                  disabled={deleting}
-                  data-testid="runtime-detail-delete-review-button"
-                  id="runtime-detail-delete-controls"
-                >
-                  {deleteReviewOpen ? "Hide delete review" : "Review delete"}
-                </button>
+                {canMutateRuntime ? (
+                  <button
+                    type="button"
+                    className="dangerButton"
+                    onClick={() => setDeleteReviewOpen((current) => !current)}
+                    disabled={deleting}
+                    data-testid="runtime-detail-delete-review-button"
+                    id="runtime-detail-delete-controls"
+                  >
+                    {deleteReviewOpen ? "Hide delete review" : "Review delete"}
+                  </button>
+                ) : null}
               </div>
-              {deleteReviewOpen ? (
+              {canMutateRuntime && deleteReviewOpen ? (
                 <div className="stackedValue" data-testid="runtime-detail-delete-review-panel">
                   <div className="banner error">
                     {buildReviewIntroText("delete", deleteConfirmationPhrase).split(deleteConfirmationPhrase)[0]}

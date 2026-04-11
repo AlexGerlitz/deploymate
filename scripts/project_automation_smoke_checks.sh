@@ -72,6 +72,7 @@ automation_smoke_runtime_checks() {
 /app/deployment-workflow|runtime deployments list|data-testid="runtime-deployments-list"
 /app/deployment-workflow|runtime deployment card|data-testid="runtime-deployment-card-smoke-deployment"|data-testid="runtime-deployment-card-review-worker"|data-testid="runtime-deployment-card-billing-api"
 /app/deployment-workflow|runtime deployment details link|data-testid="runtime-deployment-details-link-smoke-deployment"
+/app/deployment-workflow|failed runtime deployment details link|data-testid="runtime-deployment-details-link-review-worker"
 /app/deployment-workflow|runtime smoke copy|smoke-runtime
 /deployments/smoke-deployment|runtime detail page title|data-testid="runtime-detail-page-title"
 /deployments/smoke-deployment|runtime detail smoke banner|data-testid="runtime-detail-smoke-banner"
@@ -113,6 +114,44 @@ automation_smoke_runtime_checks() {
 /deployments/smoke-deployment|runtime detail activity export|data-testid="runtime-detail-activity-export-button"
 /deployments/smoke-deployment|runtime detail activity summary|data-testid="runtime-detail-activity-summary"
 /deployments/smoke-deployment|runtime detail smoke host copy|Smoke VPS
+EOF
+}
+
+automation_smoke_beginner_admin_checks() {
+  cat <<'EOF'
+/app|beginner overview title|data-testid="runtime-page-title"
+/app|beginner overview guide title|data-testid="workspace-scenario-title"
+/app|beginner overview primary hero action|data-testid="workspace-hero-primary-action"
+/app|beginner overview primary task card|data-testid="workspace-primary-task-card"
+/app|beginner overview primary task action|data-testid="workspace-primary-task-action"
+/app|beginner overview step 1 action|data-testid="workspace-scenario-action-step-1"
+/app|beginner overview step 2 blocked|(<button[^>]*data-testid="workspace-scenario-action-step-2"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-2")
+/app|beginner overview step 3 blocked|(<button[^>]*data-testid="workspace-scenario-action-step-3"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-3")
+/app|beginner overview ordering copy|Do this now, then keep going in order
+/app/server-review|beginner server review title|data-testid="server-review-page-title"
+/app/server-review|beginner server review step framing|Step 1: Connect and verify one server
+/app/server-review|beginner server review create card|data-testid="server-review-create-card"
+/app/server-review|beginner server review create form|data-testid="server-review-create-server"
+/app/deployment-workflow|beginner workflow title|data-testid="deployment-workflow-title"
+/app/deployment-workflow|beginner workflow step framing|Step 2: Choose what to run and deploy it
+/app/deployment-workflow|beginner workflow hero action|data-testid="deployment-workflow-hero-primary-action"
+/app/deployment-workflow|beginner workflow main next step card|data-testid="deployment-workflow-main-next-step-card"
+/app/deployment-workflow|beginner workflow main next step button|data-testid="deployment-workflow-main-next-step-button"
+EOF
+}
+
+automation_smoke_beginner_member_checks() {
+  cat <<'EOF'
+/app|beginner member overview title|data-testid="runtime-page-title"
+/app|beginner member guide title|data-testid="workspace-scenario-title"
+/app|beginner member blocked copy|Wait for the server target
+/app|beginner member blocked status|Blocked until Step 1
+/app/server-review|beginner member server review blocked card|data-testid="server-review-blocked-card"
+/app/server-review|beginner member server review blocked title|data-testid="server-review-blocked-title"
+/app/server-review|beginner member server review blocked banner|data-testid="server-review-blocked-banner"
+/app/deployment-workflow|beginner member workflow title|data-testid="deployment-workflow-title"
+/app/deployment-workflow|beginner member blocked card|data-testid="deployment-workflow-member-blocked-card"
+/app/deployment-workflow|beginner member blocked copy|Server target is admin-managed
 EOF
 }
 

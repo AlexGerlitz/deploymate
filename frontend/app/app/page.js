@@ -114,6 +114,9 @@ export default function HomePage() {
           ? "Next best step: choose which app to run on that server."
           : "Next best step: open your app list and continue from one running service.";
   const waitingForAdminTarget = overviewPrimaryPath.reason === "admin-target-needed";
+  const waitingForServerSetup = overviewPrimaryPath.reason === "server-setup";
+  const stepTwoBlocked = waitingForServerSetup || waitingForAdminTarget;
+  const stepThreeBlocked = stepTwoBlocked || opsSnapshot.deployments.total === 0;
   const stepOneIsPrimary =
     overviewPrimaryPath.reason === "server-setup" ||
     overviewPrimaryPath.reason === "admin-target-needed";
@@ -168,25 +171,27 @@ export default function HomePage() {
       key: "step-2",
       step: "Step 2",
       title: "Choose your app",
-      detail: waitingForAdminTarget
-        ? "This step opens after an admin confirms one saved server target for the workspace."
+      detail: stepTwoBlocked
+        ? waitingForAdminTarget
+          ? "This step opens after an admin confirms one saved server target for the workspace."
+          : "This step opens after Step 1 is done and one server is already connected."
         : "Paste the app image you want to run, or pick a saved setup if you already have one.",
       href: "/app/deployment-workflow",
-      actionLabel: waitingForAdminTarget ? "Opens after Step 1" : "Choose app to run",
+      actionLabel: stepTwoBlocked ? "Opens after Step 1" : "Choose app to run",
       primary: !stepOneIsPrimary,
-      disabled: waitingForAdminTarget,
+      disabled: stepTwoBlocked,
     },
     {
       key: "step-3",
       step: "Step 3",
       title: "Start it and check status",
-      detail: waitingForAdminTarget
+      detail: stepThreeBlocked
         ? "This step opens after the first deployment exists and DeployMate has live runtime state to review."
         : "Start the app, then open live status to confirm it is running, healthy, and reachable.",
       href: "/app/deployment-workflow",
-      actionLabel: waitingForAdminTarget ? "Opens after deploy" : "See running apps",
+      actionLabel: stepThreeBlocked ? "Opens after deploy" : "See running apps",
       primary: false,
-      disabled: waitingForAdminTarget,
+      disabled: stepThreeBlocked,
     },
   ];
   const plainLanguageCards = [
@@ -965,7 +970,7 @@ export default function HomePage() {
                     Local Docker {opsSnapshot.capabilities?.local_docker_enabled ? "enabled" : "disabled"}
                   </span>
                   <span>
-                    SSH trust {opsSnapshot.capabilities?.ssh_host_key_checking || "accept-new"}
+                    SSH trust {opsSnapshot.capabilities?.ssh_host_key_checking || "yes"}
                   </span>
                   <span>
                     Cred key {opsSnapshot.capabilities?.server_credentials_key_configured ? "configured" : "missing"}

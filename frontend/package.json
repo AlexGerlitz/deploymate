@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
+    "smoke:beginner": "bash ../scripts/frontend_beginner_smoke.sh",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

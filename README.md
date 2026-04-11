@@ -129,7 +129,7 @@ Recommended reviewer order:
 - one product surface covers deployments, servers, templates, activity, admin users, upgrade requests, backups, and restore dry-runs
 - production release flow is already scripted with preflight and post-deploy smoke checks
 - the admin surface has saved views, bulk actions, exports, audit history, and backup tooling
-- production security posture was improved with a remote-only deployment profile and safer SSH defaults
+- production security posture was improved with a remote-only deployment profile and strict pinned SSH defaults
 
 ## At A Glance
 
@@ -542,6 +542,7 @@ PRs are not just ceremony here:
 - scripted post-deploy smoke in [scripts/post_deploy_smoke.sh](scripts/post_deploy_smoke.sh)
 - dedicated admin frontend smoke in [scripts/frontend_admin_smoke.sh](scripts/frontend_admin_smoke.sh)
 - dedicated auth frontend smoke in [scripts/frontend_auth_smoke.sh](scripts/frontend_auth_smoke.sh)
+- dedicated beginner-path frontend smoke in [scripts/frontend_beginner_smoke.sh](scripts/frontend_beginner_smoke.sh) for `/app`, `/app/server-review`, and `/app/deployment-workflow`
 - dedicated admin-interactions frontend smoke in [scripts/frontend_admin_interactions_smoke.sh](scripts/frontend_admin_interactions_smoke.sh) for saved views and bulk-action surfaces
 - dedicated ops frontend smoke in [scripts/frontend_ops_smoke.sh](scripts/frontend_ops_smoke.sh)
 - dedicated restore-report frontend smoke in [scripts/frontend_restore_smoke.sh](scripts/frontend_restore_smoke.sh)
@@ -553,11 +554,13 @@ PRs are not just ceremony here:
 - operations overview now exposes backend runtime capability posture, including local Docker, SSH trust mode, and credential-key readiness
 - preflight and security audit now check that production frontend and backend local-runtime flags stay aligned
 - preflight and remote release now also fail on insecure production env overrides such as memory-backed auth throttling, non-strict SSH trust, placeholder admin passwords, or missing pinned `known_hosts`
-- the local release gate now runs auth, admin, admin-interactions, ops, restore, runtime, servers, and templates frontend smokes before build
+- the local release gate now runs auth, admin, admin-interactions, beginner, ops, restore, runtime, servers, and templates frontend smokes before build
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)
 
 ## Demo Walkthrough
+
+For the current main product path walkthrough, use [docs/beginner-walkthrough.md](docs/beginner-walkthrough.md) first.
 
 If I were demoing the project to a reviewer, I would open it in this order:
 
@@ -613,6 +616,7 @@ Typical release flow:
 
 ```bash
 ./scripts/preflight.sh
+npm --prefix frontend run smoke:beginner
 npm --prefix frontend run smoke:admin
 npm --prefix frontend run smoke:runtime
 npm --prefix frontend run build
@@ -625,6 +629,8 @@ DEPLOYMATE_BASE_URL=https://your-domain DEPLOYMATE_ADMIN_USERNAME=admin DEPLOYMA
 ```
 
 `./scripts/preflight.sh` now includes both the runtime capability audit and the production env security audit. `bash scripts/remote_release.sh ...` now runs the same checks on the target host before it calls `docker compose up`. The GitHub CI and manual release workflows also run `bash scripts/production_contract_gate.sh` before they touch a remote host.
+
+If the change touches `/app`, `/app/server-review`, or `/app/deployment-workflow`, keep `npm --prefix frontend run smoke:beginner` in the local loop even when you skip heavier frontend checks.
 
 Or use the single remote helper for prod-like or staging-like deploys:
 

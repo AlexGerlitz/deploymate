@@ -413,6 +413,12 @@ export function buildDeploymentWorkflowNextStep({
   const failedDeployment =
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     null;
+  const rolloutDraftStarted =
+    form.image.trim() ||
+    form.name.trim() ||
+    form.internal_port.trim() ||
+    form.external_port.trim() ||
+    templateName.trim();
 
   if (failedDeployment) {
     return {
@@ -433,6 +439,17 @@ export function buildDeploymentWorkflowNextStep({
       primaryAction: "Review live deployments",
       secondaryAction: "Copy next step",
       tone: "error",
+    };
+  }
+
+  if (form.server_id && filteredDeployments.length === 0 && !rolloutDraftStarted) {
+    return {
+      focus: "Start the first deployment",
+      nextStep:
+        "Step 1 is already done for the selected server. Set the image first and keep saved setups or live review secondary until the first deployment exists.",
+      primaryAction: "Create deployment",
+      secondaryAction: "Copy next step",
+      tone: "info",
     };
   }
 
@@ -730,7 +747,7 @@ export function buildOpsSnapshot({ currentUser, deployments, servers, notificati
     },
     capabilities: {
       local_docker_enabled: process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0",
-      ssh_host_key_checking: process.env.NEXT_PUBLIC_SSH_HOST_KEY_CHECKING || "accept-new",
+      ssh_host_key_checking: process.env.NEXT_PUBLIC_SSH_HOST_KEY_CHECKING || "yes",
       server_credentials_key_configured: Boolean(
         process.env.NEXT_PUBLIC_SERVER_CREDENTIALS_KEY_CONFIGURED,
       ),
