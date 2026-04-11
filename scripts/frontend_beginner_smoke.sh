@@ -395,28 +395,36 @@ run_beginner_member_waiting_smoke() {
     start_frontend_smoke_server
     wait_for_frontend_smoke_url "/app"
 
+    overview_html="$(mktemp)"
     waiting_html="$(mktemp)"
+    curl -sS "${BASE_URL}/app" > "$overview_html"
     curl -sS "${BASE_URL}/app/deployment-workflow" > "$waiting_html"
+
+    if ! grep -Eq 'data-testid="workspace-hero-primary-action"[^>]*>Review rollout status<' "$overview_html"; then
+      echo "[frontend-beginner-member-waiting-smoke] member waiting overview lost the explicit rollout-status action" >&2
+      rm -f "$overview_html" "$waiting_html"
+      exit 1
+    fi
 
     if ! grep -Eq 'data-testid="deployment-workflow-member-blocked-card"' "$waiting_html"; then
       echo "[frontend-beginner-member-waiting-smoke] member waiting path lost the blocked guidance card" >&2
-      rm -f "$waiting_html"
+      rm -f "$overview_html" "$waiting_html"
       exit 1
     fi
 
     if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-button"[^>]*>Back to overview<' "$waiting_html"; then
       echo "[frontend-beginner-member-waiting-smoke] member waiting path lost the overview primary action" >&2
-      rm -f "$waiting_html"
+      rm -f "$overview_html" "$waiting_html"
       exit 1
     fi
 
     if grep -Eq 'data-testid="deployment-workflow-member-live-card"|data-testid="create-deployment-card"|data-testid="templates-card"|data-testid="runtime-deployment-card-' "$waiting_html"; then
       echo "[frontend-beginner-member-waiting-smoke] member waiting path leaked live or create surfaces" >&2
-      rm -f "$waiting_html"
+      rm -f "$overview_html" "$waiting_html"
       exit 1
     fi
 
-    rm -f "$waiting_html"
+    rm -f "$overview_html" "$waiting_html"
   )
 }
 

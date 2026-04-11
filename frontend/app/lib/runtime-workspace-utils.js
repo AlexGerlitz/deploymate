@@ -351,7 +351,7 @@ export function buildOverviewPrimaryPath({
   if (!isAdmin && !localDeploymentsEnabled && deploymentsTotal === 0) {
     return {
       href: "/app/deployment-workflow",
-      label: "See what opens next",
+      label: "Review rollout status",
       title: "Wait for the server target",
       detail:
         "An admin still needs to confirm one saved server target before the first remote deployment can start here.",

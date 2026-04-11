@@ -176,6 +176,11 @@ Updated: 2026-04-11
   - issue: healthy runtimes without a public URL still fell back to vague `View details` language in the queue, while detail copy said the runtime was stable without making the review step explicit enough
   - fix: no-public-URL runtime cards now make detail review the primary action, running internal-only cards use `Review stable runtime`, and internal-only detail now explains that overview/ports/health/activity review comes before rollout changes
   - guardrail: `smoke:runtime` now checks an internal-only detail fixture plus focus/secondary workflow cards so private-runtime review cannot regress back into ambiguous queue copy
+- The blocked member overview CTA now says what the click actually does:
+  - screen: member remote-only `/app` before admin Step 1 is complete
+  - issue: the primary CTA still said `See what opens next`, which was directionally correct but too vague for a first-time user trying to understand why rollout is blocked
+  - fix: the blocked member overview now uses `Review rollout status`, matching the fact that the click opens the blocked deployment workflow state instead of a hidden next-step surprise
+  - guardrail: `smoke:beginner` now fails if the member waiting overview loses that explicit rollout-status action
 - The member-safe pass found one blocked-path leak:
   - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
   - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
@@ -1042,6 +1047,8 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run smoke:runtime` после deployment workflow runtime queue consistency package -> ok
 - `npm --prefix frontend run build` после internal-only runtime review path package -> ok
 - `npm --prefix frontend run smoke:runtime` после internal-only runtime review path package -> ok
+- `npm --prefix frontend run build` после blocked member overview CTA wording slice -> ok
+- `npm --prefix frontend run smoke:beginner` после blocked member overview CTA wording slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:

@@ -138,7 +138,7 @@ export default function HomePage() {
           stepDetail: memberHasLiveDeployments
             ? "You can review existing deployments, but target control and new remote deploys stay admin-managed."
             : "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
-          stepAction: memberHasLiveDeployments ? "Open live review" : "See what opens next",
+          stepAction: memberHasLiveDeployments ? "Open live review" : "Review rollout status",
         };
   const beginnerStatusSummary = canAccessServers
     ? servers.length === 0
