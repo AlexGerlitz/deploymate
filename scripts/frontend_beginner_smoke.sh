@@ -254,6 +254,12 @@ run_beginner_admin_server_ready_smoke() {
       exit 1
     fi
 
+    if ! grep -Eq 'data-testid="workspace-scenario-primary-action"[^>]*>Choose app to run<' "$overview_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] overview lost the top-level first-deploy action" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
     if ! grep -Eq 'href="/app/deployment-workflow\?server=smoke-server&amp;source=overview-first-deploy"' "$overview_html"; then
       echo "[frontend-beginner-admin-server-ready-smoke] overview did not preserve the ready server into the first-deploy link" >&2
       rm -f "$overview_html"
@@ -342,8 +348,17 @@ def card(step):
     next_start = html.find('data-testid="workspace-scenario-item-step-', start + len(marker))
     return html[start: next_start if next_start != -1 else len(html)]
 
+def testid_anchor(testid):
+    marker = f'data-testid="{testid}"'
+    start = html.find(marker)
+    if start == -1:
+        raise SystemExit(f"missing {testid}")
+    end = html.find("</a>", start)
+    return html[start: end + len("</a>") if end != -1 else len(html)]
+
 step_two = card(2)
 step_three = card(3)
+primary_action = testid_anchor("workspace-scenario-primary-action")
 
 if 'data-testid="workspace-primary-task-card"' in step_two:
     raise SystemExit("Step 2 stayed primary after the first deployment existed")
@@ -356,6 +371,9 @@ if ">Start another deploy<" not in step_two:
 
 if ">Review live apps<" not in step_three:
     raise SystemExit("Step 3 did not expose live review as the current action")
+
+if ">Review live apps<" not in primary_action:
+    raise SystemExit("overview lost the top-level live-review action after deploy")
 PY
 
     rm -f "$overview_html"

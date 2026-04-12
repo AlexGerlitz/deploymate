@@ -238,6 +238,10 @@ export default function HomePage() {
       disabled: stepThreeBlocked,
     },
   ];
+  const primaryBeginnerStep =
+    beginnerSteps.find((card) => card.primary && !card.disabled) ||
+    beginnerSteps.find((card) => !card.disabled) ||
+    null;
   const workspaceBoardSteps = beginnerSteps.map((card) => ({
     ...card,
     boardTitle:
@@ -617,6 +621,17 @@ export default function HomePage() {
             <h1 data-testid="runtime-page-title">Choose the next step.</h1>
             <p>{beginnerNextStep}</p>
             <p data-testid="workspace-scenario-title">Step 1, Step 2, Step 3.</p>
+            {primaryBeginnerStep ? (
+              <div className="formActions">
+                <Link
+                  href={primaryBeginnerStep.href}
+                  className="landingButton primaryButton"
+                  data-testid="workspace-scenario-primary-action"
+                >
+                  {primaryBeginnerStep.actionLabel}
+                </Link>
+              </div>
+            ) : null}
           </div>
 
           <div className="workspaceActionGrid" data-testid="workspace-quick-actions">
