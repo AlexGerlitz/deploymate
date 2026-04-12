@@ -130,38 +130,33 @@ summary:focus-visible {
   min-height: 1px;
 }
 
-.workspaceTopBarBadge {
+.workspaceTopBarBrand {
   display: inline-flex;
   align-items: center;
   justify-self: center;
-  gap: 10px;
   min-height: 38px;
-  padding: 6px 12px;
-  border: 1px solid rgba(18, 34, 56, 0.08);
+  padding: 8px 18px;
+  border: 1px solid rgba(193, 203, 214, 0.46);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(242, 246, 249, 0.72));
+  color: #1d1d1f;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    0 10px 24px rgba(18, 34, 56, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 12px 30px rgba(73, 92, 116, 0.1);
 }
 
-.workspaceTopBarBadgeMark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: #1d1d1f;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
+.workspaceTopBarBrand:hover {
+  border-color: rgba(151, 166, 184, 0.62);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(236, 242, 247, 0.82));
 }
 
-.workspaceTopBarBadgeLabel {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0;
+.workspaceTopBarBrandText {
+  font-family: var(--font-display), sans-serif;
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
 }
 
 .workspaceTopBarActions {
@@ -3934,13 +3929,15 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceActionGrid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 12px;
+  align-items: stretch;
 }
 
 .workspaceActionCard {
   display: grid;
-  gap: 14px;
-  align-content: start;
+  grid-template-rows: auto auto minmax(124px, 1fr) auto auto;
+  gap: 16px;
   min-height: 280px;
   padding: 18px;
   border: 1px solid rgba(18, 34, 56, 0.08);
@@ -4004,17 +4001,23 @@ button.landingButton.primaryButton:disabled {
 .workspaceActionCardCopy {
   display: grid;
   gap: 8px;
+  align-self: start;
 }
 
 .workspaceActionPrimaryMarker {
   display: inline-flex;
   width: fit-content;
+  min-height: 30px;
   border-radius: 8px;
   background: rgba(18, 34, 56, 0.06);
   color: #16324d;
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 700;
+}
+
+.workspaceActionPrimaryMarker.isPlaceholder {
+  visibility: hidden;
 }
 
 .workspaceActionCardCopy h2 {
@@ -4033,6 +4036,7 @@ button.landingButton.primaryButton:disabled {
 }
 
 .workspaceActionCardMeta {
+  align-self: end;
   color: #6e6e73;
   font-size: 13px;
   font-weight: 700;
@@ -4903,8 +4907,10 @@ button.landingButton.primaryButton:disabled {
     display: none;
   }
 
-  .workspaceTopBarBadge {
+  .workspaceTopBarBrand {
     justify-self: start;
+    padding-left: 14px;
+    padding-right: 14px;
   }
 
   .workspaceTopBarActions {
@@ -4934,8 +4940,17 @@ button.landingButton.primaryButton:disabled {
     font-size: 16px;
   }
 
+  .workspaceActionGrid {
+    grid-template-columns: 1fr;
+  }
+
   .workspaceActionCard {
+    grid-template-rows: auto auto auto auto auto;
     min-height: auto;
+  }
+
+  .workspaceActionPrimaryMarker.isPlaceholder {
+    display: none;
   }
 
   .workspaceProductContainer {
@@ -5058,7 +5073,7 @@ button.landingButton.primaryButton:disabled {
   }
 
   .workspaceActionGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 
   .overviewProductQuickGrid {

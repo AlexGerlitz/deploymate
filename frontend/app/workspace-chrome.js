@@ -88,11 +88,8 @@ export default function WorkspaceChrome({ children, footer }) {
         <div className="workspaceTopBarInner">
           <div className="workspaceTopBarSpacer" />
 
-          <Link href="/app" className="workspaceTopBarBadge" data-testid="workspace-topbar-badge">
-            <span className="workspaceTopBarBadgeMark" aria-hidden="true">
-              DM
-            </span>
-            <span className="workspaceTopBarBadgeLabel">DeployMate</span>
+          <Link href="/app" className="workspaceTopBarBrand" data-testid="workspace-topbar-badge">
+            <span className="workspaceTopBarBrandText">DeployMate</span>
           </Link>
 
           <div className="workspaceTopBarActions">

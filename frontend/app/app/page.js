@@ -601,11 +601,13 @@ export default function HomePage() {
                   <span className="workspaceActionCardState">{card.boardState}</span>
                 </div>
 
-                {card.primary ? (
-                  <span className="workspaceActionPrimaryMarker" data-testid="workspace-primary-task-card">
-                    Current step
-                  </span>
-                ) : null}
+                <span
+                  className={`workspaceActionPrimaryMarker${card.primary ? "" : " isPlaceholder"}`}
+                  data-testid={card.primary ? "workspace-primary-task-card" : undefined}
+                  aria-hidden={!card.primary}
+                >
+                  {card.primary ? "Current step" : "Step marker"}
+                </span>
 
                 <div className="workspaceActionCardCopy">
                   <h2>{card.boardTitle}</h2>
