@@ -860,6 +860,7 @@ export default function DeploymentDetailsPage({ params }) {
     deployment?.status === "running" &&
     (!health?.status || health.status === "healthy") &&
     attentionItems.length === 0;
+  const showChangeTab = canMutateRuntime && !freshRolloutReview;
   const runtimeSummaryText = buildRuntimeSummaryText(
     deployment,
     health,
@@ -1871,7 +1872,7 @@ export default function DeploymentDetailsPage({ params }) {
               >
                 Review runtime
               </button>
-              {canMutateRuntime ? (
+              {showChangeTab ? (
                 <button
                   type="button"
                   className={detailTab === "change" ? "active" : ""}

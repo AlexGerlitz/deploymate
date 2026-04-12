@@ -82,6 +82,11 @@ if grep -Eq 'data-testid="runtime-detail-main-next-step-action-secondary"[^>]*>P
   exit 1
 fi
 
+if grep -Eq 'data-testid="runtime-detail-tab-change"' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout detail still exposes the change tab before verification" >&2
+  exit 1
+fi
+
 curl -sS "${BASE_URL}/app/deployment-workflow" > "$APP_HTML"
 if grep -Eq 'data-testid="runtime-deployment-delete-button-review-worker"' "$APP_HTML"; then
   echo "[frontend-runtime-smoke] failed runtime queue exposes delete before detail review" >&2
