@@ -188,6 +188,7 @@ If you want the same flow from GitHub instead of a workstation shell, use the ma
 For a short operator-only secret drift check without a deploy, use `.github/workflows/release-secrets-audit.yml` and choose `production` or `staging`.
 That workflow also runs every day at `02:17 UTC` (`09:17` in Novosibirsk) for both environments and sends a best-effort webhook notification when `DEPLOY_NOTIFICATION_WEBHOOK` is configured.
 If a scheduled audit fails, GitHub automatically opens or updates one environment-specific incident issue so the failure does not disappear in webhook history alone.
+That incident now gets `incident` plus severity labels, and severity is raised to `severity:high` after the configured number of consecutive scheduled failures.
 When the next scheduled audit for that environment succeeds, the workflow comments on the issue and closes it automatically.
 
 Recommended promotion order:
@@ -606,6 +607,11 @@ Runtime smoke notes:
 - production can keep runtime smoke disabled when running in remote-only mode without a preconfigured smoke target
 - the script always attempts to delete the temporary smoke deployment before exit
 - if it created a temporary smoke server target, it also deletes that target before exit
+
+Optional GitHub repository variables for scheduled audit incident triage:
+
+- `RELEASE_AUDIT_INCIDENT_ASSIGNEE` to auto-assign the incident issue to one GitHub login
+- `RELEASE_AUDIT_INCIDENT_FAILURE_THRESHOLD` to control after how many consecutive scheduled failures severity escalates to `severity:high` (default: 3)
 
 ## Deploy notifications
 
