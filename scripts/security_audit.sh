@@ -170,7 +170,7 @@ if [ "${DEPLOYMATE_RUNTIME_POLICY_SCAN_SCOPE:-skip}" = "skip" ]; then
 else
   for file in "${FILTERED_FILES[@]}"; do
     case "$file" in
-      docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/local_runtime_audit.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh|backend/app/routes/deployments.py|backend/app/routes/ops.py|backend/app/routes/servers.py|backend/app/services/runtime_executors.py|backend/tests/test_deployment_ssh_options.py)
+      docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/local_runtime_audit.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh|backend/app/routes/deployments.py|backend/app/routes/ops.py|backend/app/routes/servers.py|backend/app/services/runtime_executors.py|backend/tests/test_deployment_ssh_options.py)
         RUNTIME_FILES+=("$file")
         ;;
     esac

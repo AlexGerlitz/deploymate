@@ -148,7 +148,7 @@ automation_frontend_fast_scope_for_path() {
     frontend/*)
       printf 'frontend\n'
       ;;
-    frontend/Dockerfile|docker-compose.yml|docker-compose.prod.yml|deploy/*|infra/*|scripts/release_workflow.sh|scripts/preflight.sh|scripts/remote_release.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh)
+    frontend/Dockerfile|docker-compose.yml|docker-compose.prod.yml|deploy/*|infra/*|scripts/release_workflow.sh|scripts/preflight.sh|scripts/remote_release.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh)
       printf 'frontend_delivery_contract\n'
       ;;
     .github/*|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|NOTICE|COMMERCIAL-LICENSE.md|docs/*|backend/*)
@@ -166,7 +166,7 @@ automation_backend_fast_scope_for_path() {
     backend/*)
       printf 'backend\n'
       ;;
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh)
+    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh)
       printf 'backend_release_contract\n'
       ;;
     .github/*|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|NOTICE|COMMERCIAL-LICENSE.md|docs/*|frontend/*)
@@ -181,7 +181,7 @@ automation_backend_fast_scope_for_path() {
 automation_runtime_audit_scope_for_path() {
   local path="$1"
   case "$path" in
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|backend/app/services/runtime_executors.py|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh|scripts/release_smoke_precheck.sh)
+    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|backend/app/services/runtime_executors.py|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/security_audit.sh|scripts/preflight.sh|scripts/release_workflow.sh|scripts/remote_release.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh)
       printf 'runtime_contract\n'
       ;;
     *)
@@ -214,13 +214,13 @@ automation_backend_syntax_scope_for_path() {
 automation_security_scope_for_path() {
   local path="$1"
   case "$path" in
-    .github/*|RUNBOOK.md|SAFE-RELEASE.md|scripts/release_workflow.sh|scripts/release_workflow_audit.sh|scripts/remote_release.sh|scripts/release_smoke_precheck.sh|scripts/preflight.sh|scripts/security_audit.sh|scripts/production_contract_gate.sh|scripts/dev_fast_check.sh|scripts/dev_verify_changed.sh|scripts/derive_local_fast_context.sh)
+    .github/*|RUNBOOK.md|SAFE-RELEASE.md|scripts/release_workflow.sh|scripts/release_workflow_audit.sh|scripts/remote_release.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/preflight.sh|scripts/security_audit.sh|scripts/production_contract_gate.sh|scripts/dev_fast_check.sh|scripts/dev_verify_changed.sh|scripts/derive_local_fast_context.sh)
       printf 'release_workflow_contract\n'
       ;;
     backend/app/db.py|backend/app/routes/servers.py|backend/app/routes/ops.py|backend/app/services/server_credentials.py|backend/app/services/runtime_executors.py|backend/tests/test_server_credentials.py|backend/tests/test_server_credentials_policy.py|scripts/server_credentials_audit.sh)
       printf 'server_credentials_contract\n'
       ;;
-    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh)
+    docker-compose.yml|docker-compose.prod.yml|.env.production.example|frontend/Dockerfile|deploy/*|infra/*|scripts/runtime_capability_audit.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh|scripts/local_runtime_audit.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh)
       printf 'runtime_or_deploy_contract\n'
       ;;
     backend/app/services/runtime_executors.py|backend/app/routes/deployments.py|backend/app/routes/servers.py|backend/app/routes/ops.py|backend/tests/test_deployment_ssh_options.py)

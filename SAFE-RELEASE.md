@@ -75,6 +75,7 @@ bash scripts/remote_release.sh \
 ```
 
 That remote helper now validates the target host env file and pinned `known_hosts` file before it runs `docker compose up`.
+It also compares the provided smoke credentials with the effective admin credentials from the target runtime env file before deploy starts.
 It also performs a fast smoke-credentials precheck against the current target and aborts early on explicit `401` or `403` auth failures, so bad admin secrets stop the release before the remote rebuild starts.
 
 For teams that want a guarded click-to-release path, the repository also includes `.github/workflows/release.yml`, a manual GitHub Actions workflow that runs the same remote helper with repository secrets and an environment gate.

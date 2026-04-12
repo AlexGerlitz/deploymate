@@ -42,6 +42,8 @@ Environment passthrough:
   scripts/post_deploy_smoke.sh. Use that for optional runtime smoke inputs.
   Set DEPLOYMATE_SMOKE_CURL_RESOLVE=host:443:ip when the smoke runner cannot
   resolve the public hostname directly.
+  Before any remote build, the helper verifies that the provided admin smoke
+  credentials still match the target runtime env file.
   Before any remote build, the helper runs a fast smoke-credentials precheck
   against the current target and aborts early on explicit 401/403 auth failures.
   Set DEPLOYMATE_SMOKE_RUNNER=remote to execute post-deploy smoke on the
@@ -187,6 +189,14 @@ echo "[remote-release] remote env file: $DEPLOY_ENV_FILE"
 echo "[remote-release] smoke runner: $SMOKE_RUNNER"
 
 if [ "$SKIP_SMOKE" != "1" ]; then
+  echo "[remote-release] release secret contract"
+  run_cmd bash scripts/release_secret_contract_audit.sh \
+    --host "$DEPLOY_HOST" \
+    --repo-dir "$DEPLOY_REPO_DIR" \
+    --env-file "$DEPLOY_ENV_FILE" \
+    --admin-username "$ADMIN_USERNAME" \
+    --admin-password "$ADMIN_PASSWORD"
+
   echo "[remote-release] smoke credential precheck"
   run_cmd env \
     DEPLOYMATE_BASE_URL="$BASE_URL" \

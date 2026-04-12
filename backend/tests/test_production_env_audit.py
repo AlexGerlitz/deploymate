@@ -95,6 +95,7 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         self,
         directory: Path,
         *,
+        admin_username: str | None = None,
         admin_password: str = "super-secret-admin-password",
         credentials_key: str = "real-fernet-key-for-production",
         session_cookie_secure: str = "true",
@@ -108,7 +109,10 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         known_hosts_path = known_hosts_file or str(directory / "known_hosts")
         env_path.write_text(
             "\n".join(
-                [
+                (
+                    [f"DEPLOYMATE_ADMIN_USERNAME={admin_username}"] if admin_username is not None else []
+                )
+                + [
                     f"DEPLOYMATE_ADMIN_PASSWORD={admin_password}",
                     f"DEPLOYMATE_SERVER_CREDENTIALS_KEY={credentials_key}",
                     f"SESSION_COOKIE_SECURE={session_cookie_secure}",
@@ -305,6 +309,105 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         self.assertIn("json_get()", script)
         self.assertIn("json_query()", script)
 
+    def test_release_secret_contract_audit_accepts_matching_credentials(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            env_path = self._write_env_file(
+                temp_path,
+                admin_username="ops-admin",
+                admin_password="shared-secret",
+            )
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/release_secret_contract_audit.sh",
+                    "--host",
+                    "local",
+                    "--repo-dir",
+                    str(temp_path),
+                    "--env-file",
+                    env_path.name,
+                    "--admin-username",
+                    "ops-admin",
+                    "--admin-password",
+                    "shared-secret",
+                ],
+                cwd=self.repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("runtime env matches provided smoke credentials", result.stdout)
+
+    def test_release_secret_contract_audit_rejects_password_drift(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            env_path = self._write_env_file(
+                temp_path,
+                admin_username="ops-admin",
+                admin_password="runtime-secret",
+            )
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/release_secret_contract_audit.sh",
+                    "--host",
+                    "local",
+                    "--repo-dir",
+                    str(temp_path),
+                    "--env-file",
+                    env_path.name,
+                    "--admin-username",
+                    "ops-admin",
+                    "--admin-password",
+                    "github-secret",
+                ],
+                cwd=self.repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("target admin password does not match", result.stderr)
+
+    def test_release_secret_contract_audit_uses_default_admin_username(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            env_path = self._write_env_file(
+                temp_path,
+                admin_username=None,
+                admin_password="shared-secret",
+            )
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/release_secret_contract_audit.sh",
+                    "--host",
+                    "local",
+                    "--repo-dir",
+                    str(temp_path),
+                    "--env-file",
+                    env_path.name,
+                    "--admin-username",
+                    "admin",
+                    "--admin-password",
+                    "shared-secret",
+                ],
+                cwd=self.repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("runtime env matches provided smoke credentials", result.stdout)
+
     def test_release_smoke_precheck_accepts_valid_credentials(self):
         server, thread = self._start_precheck_server("login-200")
         self.addCleanup(server.shutdown)
@@ -396,7 +499,12 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("bash scripts/release_secret_contract_audit.sh", result.stdout)
         self.assertIn("bash scripts/release_smoke_precheck.sh", result.stdout)
+        self.assertLess(
+            result.stdout.index("bash scripts/release_secret_contract_audit.sh"),
+            result.stdout.index("bash scripts/release_smoke_precheck.sh"),
+        )
         self.assertLess(
             result.stdout.index("bash scripts/release_smoke_precheck.sh"),
             result.stdout.index("ssh deploymate"),
