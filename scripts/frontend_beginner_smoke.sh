@@ -219,7 +219,7 @@ run_beginner_admin_server_ready_smoke() {
     set -euo pipefail
     source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-    export PORT="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_PORT:-3010}"
+    export PORT="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_PORT:-3016}"
     export BASE_URL="http://127.0.0.1:${PORT}"
     export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_LOG:-/tmp/deploymate-frontend-beginner-admin-server-ready-smoke.log}"
     export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_DIST_DIR:-.next-smoke-beginner-admin-server-ready-${PORT}}"
