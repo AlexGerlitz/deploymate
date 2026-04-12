@@ -186,10 +186,12 @@ It also compares the provided smoke credentials against the target runtime env f
 
 If you want the same flow from GitHub instead of a workstation shell, use the manual workflow in `.github/workflows/release.yml` after configuring repository secrets for the deploy host, deploy SSH key, pinned known_hosts contents, base URL, and admin smoke credentials.
 For a short operator-only secret drift check without a deploy, use `.github/workflows/release-secrets-audit.yml` and choose `production` or `staging`.
+That manual workflow now also supports an `incident_self_test` mode with `open`, `update`, and `resolve` actions so operators can verify the incident automation path without waiting for the nightly schedule and without forcing a real target failure.
 That workflow also runs every day at `02:17 UTC` (`09:17` in Novosibirsk) for both environments and sends a best-effort webhook notification when `DEPLOY_NOTIFICATION_WEBHOOK` is configured.
 If a scheduled audit fails, GitHub automatically opens or updates one environment-specific incident issue so the failure does not disappear in webhook history alone.
 That incident now gets `incident` plus severity labels, and severity is raised to `severity:high` after the configured number of consecutive scheduled failures.
 When the next scheduled audit for that environment succeeds, the workflow comments on the issue and closes it automatically.
+The manual self-test flow uses a separate `[release-secrets-audit:self-test] ...` issue title and the `incident:test` label, so it does not interfere with real scheduled incidents.
 
 Recommended promotion order:
 
@@ -612,6 +614,14 @@ Optional GitHub repository variables for scheduled audit incident triage:
 
 - `RELEASE_AUDIT_INCIDENT_ASSIGNEE` to auto-assign the incident issue to one GitHub login
 - `RELEASE_AUDIT_INCIDENT_FAILURE_THRESHOLD` to control after how many consecutive scheduled failures severity escalates to `severity:high` (default: 3)
+
+Recommended operator self-test sequence:
+
+1. run `.github/workflows/release-secrets-audit.yml` with `incident_self_test=open`
+2. re-run it with `incident_self_test=update`
+3. confirm the same issue was reused and severity/labels updated as expected
+4. re-run it with `incident_self_test=resolve`
+5. confirm the self-test issue was commented and closed
 
 ## Deploy notifications
 
