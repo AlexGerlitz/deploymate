@@ -297,6 +297,144 @@ function buildRuntimeCardActionState(deployment) {
   };
 }
 
+function buildRuntimeReviewState(deployment, visibleDeploymentsCount) {
+  if (!deployment) {
+    return {
+      label: "Waiting",
+      tone: "unknown",
+      focus: "No live deployment is selected yet",
+      nextStep: "Start one app first, then use this lane to check whether it is alive.",
+      summary: "Step 3 stays quiet until there is something running or failing to review.",
+      checks: [
+        {
+          label: "First check",
+          value: "Start an app",
+          detail: "A runtime review begins after the first deployment exists.",
+        },
+        {
+          label: "Signal",
+          value: "None yet",
+          detail: "There is no health or endpoint signal to interpret yet.",
+        },
+        {
+          label: "Then",
+          value: "Return here",
+          detail: "This lane becomes the place to verify the result.",
+        },
+      ],
+    };
+  }
+
+  const runtimeUrl = buildDeploymentUrl(deployment);
+  const deploymentName = deployment.container_name || deployment.image || "This deployment";
+
+  if (deployment.status === "failed") {
+    return {
+      label: "Needs review",
+      tone: "error",
+      focus: `${deploymentName} failed before it became a safe next step`,
+      nextStep: "Open runtime detail and read the failure context before deleting or redeploying.",
+      summary: "Keep the queue calm: understand the failed runtime before starting another app.",
+      checks: [
+        {
+          label: "First check",
+          value: "Runtime detail",
+          detail: "Use diagnostics and recent activity before taking a destructive action.",
+        },
+        {
+          label: "Signal",
+          value: "Failed",
+          detail: deployment.error || "Deployment is currently failed.",
+        },
+        {
+          label: "Then",
+          value: "Decide safely",
+          detail: "Redeploy or delete only after the cause is concrete enough to explain.",
+        },
+      ],
+    };
+  }
+
+  if (deployment.status === "running" && runtimeUrl) {
+    return {
+      label: "Ready to verify",
+      tone: "healthy",
+      focus: `${deploymentName} is running with a public endpoint`,
+      nextStep: "Open the app once, then return to runtime detail if anything looks off.",
+      summary: `${visibleDeploymentsCount} live deployment${visibleDeploymentsCount === 1 ? "" : "s"} are visible. Start with the focused one and keep the rest secondary.`,
+      checks: [
+        {
+          label: "First check",
+          value: "Open app",
+          detail: "Confirm the user-facing path works before preparing another rollout.",
+        },
+        {
+          label: "Signal",
+          value: "Public URL",
+          detail: runtimeUrl,
+        },
+        {
+          label: "Then",
+          value: "Review detail",
+          detail: "Use runtime detail for health, activity, and deliberate changes.",
+        },
+      ],
+    };
+  }
+
+  if (deployment.status === "running") {
+    return {
+      label: "Stable private",
+      tone: "healthy",
+      focus: `${deploymentName} is running without a public endpoint`,
+      nextStep: "Open runtime detail and confirm the private service signals before changing it.",
+      summary: "There is no public app link here, so Step 3 should lead to runtime review instead of pretending the service can be clicked.",
+      checks: [
+        {
+          label: "First check",
+          value: "Review detail",
+          detail: "Confirm ports, health, and activity from the runtime page.",
+        },
+        {
+          label: "Signal",
+          value: "Internal only",
+          detail: "No public URL is assigned to this deployment.",
+        },
+        {
+          label: "Then",
+          value: "Keep or change",
+          detail: "Prepare a rollout change only after the stable state is believable.",
+        },
+      ],
+    };
+  }
+
+  return {
+    label: "Check state",
+    tone: "warn",
+    focus: `${deploymentName} is ${deployment.status || "in an unknown state"}`,
+    nextStep: "Open runtime detail and confirm what DeployMate knows before taking action.",
+    summary: "This deployment is not clearly running or failed, so the safest action is a detail review.",
+    checks: [
+      {
+        label: "First check",
+        value: "Runtime detail",
+        detail: "Use the detail page to avoid guessing from a compact queue card.",
+      },
+      {
+        label: "Signal",
+        value: deployment.status || "Unknown",
+        detail: "The queue view is intentionally brief.",
+      },
+      {
+        label: "Then",
+        value: "Decide",
+        detail: "Change or clean up only after the state is clear.",
+      },
+    ],
+  };
+}
+
 function DeploymentWorkflowPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -475,6 +613,10 @@ function DeploymentWorkflowPageContent() {
   const primaryRuntimeActionState = primaryRuntimeDeployment
     ? buildRuntimeCardActionState(primaryRuntimeDeployment)
     : null;
+  const primaryRuntimeReviewState = buildRuntimeReviewState(
+    primaryRuntimeDeployment,
+    filteredDeployments.length,
+  );
   const secondaryRuntimeDeployments = primaryRuntimeDeployment
     ? filteredDeployments.filter((deployment) => deployment.id !== primaryRuntimeDeployment.id)
     : [];
@@ -1970,7 +2112,7 @@ function DeploymentWorkflowPageContent() {
 
         <section hidden={workflowTab !== "live"}>
         <div
-          className="sectionHeader deploymentsHeader"
+          className="sectionHeader deploymentsHeader runtimeDeploymentsHeader"
           data-testid="runtime-deployments-section"
           id="runtime-deployments"
         >
@@ -2017,6 +2159,33 @@ function DeploymentWorkflowPageContent() {
             </div>
           </div>
         </div>
+
+        <article
+          className="card formCard workspaceGuidePanel runtimeReviewPanel"
+          data-testid="runtime-deployments-review-panel"
+        >
+          <div className="sectionHeader workspaceGuideHeader">
+            <div>
+              <span className={`status ${primaryRuntimeReviewState.tone}`}>
+                {primaryRuntimeReviewState.label}
+              </span>
+              <h3>{primaryRuntimeReviewState.focus}</h3>
+              <p className="formHint">{primaryRuntimeReviewState.nextStep}</p>
+            </div>
+            <div className="workspaceMetaLine">
+              <span>{primaryRuntimeReviewState.summary}</span>
+            </div>
+          </div>
+          <div className="workspaceReviewerGrid runtimeReviewGrid">
+            {primaryRuntimeReviewState.checks.map((item) => (
+              <article className="workspaceReviewerCard" key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <p>{item.detail}</p>
+              </article>
+            ))}
+          </div>
+        </article>
 
         <div className="list" data-testid="runtime-deployments-list">
           {loading && deployments.length === 0 ? (
@@ -2065,19 +2234,17 @@ function DeploymentWorkflowPageContent() {
                   </strong>
                 </div>
               </div>
-              <div className="row">
-                <span className="label">Created</span>
-                <span>{formatDate(primaryRuntimeDeployment.created_at)}</span>
+              <div className="runtimeDecisionNote">
+                <span className={`status ${primaryRuntimeReviewState.tone}`}>
+                  {primaryRuntimeReviewState.label}
+                </span>
+                <strong>{primaryRuntimeReviewState.nextStep}</strong>
+                <p>
+                  Created {formatDate(primaryRuntimeDeployment.created_at)}
+                  {primaryRuntimeDeployment.error ? ` · ${primaryRuntimeDeployment.error}` : ""}
+                </p>
               </div>
-              <div className="row">
-                <span className="label">Error</span>
-                <span>{primaryRuntimeDeployment.error || "-"}</span>
-              </div>
-              <div className="row">
-                <span className="label">URL</span>
-                <span>{buildDeploymentUrl(primaryRuntimeDeployment) || "-"}</span>
-              </div>
-              <div className="actions">
+              <div className="actions runtimeCardActions">
                 {primaryRuntimeActionState?.showOpenAppPrimary ? (
                   <a
                     href={primaryRuntimeActionState.runtimeUrl}

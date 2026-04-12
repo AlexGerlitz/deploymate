@@ -1038,6 +1038,39 @@ export default function DeploymentDetailsPage({ params }) {
         : detailPriority,
     },
   ];
+  const runtimeReviewPathItems = [
+    {
+      label: "1. Is it alive?",
+      value:
+        deployment?.status === "failed"
+          ? "Failed"
+          : deploymentUrl
+            ? "Open app"
+            : "Review here",
+      detail:
+        deployment?.status === "failed"
+          ? "Start with the failure evidence instead of another rollout change."
+          : deploymentUrl
+            ? "Click the running app once, then come back to the runtime signals."
+            : "No public URL is available, so the first check stays on this page.",
+    },
+    {
+      label: "2. Is it quiet?",
+      value:
+        attentionItems.length > 0
+          ? `${attentionItems.length} warning${attentionItems.length === 1 ? "" : "s"}`
+          : health?.status || "Unknown",
+      detail:
+        attentionItems.length > 0
+          ? "Resolve the attention list before treating this deployment as settled."
+          : "Health and attention signals are not currently forcing an incident path.",
+    },
+    {
+      label: "3. What next?",
+      value: runtimeDecisionState.primaryAction,
+      detail: runtimeDecisionState.nextStep,
+    },
+  ];
   const renderRuntimeDecisionPrimaryAction = (className, testId) =>
     runtimeDecisionState.primaryExternal ? (
       <a
@@ -1873,6 +1906,32 @@ export default function DeploymentDetailsPage({ params }) {
         {deployment ? (
           <>
             <section hidden={detailTab !== "overview"}>
+            <article
+              className="card compactCard runtimeReviewPanel runtimeDetailReviewPanel"
+              data-testid="runtime-detail-review-path-card"
+            >
+              <div className="sectionHeader">
+                <div>
+                  <span className={`status ${runtimeDecisionState.tone}`}>
+                    {runtimeDecisionState.label}
+                  </span>
+                  <h2 data-testid="runtime-detail-review-path-title">Review in this order</h2>
+                  <p className="formHint">
+                    Keep Step 3 readable: first prove the service is alive, then check whether it is quiet, then decide whether to keep, share, or change it.
+                  </p>
+                </div>
+              </div>
+              <div className="workspaceReviewerGrid runtimeReviewGrid">
+                {runtimeReviewPathItems.map((item) => (
+                  <article className="workspaceReviewerCard" key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </article>
+
             <div
               className="overviewGrid"
               data-testid="runtime-detail-overview-grid"
