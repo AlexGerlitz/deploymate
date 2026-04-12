@@ -111,6 +111,7 @@ export default function HomePage() {
         source: "overview-first-deploy",
       }).toString()}`
     : "/app/deployment-workflow";
+  const readyServerFirstDeploy = Boolean(singleServerFirstDeployTarget);
   const memberServerCopy = canAccessServers
     ? null
     : localDeploymentsEnabled
@@ -162,12 +163,22 @@ export default function HomePage() {
     {
       key: "step-1",
       step: "Step 1",
-      title: canAccessServers ? "Connect a server" : memberServerCopy?.stepTitle || "Continue in deployment workflow",
+      title: canAccessServers
+        ? readyServerFirstDeploy
+          ? "Server is ready"
+          : "Connect a server"
+        : memberServerCopy?.stepTitle || "Continue in deployment workflow",
       detail: canAccessServers
-        ? "Add one machine and make sure DeployMate can sign in to it over SSH."
+        ? readyServerFirstDeploy
+          ? "The first server target is already connected. Return here only to review SSH access or change the target."
+          : "Add one machine and make sure DeployMate can sign in to it over SSH."
         : memberServerCopy?.stepDetail || "Use the deployment workflow for the next rollout step.",
       href: canAccessServers ? "/app/server-review" : "/app/deployment-workflow",
-      actionLabel: canAccessServers ? "Open server setup" : memberServerCopy?.stepAction || "Open deployment workflow",
+      actionLabel: canAccessServers
+        ? readyServerFirstDeploy
+          ? "Review server setup"
+          : "Open server setup"
+        : memberServerCopy?.stepAction || "Open deployment workflow",
       primary: stepOneIsPrimary,
       disabled: false,
     },
@@ -215,7 +226,9 @@ export default function HomePage() {
     boardTitle:
       card.key === "step-1"
         ? canAccessServers
-          ? "Connect server"
+          ? readyServerFirstDeploy
+            ? "Server ready"
+            : "Connect server"
           : card.title
         : card.key === "step-2"
           ? "Deploy app"

@@ -645,10 +645,16 @@ function DeploymentWorkflowPageContent() {
     : serverAccessBlocked
       ? "Keep this page focused on the rollout itself. The saved server target stays with admins until they confirm it."
       : workflowState.mode === "prerequisite"
-      ? "Do not overthink this page yet. Save one server in Step 1 first, then come back and keep Step 2 focused on the app you want to start."
+        ? "Do not overthink this page yet. Save one server in Step 1 first, then come back and keep Step 2 focused on the app you want to start."
       : workflowPrimaryMode === "live"
         ? "Because something already needs review, start by checking the live queue before you create another deployment."
         : "Keep Step 2 simple: choose an app image or a saved setup first, then open advanced fields only if the rollout really needs them.";
+  const firstDeployHandoffSummary =
+    selectedCreateServer && requestedWithServerContext
+      ? requestedFromOverview
+        ? `Overview already handed you "${selectedCreateServer.name}". Set the image next and leave everything else closed unless the rollout really needs more.`
+        : `Step 1 already handed you "${selectedCreateServer.name}". Set the image next and leave everything else closed unless the rollout really needs more.`
+      : "";
   const primaryRuntimeTargetLabel = primaryRuntimeDeployment
     ? formatAccessibleServerLabel({
         canAccessServers,
@@ -1032,7 +1038,12 @@ function DeploymentWorkflowPageContent() {
     }
 
     handoffImageFocusAppliedRef.current = true;
-    focusCreateForm({ scrollBehavior: "auto" });
+    window.setTimeout(() => {
+      const imageInput = createImageInputRef.current;
+      if (imageInput instanceof HTMLInputElement) {
+        imageInput.focus({ preventScroll: true });
+      }
+    }, 0);
   }, [shouldAutoFocusEntryImage]);
 
   function updateFormField(event) {
@@ -1698,6 +1709,7 @@ function DeploymentWorkflowPageContent() {
     requestedWithServerContext &&
     Boolean(selectedCreateServer) &&
     firstDeployImageDraftPending;
+  const firstDeployHandoffCompact = firstDeployHandoffFocusMode && !form.image.trim();
   const showLiveTab = deployments.length > 0;
   const createDeploymentBlocked =
     submitting ||
@@ -1793,9 +1805,17 @@ function DeploymentWorkflowPageContent() {
               <div className="eyebrow">Step 2</div>
               <h1 data-testid="deployment-workflow-title">Step 2: Choose what to run and deploy it</h1>
               <p className="formHint">{stepTwoLead}</p>
-              <p className="formHint">{stepTwoSupport}</p>
+              {!firstDeployHandoffCompact ? <p className="formHint">{stepTwoSupport}</p> : null}
               <p className="formHint">
-                Right now: <strong>{memberWorkflowNextStep.focus}</strong>
+                Right now:{" "}
+                <strong>
+                  {firstDeployHandoffCompact
+                    ? "Set the image for the first deploy."
+                    : memberWorkflowNextStep.focus}
+                </strong>
+                {firstDeployHandoffCompact
+                  ? " Save templates and advanced setup for later if the rollout really needs them."
+                  : null}
               </p>
             </div>
             <div className="buttonRow">
@@ -1857,24 +1877,6 @@ function DeploymentWorkflowPageContent() {
           <div className="banner success" data-testid="deployment-workflow-template-bridge-banner">
             {workflowMessage}
           </div>
-        ) : null}
-        {requestedWithServerContext && selectedCreateServer ? (
-          <article className="card formCard">
-            <div className="sectionHeader">
-              <div>
-                <h2>Server ready</h2>
-                <p className="formHint">
-                  Step 1 is complete for <strong>{selectedCreateServer.name}</strong>. Stay on this server and choose what to run next.
-                </p>
-              </div>
-              <span className="status healthy">ready</span>
-            </div>
-            <div className="backupSummaryBadges">
-              <span className="status info">{selectedServerLabel}</span>
-              <span className="status healthy">Step 1 done</span>
-              <span className="status unknown">Now: choose what to run</span>
-            </div>
-          </article>
         ) : null}
         {smokeMode ? (
           <div className="banner subtle">
@@ -2008,23 +2010,40 @@ function DeploymentWorkflowPageContent() {
             <div>
               <h2 data-testid="deployment-workflow-main-next-step-title">Do this now</h2>
               <p className="formHint">
-                Use one lane at a time on this page. Finish the current job before you open the others.
+                {firstDeployHandoffCompact
+                  ? "Set one app image first. Keep everything else secondary until that draft exists."
+                  : "Use one lane at a time on this page. Finish the current job before you open the others."}
               </p>
             </div>
           </div>
           <div className="row">
             <span className="label">Current focus</span>
-            <span data-testid="deployment-workflow-main-next-step-focus">{memberWorkflowNextStep.focus}</span>
+            <span data-testid="deployment-workflow-main-next-step-focus">
+              {firstDeployHandoffCompact
+                ? "Set the image for the first deploy"
+                : memberWorkflowNextStep.focus}
+            </span>
           </div>
           <div className="row">
             <span className="label">What to do</span>
-            <span data-testid="deployment-workflow-main-next-step-copy">{memberWorkflowNextStep.nextStep}</span>
+            <span data-testid="deployment-workflow-main-next-step-copy">
+              {firstDeployHandoffCompact
+                ? firstDeployHandoffSummary || memberWorkflowNextStep.nextStep
+                : memberWorkflowNextStep.nextStep}
+            </span>
           </div>
           <div className="backupSummaryBadges">
-            <span className={`status ${memberWorkflowNextStep.tone}`}>filtered {filteredDeployments.length}</span>
-            <span className="status healthy">running {runningDeploymentCount}</span>
-            <span className="status error">failed {failedDeploymentCount}</span>
-            <span className="status info">templates {templates.length}</span>
+            {requestedWithServerContext && selectedCreateServer ? (
+              <span className="status info">{selectedServerLabel}</span>
+            ) : null}
+            {!firstDeployHandoffCompact ? (
+              <>
+                <span className={`status ${memberWorkflowNextStep.tone}`}>filtered {filteredDeployments.length}</span>
+                <span className="status healthy">running {runningDeploymentCount}</span>
+                <span className="status error">failed {failedDeploymentCount}</span>
+              </>
+            ) : null}
+            {templates.length > 0 ? <span className="status info">templates {templates.length}</span> : null}
           </div>
           {firstDeployCreatePriority && templates.length > 0 ? (
             <div
@@ -2381,6 +2400,8 @@ function DeploymentWorkflowPageContent() {
               ? "Members cannot choose saved servers here. Ask an admin to confirm the target, then keep this form focused on the app itself."
               : workflowState.mode === "prerequisite"
                 ? "This becomes the main path as soon as Step 1 has one saved server target. When that is done, start with the image first and open advanced setup only if needed."
+                : firstDeployHandoffCompact
+                  ? "Set one image first. Leave advanced setup closed unless this rollout really needs more."
                 : "For a first pass, start with the image first. Leave advanced setup closed unless you need custom ports, env vars, server targeting, or a saved setup."}
           </p>
           {!localDeploymentsEnabled ? (
@@ -2422,7 +2443,6 @@ function DeploymentWorkflowPageContent() {
                 placeholder="nginx:latest"
                 disabled={submitting}
                 required
-                autoFocus={shouldAutoFocusEntryImage}
                 data-testid="create-deployment-image-input"
                 data-handoff-focus-source={shouldAutoFocusEntryImage ? requestedSource : undefined}
               />
@@ -2437,8 +2457,8 @@ function DeploymentWorkflowPageContent() {
                     : "The app image is set. Create now if the defaults are enough, or open advanced setup only for ports, env vars, server target, and template save."
                 : selectedCreateServer && requestedWithServerContext
                   ? requestedFromOverview
-                    ? `Overview already handed you "${selectedCreateServer.name}". Set the image next and keep the rest closed unless the rollout really needs more.`
-                    : `Server "${selectedCreateServer.name}" is already selected from Step 1. Set the image next and keep the rest closed unless the rollout really needs more.`
+                    ? `Overview already handed you "${selectedCreateServer.name}". Set the image next.`
+                    : `Step 1 already handed you "${selectedCreateServer.name}". Set the image next.`
                   : serverAccessBlocked
                     ? "Set the image first. Members cannot choose a saved server target here, so keep everything else focused on the rollout itself."
                     : "Set the image first. Everything else is optional and can stay closed until you actually need it."}

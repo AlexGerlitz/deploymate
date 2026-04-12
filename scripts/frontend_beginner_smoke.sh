@@ -62,6 +62,11 @@ assert_first_deploy_handoff_workflow() {
     return 1
   fi
 
+  if grep -Eq 'data-testid="create-deployment-image-input"[^>]*autofocus' "$html_file"; then
+    echo "[${smoke_name}] workflow still autofocuses the image field and can scroll past the Step 2 guidance" >&2
+    return 1
+  fi
+
   if grep -Eq 'data-testid="deployment-workflow-tab-live"' "$html_file"; then
     echo "[${smoke_name}] live-review tab still appears before the first deployment exists" >&2
     return 1
@@ -257,6 +262,18 @@ run_beginner_admin_server_ready_smoke() {
 
     if grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Add first server target<' "$overview_html"; then
       echo "[frontend-beginner-admin-server-ready-smoke] overview regressed to server setup after a server was ready" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="workspace-scenario-item-step-1".*Server ready.*already connected' "$overview_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] overview lost the explicit ready-server demotion copy on Step 1" >&2
+      rm -f "$overview_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Review server setup<' "$overview_html"; then
+      echo "[frontend-beginner-admin-server-ready-smoke] overview Step 1 still competes with first deploy instead of staying a review action" >&2
       rm -f "$overview_html"
       exit 1
     fi
