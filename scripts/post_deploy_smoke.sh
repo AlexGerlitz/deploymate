@@ -44,7 +44,11 @@ if [ -n "$SMOKE_CURL_RESOLVE" ]; then
 fi
 
 curl_smoke() {
-  curl "${CURL_ARGS[@]}" "$@"
+  if [ "${#CURL_ARGS[@]}" -gt 0 ]; then
+    curl "${CURL_ARGS[@]}" "$@"
+  else
+    curl "$@"
+  fi
 }
 
 cleanup() {

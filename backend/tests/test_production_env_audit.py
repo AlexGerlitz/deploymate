@@ -1,7 +1,10 @@
 import os
+import json
 import subprocess
 import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
@@ -24,6 +27,69 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
             text=True,
             check=False,
         )
+
+    def _start_precheck_server(self, mode: str):
+        session_cookie = "deploymate_session=test-session"
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, format: str, *args) -> None:
+                return
+
+            def _write_json(self, status: int, payload: dict, headers: dict[str, str] | None = None) -> None:
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                for name, value in (headers or {}).items():
+                    self.send_header(name, value)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self) -> None:
+                if self.path == "/api/health":
+                    if mode == "login-401":
+                        self._write_json(200, {"status": "healthy"})
+                    else:
+                        self._write_json(503, {"status": "starting"})
+                    return
+
+                if self.path == "/api/auth/me":
+                    if mode == "login-200" and session_cookie in (self.headers.get("Cookie") or ""):
+                        self._write_json(200, {"username": "admin"})
+                    else:
+                        self._write_json(401, {"detail": "Not authenticated"})
+                    return
+
+                self._write_json(404, {"detail": "Not found"})
+
+            def do_POST(self) -> None:
+                if self.path == "/api/auth/login":
+                    length = int(self.headers.get("Content-Length", "0"))
+                    body = self.rfile.read(length).decode("utf-8")
+                    payload = json.loads(body or "{}")
+
+                    if mode == "login-200" and payload == {"username": "admin", "password": "secret"}:
+                        self._write_json(
+                            200,
+                            {"username": "admin"},
+                            {"Set-Cookie": session_cookie},
+                        )
+                    elif mode == "login-401":
+                        self._write_json(401, {"detail": "Invalid username or password."})
+                    else:
+                        self._write_json(503, {"detail": "Service unavailable"})
+                    return
+
+                if self.path == "/api/auth/logout":
+                    self._write_json(200, {"status": "logged_out"})
+                    return
+
+                self._write_json(404, {"detail": "Not found"})
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return server, thread
 
     def _write_env_file(
         self,
@@ -238,6 +304,103 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
 
         self.assertIn("json_get()", script)
         self.assertIn("json_query()", script)
+
+    def test_release_smoke_precheck_accepts_valid_credentials(self):
+        server, thread = self._start_precheck_server("login-200")
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join, 1)
+
+        env = os.environ.copy()
+        env["DEPLOYMATE_BASE_URL"] = f"http://127.0.0.1:{server.server_address[1]}"
+        env["DEPLOYMATE_ADMIN_USERNAME"] = "admin"
+        env["DEPLOYMATE_ADMIN_PASSWORD"] = "secret"
+
+        result = subprocess.run(
+            ["bash", "scripts/release_smoke_precheck.sh"],
+            cwd=self.repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("smoke credentials validated", result.stdout)
+
+    def test_release_smoke_precheck_fails_fast_on_invalid_credentials(self):
+        server, thread = self._start_precheck_server("login-401")
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join, 1)
+
+        env = os.environ.copy()
+        env["DEPLOYMATE_BASE_URL"] = f"http://127.0.0.1:{server.server_address[1]}"
+        env["DEPLOYMATE_ADMIN_USERNAME"] = "admin"
+        env["DEPLOYMATE_ADMIN_PASSWORD"] = "secret"
+
+        result = subprocess.run(
+            ["bash", "scripts/release_smoke_precheck.sh"],
+            cwd=self.repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("smoke credentials are invalid", result.stderr)
+
+    def test_release_smoke_precheck_allows_inconclusive_target_state(self):
+        server, thread = self._start_precheck_server("login-503")
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join, 1)
+
+        env = os.environ.copy()
+        env["DEPLOYMATE_BASE_URL"] = f"http://127.0.0.1:{server.server_address[1]}"
+        env["DEPLOYMATE_ADMIN_USERNAME"] = "admin"
+        env["DEPLOYMATE_ADMIN_PASSWORD"] = "secret"
+
+        result = subprocess.run(
+            ["bash", "scripts/release_smoke_precheck.sh"],
+            cwd=self.repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("login precheck inconclusive", result.stdout)
+
+    def test_remote_release_dry_run_runs_precheck_before_remote_deploy(self):
+        result = subprocess.run(
+            [
+                "bash",
+                "scripts/remote_release.sh",
+                "--host",
+                "deploymate",
+                "--base-url",
+                "https://deploymatecloud.ru",
+                "--admin-username",
+                "admin",
+                "--admin-password",
+                "super-secret-admin-password",
+                "--dry-run",
+            ],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("bash scripts/release_smoke_precheck.sh", result.stdout)
+        self.assertLess(
+            result.stdout.index("bash scripts/release_smoke_precheck.sh"),
+            result.stdout.index("ssh deploymate"),
+        )
 
 
 if __name__ == "__main__":

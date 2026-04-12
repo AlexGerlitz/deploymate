@@ -181,6 +181,8 @@ bash scripts/remote_release.sh \
   --admin-password '<secret>'
 ```
 
+That helper now runs a fast smoke-credentials precheck before the remote rebuild. If the configured admin smoke credentials already return `401` or `403`, the release stops immediately instead of spending another 10-20 minutes on a deploy that will fail in post-deploy smoke anyway.
+
 If you want the same flow from GitHub instead of a workstation shell, use the manual workflow in `.github/workflows/release.yml` after configuring repository secrets for the deploy host, deploy SSH key, pinned known_hosts contents, base URL, and admin smoke credentials.
 
 Recommended promotion order:
