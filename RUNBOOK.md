@@ -185,6 +185,7 @@ That helper now runs a fast smoke-credentials precheck before the remote rebuild
 It also compares the provided smoke credentials against the target runtime env file over SSH before deploy, so GitHub environment drift now fails as a fast contract error instead of a delayed post-deploy surprise.
 
 If you want the same flow from GitHub instead of a workstation shell, use the manual workflow in `.github/workflows/release.yml` after configuring repository secrets for the deploy host, deploy SSH key, pinned known_hosts contents, base URL, and admin smoke credentials.
+For a short operator-only secret drift check without a deploy, use `.github/workflows/release-secrets-audit.yml` and choose `production` or `staging`.
 
 Recommended promotion order:
 
@@ -577,6 +578,14 @@ Optional GitHub Actions release workflow secrets:
 
 The staging workflow uses the same secret names, but scoped under the `staging` environment instead of `production`.
 If `DEPLOY_NOTIFICATION_WEBHOOK` is unset, the workflows simply skip notifications.
+
+Required GitHub Actions release secrets audit workflow secrets:
+
+- `DEPLOY_HOST`
+- `DEPLOY_REPO_DIR`
+- `DEPLOY_ENV_FILE`
+- `DEPLOYMATE_ADMIN_USERNAME`
+- `DEPLOYMATE_ADMIN_PASSWORD`
 
 Runtime smoke notes:
 
