@@ -1,6 +1,6 @@
 # DeployMate Project Rules
 
-Updated: 2026-04-11
+Updated: 2026-04-12
 
 ## Source Of Truth
 
@@ -104,6 +104,41 @@ These can exist, but they must not compete with the main deploy path on the firs
 - Do not add new entities without a product reason.
 - Do not add new top-level navigation without a strong reason.
 - Refactor only when the current shape blocks clarity or correctness.
+
+## Execution Budget Rules
+
+- Always use the cheapest sufficient execution path.
+- Minimize tokens, file reads, repo exploration, planning, and diff size at all times.
+- Do not do a broad repo scan unless the task truly cannot be solved from a narrow surface.
+- Do not add optional refactors, cleanup, or scope expansion.
+- Never over-explain.
+- All chat responses to the owner must be in Russian unless the owner explicitly asks for another language.
+- Before every task recommendation or task start, explicitly print two separate lines:
+  `Рекомендованная модель: <full GPT model/version name>`
+  `Рекомендованный reasoning: <level>`
+- This recommendation header is mandatory every time and must never be omitted.
+- Before every new task, that recommendation header must be shown to the owner first, and the task must not begin before that header is shown.
+- If task execution reveals that a stronger or weaker reasoning level is needed, pause the task and explicitly tell the owner which reasoning level to switch to before continuing.
+- If hidden complexity appears, say exactly: `Escalation needed: switch model/reasoning manually.`
+- Do not silently escalate effort.
+
+### Task Budget Modes
+
+- Simple task:
+  act immediately
+  use minimal reasoning
+  use the smallest safe diff
+  skip long plans
+  skip broad repo scans
+- Moderate task:
+  do a narrow diagnosis first
+  inspect only the directly relevant files
+  then make the smallest safe change
+- Complex task:
+  do not spend heavily at once
+  first state that stronger reasoning is justified
+  give one short reason
+  use a narrow plan only
 
 ## Security And Ownership Rules
 

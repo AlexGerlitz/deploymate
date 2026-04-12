@@ -387,6 +387,22 @@ function buildRedeployImpactSummary({
   return lines.join("\n");
 }
 
+function buildActionReviewChecklist(action) {
+  if (action === "delete") {
+    return [
+      "What happens now: DeployMate will try to stop and remove the running container, then delete the saved deployment record.",
+      "What does not happen automatically: this review does not verify app health, preserve runtime state, or create a rollback.",
+      "Safe next step: only confirm delete after handoff notes, diagnostics, and any data/export checks are already complete.",
+    ].join("\n");
+  }
+
+  return [
+    "What happens now: DeployMate will apply the draft below as the next rollout for this runtime.",
+    "What does not happen automatically: this review does not prove the new rollout is healthy or user-safe yet.",
+    "Safe next step: confirm redeploy only when the draft is intentional, then verify app health and recent activity after the rollout finishes.",
+  ].join("\n");
+}
+
 function buildRuntimeDecisionState(
   deployment,
   health,
@@ -934,7 +950,7 @@ export default function DeploymentDetailsPage({ params }) {
         }`,
         deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
         "",
-        "This action will try to remove the running container and then delete the saved deployment record.",
+        buildActionReviewChecklist("delete"),
       ].join("\n")
     : "";
   const detailPriority =
@@ -1062,6 +1078,8 @@ export default function DeploymentDetailsPage({ params }) {
     changeRows: redeployChangeRows,
     canAccessServers,
   });
+  const redeployReviewChecklist = buildActionReviewChecklist("redeploy");
+  const deleteReviewChecklist = buildActionReviewChecklist("delete");
 
   async function loadDeploymentDiagnostics() {
     setDiagnosticsLoading(true);
@@ -2192,6 +2210,9 @@ export default function DeploymentDetailsPage({ params }) {
                   {redeployPreflight.warnings.join(" ")}
                 </div>
               ) : null}
+              <pre className="logs expandedBlock" data-testid="runtime-detail-redeploy-review-checklist">
+                {redeployReviewChecklist}
+              </pre>
               <pre className="logs expandedBlock" data-testid="runtime-detail-redeploy-impact-summary">
                 {redeployImpactSummary}
               </pre>
@@ -2355,6 +2376,9 @@ export default function DeploymentDetailsPage({ params }) {
                     <strong>{deleteConfirmationPhrase}</strong>
                     {buildReviewIntroText("delete", deleteConfirmationPhrase).split(deleteConfirmationPhrase)[1]}
                   </div>
+                  <pre className="logs expandedBlock" data-testid="runtime-detail-delete-review-checklist">
+                    {deleteReviewChecklist}
+                  </pre>
                   <pre className="logs expandedBlock" data-testid="runtime-detail-delete-impact-summary">
                     {deleteImpactSummary}
                   </pre>
