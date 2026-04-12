@@ -137,7 +137,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_HEALTHY_RUNTIME_PORT:-3011}"
+  export PORT="${FRONTEND_SMOKE_HEALTHY_RUNTIME_PORT:-3021}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_HEALTHY_RUNTIME_LOG:-/tmp/deploymate-frontend-healthy-runtime-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_HEALTHY_RUNTIME_DIST_DIR:-.next-smoke-healthy-runtime-${PORT}}"
@@ -178,7 +178,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_FAILED_RUNTIME_PORT:-3012}"
+  export PORT="${FRONTEND_SMOKE_FAILED_RUNTIME_PORT:-3022}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_FAILED_RUNTIME_LOG:-/tmp/deploymate-frontend-failed-runtime-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_FAILED_RUNTIME_DIST_DIR:-.next-smoke-failed-runtime-${PORT}}"
@@ -214,7 +214,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_INTERNAL_RUNTIME_PORT:-3013}"
+  export PORT="${FRONTEND_SMOKE_INTERNAL_RUNTIME_PORT:-3023}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_INTERNAL_RUNTIME_LOG:-/tmp/deploymate-frontend-internal-runtime-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_INTERNAL_RUNTIME_DIST_DIR:-.next-smoke-internal-runtime-${PORT}}"
@@ -270,7 +270,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_PORT:-3014}"
+  export PORT="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_PORT:-3024}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_LOG:-/tmp/deploymate-frontend-template-success-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_DIST_DIR:-.next-smoke-template-success-${PORT}}"
@@ -321,7 +321,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_CREATE_SUCCESS_PORT:-3015}"
+  export PORT="${FRONTEND_SMOKE_CREATE_SUCCESS_PORT:-3025}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_CREATE_SUCCESS_LOG:-/tmp/deploymate-frontend-create-success-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_CREATE_SUCCESS_DIST_DIR:-.next-smoke-create-success-${PORT}}"
