@@ -200,8 +200,16 @@ esac
 
 REMOTE_AUDIT_CMD="bash scripts/runtime_capability_audit.sh --env-file $quoted_env_file && bash scripts/production_env_audit.sh --env-file $quoted_env_file --require-runtime-files"
 REMOTE_SWITCH_CMD="git switch $DEPLOY_BRANCH || { echo [remote-release]\ regular\ branch\ switch\ failed,\ retrying\ with\ local\ changes\ preserved; git status --short; git switch --merge $DEPLOY_BRANCH; }"
+REMOTE_RECOVER_CMD="git merge --abort >/dev/null 2>&1 || git reset --merge >/dev/null 2>&1 || true"
 
-if [ -n "$DEPLOY_REF" ]; then
+if [ "$DEPLOY_SURFACE" = "frontend" ]; then
+  if [ -n "$DEPLOY_REF" ]; then
+    REMOTE_TARGET_CMD="git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD)"
+  else
+    REMOTE_TARGET_CMD="git fetch origin $DEPLOY_BRANCH && TARGET_SHA=\$(git rev-parse origin/$DEPLOY_BRANCH)"
+  fi
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && $REMOTE_RECOVER_CMD && $REMOTE_TARGET_CMD && RELEASE_WORKTREE=.release-worktrees/\$TARGET_SHA-\$\$ && mkdir -p .release-worktrees && git worktree add --detach \$RELEASE_WORKTREE \$TARGET_SHA && REMOTE_ENV_FILE=$DEPLOY_ENV_FILE && case \"\$REMOTE_ENV_FILE\" in /*) ;; *) REMOTE_ENV_FILE=$DEPLOY_REPO_DIR/\$REMOTE_ENV_FILE ;; esac && cd \$RELEASE_WORKTREE && bash scripts/runtime_capability_audit.sh --env-file \$REMOTE_ENV_FILE && bash scripts/production_env_audit.sh --env-file \$REMOTE_ENV_FILE --require-runtime-files && COMPOSE_PROJECT_NAME=deploymate docker compose -f docker-compose.prod.yml --env-file \$REMOTE_ENV_FILE up -d --build --no-deps frontend && COMPOSE_PROJECT_NAME=deploymate docker compose -f docker-compose.prod.yml --env-file \$REMOTE_ENV_FILE ps frontend && DEPLOYED_SHA=\$TARGET_SHA && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && cd $DEPLOY_REPO_DIR && (git worktree remove --force \$RELEASE_WORKTREE >/dev/null 2>&1 || true)"
+elif [ -n "$DEPLOY_REF" ]; then
   REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
 else
   REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
