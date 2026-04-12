@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   smokeDeployments,
   smokeInternalRuntimeDeployment,
@@ -352,6 +352,9 @@ function DeploymentWorkflowPageContent() {
     smokeMode ? smokeWorkflowFixture.workflowTab : "create",
   );
   const [createAdvancedOpen, setCreateAdvancedOpen] = useState(false);
+  const createSectionRef = useRef(null);
+  const createImageInputRef = useRef(null);
+  const handoffImageFocusAppliedRef = useRef(false);
   const [form, setForm] = useState({
     image: smokeMode ? smokeWorkflowFixture.form.image : "",
     name: smokeMode ? smokeWorkflowFixture.form.name : "",
@@ -483,6 +486,8 @@ function DeploymentWorkflowPageContent() {
   const requestedFromOverview = requestedSource === "overview-first-deploy";
   const requestedFromServerReview = requestedSource === "server-review";
   const requestedWithServerContext = requestedFromServerReview || requestedFromOverview;
+  const shouldAutoFocusEntryImage = requestedWithServerContext && !serverAccessBlocked;
+  const rolloutDraftHasEnvRows = envRows.some((row) => row.key.trim() || row.value.trim());
   const selectedCreateServer =
     servers.find((server) => server.id === form.server_id) || null;
   const selectedServerLabel = selectedCreateServer
@@ -775,21 +780,17 @@ function DeploymentWorkflowPageContent() {
     if (
       form.name.trim() ||
       form.internal_port.trim() ||
-      form.external_port.trim() ||
-      form.server_id ||
       templateName.trim() ||
-      envRows.some((row) => row.key.trim() || row.value.trim()) ||
+      rolloutDraftHasEnvRows ||
       editingTemplateId
     ) {
       setCreateAdvancedOpen(true);
     }
   }, [
     editingTemplateId,
-    envRows,
-    form.external_port,
     form.internal_port,
     form.name,
-    form.server_id,
+    rolloutDraftHasEnvRows,
     templateName,
   ]);
 
@@ -883,6 +884,15 @@ function DeploymentWorkflowPageContent() {
     }
   }, [requestedTemplateAction, requestedTemplateId, requestedTemplateSource, templates]);
 
+  useEffect(() => {
+    if (!shouldAutoFocusEntryImage || handoffImageFocusAppliedRef.current) {
+      return;
+    }
+
+    handoffImageFocusAppliedRef.current = true;
+    focusCreateForm({ scrollBehavior: "auto" });
+  }, [shouldAutoFocusEntryImage]);
+
   function updateFormField(event) {
     const { name, value } = event.target;
     setForm((currentForm) => {
@@ -916,6 +926,36 @@ function DeploymentWorkflowPageContent() {
 
   function addEnvRow() {
     setEnvRows((currentRows) => [...currentRows, { key: "", value: "" }]);
+  }
+
+  function focusCreateForm(options = {}) {
+    const { scrollBehavior = "smooth", focusImage = true } = options;
+
+    const scrollAndFocus = () => {
+      const createSection = createSectionRef.current;
+      if (createSection instanceof HTMLElement) {
+        createSection.scrollIntoView({ behavior: scrollBehavior, block: "start" });
+      }
+
+      if (!focusImage) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        const imageInput = createImageInputRef.current;
+        if (imageInput instanceof HTMLInputElement) {
+          imageInput.focus();
+        }
+      }, scrollBehavior === "smooth" ? 180 : 0);
+    };
+
+    if (workflowTab !== "create") {
+      setWorkflowTab("create");
+      window.setTimeout(scrollAndFocus, 80);
+      return;
+    }
+
+    scrollAndFocus();
   }
 
   function removeEnvRow(index) {
@@ -1500,13 +1540,22 @@ function DeploymentWorkflowPageContent() {
       form.external_port.trim() ||
       templateName.trim() ||
       editingTemplateId ||
-      envRows.some((row) => row.key.trim() || row.value.trim()),
+      rolloutDraftHasEnvRows,
   );
-  const firstDeployCreatePriority =
+  const firstDeployImageDraftPending =
     Boolean(form.server_id) &&
     deployments.length === 0 &&
-    !rolloutDraftStarted &&
-    !editingTemplateId;
+    !form.image.trim() &&
+    !form.name.trim() &&
+    !form.internal_port.trim() &&
+    !templateName.trim() &&
+    !editingTemplateId &&
+    !rolloutDraftHasEnvRows;
+  const firstDeployCreatePriority = firstDeployImageDraftPending;
+  const firstDeployHandoffFocusMode =
+    requestedWithServerContext &&
+    Boolean(selectedCreateServer) &&
+    firstDeployImageDraftPending;
   const showLiveTab = deployments.length > 0;
   const createDeploymentBlocked =
     submitting ||
@@ -1547,6 +1596,8 @@ function DeploymentWorkflowPageContent() {
       ? { kind: "link", href: "/app", label: "Back to overview" }
       : serverAccessBlocked
         ? { kind: "button", tab: "live", label: "Open live deployments" }
+        : firstDeployHandoffFocusMode
+          ? { kind: "focus-create", label: "Set image for first deploy" }
         : workflowState.mode === "prerequisite"
           ? { kind: "link", href: "/app/server-review", label: "Open server review" }
           : failedDeploymentCount > 0
@@ -1556,6 +1607,7 @@ function DeploymentWorkflowPageContent() {
               : memberWorkflowNextStep.primaryAction === "Fix the create form"
                 ? { kind: "button", tab: "create", label: "Fix the create form" }
                 : { kind: "button", tab: "create", label: "Create deployment" };
+  const showMainNextStepPrimaryAction = !firstDeployHandoffFocusMode;
   const previewDiffRows = buildTemplateDiff(primaryTemplate, currentDraft, servers);
 
   if (!authChecked) {
@@ -1613,6 +1665,15 @@ function DeploymentWorkflowPageContent() {
                 >
                   {pagePrimaryAction.label}
                 </Link>
+              ) : pagePrimaryAction.kind === "focus-create" ? (
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-hero-primary-action"
+                  onClick={() => focusCreateForm()}
+                >
+                  {pagePrimaryAction.label}
+                </button>
               ) : (
                 <button
                   type="button"
@@ -1867,24 +1928,35 @@ function DeploymentWorkflowPageContent() {
             </div>
           ) : null}
           <div className="actionCluster">
-            {pagePrimaryAction.kind === "link" ? (
-              <Link
-                href={pagePrimaryAction.href}
-                className="landingButton primaryButton"
-                data-testid="deployment-workflow-main-next-step-button"
-              >
-                {pagePrimaryAction.label}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className="landingButton primaryButton"
-                data-testid="deployment-workflow-main-next-step-button"
-                onClick={() => setWorkflowTab(pagePrimaryAction.tab)}
-              >
-                {pagePrimaryAction.label}
-              </button>
-            )}
+            {showMainNextStepPrimaryAction
+              ? pagePrimaryAction.kind === "link" ? (
+                <Link
+                  href={pagePrimaryAction.href}
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-main-next-step-button"
+                >
+                  {pagePrimaryAction.label}
+                </Link>
+              ) : pagePrimaryAction.kind === "focus-create" ? (
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-main-next-step-button"
+                  onClick={() => focusCreateForm()}
+                >
+                  {pagePrimaryAction.label}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-main-next-step-button"
+                  onClick={() => setWorkflowTab(pagePrimaryAction.tab)}
+                >
+                  {pagePrimaryAction.label}
+                </button>
+              )
+              : null}
             <button
               type="button"
               className="secondaryButton"
@@ -2130,7 +2202,12 @@ function DeploymentWorkflowPageContent() {
 
         {!serverAccessBlocked ? (
         <section hidden={workflowTab !== "create"}>
-        <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
+        <article
+          ref={createSectionRef}
+          className="card formCard"
+          data-testid="create-deployment-card"
+          id="create-deployment"
+        >
           <h2 data-testid="create-deployment-title">Step 2A: Start one app</h2>
           <p className="formHint">
             {serverAccessBlocked
@@ -2171,12 +2248,16 @@ function DeploymentWorkflowPageContent() {
             <label className="field">
               <span>Image</span>
               <input
+                ref={createImageInputRef}
                 name="image"
                 value={form.image}
                 onChange={updateFormField}
                 placeholder="nginx:latest"
                 disabled={submitting}
                 required
+                autoFocus={shouldAutoFocusEntryImage}
+                data-testid="create-deployment-image-input"
+                data-handoff-focus-source={shouldAutoFocusEntryImage ? requestedSource : undefined}
               />
             </label>
 

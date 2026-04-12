@@ -5,6 +5,94 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+frontend_smoke_browser_bin() {
+  if [ -n "${FRONTEND_SMOKE_BROWSER_BIN:-}" ] && [ -x "${FRONTEND_SMOKE_BROWSER_BIN}" ]; then
+    printf '%s\n' "${FRONTEND_SMOKE_BROWSER_BIN}"
+    return 0
+  fi
+
+  for browser in google-chrome chromium chromium-browser; do
+    if command -v "$browser" >/dev/null 2>&1; then
+      command -v "$browser"
+      return 0
+    fi
+  done
+
+  if [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
+    printf '%s\n' "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    return 0
+  fi
+
+  echo "[frontend-beginner-smoke] no headless browser found for hydrated DOM checks" >&2
+  return 1
+}
+
+frontend_smoke_dump_dom() {
+  local url="$1"
+  local output_file="$2"
+  local browser_bin=""
+
+  browser_bin="$(frontend_smoke_browser_bin)"
+  "$browser_bin" --headless=new --disable-gpu --dump-dom "$url" >"$output_file" 2>/dev/null
+}
+
+assert_first_deploy_handoff_workflow() {
+  local smoke_name="$1"
+  local html_file="$2"
+  local bridge_pattern="$3"
+  local handoff_source="$4"
+
+  if ! grep -Eq "$bridge_pattern" "$html_file"; then
+    echo "[${smoke_name}] workflow lost the handoff bridge copy" >&2
+    return 1
+  fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-hero-primary-action"[^>]*>Set image for first deploy<' "$html_file"; then
+    echo "[${smoke_name}] workflow lost the single image-first hero CTA" >&2
+    return 1
+  fi
+
+  if grep -Eq 'data-testid="deployment-workflow-main-next-step-button"' "$html_file"; then
+    echo "[${smoke_name}] workflow still renders a second primary CTA above the fold" >&2
+    return 1
+  fi
+
+  if ! grep -Eq "data-testid=\"create-deployment-image-input\"[^>]*data-handoff-focus-source=\"${handoff_source}\"" "$html_file"; then
+    echo "[${smoke_name}] workflow lost the handoff image-focus marker" >&2
+    return 1
+  fi
+
+  if grep -Eq 'data-testid="deployment-workflow-tab-live"' "$html_file"; then
+    echo "[${smoke_name}] live-review tab still appears before the first deployment exists" >&2
+    return 1
+  fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-tab-templates"[^>]*>Use saved setup instead<' "$html_file"; then
+    echo "[${smoke_name}] template tab did not stay framed as the fallback path" >&2
+    return 1
+  fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-first-deploy-templates-note"' "$html_file"; then
+    echo "[${smoke_name}] first deploy path lost the explicit template fallback note" >&2
+    return 1
+  fi
+
+  if ! grep -Eq 'data-testid="create-advanced-toggle-button"[^>]*>Open advanced setup<' "$html_file"; then
+    echo "[${smoke_name}] workflow opened advanced setup before the user asked for it" >&2
+    return 1
+  fi
+
+  if ! grep -Eq '(<section[^>]*data-testid="create-advanced-section"[^>]*hidden)|(<section[^>]*hidden[^>]*data-testid="create-advanced-section")' "$html_file"; then
+    echo "[${smoke_name}] workflow lost the collapsed advanced section" >&2
+    return 1
+  fi
+
+  if grep -Eq 'Image is required\.' "$html_file"; then
+    echo "[${smoke_name}] workflow showed a premature validation error" >&2
+    return 1
+  fi
+}
+
 run_beginner_export_payload_smoke() {
   (
     set -euo pipefail
@@ -180,22 +268,13 @@ run_beginner_admin_server_ready_smoke() {
     fi
 
     workflow_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app/deployment-workflow?server=smoke-server&source=overview-first-deploy" > "$workflow_html"
+    frontend_smoke_dump_dom "${BASE_URL}/app/deployment-workflow?server=smoke-server&source=overview-first-deploy" "$workflow_html"
 
-    if ! grep -Eq 'selected from Overview' "$workflow_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] workflow lost the overview-to-first-deploy bridge copy" >&2
-      rm -f "$overview_html" "$workflow_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-button">Create deployment<' "$workflow_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] workflow did not keep create deployment as the main next step" >&2
-      rm -f "$overview_html" "$workflow_html"
-      exit 1
-    fi
-
-    if grep -Eq 'Image is required\.' "$workflow_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] workflow showed a premature validation error after the overview bridge" >&2
+    if ! assert_first_deploy_handoff_workflow \
+      "frontend-beginner-admin-server-ready-smoke" \
+      "$workflow_html" \
+      'selected from Overview' \
+      "overview-first-deploy"; then
       rm -f "$overview_html" "$workflow_html"
       exit 1
     fi
@@ -461,6 +540,7 @@ run_beginner_first_deploy_smoke() {
     export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
     export FRONTEND_SMOKE_REUSE_SERVER=0
     export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
+    export NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO=ready
     export NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=first-deploy-after-server-review
 
     cleanup_first_deploy() {
@@ -472,52 +552,34 @@ run_beginner_first_deploy_smoke() {
     start_frontend_smoke_server
     wait_for_frontend_smoke_url "/app"
 
+    server_review_html="$(mktemp)"
+    curl -sS "${BASE_URL}/app/server-review" > "$server_review_html"
+
+    if ! grep -Eq 'href="/app/deployment-workflow\?server=smoke-server&amp;source=server-review"' "$server_review_html"; then
+      echo "[frontend-beginner-first-deploy-smoke] server review did not preserve the ready handoff into deployment workflow" >&2
+      rm -f "$server_review_html"
+      exit 1
+    fi
+
     first_deploy_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app/deployment-workflow" > "$first_deploy_html"
+    frontend_smoke_dump_dom "${BASE_URL}/app/deployment-workflow?server=smoke-server&source=server-review" "$first_deploy_html"
 
     if ! grep -Eq 'Step 1 is done on' "$first_deploy_html"; then
       echo "[frontend-beginner-first-deploy-smoke] server-ready lead is missing" >&2
-      rm -f "$first_deploy_html"
+      rm -f "$server_review_html" "$first_deploy_html"
       exit 1
     fi
 
-    if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-button">Create deployment<' "$first_deploy_html"; then
-      echo "[frontend-beginner-first-deploy-smoke] create lane is not the main next step" >&2
-      rm -f "$first_deploy_html"
+    if ! assert_first_deploy_handoff_workflow \
+      "frontend-beginner-first-deploy-smoke" \
+      "$first_deploy_html" \
+      'selected from Server Review' \
+      "server-review"; then
+      rm -f "$server_review_html" "$first_deploy_html"
       exit 1
     fi
 
-    if grep -Eq 'data-testid="deployment-workflow-main-next-step-button">Open saved setups<' "$first_deploy_html"; then
-      echo "[frontend-beginner-first-deploy-smoke] template reuse still hijacks the main next step" >&2
-      rm -f "$first_deploy_html"
-      exit 1
-    fi
-
-    if grep -Eq 'data-testid="deployment-workflow-tab-live"' "$first_deploy_html"; then
-      echo "[frontend-beginner-first-deploy-smoke] live-review tab still appears before the first deployment exists" >&2
-      rm -f "$first_deploy_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="deployment-workflow-tab-templates"[^>]*>Use saved setup instead<' "$first_deploy_html"; then
-      echo "[frontend-beginner-first-deploy-smoke] template tab did not stay framed as the fallback path" >&2
-      rm -f "$first_deploy_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="deployment-workflow-first-deploy-templates-note"' "$first_deploy_html"; then
-      echo "[frontend-beginner-first-deploy-smoke] first deploy path lost the explicit template fallback note" >&2
-      rm -f "$first_deploy_html"
-      exit 1
-    fi
-
-    if grep -Eq 'Image is required\.' "$first_deploy_html"; then
-      echo "[frontend-beginner-first-deploy-smoke] empty first draft shows a premature validation error" >&2
-      rm -f "$first_deploy_html"
-      exit 1
-    fi
-
-    rm -f "$first_deploy_html"
+    rm -f "$server_review_html" "$first_deploy_html"
   )
 }
 
