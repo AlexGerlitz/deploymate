@@ -582,6 +582,8 @@ If `DEPLOY_NOTIFICATION_WEBHOOK` is unset, the workflows simply skip notificatio
 Required GitHub Actions release secrets audit workflow secrets:
 
 - `DEPLOY_HOST`
+- `DEPLOY_SSH_PRIVATE_KEY`
+- `DEPLOY_SSH_KNOWN_HOSTS`
 - `DEPLOY_REPO_DIR`
 - `DEPLOY_ENV_FILE`
 - `DEPLOYMATE_ADMIN_USERNAME`
