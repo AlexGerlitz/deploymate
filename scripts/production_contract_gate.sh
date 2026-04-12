@@ -32,4 +32,7 @@ bash scripts/production_env_audit.sh
 echo "[production-contract] script regression tests"
 "$PYTHON_BIN" -m unittest discover -s backend/tests -p 'test_production_env_audit.py'
 
+echo "[production-contract] release audit incident module tests"
+node --test scripts/release_audit_incident.test.js
+
 echo "[production-contract] ok"

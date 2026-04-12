@@ -192,6 +192,7 @@ If a scheduled audit fails, GitHub automatically opens or updates one environmen
 That incident now gets `incident` plus severity labels, and severity is raised to `severity:high` after the configured number of consecutive scheduled failures.
 When the next scheduled audit for that environment succeeds, the workflow comments on the issue and closes it automatically.
 The manual self-test flow uses a separate `[release-secrets-audit:self-test] ...` issue title and the `incident:test` label, so it does not interfere with real scheduled incidents.
+The incident triage logic itself now lives in `scripts/release_audit_incident.js`, and the local regression path for it is `node --test scripts/release_audit_incident.test.js`.
 
 Recommended promotion order:
 
