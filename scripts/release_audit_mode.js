@@ -6,22 +6,7 @@ function normalizeSelfTestAction(action) {
   return action && action !== "" ? action : "none";
 }
 
-function deriveInitialAuditMode({ eventName, matrixTargetEnvironment, selectedTargetEnvironment, incidentSelfTestAction }) {
-  const selfTestAction = normalizeSelfTestAction(incidentSelfTestAction);
-  const isSchedule = eventName === "schedule";
-  const selectedTarget = isSchedule || matrixTargetEnvironment === selectedTargetEnvironment;
-  const selfTestEnabled = eventName === "workflow_dispatch" && selfTestAction !== "none";
-
-  return {
-    selected_target: String(selectedTarget),
-    self_test_action: selfTestAction,
-    self_test_enabled: String(selfTestEnabled),
-    run_remote_audit: String(selectedTarget && !selfTestEnabled),
-    run_notify: String(selectedTarget && !selfTestEnabled),
-  };
-}
-
-function deriveFinalAuditMode({ eventName, selectedTarget, selfTestAction, jobStatus }) {
+function deriveSelfTestAuditMode({ eventName, selfTestAction, jobStatus }) {
   const normalizedSelfTestAction = normalizeSelfTestAction(selfTestAction);
   const isSelfTest = eventName === "workflow_dispatch" && normalizedSelfTestAction !== "none";
   let effectiveStatus = jobStatus;
@@ -33,10 +18,9 @@ function deriveFinalAuditMode({ eventName, selectedTarget, selfTestAction, jobSt
   }
 
   return {
-    selected_target: String(selectedTarget === true || selectedTarget === "true"),
     self_test_action: normalizedSelfTestAction,
     effective_status: effectiveStatus,
-    run_triage: String((selectedTarget === true || selectedTarget === "true") && (eventName === "schedule" || isSelfTest)),
+    run_triage: String(isSelfTest),
   };
 }
 
@@ -60,32 +44,16 @@ function printOutputs(outputs) {
 }
 
 module.exports = {
-  deriveInitialAuditMode,
-  deriveFinalAuditMode,
+  deriveSelfTestAuditMode,
 };
 
 if (require.main === module) {
   const options = parseArgs(process.argv.slice(2));
-  if (options.phase === "initial") {
-    printOutputs(deriveInitialAuditMode({
-      eventName: options["event-name"],
-      matrixTargetEnvironment: options["matrix-target-environment"],
-      selectedTargetEnvironment: options["selected-target-environment"],
-      incidentSelfTestAction: options["incident-self-test-action"],
-    }));
-    process.exit(0);
-  }
+  printOutputs(deriveSelfTestAuditMode({
+    eventName: options["event-name"],
+    selfTestAction: options["self-test-action"],
+    jobStatus: options["job-status"],
+  }));
 
-  if (options.phase === "final") {
-    printOutputs(deriveFinalAuditMode({
-      eventName: options["event-name"],
-      selectedTarget: options["selected-target"],
-      selfTestAction: options["self-test-action"],
-      jobStatus: options["job-status"],
-    }));
-    process.exit(0);
-  }
-
-  console.error("Usage: node scripts/release_audit_mode.js --phase <initial|final> ...");
-  process.exit(1);
+  process.exit(0);
 }

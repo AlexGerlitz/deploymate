@@ -1,0 +1,109 @@
+name: Release secrets audit
+description: Run the release secrets drift audit for one GitHub environment.
+
+inputs:
+  target-environment:
+    description: Environment name shown in summaries and notifications.
+    required: true
+  deploy-host:
+    description: SSH host for the target environment.
+    required: true
+  deploy-ssh-private-key:
+    description: SSH private key for the target environment.
+    required: true
+  deploy-ssh-known-hosts:
+    description: Pinned SSH known_hosts content for the target environment.
+    required: true
+  deploy-repo-dir:
+    description: Repository directory on the target host.
+    required: true
+  deploy-env-file:
+    description: Runtime env file on the target host.
+    required: true
+  admin-username:
+    description: Admin username expected by the smoke credential contract.
+    required: true
+  admin-password:
+    description: Admin password expected by the smoke credential contract.
+    required: true
+  notification-webhook:
+    description: Optional Slack/Discord-compatible webhook.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare SSH
+      shell: bash
+      env:
+        DEPLOY_SSH_PRIVATE_KEY: ${{ inputs.deploy-ssh-private-key }}
+        DEPLOY_SSH_KNOWN_HOSTS: ${{ inputs.deploy-ssh-known-hosts }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$HOME/.ssh"
+        chmod 700 "$HOME/.ssh"
+
+        if [ -z "$DEPLOY_SSH_PRIVATE_KEY" ]; then
+          echo "[release-secrets-audit] missing DEPLOY_SSH_PRIVATE_KEY secret" >&2
+          exit 1
+        fi
+
+        if [ -z "$DEPLOY_SSH_KNOWN_HOSTS" ]; then
+          echo "[release-secrets-audit] missing DEPLOY_SSH_KNOWN_HOSTS secret" >&2
+          exit 1
+        fi
+
+        printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+        chmod 600 "$HOME/.ssh/id_ed25519"
+
+        printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+        chmod 600 "$HOME/.ssh/known_hosts"
+
+    - name: Run release secret contract audit
+      shell: bash
+      run: |
+        bash scripts/release_secret_contract_audit.sh \
+          --host "${{ inputs.deploy-host }}" \
+          --repo-dir "${{ inputs.deploy-repo-dir }}" \
+          --env-file "${{ inputs.deploy-env-file }}" \
+          --admin-username "${{ inputs.admin-username }}" \
+          --admin-password "${{ inputs.admin-password }}"
+
+    - name: Write audit summary
+      if: always()
+      shell: bash
+      run: |
+        {
+          echo "## Release Secrets Audit"
+          echo
+          echo "- Environment: \`${{ inputs.target-environment }}\`"
+          echo "- Trigger: \`${{ github.event_name }}\`"
+          echo "- Status: \`${{ job.status }}\`"
+          echo "- Incident self-test: \`none\`"
+          echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Notify audit result
+      if: always()
+      continue-on-error: true
+      shell: bash
+      env:
+        DEPLOY_NOTIFICATION_WEBHOOK: ${{ inputs.notification-webhook }}
+      run: |
+        if [ -z "$DEPLOY_NOTIFICATION_WEBHOOK" ]; then
+          echo "[notify] DEPLOY_NOTIFICATION_WEBHOOK is not configured"
+          exit 0
+        fi
+
+        bash scripts/send_workflow_notification.sh \
+          --webhook-url "$DEPLOY_NOTIFICATION_WEBHOOK" \
+          --workflow "Release secrets audit" \
+          --environment "${{ inputs.target-environment }}" \
+          --status "${{ job.status }}" \
+          --surface "secret-contract" \
+          --smoke "drift audit" \
+          --commit "${{ github.sha }}" \
+          --ref "${{ github.ref_name }}" \
+          --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          --details "trigger=${{ github.event_name }}"

@@ -193,7 +193,7 @@ That incident now gets `incident` plus severity labels, and severity is raised t
 When the next scheduled audit for that environment succeeds, the workflow comments on the issue and closes it automatically.
 The manual self-test flow uses a separate `[release-secrets-audit:self-test] ...` issue title and the `incident:test` label, so it does not interfere with real scheduled incidents.
 The incident triage logic itself now lives in `scripts/release_audit_incident.js`, and the local regression path for it is `node --test scripts/release_audit_incident.test.js`.
-The workflow mode selection and effective status derivation now live in `scripts/release_audit_mode.js`, so the YAML step wiring stays thin and the local regression path for it is `node --test scripts/release_audit_mode.test.js`.
+The workflow self-test effective status derivation now lives in `scripts/release_audit_mode.js`, so the YAML step wiring stays thin and the local regression path for it is `node --test scripts/release_audit_mode.test.js`.
 
 Recommended promotion order:
 
