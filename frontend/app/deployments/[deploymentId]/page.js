@@ -1741,8 +1741,8 @@ export default function DeploymentDetailsPage({ params }) {
               data-testid="runtime-detail-fresh-rollout-banner"
             >
               {deploymentUrl
-                ? "Fresh rollout: open the app once, then confirm health and recent activity before preparing another change."
-                : "Fresh rollout: review overview, health, and recent activity before preparing another change."}
+                ? "Opened from deployment workflow: this rollout is still fresh. Open the app once, then confirm health and recent activity before preparing another change."
+                : "Opened from deployment workflow: this rollout is still fresh. Review overview, health, and recent activity before preparing another change."}
             </div>
           ) : null}
           {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}

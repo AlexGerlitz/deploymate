@@ -55,6 +55,11 @@ if ! grep -Eq 'data-testid="runtime-detail-fresh-rollout-banner"' "$FRESH_DETAIL
   exit 1
 fi
 
+if ! grep -Eq 'Opened from deployment workflow: this rollout is still fresh\.' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout detail lost the explicit workflow-to-detail bridge copy" >&2
+  exit 1
+fi
+
 if ! grep -Eq 'data-testid="runtime-detail-fresh-rollout-checklist-card"' "$FRESH_DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] fresh rollout detail lost the first-review checklist card" >&2
   exit 1

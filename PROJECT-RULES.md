@@ -118,9 +118,18 @@ These can exist, but they must not compete with the main deploy path on the firs
   `Рекомендованный reasoning: <level>`
 - This recommendation header is mandatory every time and must never be omitted.
 - Before every new task, that recommendation header must be shown to the owner first, and the task must not begin before that header is shown.
+- If several small tasks fit the same recommended model and reasoning, batch them into one narrow work package instead of splitting them into separate micro-tasks.
+- Only split small tasks when the scope, files, risk, or recommended model/reasoning meaningfully differ.
 - If task execution reveals that a stronger or weaker reasoning level is needed, pause the task and explicitly tell the owner which reasoning level to switch to before continuing.
 - If hidden complexity appears, say exactly: `Escalation needed: switch model/reasoning manually.`
 - Do not silently escalate effort.
+
+### Task Start Protocol
+
+- First: print `Рекомендованная модель` and `Рекомендованный reasoning`.
+- Second: state the next task in one short practical sentence.
+- Third: start only the narrowest relevant inspection or change.
+- Never begin with broad exploration if the task can be handled from the directly relevant files.
 
 ### Task Budget Modes
 

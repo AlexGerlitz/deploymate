@@ -17,6 +17,8 @@ If the owner uses one of the commands below, Codex should:
   `Рекомендованная модель: <full GPT model/version name>`
   `Рекомендованный reasoning: <level>`
 - before every new task, print that header first and do not begin the task until the owner has been shown the chosen model and reasoning
+- if several small tasks fit the same recommended model and reasoning, batch them into one narrow work package
+- only split them when scope, files, risk, or recommended model/reasoning materially differ
 - if task execution reveals that a stronger or weaker reasoning level is needed, pause and tell the owner which reasoning level to switch to before continuing
 - apply the `Execution Budget Rules` from [PROJECT-RULES.md](PROJECT-RULES.md) strictly
 - default to the cheapest sufficient approach
