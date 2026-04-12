@@ -300,6 +300,68 @@ run_beginner_admin_server_ready_smoke() {
   )
 }
 
+run_beginner_admin_live_review_smoke() {
+  (
+    set -euo pipefail
+    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+
+    export PORT="${FRONTEND_SMOKE_BEGINNER_ADMIN_LIVE_REVIEW_PORT:-3017}"
+    export BASE_URL="http://127.0.0.1:${PORT}"
+    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_ADMIN_LIVE_REVIEW_LOG:-/tmp/deploymate-frontend-beginner-admin-live-review-smoke.log}"
+    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_ADMIN_LIVE_REVIEW_DIST_DIR:-.next-smoke-beginner-admin-live-review-${PORT}}"
+    export FRONTEND_SMOKE_PORT="$PORT"
+    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
+    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
+    export FRONTEND_SMOKE_REUSE_SERVER=0
+    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
+    export NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-live-review
+
+    cleanup_admin_live_review() {
+      stop_frontend_smoke_server
+    }
+
+    trap cleanup_admin_live_review EXIT
+
+    start_frontend_smoke_server
+    wait_for_frontend_smoke_url "/app"
+
+    overview_html="$(mktemp)"
+    curl -sS "${BASE_URL}/app" > "$overview_html"
+
+    python3 - "$overview_html" <<'PY'
+import sys
+from pathlib import Path
+
+html = Path(sys.argv[1]).read_text(encoding="utf-8")
+
+def card(step):
+    marker = f'data-testid="workspace-scenario-item-step-{step}"'
+    start = html.find(marker)
+    if start == -1:
+        raise SystemExit(f"missing overview step {step}")
+    next_start = html.find('data-testid="workspace-scenario-item-step-', start + len(marker))
+    return html[start: next_start if next_start != -1 else len(html)]
+
+step_two = card(2)
+step_three = card(3)
+
+if 'data-testid="workspace-primary-task-card"' in step_two:
+    raise SystemExit("Step 2 stayed primary after the first deployment existed")
+
+if 'data-testid="workspace-primary-task-card"' not in step_three:
+    raise SystemExit("Step 3 did not become primary after the first deployment existed")
+
+if ">Start another deploy<" not in step_two:
+    raise SystemExit("Step 2 did not become a secondary another-deploy action")
+
+if ">Review live apps<" not in step_three:
+    raise SystemExit("Step 3 did not expose live review as the current action")
+PY
+
+    rm -f "$overview_html"
+  )
+}
+
 run_beginner_member_smoke() {
   (
     set -euo pipefail
@@ -602,6 +664,7 @@ run_beginner_first_deploy_smoke() {
 
 run_beginner_admin_smoke
 run_beginner_admin_server_ready_smoke
+run_beginner_admin_live_review_smoke
 run_beginner_member_smoke
 run_beginner_member_overview_live_smoke
 run_beginner_member_waiting_smoke
@@ -610,6 +673,7 @@ run_beginner_export_payload_smoke
 
 echo "[frontend-beginner-smoke] first-time admin path rendered"
 echo "[frontend-beginner-smoke] admin server-ready first deploy path rendered"
+echo "[frontend-beginner-smoke] admin live-review handoff rendered"
 echo "[frontend-beginner-smoke] member remote-only live review path rendered"
 echo "[frontend-beginner-smoke] member overview live review path rendered"
 echo "[frontend-beginner-smoke] member remote-only waiting path rendered"

@@ -117,7 +117,7 @@ export default function WorkspaceChrome({ children, footer }) {
                     <div className="workspaceTopBarMiniList">
                       <Link href="/app/server-review">Step 1 opens Server review</Link>
                       <Link href="/app/deployment-workflow">Step 2 opens Deployment workflow</Link>
-                      <Link href="/app/deployment-workflow">Step 3 opens Live review</Link>
+                      <Link href="/app/deployment-workflow">Step 3 starts Live review, then Runtime detail</Link>
                     </div>
                   </div>
                 </div>

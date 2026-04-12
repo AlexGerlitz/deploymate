@@ -39,16 +39,21 @@ const smokeMemberOverviewDeployments = smokeDeployments.map(
   }),
 );
 const smokeHomeDeployments =
-  smokeMode && smokeOverviewScenario === "member-live-review"
+  smokeMode && smokeOverviewScenario === "admin-live-review"
+    ? smokeDeployments.slice(0, 1)
+    : smokeMode && smokeOverviewScenario === "member-live-review"
     ? smokeMemberOverviewDeployments
     : smokeOverviewDeployments;
 const smokeHomeServers =
-  smokeMode && smokeOverviewScenario === "admin-server-ready-first-deploy"
+  smokeMode &&
+  (smokeOverviewScenario === "admin-server-ready-first-deploy" ||
+    smokeOverviewScenario === "admin-live-review")
     ? smokeServers.slice(0, 1)
     : smokeOverviewServers;
 const smokeHomeOpsOverview =
   smokeMode &&
   (smokeOverviewScenario === "member-live-review" ||
+    smokeOverviewScenario === "admin-live-review" ||
     smokeOverviewScenario === "admin-server-ready-first-deploy")
     ? null
     : smokeOverviewOpsOverview;
@@ -151,11 +156,17 @@ export default function HomePage() {
   const waitingForAdminTarget = overviewPrimaryPath.reason === "admin-target-needed";
   const waitingForServerSetup = overviewPrimaryPath.reason === "server-setup";
   const memberNewDeploymentBlocked = memberHasLiveDeployments;
+  const hasLiveDeployments = opsSnapshot.deployments.total > 0;
   const stepTwoBlocked =
     waitingForServerSetup || waitingForAdminTarget || memberNewDeploymentBlocked;
   const stepThreeBlocked =
     waitingForServerSetup || waitingForAdminTarget || opsSnapshot.deployments.total === 0;
-  const stepThreeIsPrimary = memberHasLiveDeployments && !stepThreeBlocked;
+  const stepThreeIsPrimary =
+    hasLiveDeployments &&
+    !stepThreeBlocked &&
+    (memberHasLiveDeployments ||
+      overviewPrimaryPath.reason === "incident" ||
+      overviewPrimaryPath.reason === "steady-state");
   const stepOneIsPrimary =
     overviewPrimaryPath.reason === "server-setup" ||
     overviewPrimaryPath.reason === "admin-target-needed";
@@ -192,12 +203,16 @@ export default function HomePage() {
           : memberNewDeploymentBlocked
             ? "New remote deployments need an admin-managed target. Review the live apps that already exist instead."
             : "This step opens after Step 1 is done and one server is already connected."
+        : hasLiveDeployments
+          ? "Use this only when you are ready to start another app after reviewing what is already live."
         : "Paste the app image you want to run, or pick a saved setup if you already have one.",
       href: singleServerFirstDeployTarget ? firstDeployWorkflowHref : "/app/deployment-workflow",
       actionLabel: stepTwoBlocked
         ? memberNewDeploymentBlocked
           ? "Ask admin for new deploy"
           : "Opens after Step 1"
+        : hasLiveDeployments
+          ? "Start another deploy"
         : "Choose app to run",
       primary: !stepOneIsPrimary && !stepThreeIsPrimary,
       disabled: stepTwoBlocked,
@@ -205,18 +220,20 @@ export default function HomePage() {
     {
       key: "step-3",
       step: "Step 3",
-      title: memberHasLiveDeployments ? "Review live apps" : "Start it and check status",
+      title: hasLiveDeployments ? "Review live apps" : "Start it and check status",
       detail: stepThreeBlocked
         ? "This step opens after the first deployment exists and DeployMate has live runtime state to review."
         : memberHasLiveDeployments
           ? "Open live status and runtime detail without exposing saved server inventory or target controls."
+          : hasLiveDeployments
+            ? "Open live status and runtime detail before starting another rollout."
         : "Start the app, then open live status to confirm it is running, healthy, and reachable.",
       href: "/app/deployment-workflow",
       actionLabel: stepThreeBlocked
         ? "Opens after deploy"
-        : memberHasLiveDeployments
+        : hasLiveDeployments
           ? "Review live apps"
-          : "See running apps",
+        : "See running apps",
       primary: stepThreeIsPrimary,
       disabled: stepThreeBlocked,
     },
