@@ -186,6 +186,7 @@ It also compares the provided smoke credentials against the target runtime env f
 
 If you want the same flow from GitHub instead of a workstation shell, use the manual workflow in `.github/workflows/release.yml` after configuring repository secrets for the deploy host, deploy SSH key, pinned known_hosts contents, base URL, and admin smoke credentials.
 For a short operator-only secret drift check without a deploy, use `.github/workflows/release-secrets-audit.yml` and choose `production` or `staging`.
+That workflow also runs every day at `02:17 UTC` (`09:17` in Novosibirsk) for both environments and sends a best-effort webhook notification when `DEPLOY_NOTIFICATION_WEBHOOK` is configured.
 
 Recommended promotion order:
 
@@ -588,6 +589,10 @@ Required GitHub Actions release secrets audit workflow secrets:
 - `DEPLOY_ENV_FILE`
 - `DEPLOYMATE_ADMIN_USERNAME`
 - `DEPLOYMATE_ADMIN_PASSWORD`
+
+Optional GitHub Actions release secrets audit workflow secrets:
+
+- `DEPLOY_NOTIFICATION_WEBHOOK` for best-effort drift audit notifications
 
 Runtime smoke notes:
 
