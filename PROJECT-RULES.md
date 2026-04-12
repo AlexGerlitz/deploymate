@@ -116,6 +116,8 @@ These can exist, but they must not compete with the main deploy path on the firs
 - Before every task recommendation or task start, explicitly print two separate lines:
   `Рекомендованная модель: <full GPT model/version name>`
   `Рекомендованный reasoning: <level>`
+- Choose that recommended model and reasoning only after analyzing the specific task complexity, scope, risk, and number of touched surfaces.
+- Do not print a model/reasoning header in filler messages that do not introduce or start a concrete task.
 - This recommendation header is mandatory every time and must never be omitted.
 - Before every new task, that recommendation header must be shown to the owner first, and the task must not begin before that header is shown.
 - If several small tasks fit the same recommended model and reasoning, batch them into one narrow work package instead of splitting them into separate micro-tasks.

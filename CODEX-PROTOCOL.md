@@ -16,6 +16,8 @@ If the owner uses one of the commands below, Codex should:
 - before every task recommendation or task start, print:
   `Рекомендованная модель: <full GPT model/version name>`
   `Рекомендованный reasoning: <level>`
+- choose that recommendation only after analyzing the concrete task
+- do not print that header in filler messages that do not start or propose a concrete task
 - before every new task, print that header first and do not begin the task until the owner has been shown the chosen model and reasoning
 - if several small tasks fit the same recommended model and reasoning, batch them into one narrow work package
 - only split them when scope, files, risk, or recommended model/reasoning materially differ
