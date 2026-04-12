@@ -35,14 +35,22 @@ frontend_smoke_url_alive() {
 }
 
 frontend_smoke_port_pids() {
+  local pids=""
+
   if command -v lsof >/dev/null 2>&1; then
-    lsof -ti "tcp:${PORT}" 2>/dev/null | tr '\n' ' ' | xargs || true
-    return 0
+    pids="$(lsof -ti "tcp:${PORT}" 2>/dev/null | tr '\n' ' ' | xargs || true)"
+    if [ -n "$pids" ]; then
+      printf '%s\n' "$pids"
+      return 0
+    fi
   fi
 
   if command -v fuser >/dev/null 2>&1; then
-    fuser -n tcp "$PORT" 2>/dev/null | tr '\n' ' ' | xargs || true
-    return 0
+    pids="$(fuser -n tcp "$PORT" 2>/dev/null | tr '\n' ' ' | xargs || true)"
+    if [ -n "$pids" ]; then
+      printf '%s\n' "$pids"
+      return 0
+    fi
   fi
 
   if command -v ss >/dev/null 2>&1; then
