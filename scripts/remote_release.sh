@@ -199,11 +199,12 @@ case "$DEPLOY_SURFACE" in
 esac
 
 REMOTE_AUDIT_CMD="bash scripts/runtime_capability_audit.sh --env-file $quoted_env_file && bash scripts/production_env_audit.sh --env-file $quoted_env_file --require-runtime-files"
+REMOTE_SWITCH_CMD="git switch $DEPLOY_BRANCH || { echo [remote-release]\ regular\ branch\ switch\ failed,\ retrying\ with\ local\ changes\ preserved; git status --short; git switch --merge $DEPLOY_BRANCH; }"
 
 if [ -n "$DEPLOY_REF" ]; then
-  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && git switch $DEPLOY_BRANCH && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
 else
-  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && git switch $DEPLOY_BRANCH && git merge --ff-only origin/$DEPLOY_BRANCH && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
 fi
 
 echo "[remote-release] remote deploy"
