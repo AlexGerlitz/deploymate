@@ -126,6 +126,10 @@ class MemberOwnershipIsolationTests(unittest.TestCase):
                 side_effect=self._get_deployment_or_404,
             ),
             patch(
+                "app.routes.deployment_observability.list_deployment_activity",
+                side_effect=self._list_deployment_activity,
+            ),
+            patch(
                 "app.routes.deployment_observability.get_container_logs",
                 side_effect=AssertionError("unexpected access to foreign logs"),
             ),
@@ -163,6 +167,9 @@ class MemberOwnershipIsolationTests(unittest.TestCase):
 
     def _list_notifications(self, limit=100):
         return list(self.notifications[:limit])
+
+    def _list_deployment_activity(self, deployment_id):
+        return [item for item in self.notifications if item.get("deployment_id") == deployment_id]
 
     def _get_server_or_404(self, server_id):
         if server_id != self.remote_server["id"]:
@@ -226,6 +233,209 @@ class MemberOwnershipIsolationTests(unittest.TestCase):
         activity_export = activity_export_response.json()
         self.assertEqual(activity_export["count"], 1)
         self.assertEqual(activity_export["items"][0]["deployment_id"], "deployment-own")
+
+    def test_member_owned_remote_records_hide_admin_server_inventory(self):
+        self.deployments.append(
+            {
+                "id": "deployment-remote",
+                "owner_user_id": "member-1",
+                "status": "running",
+                "image": "nginx:alpine",
+                "container_name": "member-remote-runtime",
+                "container_id": "container-remote",
+                "created_at": "2026-04-02T00:10:00Z",
+                "error": None,
+                "internal_port": 80,
+                "external_port": 38082,
+                "server_id": "server-admin",
+                "server_name": "Admin VPS",
+                "server_host": "203.0.113.10",
+                "env": {},
+            }
+        )
+        self.templates.append(
+            {
+                "id": "template-remote",
+                "owner_user_id": "member-1",
+                "template_name": "member-remote-template",
+                "image": "nginx:alpine",
+                "name": "member-remote-runtime",
+                "internal_port": 80,
+                "external_port": 38082,
+                "server_id": "server-admin",
+                "server_name": "Admin VPS",
+                "server_host": "203.0.113.10",
+                "env": {},
+                "created_at": "2026-04-02T00:10:00Z",
+                "updated_at": "2026-04-02T00:10:00Z",
+                "last_used_at": None,
+                "use_count": 0,
+            }
+        )
+
+        detail_response = self.client.get("/deployments/deployment-remote")
+        self.assertEqual(detail_response.status_code, 200)
+        detail = detail_response.json()
+        self.assertIsNone(detail["server_id"])
+        self.assertIsNone(detail["server_name"])
+        self.assertIsNone(detail["server_host"])
+        self.assertTrue(detail["server_managed_by_admin"])
+
+        list_response = self.client.get("/deployments")
+        self.assertEqual(list_response.status_code, 200)
+        remote_item = next(item for item in list_response.json() if item["id"] == "deployment-remote")
+        self.assertIsNone(remote_item["server_id"])
+        self.assertIsNone(remote_item["server_name"])
+        self.assertIsNone(remote_item["server_host"])
+        self.assertTrue(remote_item["server_managed_by_admin"])
+
+        server_query_response = self.client.get("/deployments?q=Admin%20VPS")
+        self.assertEqual(server_query_response.status_code, 200)
+        self.assertEqual(server_query_response.json(), [])
+
+        deployments_export_response = self.client.get("/ops/exports/deployments?format=json")
+        self.assertEqual(deployments_export_response.status_code, 200)
+        deployments_payload = deployments_export_response.json()
+        remote_export = next(item for item in deployments_payload["items"] if item["id"] == "deployment-remote")
+        self.assertIsNone(remote_export["server_id"])
+        self.assertIsNone(remote_export["server_name"])
+        self.assertIsNone(remote_export["server_host"])
+        self.assertTrue(remote_export["server_managed_by_admin"])
+
+        deployments_csv_response = self.client.get("/ops/exports/deployments?format=csv")
+        self.assertEqual(deployments_csv_response.status_code, 200)
+        deployments_csv = deployments_csv_response.text
+        self.assertNotIn("server-admin", deployments_csv)
+        self.assertNotIn("Admin VPS", deployments_csv)
+        self.assertNotIn("203.0.113.10", deployments_csv)
+
+        templates_response = self.client.get("/deployment-templates")
+        self.assertEqual(templates_response.status_code, 200)
+        remote_template = next(item for item in templates_response.json() if item["id"] == "template-remote")
+        self.assertIsNone(remote_template["server_id"])
+        self.assertIsNone(remote_template["server_name"])
+        self.assertIsNone(remote_template["server_host"])
+        self.assertTrue(remote_template["server_managed_by_admin"])
+
+        template_query_response = self.client.get("/deployment-templates?q=Admin%20VPS")
+        self.assertEqual(template_query_response.status_code, 200)
+        self.assertEqual(template_query_response.json(), [])
+
+        templates_export_response = self.client.get("/ops/exports/templates?format=json")
+        self.assertEqual(templates_export_response.status_code, 200)
+        templates_payload = templates_export_response.json()
+        remote_template_export = next(item for item in templates_payload["items"] if item["id"] == "template-remote")
+        self.assertIsNone(remote_template_export["server_id"])
+        self.assertIsNone(remote_template_export["server_name"])
+        self.assertIsNone(remote_template_export["server_host"])
+        self.assertTrue(remote_template_export["server_managed_by_admin"])
+
+    def test_member_remote_runtime_live_actions_are_admin_only(self):
+        self.deployments.append(
+            {
+                "id": "deployment-remote",
+                "owner_user_id": "member-1",
+                "status": "running",
+                "image": "nginx:alpine",
+                "container_name": "member-remote-runtime",
+                "container_id": "container-remote",
+                "created_at": "2026-04-02T00:10:00Z",
+                "error": None,
+                "internal_port": 80,
+                "external_port": 38082,
+                "server_id": "server-admin",
+                "server_name": "Admin VPS",
+                "server_host": "203.0.113.10",
+                "env": {},
+            }
+        )
+
+        for path in [
+            "/deployments/deployment-remote/diagnostics",
+            "/deployments/deployment-remote/logs",
+            "/deployments/deployment-remote/health",
+        ]:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 403)
+            self.assertIn("admin-only", response.json()["detail"])
+
+        redeploy_response = self.client.post(
+            "/deployments/deployment-remote/redeploy",
+            json={
+                "image": "nginx:alpine",
+                "env": {},
+            },
+        )
+        self.assertEqual(redeploy_response.status_code, 403)
+        self.assertIn("admin-only", redeploy_response.json()["detail"])
+
+        delete_response = self.client.delete("/deployments/deployment-remote")
+        self.assertEqual(delete_response.status_code, 403)
+        self.assertIn("admin-only", delete_response.json()["detail"])
+
+    def test_member_activity_redacts_remote_server_inventory(self):
+        self.deployments.append(
+            {
+                "id": "deployment-remote",
+                "owner_user_id": "member-1",
+                "status": "running",
+                "image": "nginx:alpine",
+                "container_name": "member-remote-runtime",
+                "container_id": "container-remote",
+                "created_at": "2026-04-02T00:10:00Z",
+                "error": None,
+                "internal_port": 80,
+                "external_port": 38082,
+                "server_id": "server-admin",
+                "server_name": "Admin VPS",
+                "server_host": "203.0.113.10",
+                "env": {},
+            }
+        )
+        self.notifications.append(
+            {
+                "id": "notification-remote",
+                "deployment_id": "deployment-remote",
+                "level": "error",
+                "title": "Admin VPS deploy failed",
+                "message": "deploy@203.0.113.10:22 uses server-admin and needs review.",
+                "created_at": "2026-04-02T00:11:00Z",
+            }
+        )
+
+        notifications_response = self.client.get("/notifications?limit=10")
+        self.assertEqual(notifications_response.status_code, 200)
+        remote_notification = next(
+            item for item in notifications_response.json() if item["id"] == "notification-remote"
+        )
+        serialized_notification = str(remote_notification)
+        self.assertNotIn("Admin VPS", serialized_notification)
+        self.assertNotIn("server-admin", serialized_notification)
+        self.assertNotIn("203.0.113.10", serialized_notification)
+        self.assertNotIn("deploy@", serialized_notification)
+        self.assertIn("Managed by an admin", serialized_notification)
+
+        server_query_response = self.client.get("/notifications?q=Admin%20VPS&limit=10")
+        self.assertEqual(server_query_response.status_code, 200)
+        self.assertEqual(server_query_response.json(), [])
+
+        activity_response = self.client.get("/deployments/deployment-remote/activity")
+        self.assertEqual(activity_response.status_code, 200)
+        serialized_activity = str(activity_response.json())
+        self.assertNotIn("Admin VPS", serialized_activity)
+        self.assertNotIn("server-admin", serialized_activity)
+        self.assertNotIn("203.0.113.10", serialized_activity)
+        self.assertNotIn("deploy@", serialized_activity)
+        self.assertIn("Managed by an admin", serialized_activity)
+
+        ops_activity_response = self.client.get("/ops/exports/activity?format=json&limit=10")
+        self.assertEqual(ops_activity_response.status_code, 200)
+        serialized_ops_activity = str(ops_activity_response.json())
+        self.assertNotIn("Admin VPS", serialized_ops_activity)
+        self.assertNotIn("server-admin", serialized_ops_activity)
+        self.assertNotIn("203.0.113.10", serialized_ops_activity)
+        self.assertNotIn("deploy@", serialized_ops_activity)
+        self.assertIn("Managed by an admin", serialized_ops_activity)
 
     def test_member_cannot_open_foreign_logs_or_server_inventory_export(self):
         logs_response = self.client.get("/deployments/deployment-foreign/logs")

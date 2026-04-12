@@ -1,6 +1,6 @@
 # Codex Protocol
 
-Updated: 2026-04-07
+Updated: 2026-04-12
 
 This file defines the short commands the project owner can use to resync Codex without writing long prompts.
 
@@ -12,6 +12,19 @@ If the owner uses one of the commands below, Codex should:
 - keep the main story as `server -> deploy -> observe`
 - avoid drifting into admin, recovery, import, or architecture vanity work unless asked directly
 - respond with a short practical restatement of the current focus before doing work
+- write responses to the owner in Russian unless another language is explicitly requested
+- before every task recommendation or task start, print:
+  `Рекомендованная модель: <full GPT model/version name>`
+  `Рекомендованный reasoning: <level>`
+- choose that recommendation only after analyzing the concrete task
+- do not print that header in filler messages that do not start or propose a concrete task
+- before every new task, print that header first and do not begin the task until the owner has been shown the chosen model and reasoning
+- if several small tasks fit the same recommended model and reasoning, batch them into one narrow work package
+- only split them when scope, files, risk, or recommended model/reasoning materially differ
+- if task execution reveals that a stronger or weaker reasoning level is needed, pause and tell the owner which reasoning level to switch to before continuing
+- apply the `Execution Budget Rules` from [PROJECT-RULES.md](PROJECT-RULES.md) strictly
+- default to the cheapest sufficient approach
+- if hidden complexity appears, say exactly: `Escalation needed: switch model/reasoning manually.`
 
 ## Short Commands
 
@@ -29,6 +42,14 @@ Meaning:
 - re-anchor on the main product story
 - ignore secondary layers unless they directly block the core path
 - propose the next highest-value step for clarity
+
+### `прогони новичка`
+
+Meaning:
+- reread [PROJECT-RULES.md](PROJECT-RULES.md) and [docs/beginner-walkthrough.md](docs/beginner-walkthrough.md)
+- evaluate the first-time admin path: `/app -> /app/server-review -> /app/deployment-workflow`
+- evaluate the member path in an admin-managed remote-only setup
+- report hesitation points, false primary CTAs, and one smallest recommended fix
 
 ### `режим недели`
 

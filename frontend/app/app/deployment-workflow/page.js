@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   smokeDeployments,
+  smokeInternalRuntimeDeployment,
   smokeMode,
   smokeServers,
   smokeTemplates,
@@ -21,6 +22,7 @@ import {
   buildEnvIssues,
   buildRolloutDraftSummary,
   buildTemplateDiff,
+  formatAccessibleServerLabel,
   formatDate,
   formatPortMapping,
   formatServerLabel,
@@ -35,6 +37,403 @@ const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const localDeploymentsEnabled =
   process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
+const smokeWorkflowScenario =
+  process.env.NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO || "default";
+const smokeReviewWorkerDeployment =
+  smokeDeployments.find((deployment) => deployment.id === "review-worker") || null;
+const smokeRunningDeployments = smokeDeployments.filter((deployment) => deployment.status === "running");
+const smokeInternalRuntimeShadowDeployment = {
+  ...smokeInternalRuntimeDeployment,
+  id: "internal-runtime-shadow",
+  container_name: "internal-api-shadow",
+  container_id: "container-internal-2",
+  created_at: "2026-04-02T00:22:00Z",
+};
+const smokeTemplateCreatedDeployment = {
+  ...smokeDeployments[0],
+  id: "template-success-deployment",
+  container_name: "template-success-runtime",
+  container_id: "container-template-success-1",
+  created_at: "2026-04-02T00:25:00Z",
+};
+const smokeCreatedDeployment = {
+  ...smokeDeployments[0],
+  id: "fresh-success-deployment",
+  container_name: "fresh-success-runtime",
+  container_id: "container-fresh-success-1",
+  created_at: "2026-04-02T00:24:00Z",
+};
+const smokeFailedQueueReviewDeployments = smokeReviewWorkerDeployment
+  ? [
+      smokeReviewWorkerDeployment,
+      {
+        ...smokeReviewWorkerDeployment,
+        id: "review-worker-shadow",
+        container_name: "review-worker-shadow",
+        container_id: "container-review-2",
+        created_at: "2026-04-02T02:18:00Z",
+        error: "Container restarted again before readiness recovered.",
+      },
+      ...smokeRunningDeployments,
+    ]
+  : smokeRunningDeployments;
+const smokeWorkflowFixture =
+  smokeMode && smokeWorkflowScenario === "first-deploy-after-server-review"
+    ? {
+        deployments: [],
+        servers: smokeServers,
+        templates: smokeTemplates,
+        form: {
+          image: "",
+          name: "",
+          internal_port: "",
+          external_port: "",
+          server_id: smokeServers[0]?.id || "",
+        },
+        workflowMessage: smokeServers[0]
+          ? `Server "${smokeServers[0].name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`
+          : "",
+        workflowTab: "create",
+        submitSuccess: "",
+        createdDeployment: null,
+        templateDeploySuccess: "",
+        templateCreatedDeployment: null,
+      }
+    : smokeMode && smokeWorkflowScenario === "healthy-live-review"
+      ? {
+          deployments: smokeDeployments.filter((deployment) => deployment.status === "running"),
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "live",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
+        }
+    : smokeMode && smokeWorkflowScenario === "internal-only-live-review"
+      ? {
+          deployments: [
+            smokeInternalRuntimeDeployment,
+            smokeInternalRuntimeShadowDeployment,
+            smokeDeployments[0],
+          ],
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "live",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
+        }
+    : smokeMode && smokeWorkflowScenario === "failed-live-review"
+      ? {
+          deployments: smokeFailedQueueReviewDeployments,
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "live",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
+        }
+    : smokeMode && smokeWorkflowScenario === "template-deploy-success"
+      ? {
+          deployments: smokeDeployments,
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "templates",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess:
+            "Deployment created from template. Open runtime detail next while this rollout is still fresh.",
+          templateCreatedDeployment: smokeTemplateCreatedDeployment,
+        }
+    : smokeMode && smokeWorkflowScenario === "create-deploy-success"
+      ? {
+          deployments: smokeDeployments,
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "create",
+          submitSuccess:
+            "Deployment created. Open runtime detail next while this rollout is still fresh.",
+          createdDeployment: smokeCreatedDeployment,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
+        }
+    : smokeMode && smokeWorkflowScenario === "first-deploy-after-overview"
+      ? {
+          deployments: [],
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: smokeServers[0]?.id || "",
+          },
+          workflowMessage: smokeServers[0]
+            ? `Server "${smokeServers[0].name}" is already selected from Overview. Continue with the first deployment while that target is still understood.`
+            : "",
+          workflowTab: "create",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
+        }
+    : smokeMode && smokeWorkflowScenario === "member-waiting-for-admin-target"
+      ? {
+          deployments: [],
+          servers: [],
+          templates: [],
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "create",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
+        }
+      : smokeMode && !smokeUser.is_admin
+        ? {
+            deployments: smokeDeployments,
+            servers: [],
+            templates: [],
+            form: {
+              image: "",
+              name: "",
+              internal_port: "",
+              external_port: "",
+              server_id: "",
+            },
+            workflowMessage: "",
+            workflowTab: "create",
+            submitSuccess: "",
+            createdDeployment: null,
+            templateDeploySuccess: "",
+            templateCreatedDeployment: null,
+          }
+    : {
+        deployments: smokeDeployments,
+        servers: smokeServers,
+        templates: smokeTemplates,
+        form: {
+          image: "",
+          name: "",
+          internal_port: "",
+          external_port: "",
+          server_id: "",
+        },
+        workflowMessage: "",
+        workflowTab: "create",
+        submitSuccess: "",
+        createdDeployment: null,
+        templateDeploySuccess: "",
+        templateCreatedDeployment: null,
+      };
+
+function buildRuntimeCardActionState(deployment) {
+  const runtimeUrl = buildDeploymentUrl(deployment);
+  const failed = deployment?.status === "failed";
+  const stableWithoutPublicUrl = deployment?.status === "running" && !runtimeUrl;
+
+  return {
+    runtimeUrl,
+    detailsClassName: failed || !runtimeUrl ? "landingButton primaryButton" : "secondaryButton",
+    detailsLabel: failed
+      ? "Review runtime issues"
+      : stableWithoutPublicUrl
+        ? "Review stable runtime"
+        : "View details",
+    openAppClassName: failed ? "linkButton" : "landingButton primaryButton",
+    showOpenAppPrimary: Boolean(runtimeUrl) && !failed,
+    showOpenAppSecondary: Boolean(runtimeUrl) && failed,
+  };
+}
+
+function buildRuntimeReviewState(deployment, visibleDeploymentsCount) {
+  if (!deployment) {
+    return {
+      label: "Waiting",
+      tone: "unknown",
+      focus: "No live deployment is selected yet",
+      nextStep: "Start one app first, then use this lane to check whether it is alive.",
+      summary: "Step 3 stays quiet until there is something running or failing to review.",
+      checks: [
+        {
+          label: "First check",
+          value: "Start an app",
+          detail: "A runtime review begins after the first deployment exists.",
+        },
+        {
+          label: "Signal",
+          value: "None yet",
+          detail: "There is no health or endpoint signal to interpret yet.",
+        },
+        {
+          label: "Then",
+          value: "Return here",
+          detail: "This lane becomes the place to verify the result.",
+        },
+      ],
+    };
+  }
+
+  const runtimeUrl = buildDeploymentUrl(deployment);
+  const deploymentName = deployment.container_name || deployment.image || "This deployment";
+
+  if (deployment.status === "failed") {
+    return {
+      label: "Needs review",
+      tone: "error",
+      focus: `${deploymentName} failed before it became a safe next step`,
+      nextStep: "Open runtime detail and read the failure context before deleting or redeploying.",
+      summary: "Keep the queue calm: understand the failed runtime before starting another app.",
+      checks: [
+        {
+          label: "First check",
+          value: "Runtime detail",
+          detail: "Use diagnostics and recent activity before taking a destructive action.",
+        },
+        {
+          label: "Signal",
+          value: "Failed",
+          detail: deployment.error || "Deployment is currently failed.",
+        },
+        {
+          label: "Then",
+          value: "Decide safely",
+          detail: "Redeploy or delete only after the cause is concrete enough to explain.",
+        },
+      ],
+    };
+  }
+
+  if (deployment.status === "running" && runtimeUrl) {
+    return {
+      label: "Ready to verify",
+      tone: "healthy",
+      focus: `${deploymentName} is running with a public endpoint`,
+      nextStep: "Open the app once, then return to runtime detail if anything looks off.",
+      summary: `${visibleDeploymentsCount} live deployment${visibleDeploymentsCount === 1 ? "" : "s"} are visible. Start with the focused one and keep the rest secondary.`,
+      checks: [
+        {
+          label: "First check",
+          value: "Open app",
+          detail: "Confirm the user-facing path works before preparing another rollout.",
+        },
+        {
+          label: "Signal",
+          value: "Public URL",
+          detail: runtimeUrl,
+        },
+        {
+          label: "Then",
+          value: "Review detail",
+          detail: "Use runtime detail for health, activity, and deliberate changes.",
+        },
+      ],
+    };
+  }
+
+  if (deployment.status === "running") {
+    return {
+      label: "Stable private",
+      tone: "healthy",
+      focus: `${deploymentName} is running without a public endpoint`,
+      nextStep: "Open runtime detail and confirm the private service signals before changing it.",
+      summary: "There is no public app link here, so Step 3 should lead to runtime review instead of pretending the service can be clicked.",
+      checks: [
+        {
+          label: "First check",
+          value: "Review detail",
+          detail: "Confirm ports, health, and activity from the runtime page.",
+        },
+        {
+          label: "Signal",
+          value: "Internal only",
+          detail: "No public URL is assigned to this deployment.",
+        },
+        {
+          label: "Then",
+          value: "Keep or change",
+          detail: "Prepare a rollout change only after the stable state is believable.",
+        },
+      ],
+    };
+  }
+
+  return {
+    label: "Check state",
+    tone: "warn",
+    focus: `${deploymentName} is ${deployment.status || "in an unknown state"}`,
+    nextStep: "Open runtime detail and confirm what DeployMate knows before taking action.",
+    summary: "This deployment is not clearly running or failed, so the safest action is a detail review.",
+    checks: [
+      {
+        label: "First check",
+        value: "Runtime detail",
+        detail: "Use the detail page to avoid guessing from a compact queue card.",
+      },
+      {
+        label: "Signal",
+        value: deployment.status || "Unknown",
+        detail: "The queue view is intentionally brief.",
+      },
+      {
+        label: "Then",
+        value: "Decide",
+        detail: "Change or clean up only after the state is clear.",
+      },
+    ],
+  };
+}
 
 function DeploymentWorkflowPageContent() {
   const router = useRouter();
@@ -43,9 +442,9 @@ function DeploymentWorkflowPageContent() {
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
-  const [deployments, setDeployments] = useState(smokeMode ? smokeDeployments : []);
-  const [servers, setServers] = useState(smokeMode ? smokeServers : []);
-  const [templates, setTemplates] = useState(smokeMode ? smokeTemplates : []);
+  const [deployments, setDeployments] = useState(smokeMode ? smokeWorkflowFixture.deployments : []);
+  const [servers, setServers] = useState(smokeMode ? smokeWorkflowFixture.servers : []);
+  const [templates, setTemplates] = useState(smokeMode ? smokeWorkflowFixture.templates : []);
   const [loading, setLoading] = useState(!smokeMode);
   const [serversLoading, setServersLoading] = useState(!smokeMode);
   const [templatesLoading, setTemplatesLoading] = useState(!smokeMode);
@@ -54,14 +453,22 @@ function DeploymentWorkflowPageContent() {
   const [templatesError, setTemplatesError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [submitSuccess, setSubmitSuccess] = useState("");
-  const [createdDeployment, setCreatedDeployment] = useState(null);
+  const [submitSuccess, setSubmitSuccess] = useState(
+    smokeMode ? smokeWorkflowFixture.submitSuccess : "",
+  );
+  const [createdDeployment, setCreatedDeployment] = useState(
+    smokeMode ? smokeWorkflowFixture.createdDeployment : null,
+  );
   const [templateSubmitting, setTemplateSubmitting] = useState(false);
   const [templateSubmitError, setTemplateSubmitError] = useState("");
   const [templateSubmitSuccess, setTemplateSubmitSuccess] = useState("");
   const [templateDeployError, setTemplateDeployError] = useState("");
-  const [templateDeploySuccess, setTemplateDeploySuccess] = useState("");
-  const [templateCreatedDeployment, setTemplateCreatedDeployment] = useState(null);
+  const [templateDeploySuccess, setTemplateDeploySuccess] = useState(
+    smokeMode ? smokeWorkflowFixture.templateDeploySuccess : "",
+  );
+  const [templateCreatedDeployment, setTemplateCreatedDeployment] = useState(
+    smokeMode ? smokeWorkflowFixture.templateCreatedDeployment : null,
+  );
   const [templateDuplicateError, setTemplateDuplicateError] = useState("");
   const [templateDuplicateSuccess, setTemplateDuplicateSuccess] = useState("");
   const [deleteError, setDeleteError] = useState("");
@@ -76,23 +483,29 @@ function DeploymentWorkflowPageContent() {
   const [templateFilter, setTemplateFilter] = useState("all");
   const [templatePreviewId, setTemplatePreviewId] = useState(smokeMode ? "smoke-template" : "");
   const [editingTemplateId, setEditingTemplateId] = useState("");
-  const [workflowMessage, setWorkflowMessage] = useState("");
+  const [workflowMessage, setWorkflowMessage] = useState(smokeMode ? smokeWorkflowFixture.workflowMessage : "");
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
-  const [workflowTab, setWorkflowTab] = useState("create");
+  const [workflowTab, setWorkflowTab] = useState(
+    smokeMode ? smokeWorkflowFixture.workflowTab : "create",
+  );
   const [createAdvancedOpen, setCreateAdvancedOpen] = useState(false);
+  const createSectionRef = useRef(null);
+  const createImageInputRef = useRef(null);
+  const handoffImageFocusAppliedRef = useRef(false);
   const [form, setForm] = useState({
-    image: "",
-    name: "",
-    internal_port: "",
-    external_port: "",
-    server_id: "",
+    image: smokeMode ? smokeWorkflowFixture.form.image : "",
+    name: smokeMode ? smokeWorkflowFixture.form.name : "",
+    internal_port: smokeMode ? smokeWorkflowFixture.form.internal_port : "",
+    external_port: smokeMode ? smokeWorkflowFixture.form.external_port : "",
+    server_id: smokeMode ? smokeWorkflowFixture.form.server_id : "",
   });
   const [templateName, setTemplateName] = useState("");
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const canAccessServers = Boolean(currentUser?.is_admin);
   const serverAccessBlocked = !canAccessServers && !localDeploymentsEnabled;
-  const waitingForAdminTarget = serverAccessBlocked && deployments.length === 0;
+  const memberHasLiveDeployments = serverAccessBlocked && deployments.length > 0;
+  const waitingForAdminTarget = serverAccessBlocked && !memberHasLiveDeployments;
 
   const deploymentLimitReached =
     currentUser &&
@@ -116,8 +529,8 @@ function DeploymentWorkflowPageContent() {
     return [
       deployment.image,
       deployment.container_name,
-      deployment.server_name,
-      deployment.server_host,
+      canAccessServers ? deployment.server_name : null,
+      canAccessServers ? deployment.server_host : null,
       deployment.status,
     ]
       .filter(Boolean)
@@ -197,6 +610,13 @@ function DeploymentWorkflowPageContent() {
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     filteredDeployments[0] ||
     null;
+  const primaryRuntimeActionState = primaryRuntimeDeployment
+    ? buildRuntimeCardActionState(primaryRuntimeDeployment)
+    : null;
+  const primaryRuntimeReviewState = buildRuntimeReviewState(
+    primaryRuntimeDeployment,
+    filteredDeployments.length,
+  );
   const secondaryRuntimeDeployments = primaryRuntimeDeployment
     ? filteredDeployments.filter((deployment) => deployment.id !== primaryRuntimeDeployment.id)
     : [];
@@ -205,6 +625,11 @@ function DeploymentWorkflowPageContent() {
   const requestedTemplateSource = searchParams.get("template_source") || "";
   const requestedServerId = searchParams.get("server") || "";
   const requestedSource = searchParams.get("source") || "";
+  const requestedFromOverview = requestedSource === "overview-first-deploy";
+  const requestedFromServerReview = requestedSource === "server-review";
+  const requestedWithServerContext = requestedFromServerReview || requestedFromOverview;
+  const shouldAutoFocusEntryImage = requestedWithServerContext && !serverAccessBlocked;
+  const rolloutDraftHasEnvRows = envRows.some((row) => row.key.trim() || row.value.trim());
   const selectedCreateServer =
     servers.find((server) => server.id === form.server_id) || null;
   const selectedServerLabel = selectedCreateServer
@@ -224,6 +649,16 @@ function DeploymentWorkflowPageContent() {
       : workflowPrimaryMode === "live"
         ? "Because something already needs review, start by checking the live queue before you create another deployment."
         : "Keep Step 2 simple: choose an app image or a saved setup first, then open advanced fields only if the rollout really needs them.";
+  const primaryRuntimeTargetLabel = primaryRuntimeDeployment
+    ? formatAccessibleServerLabel({
+        canAccessServers,
+        serverName: primaryRuntimeDeployment.server_name,
+        serverHost: primaryRuntimeDeployment.server_host,
+        serverId: primaryRuntimeDeployment.server_id,
+        localLabel: "Local target",
+        managedLabel: "Admin-managed target",
+      })
+    : "";
 
   function getSuggestedExternalPort() {
     return suggestedPorts.length > 0 ? String(suggestedPorts[0]) : "";
@@ -487,34 +922,37 @@ function DeploymentWorkflowPageContent() {
     if (
       form.name.trim() ||
       form.internal_port.trim() ||
-      form.external_port.trim() ||
-      form.server_id ||
       templateName.trim() ||
-      envRows.some((row) => row.key.trim() || row.value.trim()) ||
+      rolloutDraftHasEnvRows ||
       editingTemplateId
     ) {
       setCreateAdvancedOpen(true);
     }
   }, [
     editingTemplateId,
-    envRows,
-    form.external_port,
     form.internal_port,
     form.name,
-    form.server_id,
+    rolloutDraftHasEnvRows,
     templateName,
   ]);
 
   useEffect(() => {
+    if (serverAccessBlocked) {
+      if (memberHasLiveDeployments && workflowTab !== "live") {
+        setWorkflowTab("live");
+      }
+      return;
+    }
+
     if (workflowState.mode === "live") {
       setWorkflowTab("live");
       return;
     }
 
-    if (workflowState.mode === "prerequisite" && workflowTab === "live") {
+    if ((workflowState.mode === "prerequisite" || deployments.length === 0) && workflowTab === "live") {
       setWorkflowTab("create");
     }
-  }, [workflowState.mode, workflowTab]);
+  }, [deployments.length, memberHasLiveDeployments, serverAccessBlocked, workflowState.mode, workflowTab]);
 
   useEffect(() => {
     if (requestedTemplateSource !== "deployment-detail") {
@@ -546,12 +984,19 @@ function DeploymentWorkflowPageContent() {
     });
     setWorkflowTab("create");
 
-    if (requestedSource === "server-review") {
+    if (requestedFromServerReview) {
       setWorkflowMessage(
         `Server "${targetServer.name}" is already selected from Server Review. Continue with the first deployment while that target is still understood.`,
       );
+      return;
     }
-  }, [requestedServerId, requestedSource, servers]);
+
+    if (requestedFromOverview) {
+      setWorkflowMessage(
+        `Server "${targetServer.name}" is already selected from Overview. Continue with the first deployment while that target is still understood.`,
+      );
+    }
+  }, [requestedFromOverview, requestedFromServerReview, requestedServerId, servers]);
 
   useEffect(() => {
     if (!requestedTemplateId || templates.length === 0) {
@@ -580,6 +1025,15 @@ function DeploymentWorkflowPageContent() {
       );
     }
   }, [requestedTemplateAction, requestedTemplateId, requestedTemplateSource, templates]);
+
+  useEffect(() => {
+    if (!shouldAutoFocusEntryImage || handoffImageFocusAppliedRef.current) {
+      return;
+    }
+
+    handoffImageFocusAppliedRef.current = true;
+    focusCreateForm({ scrollBehavior: "auto" });
+  }, [shouldAutoFocusEntryImage]);
 
   function updateFormField(event) {
     const { name, value } = event.target;
@@ -614,6 +1068,36 @@ function DeploymentWorkflowPageContent() {
 
   function addEnvRow() {
     setEnvRows((currentRows) => [...currentRows, { key: "", value: "" }]);
+  }
+
+  function focusCreateForm(options = {}) {
+    const { scrollBehavior = "smooth", focusImage = true } = options;
+
+    const scrollAndFocus = () => {
+      const createSection = createSectionRef.current;
+      if (createSection instanceof HTMLElement) {
+        createSection.scrollIntoView({ behavior: scrollBehavior, block: "start" });
+      }
+
+      if (!focusImage) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        const imageInput = createImageInputRef.current;
+        if (imageInput instanceof HTMLInputElement) {
+          imageInput.focus();
+        }
+      }, scrollBehavior === "smooth" ? 180 : 0);
+    };
+
+    if (workflowTab !== "create") {
+      setWorkflowTab("create");
+      window.setTimeout(scrollAndFocus, 80);
+      return;
+    }
+
+    scrollAndFocus();
   }
 
   function removeEnvRow(index) {
@@ -1157,7 +1641,9 @@ function DeploymentWorkflowPageContent() {
       );
       const data = await readJsonOrError(response, "Failed to deploy from template.");
       setTemplateCreatedDeployment(data);
-      setTemplateDeploySuccess("Deployment created from template.");
+      setTemplateDeploySuccess(
+        "Deployment created from template. Open runtime detail next while this rollout is still fresh.",
+      );
       await refreshWorkspace();
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -1189,6 +1675,30 @@ function DeploymentWorkflowPageContent() {
     ignoreTemplateId: editingTemplateId,
     canAccessServers,
   });
+  const rolloutDraftStarted = Boolean(
+    form.image.trim() ||
+      form.name.trim() ||
+      form.internal_port.trim() ||
+      form.external_port.trim() ||
+      templateName.trim() ||
+      editingTemplateId ||
+      rolloutDraftHasEnvRows,
+  );
+  const firstDeployImageDraftPending =
+    Boolean(form.server_id) &&
+    deployments.length === 0 &&
+    !form.image.trim() &&
+    !form.name.trim() &&
+    !form.internal_port.trim() &&
+    !templateName.trim() &&
+    !editingTemplateId &&
+    !rolloutDraftHasEnvRows;
+  const firstDeployCreatePriority = firstDeployImageDraftPending;
+  const firstDeployHandoffFocusMode =
+    requestedWithServerContext &&
+    Boolean(selectedCreateServer) &&
+    firstDeployImageDraftPending;
+  const showLiveTab = deployments.length > 0;
   const createDeploymentBlocked =
     submitting ||
     deploymentLimitReached ||
@@ -1205,11 +1715,11 @@ function DeploymentWorkflowPageContent() {
     templateFormPreflight,
   });
   const memberWorkflowNextStep = serverAccessBlocked
-    ? filteredDeployments.length > 0
+    ? memberHasLiveDeployments
       ? {
-          focus: "Live apps are still available",
+          focus: "Live apps are available for review",
           nextStep:
-            "Review the running deployments first while the saved server target stays with admins.",
+            "Review the deployments that already exist. Creating new remote deployments and choosing saved server targets stay with admins.",
           primaryAction: "Open live deployments",
           secondaryAction: "Copy next step",
           tone: "info",
@@ -1224,10 +1734,12 @@ function DeploymentWorkflowPageContent() {
         }
     : workflowNextStep;
   const pagePrimaryAction =
-    serverAccessBlocked && filteredDeployments.length === 0
+    serverAccessBlocked && !memberHasLiveDeployments
       ? { kind: "link", href: "/app", label: "Back to overview" }
       : serverAccessBlocked
         ? { kind: "button", tab: "live", label: "Open live deployments" }
+        : firstDeployHandoffFocusMode
+          ? { kind: "focus-create", label: "Set image for first deploy" }
         : workflowState.mode === "prerequisite"
           ? { kind: "link", href: "/app/server-review", label: "Open server review" }
           : failedDeploymentCount > 0
@@ -1237,6 +1749,7 @@ function DeploymentWorkflowPageContent() {
               : memberWorkflowNextStep.primaryAction === "Fix the create form"
                 ? { kind: "button", tab: "create", label: "Fix the create form" }
                 : { kind: "button", tab: "create", label: "Create deployment" };
+  const showMainNextStepPrimaryAction = !firstDeployHandoffFocusMode;
   const previewDiffRows = buildTemplateDiff(primaryTemplate, currentDraft, servers);
 
   if (!authChecked) {
@@ -1294,6 +1807,15 @@ function DeploymentWorkflowPageContent() {
                 >
                   {pagePrimaryAction.label}
                 </Link>
+              ) : pagePrimaryAction.kind === "focus-create" ? (
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-hero-primary-action"
+                  onClick={() => focusCreateForm()}
+                >
+                  {pagePrimaryAction.label}
+                </button>
               ) : (
                 <button
                   type="button"
@@ -1336,7 +1858,7 @@ function DeploymentWorkflowPageContent() {
             {workflowMessage}
           </div>
         ) : null}
-        {requestedSource === "server-review" && selectedCreateServer ? (
+        {requestedWithServerContext && selectedCreateServer ? (
           <article className="card formCard">
             <div className="sectionHeader">
               <div>
@@ -1395,13 +1917,55 @@ function DeploymentWorkflowPageContent() {
               </Link>
             </div>
           </article>
+        ) : memberHasLiveDeployments ? (
+          <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-member-live-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2 data-testid="deployment-workflow-member-live-title">
+                  Review live deployments with admin-managed targets
+                </h2>
+                <p className="formHint">
+                  Existing deployments can be reviewed here. Creating new remote deployments and choosing saved server targets stay with admins.
+                </p>
+              </div>
+            </div>
+            <div className="workspaceReviewerGrid">
+              <article className="workspaceReviewerCard">
+                <span>1. Review live apps</span>
+                <strong>Open one deployment</strong>
+                <p>Start from the live queue and open detail before asking for a rollout change.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>2. Keep targets hidden</span>
+                <strong>Admin-managed target</strong>
+                <p>Server inventory names, hosts, and target selection stay outside the member workflow.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>3. Ask for changes</span>
+                <strong>Bring a clear review note</strong>
+                <p>Use runtime detail and handoff tools to explain what needs an admin decision.</p>
+              </article>
+            </div>
+            <div className="formActions">
+              <button
+                type="button"
+                className="landingButton primaryButton"
+                onClick={() => setWorkflowTab("live")}
+              >
+                Open live deployments
+              </button>
+              <Link href="/app" className="landingButton secondaryButton">
+                Back to overview
+              </Link>
+            </div>
+          </article>
         ) : serverAccessBlocked ? (
           <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-member-blocked-card">
             <div className="sectionHeader workspaceGuideHeader">
               <div>
                 <h2>Server target is admin-managed</h2>
                 <p className="formHint">
-                  Members cannot access saved server inventory here. Ask an admin to confirm the remote target, then come back to create or review the rollout.
+                  Members cannot access saved server inventory here. Ask an admin to confirm the remote target first, then come back when Step 2 is actually open.
                 </p>
               </div>
             </div>
@@ -1412,9 +1976,9 @@ function DeploymentWorkflowPageContent() {
                 <p>Saved server targets stay with admins for this workspace.</p>
               </article>
               <article className="workspaceReviewerCard">
-                <span>2. Keep working</span>
-                <strong>Use the deployment workflow</strong>
-                <p>You can still review templates and plan the rollout while the target is being confirmed.</p>
+                <span>2. Keep the path clear</span>
+                <strong>Do not fill a blocked form early</strong>
+                <p>Until Step 1 is done, this page should stay simple instead of pretending rollout setup is already available.</p>
               </article>
               <article className="workspaceReviewerCard">
                 <span>3. Return here</span>
@@ -1426,9 +1990,15 @@ function DeploymentWorkflowPageContent() {
               <Link href="/app" className="landingButton primaryButton">
                 Back to overview
               </Link>
-              <Link href="/app/deployment-workflow" className="landingButton secondaryButton">
-                Stay in workflow
-              </Link>
+              {filteredDeployments.length > 0 ? (
+                <button
+                  type="button"
+                  className="landingButton secondaryButton"
+                  onClick={() => setWorkflowTab("live")}
+                >
+                  Open live deployments
+                </button>
+              ) : null}
             </div>
           </article>
         ) : null}
@@ -1456,6 +2026,14 @@ function DeploymentWorkflowPageContent() {
             <span className="status error">failed {failedDeploymentCount}</span>
             <span className="status info">templates {templates.length}</span>
           </div>
+          {firstDeployCreatePriority && templates.length > 0 ? (
+            <div
+              className="banner subtle inlineBanner"
+              data-testid="deployment-workflow-first-deploy-templates-note"
+            >
+              Saved setups stay here as a fallback. For this first deploy, start with the image unless you already know one template should win.
+            </div>
+          ) : null}
           {!serverAccessBlocked ? (
             <div
               className="filterTabs"
@@ -1463,14 +2041,16 @@ function DeploymentWorkflowPageContent() {
               aria-label="Deployment workflow tabs"
               data-testid="deployment-workflow-tabs-card"
             >
-              <button
-                type="button"
-                className={workflowTab === "live" ? "active" : ""}
-                onClick={() => setWorkflowTab("live")}
-                data-testid="deployment-workflow-tab-live"
-              >
-                Check live apps
-              </button>
+              {showLiveTab ? (
+                <button
+                  type="button"
+                  className={workflowTab === "live" ? "active" : ""}
+                  onClick={() => setWorkflowTab("live")}
+                  data-testid="deployment-workflow-tab-live"
+                >
+                  Check live apps
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={workflowTab === "create" ? "active" : ""}
@@ -1485,29 +2065,40 @@ function DeploymentWorkflowPageContent() {
                 onClick={() => setWorkflowTab("templates")}
                 data-testid="deployment-workflow-tab-templates"
               >
-                Use saved setup
+                {firstDeployCreatePriority ? "Use saved setup instead" : "Use saved setup"}
               </button>
             </div>
           ) : null}
           <div className="actionCluster">
-            {pagePrimaryAction.kind === "link" ? (
-              <Link
-                href={pagePrimaryAction.href}
-                className="landingButton primaryButton"
-                data-testid="deployment-workflow-main-next-step-button"
-              >
-                {pagePrimaryAction.label}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className="landingButton primaryButton"
-                data-testid="deployment-workflow-main-next-step-button"
-                onClick={() => setWorkflowTab(pagePrimaryAction.tab)}
-              >
-                {pagePrimaryAction.label}
-              </button>
-            )}
+            {showMainNextStepPrimaryAction
+              ? pagePrimaryAction.kind === "link" ? (
+                <Link
+                  href={pagePrimaryAction.href}
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-main-next-step-button"
+                >
+                  {pagePrimaryAction.label}
+                </Link>
+              ) : pagePrimaryAction.kind === "focus-create" ? (
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-main-next-step-button"
+                  onClick={() => focusCreateForm()}
+                >
+                  {pagePrimaryAction.label}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  data-testid="deployment-workflow-main-next-step-button"
+                  onClick={() => setWorkflowTab(pagePrimaryAction.tab)}
+                >
+                  {pagePrimaryAction.label}
+                </button>
+              )
+              : null}
             <button
               type="button"
               className="secondaryButton"
@@ -1521,7 +2112,7 @@ function DeploymentWorkflowPageContent() {
 
         <section hidden={workflowTab !== "live"}>
         <div
-          className="sectionHeader deploymentsHeader"
+          className="sectionHeader deploymentsHeader runtimeDeploymentsHeader"
           data-testid="runtime-deployments-section"
           id="runtime-deployments"
         >
@@ -1569,6 +2160,33 @@ function DeploymentWorkflowPageContent() {
           </div>
         </div>
 
+        <article
+          className="card formCard workspaceGuidePanel runtimeReviewPanel"
+          data-testid="runtime-deployments-review-panel"
+        >
+          <div className="sectionHeader workspaceGuideHeader">
+            <div>
+              <span className={`status ${primaryRuntimeReviewState.tone}`}>
+                {primaryRuntimeReviewState.label}
+              </span>
+              <h3>{primaryRuntimeReviewState.focus}</h3>
+              <p className="formHint">{primaryRuntimeReviewState.nextStep}</p>
+            </div>
+            <div className="workspaceMetaLine">
+              <span>{primaryRuntimeReviewState.summary}</span>
+            </div>
+          </div>
+          <div className="workspaceReviewerGrid runtimeReviewGrid">
+            {primaryRuntimeReviewState.checks.map((item) => (
+              <article className="workspaceReviewerCard" key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <p>{item.detail}</p>
+              </article>
+            ))}
+          </div>
+        </article>
+
         <div className="list" data-testid="runtime-deployments-list">
           {loading && deployments.length === 0 ? (
             <div className="empty">Loading deployments...</div>
@@ -1594,11 +2212,7 @@ function DeploymentWorkflowPageContent() {
                 <div>
                   <span className="deploymentCardEyebrow">Focus deployment</span>
                   <h3>{primaryRuntimeDeployment.container_name || primaryRuntimeDeployment.image || "Unnamed deployment"}</h3>
-                  <p>
-                    {primaryRuntimeDeployment.server_name
-                      ? `${primaryRuntimeDeployment.server_name} (${primaryRuntimeDeployment.server_host})`
-                      : "Local target"}
-                  </p>
+                  <p>{primaryRuntimeTargetLabel}</p>
                 </div>
                 <span className={`status ${primaryRuntimeDeployment.status || "unknown"}`}>
                   {primaryRuntimeDeployment.status || "unknown"}
@@ -1620,44 +2234,61 @@ function DeploymentWorkflowPageContent() {
                   </strong>
                 </div>
               </div>
-              <div className="row">
-                <span className="label">Created</span>
-                <span>{formatDate(primaryRuntimeDeployment.created_at)}</span>
+              <div className="runtimeDecisionNote">
+                <span className={`status ${primaryRuntimeReviewState.tone}`}>
+                  {primaryRuntimeReviewState.label}
+                </span>
+                <strong>{primaryRuntimeReviewState.nextStep}</strong>
+                <p>
+                  Created {formatDate(primaryRuntimeDeployment.created_at)}
+                  {primaryRuntimeDeployment.error ? ` · ${primaryRuntimeDeployment.error}` : ""}
+                </p>
               </div>
-              <div className="row">
-                <span className="label">Error</span>
-                <span>{primaryRuntimeDeployment.error || "-"}</span>
-              </div>
-              <div className="row">
-                <span className="label">URL</span>
-                <span>{buildDeploymentUrl(primaryRuntimeDeployment) || "-"}</span>
-              </div>
-              <div className="actions">
-                <Link
-                  href={`/deployments/${primaryRuntimeDeployment.id}`}
-                  className="linkButton"
-                  data-testid={`runtime-deployment-details-link-${primaryRuntimeDeployment.id}`}
-                >
-                  View details
-                </Link>
-                {buildDeploymentUrl(primaryRuntimeDeployment) ? (
+              <div className="actions runtimeCardActions">
+                {primaryRuntimeActionState?.showOpenAppPrimary ? (
                   <a
-                    href={buildDeploymentUrl(primaryRuntimeDeployment)}
+                    href={primaryRuntimeActionState.runtimeUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="linkButton"
+                    className={primaryRuntimeActionState.openAppClassName}
+                    data-testid={`runtime-deployment-open-app-link-${primaryRuntimeDeployment.id}`}
                   >
                     Open app
                   </a>
                 ) : null}
-                <button
-                  type="button"
-                  className="dangerButton"
-                  onClick={() => handleDelete(primaryRuntimeDeployment.id)}
-                  disabled={deletingDeploymentId === primaryRuntimeDeployment.id}
+                <Link
+                  href={`/deployments/${primaryRuntimeDeployment.id}`}
+                  className={primaryRuntimeActionState?.detailsClassName || "linkButton"}
+                  data-testid={`runtime-deployment-details-link-${primaryRuntimeDeployment.id}`}
                 >
-                  {deletingDeploymentId === primaryRuntimeDeployment.id ? "Deleting..." : "Delete"}
-                </button>
+                  {primaryRuntimeActionState?.detailsLabel || "View details"}
+                </Link>
+                {primaryRuntimeActionState?.showOpenAppSecondary ? (
+                  <a
+                    href={primaryRuntimeActionState.runtimeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={primaryRuntimeActionState.openAppClassName}
+                    data-testid={`runtime-deployment-open-app-link-${primaryRuntimeDeployment.id}`}
+                  >
+                    Open app
+                  </a>
+                ) : null}
+                {primaryRuntimeDeployment.status === "failed" ? (
+                  <div className="banner subtle inlineBanner">
+                    Review runtime issues before deleting this failed runtime.
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="dangerButton"
+                    data-testid={`runtime-deployment-delete-button-${primaryRuntimeDeployment.id}`}
+                    onClick={() => handleDelete(primaryRuntimeDeployment.id)}
+                    disabled={deletingDeploymentId === primaryRuntimeDeployment.id}
+                  >
+                    {deletingDeploymentId === primaryRuntimeDeployment.id ? "Deleting..." : "Delete"}
+                  </button>
+                )}
               </div>
             </article>
           ) : null}
@@ -1673,55 +2304,77 @@ function DeploymentWorkflowPageContent() {
                 </div>
               </div>
               <div className="timeline">
-                {secondaryRuntimeDeployments.map((deployment) => (
-                  <div className="timelineItem" key={deployment.id}>
-                    <div className="row">
-                      <span className="label">Deployment</span>
-                      <span>{deployment.container_name || deployment.image || "Unnamed deployment"}</span>
-                    </div>
-                    <div className="row">
-                      <span className="label">Status</span>
-                      <span className={`status ${deployment.status || "unknown"}`}>
-                        {deployment.status || "unknown"}
-                      </span>
-                    </div>
-                    <div className="row">
-                      <span className="label">Endpoint</span>
-                      <span>{buildDeploymentUrl(deployment) || "Internal only"}</span>
-                    </div>
-                    <div className="row">
-                      <span className="label">Created</span>
-                      <span>{formatDate(deployment.created_at)}</span>
-                    </div>
-                    <div className="actions">
-                      <Link
-                        href={`/deployments/${deployment.id}`}
-                        className="linkButton"
-                        data-testid={`runtime-deployment-details-link-${deployment.id}`}
-                      >
-                        View details
-                      </Link>
-                      {buildDeploymentUrl(deployment) ? (
-                        <a
-                          href={buildDeploymentUrl(deployment)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="linkButton"
+                {secondaryRuntimeDeployments.map((deployment) => {
+                  const runtimeActionState = buildRuntimeCardActionState(deployment);
+
+                  return (
+                    <div className="timelineItem" key={deployment.id}>
+                      <div className="row">
+                        <span className="label">Deployment</span>
+                        <span>{deployment.container_name || deployment.image || "Unnamed deployment"}</span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Status</span>
+                        <span className={`status ${deployment.status || "unknown"}`}>
+                          {deployment.status || "unknown"}
+                        </span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Endpoint</span>
+                        <span>{runtimeActionState.runtimeUrl || "Internal only"}</span>
+                      </div>
+                      <div className="row">
+                        <span className="label">Created</span>
+                        <span>{formatDate(deployment.created_at)}</span>
+                      </div>
+                      <div className="actions">
+                        {runtimeActionState.showOpenAppPrimary ? (
+                          <a
+                            href={runtimeActionState.runtimeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={runtimeActionState.openAppClassName}
+                            data-testid={`runtime-deployment-open-app-link-${deployment.id}`}
+                          >
+                            Open app
+                          </a>
+                        ) : null}
+                        <Link
+                          href={`/deployments/${deployment.id}`}
+                          className={runtimeActionState.detailsClassName}
+                          data-testid={`runtime-deployment-details-link-${deployment.id}`}
                         >
-                          Open app
-                        </a>
-                      ) : null}
+                          {runtimeActionState.detailsLabel}
+                        </Link>
+                        {runtimeActionState.showOpenAppSecondary ? (
+                          <a
+                            href={runtimeActionState.runtimeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={runtimeActionState.openAppClassName}
+                            data-testid={`runtime-deployment-open-app-link-${deployment.id}`}
+                          >
+                            Open app
+                          </a>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </article>
           ) : null}
         </div>
         </section>
 
-        <section hidden={workflowTab !== "create" || serverAccessBlocked}>
-        <article className="card formCard" data-testid="create-deployment-card" id="create-deployment">
+        {!serverAccessBlocked ? (
+        <section hidden={workflowTab !== "create"}>
+        <article
+          ref={createSectionRef}
+          className="card formCard"
+          data-testid="create-deployment-card"
+          id="create-deployment"
+        >
           <h2 data-testid="create-deployment-title">Step 2A: Start one app</h2>
           <p className="formHint">
             {serverAccessBlocked
@@ -1762,12 +2415,16 @@ function DeploymentWorkflowPageContent() {
             <label className="field">
               <span>Image</span>
               <input
+                ref={createImageInputRef}
                 name="image"
                 value={form.image}
                 onChange={updateFormField}
                 placeholder="nginx:latest"
                 disabled={submitting}
                 required
+                autoFocus={shouldAutoFocusEntryImage}
+                data-testid="create-deployment-image-input"
+                data-handoff-focus-source={shouldAutoFocusEntryImage ? requestedSource : undefined}
               />
             </label>
 
@@ -1778,8 +2435,10 @@ function DeploymentWorkflowPageContent() {
                   : selectedCreateServer
                     ? `The app image is set and "${selectedCreateServer.name}" is already selected. Create now if the defaults are enough, or only open advanced setup for ports, env vars, or template save.`
                     : "The app image is set. Create now if the defaults are enough, or open advanced setup only for ports, env vars, server target, and template save."
-                : selectedCreateServer && requestedSource === "server-review"
-                  ? `Server "${selectedCreateServer.name}" is already selected from Step 1. Set the image next and keep the rest closed unless the rollout really needs more.`
+                : selectedCreateServer && requestedWithServerContext
+                  ? requestedFromOverview
+                    ? `Overview already handed you "${selectedCreateServer.name}". Set the image next and keep the rest closed unless the rollout really needs more.`
+                    : `Server "${selectedCreateServer.name}" is already selected from Step 1. Set the image next and keep the rest closed unless the rollout really needs more.`
                   : serverAccessBlocked
                     ? "Set the image first. Members cannot choose a saved server target here, so keep everything else focused on the rollout itself."
                     : "Set the image first. Everything else is optional and can stay closed until you actually need it."}
@@ -1979,8 +2638,10 @@ function DeploymentWorkflowPageContent() {
           </form>
 
           {submitError ? <div className="banner error">{submitError}</div> : null}
-          {templateFormPreflight.errors.length > 0 ? (
-            <div className="banner error">{templateFormPreflight.errors[0]}</div>
+          {rolloutDraftStarted && templateFormPreflight.errors.length > 0 ? (
+            <div className="banner error" data-testid="create-preflight-error-banner">
+              {templateFormPreflight.errors[0]}
+            </div>
           ) : null}
           {templateFormPreflight.warnings.length > 0 ? (
             <div className="banner subtle">
@@ -2007,7 +2668,7 @@ function DeploymentWorkflowPageContent() {
             </div>
           ) : null}
           {submitSuccess ? (
-            <div className="banner success">
+            <div className="banner success" data-testid="create-deployment-success-banner">
               <div>{submitSuccess}</div>
               {createdDeployment?.container_name || createdDeployment?.image ? (
                 <div className="formHint">
@@ -2017,7 +2678,11 @@ function DeploymentWorkflowPageContent() {
               {createdDeployment?.id || buildDeploymentUrl(createdDeployment) ? (
                 <div className="successActions">
                   {createdDeployment?.id ? (
-                    <Link href={`/deployments/${createdDeployment.id}`} className="landingButton primaryButton">
+                    <Link
+                      href={`/deployments/${createdDeployment.id}?source=workflow-success`}
+                      className="landingButton primaryButton"
+                      data-testid="create-deployment-success-open-detail-link"
+                    >
                       Open runtime detail
                     </Link>
                   ) : null}
@@ -2045,6 +2710,7 @@ function DeploymentWorkflowPageContent() {
           ) : null}
         </article>
         </section>
+        ) : null}
 
         {waitingForAdminTarget ? (
           <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-member-waiting-card">
@@ -2076,7 +2742,8 @@ function DeploymentWorkflowPageContent() {
           </article>
         ) : null}
 
-        <section hidden={workflowTab !== "templates" || serverAccessBlocked}>
+        {!serverAccessBlocked ? (
+        <section hidden={workflowTab !== "templates"}>
         <article className="card formCard" data-testid="templates-card" id="templates">
           <div className="sectionHeader" data-testid="templates-section-header">
             <div>
@@ -2338,8 +3005,12 @@ function DeploymentWorkflowPageContent() {
               {templateCreatedDeployment?.id || buildDeploymentUrl(templateCreatedDeployment) ? (
                 <div className="successActions">
                   {templateCreatedDeployment?.id ? (
-                    <Link href={`/deployments/${templateCreatedDeployment.id}`} className="linkButton">
-                      View details
+                    <Link
+                      href={`/deployments/${templateCreatedDeployment.id}?source=workflow-success`}
+                      className="landingButton primaryButton"
+                      data-testid="template-deploy-success-open-detail-link"
+                    >
+                      Open runtime detail
                     </Link>
                   ) : null}
                   {buildDeploymentUrl(templateCreatedDeployment) ? (
@@ -2348,10 +3019,19 @@ function DeploymentWorkflowPageContent() {
                       target="_blank"
                       rel="noreferrer"
                       className="linkButton"
+                      data-testid="template-deploy-success-open-app-link"
                     >
                       Open app
                     </a>
                   ) : null}
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => setWorkflowTab("live")}
+                    data-testid="template-deploy-success-open-live-button"
+                  >
+                    Review live queue
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -2368,6 +3048,7 @@ function DeploymentWorkflowPageContent() {
           ) : null}
         </article>
         </section>
+        ) : null}
       </div>
     </main>
   );

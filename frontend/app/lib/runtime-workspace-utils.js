@@ -43,6 +43,136 @@ export function formatServerLabel(serverName, serverHost) {
   return serverName ? `${serverName} (${serverHost})` : "Local";
 }
 
+export function formatAccessibleServerLabel({
+  canAccessServers,
+  serverName,
+  serverHost,
+  serverId,
+  serverManagedByAdmin = false,
+  localLabel = "Local",
+  managedLabel = "Managed by an admin",
+}) {
+  if (canAccessServers) {
+    if (serverName) {
+      return formatServerLabel(serverName, serverHost);
+    }
+
+    if (serverId) {
+      return serverId;
+    }
+  }
+
+  return serverId || serverManagedByAdmin ? managedLabel : localLabel;
+}
+
+function redactRuntimeInventoryText(value, sensitiveValues) {
+  if (typeof value !== "string" || sensitiveValues.length === 0) {
+    return value;
+  }
+
+  return sensitiveValues.reduce(
+    (current, sensitiveValue) => current.split(sensitiveValue).join("admin-managed target"),
+    value,
+  );
+}
+
+function redactRuntimeInventoryObject(value, sensitiveValues) {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactRuntimeInventoryObject(item, sensitiveValues));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        redactRuntimeInventoryObject(item, sensitiveValues),
+      ]),
+    );
+  }
+
+  return redactRuntimeInventoryText(value, sensitiveValues);
+}
+
+function buildRuntimeInventorySensitiveValues(deployment, diagnostics) {
+  return [
+    deployment?.server_name,
+    deployment?.server_id,
+    diagnostics?.server_target,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value))
+    .sort((left, right) => right.length - left.length);
+}
+
+function sanitizeRuntimeDeploymentForExport(deployment, sensitiveValues) {
+  if (!deployment) {
+    return null;
+  }
+
+  const {
+    server_id: serverId,
+    server_name: _serverName,
+    server_host: _serverHost,
+    ...safeDeployment
+  } = deployment;
+  return {
+    ...redactRuntimeInventoryObject(safeDeployment, sensitiveValues),
+    target: serverId || deployment.server_managed_by_admin ? "Managed by an admin" : "Local",
+  };
+}
+
+function sanitizeRuntimeDiagnosticsForExport(diagnostics, deployment, sensitiveValues) {
+  if (!diagnostics) {
+    return null;
+  }
+
+  return {
+    ...redactRuntimeInventoryObject(diagnostics, sensitiveValues),
+    server_target:
+      deployment?.server_id || deployment?.server_managed_by_admin ? "Managed by an admin" : null,
+  };
+}
+
+export function buildAccessControlledRuntimeExportPayload({
+  deployment,
+  health,
+  diagnostics,
+  activity,
+  attentionItems,
+  suggestedPorts,
+  canAccessServers,
+}) {
+  if (canAccessServers) {
+    return {
+      deployment,
+      health,
+      diagnostics,
+      activity: Array.isArray(activity) ? activity : [],
+      attentionItems: Array.isArray(attentionItems) ? attentionItems : [],
+      suggestedPorts: Array.isArray(suggestedPorts) ? suggestedPorts : [],
+    };
+  }
+
+  const sensitiveValues = buildRuntimeInventorySensitiveValues(deployment, diagnostics);
+
+  return {
+    deployment: sanitizeRuntimeDeploymentForExport(deployment, sensitiveValues),
+    health: redactRuntimeInventoryObject(health || null, sensitiveValues),
+    diagnostics: sanitizeRuntimeDiagnosticsForExport(diagnostics, deployment, sensitiveValues),
+    activity: redactRuntimeInventoryObject(Array.isArray(activity) ? activity : [], sensitiveValues),
+    attentionItems: redactRuntimeInventoryObject(
+      Array.isArray(attentionItems) ? attentionItems : [],
+      sensitiveValues,
+    ),
+    suggestedPorts:
+      deployment?.server_id || deployment?.server_managed_by_admin
+        ? []
+        : Array.isArray(suggestedPorts)
+          ? suggestedPorts
+          : [],
+  };
+}
+
 export function formatPortMapping(internalPort, externalPort) {
   if (!internalPort || !externalPort) {
     return "No port mapping";
@@ -221,7 +351,7 @@ export function buildOverviewPrimaryPath({
   if (!isAdmin && !localDeploymentsEnabled && deploymentsTotal === 0) {
     return {
       href: "/app/deployment-workflow",
-      label: "See what opens next",
+      label: "Review rollout status",
       title: "Wait for the server target",
       detail:
         "An admin still needs to confirm one saved server target before the first remote deployment can start here.",
@@ -413,6 +543,12 @@ export function buildDeploymentWorkflowNextStep({
   const failedDeployment =
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
     null;
+  const rolloutDraftStarted =
+    form.image.trim() ||
+    form.name.trim() ||
+    form.internal_port.trim() ||
+    form.external_port.trim() ||
+    templateName.trim();
 
   if (failedDeployment) {
     return {
@@ -433,6 +569,17 @@ export function buildDeploymentWorkflowNextStep({
       primaryAction: "Review live deployments",
       secondaryAction: "Copy next step",
       tone: "error",
+    };
+  }
+
+  if (form.server_id && filteredDeployments.length === 0 && !rolloutDraftStarted) {
+    return {
+      focus: "Start the first deployment",
+      nextStep:
+        "Step 1 is already done for the selected server. Set the image first and keep saved setups or live review secondary until the first deployment exists.",
+      primaryAction: "Create deployment",
+      secondaryAction: "Copy next step",
+      tone: "info",
     };
   }
 
@@ -730,7 +877,7 @@ export function buildOpsSnapshot({ currentUser, deployments, servers, notificati
     },
     capabilities: {
       local_docker_enabled: process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0",
-      ssh_host_key_checking: process.env.NEXT_PUBLIC_SSH_HOST_KEY_CHECKING || "accept-new",
+      ssh_host_key_checking: process.env.NEXT_PUBLIC_SSH_HOST_KEY_CHECKING || "yes",
       server_credentials_key_configured: Boolean(
         process.env.NEXT_PUBLIC_SERVER_CREDENTIALS_KEY_CONFIGURED,
       ),

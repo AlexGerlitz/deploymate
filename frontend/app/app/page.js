@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminDisclosureSection } from "./admin-ui";
 import {
+  smokeDeployments,
   smokeMode,
   smokeOverviewDeployments,
   smokeOverviewNotifications,
   smokeOverviewOpsOverview,
   smokeOverviewServers,
   smokeOverviewTemplates,
+  smokeServers,
   smokeUser,
 } from "../lib/smoke-fixtures";
 import {
@@ -28,6 +30,28 @@ const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const localDeploymentsEnabled =
   process.env.NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED !== "0";
+const smokeOverviewScenario =
+  process.env.NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO || "default";
+const smokeMemberOverviewDeployments = smokeDeployments.map(
+  ({ server_id: _serverId, server_name: _serverName, server_host: _serverHost, ...deployment }) => ({
+    ...deployment,
+    server_managed_by_admin: true,
+  }),
+);
+const smokeHomeDeployments =
+  smokeMode && smokeOverviewScenario === "member-live-review"
+    ? smokeMemberOverviewDeployments
+    : smokeOverviewDeployments;
+const smokeHomeServers =
+  smokeMode && smokeOverviewScenario === "admin-server-ready-first-deploy"
+    ? smokeServers.slice(0, 1)
+    : smokeOverviewServers;
+const smokeHomeOpsOverview =
+  smokeMode &&
+  (smokeOverviewScenario === "member-live-review" ||
+    smokeOverviewScenario === "admin-server-ready-first-deploy")
+    ? null
+    : smokeOverviewOpsOverview;
 
 export default function HomePage() {
   const router = useRouter();
@@ -35,8 +59,8 @@ export default function HomePage() {
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
-  const [deployments, setDeployments] = useState(smokeMode ? smokeOverviewDeployments : []);
-  const [servers, setServers] = useState(smokeMode ? smokeOverviewServers : []);
+  const [deployments, setDeployments] = useState(smokeMode ? smokeHomeDeployments : []);
+  const [servers, setServers] = useState(smokeMode ? smokeHomeServers : []);
   const [notifications, setNotifications] = useState(smokeMode ? smokeOverviewNotifications : []);
   const [templates, setTemplates] = useState(smokeMode ? smokeOverviewTemplates : []);
   const [loading, setLoading] = useState(!smokeMode);
@@ -48,7 +72,7 @@ export default function HomePage() {
   const [serversError, setServersError] = useState("");
   const [notificationsError, setNotificationsError] = useState("");
   const [templatesError, setTemplatesError] = useState("");
-  const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeOverviewOpsOverview : null);
+  const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeHomeOpsOverview : null);
   const [opsActionMessage, setOpsActionMessage] = useState("");
   const [opsActionError, setOpsActionError] = useState("");
 
@@ -62,6 +86,8 @@ export default function HomePage() {
       templates,
     });
   const canAccessServers = Boolean(currentUser?.is_admin);
+  const memberRemoteOnly = !canAccessServers && !localDeploymentsEnabled;
+  const memberHasLiveDeployments = memberRemoteOnly && opsSnapshot.deployments.total > 0;
   const degradedOpsAttentionItems = opsSnapshot.attention_items.filter((item) =>
     item.title.includes("temporarily unavailable"),
   );
@@ -72,6 +98,19 @@ export default function HomePage() {
     failedDeployments: opsSnapshot.deployments.failed,
     serversTotal: opsSnapshot.servers.total,
   });
+  const singleServerFirstDeployTarget =
+    canAccessServers &&
+    !localDeploymentsEnabled &&
+    opsSnapshot.deployments.total === 0 &&
+    servers.length === 1
+      ? servers[0]
+      : null;
+  const firstDeployWorkflowHref = singleServerFirstDeployTarget
+    ? `/app/deployment-workflow?${new URLSearchParams({
+        server: singleServerFirstDeployTarget.id,
+        source: "overview-first-deploy",
+      }).toString()}`
+    : "/app/deployment-workflow";
   const memberServerCopy = canAccessServers
     ? null
     : localDeploymentsEnabled
@@ -85,23 +124,18 @@ export default function HomePage() {
           stepAction: "Open deployment workflow",
         }
       : {
-          headline: "Server target is managed by an admin",
-          support:
-            "Members do not manage saved server targets here. Ask an admin to confirm the remote target, then return to Deployment Workflow.",
-          stepTitle: "Wait for the server target",
-          stepDetail:
-            "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
-          stepAction: "See what opens next",
+          headline: memberHasLiveDeployments
+            ? "Server target stays admin-managed"
+            : "Server target is managed by an admin",
+          support: memberHasLiveDeployments
+            ? "Review the deployments that already exist. Ask an admin before a new remote rollout or target change."
+            : "Members do not manage saved server targets here. Ask an admin to confirm the remote target, then return to Deployment Workflow.",
+          stepTitle: memberHasLiveDeployments ? "Server target stays with admins" : "Wait for the server target",
+          stepDetail: memberHasLiveDeployments
+            ? "You can review existing deployments, but target control and new remote deploys stay admin-managed."
+            : "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
+          stepAction: memberHasLiveDeployments ? "Open live review" : "Review rollout status",
         };
-  const beginnerStatusSummary = canAccessServers
-    ? servers.length === 0
-      ? "No server connected yet. Start with Step 1."
-      : deployments.length === 0
-        ? `${servers.length} server target${servers.length === 1 ? "" : "s"} connected. No deployments yet.`
-        : `${opsSnapshot.deployments.running} running · ${opsSnapshot.deployments.failed} failed · ${servers.length} server target${servers.length === 1 ? "" : "s"} saved.`
-    : localDeploymentsEnabled
-      ? "Server inventory is admin-managed. Use the deployment workflow to continue."
-      : "Server target is admin-managed. Return to the deployment workflow once it is confirmed.";
   const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
     ? "Next best step: connect and verify one server."
     : overviewPrimaryPath.reason === "incident"
@@ -113,43 +147,17 @@ export default function HomePage() {
         : deployments.length === 0
           ? "Next best step: choose which app to run on that server."
           : "Next best step: open your app list and continue from one running service.";
+  const waitingForAdminTarget = overviewPrimaryPath.reason === "admin-target-needed";
+  const waitingForServerSetup = overviewPrimaryPath.reason === "server-setup";
+  const memberNewDeploymentBlocked = memberHasLiveDeployments;
+  const stepTwoBlocked =
+    waitingForServerSetup || waitingForAdminTarget || memberNewDeploymentBlocked;
+  const stepThreeBlocked =
+    waitingForServerSetup || waitingForAdminTarget || opsSnapshot.deployments.total === 0;
+  const stepThreeIsPrimary = memberHasLiveDeployments && !stepThreeBlocked;
   const stepOneIsPrimary =
     overviewPrimaryPath.reason === "server-setup" ||
     overviewPrimaryPath.reason === "admin-target-needed";
-  const heroHeadline = canAccessServers
-    ? servers.length === 0
-      ? "DeployMate helps you run one app on one server in three simple steps."
-      : deployments.length === 0
-        ? "Step 1 is done. Now choose one app to run on that server."
-        : "Your app is already running. Check health first, then make the next change."
-    : localDeploymentsEnabled
-      ? "DeployMate still gives you a simple path even when admins manage saved servers."
-      : "Your deployment target is admin-managed. Confirm it with an admin, then continue.";
-  const heroSupportText = canAccessServers
-    ? servers.length === 0
-      ? "In plain language: tell DeployMate which machine to use, choose the app image to start, and then check whether the app stays healthy."
-      : deployments.length === 0
-        ? "You already connected the machine. Stay on the main path now: choose one app image or one saved setup and start it."
-        : "Stay on the main path: open the app workspace, review what is healthy, and only then decide what to change next."
-    : localDeploymentsEnabled
-      ? "Members can still choose what to run and review health while admins keep the saved server list up to date."
-      : "Members do not manage saved server targets here. Ask an admin to confirm the target, then return to the workflow.";
-  const explanationTitle = canAccessServers
-    ? servers.length === 0
-      ? "What DeployMate means in plain language"
-      : "What this app is helping you do"
-    : localDeploymentsEnabled
-      ? "What changes when admins manage saved servers"
-      : "What happens after an admin confirms the target";
-  const explanationBody = canAccessServers
-    ? servers.length === 0
-      ? "You do not need to learn the whole workspace first. Just understand the three-step path and take the next step."
-      : deployments.length === 0
-        ? "This workspace is already past the server step. The next decision is simply what app to run first."
-        : "You already have a running runtime story. Open the workflow to review status and keep the next action deliberate."
-    : localDeploymentsEnabled
-      ? "Admins keep the saved server list, but you can still understand the path: choose what to run, start it, and check health."
-      : "Once an admin confirms the saved server target, use Deployment Workflow to create or review the rollout.";
   const beginnerSteps = [
     {
       key: "step-1",
@@ -161,46 +169,66 @@ export default function HomePage() {
       href: canAccessServers ? "/app/server-review" : "/app/deployment-workflow",
       actionLabel: canAccessServers ? "Open server setup" : memberServerCopy?.stepAction || "Open deployment workflow",
       primary: stepOneIsPrimary,
+      disabled: false,
     },
     {
       key: "step-2",
       step: "Step 2",
       title: "Choose your app",
-      detail: "Paste the app image you want to run, or pick a saved setup if you already have one.",
-      href: "/app/deployment-workflow",
-      actionLabel: "Choose app to run",
-      primary: !stepOneIsPrimary,
+      detail: stepTwoBlocked
+        ? waitingForAdminTarget
+          ? "This step opens after an admin confirms one saved server target for the workspace."
+          : memberNewDeploymentBlocked
+            ? "New remote deployments need an admin-managed target. Review the live apps that already exist instead."
+            : "This step opens after Step 1 is done and one server is already connected."
+        : "Paste the app image you want to run, or pick a saved setup if you already have one.",
+      href: singleServerFirstDeployTarget ? firstDeployWorkflowHref : "/app/deployment-workflow",
+      actionLabel: stepTwoBlocked
+        ? memberNewDeploymentBlocked
+          ? "Ask admin for new deploy"
+          : "Opens after Step 1"
+        : "Choose app to run",
+      primary: !stepOneIsPrimary && !stepThreeIsPrimary,
+      disabled: stepTwoBlocked,
     },
     {
       key: "step-3",
       step: "Step 3",
-      title: "Start it and check status",
-      detail: "Start the app, then open live status to confirm it is running, healthy, and reachable.",
+      title: memberHasLiveDeployments ? "Review live apps" : "Start it and check status",
+      detail: stepThreeBlocked
+        ? "This step opens after the first deployment exists and DeployMate has live runtime state to review."
+        : memberHasLiveDeployments
+          ? "Open live status and runtime detail without exposing saved server inventory or target controls."
+        : "Start the app, then open live status to confirm it is running, healthy, and reachable.",
       href: "/app/deployment-workflow",
-      actionLabel: "See running apps",
-      primary: false,
+      actionLabel: stepThreeBlocked
+        ? "Opens after deploy"
+        : memberHasLiveDeployments
+          ? "Review live apps"
+          : "See running apps",
+      primary: stepThreeIsPrimary,
+      disabled: stepThreeBlocked,
     },
   ];
-  const plainLanguageCards = [
-    {
-      title: "What “server” means here",
-      detail: canAccessServers
-        ? "It is simply the machine where your app will run. Step 1 only tells DeployMate how to reach that machine."
-        : localDeploymentsEnabled
-          ? "Admins keep the saved server list, but your rollout path still starts by choosing what to run."
-          : "The remote machine is confirmed by an admin first, then you continue in the rollout workflow.",
-    },
-    {
-      title: "What “choose your app” means",
-      detail:
-        "Usually this is a container image like `nginx:latest`, or one saved template that already remembers the image, ports, and env vars.",
-    },
-    {
-      title: "What “healthy” means",
-      detail:
-        "After the app starts, DeployMate shows whether it is running and whether the health checks and runtime details look good enough to keep going.",
-    },
-  ];
+  const workspaceBoardSteps = beginnerSteps.map((card) => ({
+    ...card,
+    boardTitle:
+      card.key === "step-1"
+        ? canAccessServers
+          ? "Connect server"
+          : card.title
+        : card.key === "step-2"
+          ? "Deploy app"
+          : memberHasLiveDeployments
+            ? "Review live apps"
+            : "Review health",
+    boardState: card.primary ? "Current" : card.disabled ? "Locked" : "Ready",
+    boardDestination: card.href.includes("/app/server-review")
+      ? "Opens Server review"
+      : card.href.includes("/app/deployment-workflow")
+        ? "Opens Deployment workflow"
+        : "Opens workspace",
+  }));
   const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
     opsSnapshot.attention_items.length === 1 ? "" : "s"
   }`;
@@ -447,17 +475,6 @@ export default function HomePage() {
     };
   }, [authChecked]);
 
-  async function handleLogout() {
-    try {
-      await fetch(`${apiBaseUrl}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } finally {
-      router.replace("/login");
-    }
-  }
-
   function clearOpsMessages() {
     setOpsActionMessage("");
     setOpsActionError("");
@@ -562,152 +579,65 @@ export default function HomePage() {
   }
 
   return (
-    <main className="page">
-      <div className="container">
-        <section className="workspaceHero">
-          <div className="workspaceHeroBackdrop" />
-          <div className="header workspaceHeroHeader">
-            <div>
-              <div className="eyebrow">Begin here</div>
-              <h1 data-testid="runtime-page-title">DeployMate</h1>
-              <p>{heroHeadline}</p>
-              <p className="formHint">{heroSupportText}</p>
-              <p className="formHint">
-                Right now: <strong>{overviewPrimaryPath.title}</strong>
-              </p>
-            </div>
-            <div className="buttonRow workspaceHeroActions">
-              <Link
-                href={overviewPrimaryPath.href}
-                className="landingButton primaryButton"
-                data-testid="workspace-hero-primary-action"
+    <main className="page workspaceActionPage">
+      <div className="container workspaceActionContainer">
+        <section className="workspaceActionSurface" data-testid="workspace-action-surface">
+          <div className="workspaceActionSurfaceHeader" data-testid="workspace-scenario-card">
+            <span className="workspaceActionSurfaceEyebrow">Main workspace</span>
+            <h1 data-testid="runtime-page-title">Choose the next step.</h1>
+            <p>{beginnerNextStep}</p>
+            <p data-testid="workspace-scenario-title">Step 1, Step 2, Step 3.</p>
+          </div>
+
+          <div className="workspaceActionGrid" data-testid="workspace-quick-actions">
+            {workspaceBoardSteps.map((card) => (
+              <article
+                key={card.key}
+                className={`workspaceActionCard ${card.primary ? "isPrimary" : card.disabled ? "isLocked" : "isReady"}`}
+                data-testid={`workspace-scenario-item-${card.key}`}
               >
-                {overviewPrimaryPath.label}
-              </Link>
-              <button type="button" onClick={handleLogout} className="workspaceGhostAction">
-                Logout
-              </button>
-            </div>
-          </div>
-
-          <article className="card formCard workspaceGuidePanel" data-testid="workspace-scenario-card">
-            <div className="sectionHeader workspaceGuideHeader">
-              <div>
-                <h2 data-testid="workspace-scenario-title">Do this now, then keep going in order</h2>
-                <p className="formHint">
-                  If you are new here, ignore the deeper admin surfaces for now and just follow the next step.
-                </p>
-              </div>
-            </div>
-            <div className="workspaceGuideGrid" data-testid="workspace-scenario-grid">
-              <div className="workspaceGuideSteps">
-                <article className="workspaceGlancePanel workspacePriorityPanel" data-testid="workspace-primary-task-card">
-                  <div className="workspaceGlanceHeader">
-                    <span className="eyebrow">Do this now</span>
-                    <strong>{overviewPrimaryPath.title}</strong>
-                  </div>
-                  <p className="formHint">{overviewPrimaryPath.detail}</p>
-                  <div className="formActions">
-                    <Link
-                      href={overviewPrimaryPath.href}
-                      className="landingButton primaryButton"
-                      data-testid="workspace-primary-task-action"
-                    >
-                      {overviewPrimaryPath.label}
-                    </Link>
-                  </div>
-                </article>
-
-                <div className="stepsGrid">
-                  {beginnerSteps.map((card) => (
-                    <article
-                      key={card.key}
-                      className="stepCard workspaceStepCard"
-                      data-testid={`workspace-scenario-item-${card.key}`}
-                    >
-                      <span className="stepNumber">{card.step}</span>
-                      <h3>{card.title}</h3>
-                      <p>{card.detail}</p>
-                      <Link
-                        href={card.href}
-                        className={card.primary ? "landingButton primaryButton" : "landingButton secondaryButton"}
-                        data-testid={`workspace-scenario-action-${card.key}`}
-                      >
-                        {card.actionLabel}
-                      </Link>
-                    </article>
-                  ))}
+                <div className="workspaceActionCardHeader">
+                  <span className="workspaceActionCardIcon">{card.step.replace("Step ", "0")}</span>
+                  <span className="workspaceActionCardState">{card.boardState}</span>
                 </div>
-              </div>
-              <aside className="workspaceGlancePanel">
-                <div className="workspaceGlanceHeader">
-                  <span className="eyebrow">Current state</span>
-                  <strong>{beginnerStatusSummary}</strong>
-                </div>
-                <div className="workspaceGlanceList">
-                  <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Step 1</span>
-                    <strong>
-                      {canAccessServers
-                        ? servers.length === 0
-                          ? "Connect server"
-                          : "Server ready"
-                        : localDeploymentsEnabled
-                          ? "Server inventory managed"
-                          : "Server target managed"}
-                    </strong>
-                    <p>
-                      {canAccessServers
-                        ? servers.length === 0
-                          ? "Add one server target so DeployMate can reach your machine."
-                          : `${servers.length} server target${servers.length === 1 ? "" : "s"} saved for rollout.`
-                        : localDeploymentsEnabled
-                          ? "Members can keep rolling out without touching the saved server list."
-                          : "Ask an admin to confirm the target before you create a remote deployment."}
-                    </p>
-                  </div>
-                  <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Step 2</span>
-                    <strong>{deployments.length === 0 ? "Choose first app" : "Choose next app"}</strong>
-                    <p>
-                      Use the deployment workflow to choose the image or saved setup you want to run.
-                    </p>
-                  </div>
-                  <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Step 3</span>
-                    <strong>{deployments.length === 0 ? "Check health after deploy" : "Review live health"}</strong>
-                    <p>
-                      Open the live runtime list or deployment detail and confirm the app is healthy before the next change.
-                    </p>
-                  </div>
-                  <div className="workspaceStatusCard workspaceGlanceItem">
-                    <span>Right now</span>
-                    <strong>Keep the first pass simple</strong>
-                    <p>{beginnerNextStep}</p>
-                  </div>
-                </div>
-              </aside>
-            </div>
-          </article>
-        </section>
 
-        <article className="card formCard workspaceGuidePanel">
-          <div className="sectionHeader workspaceGuideHeader">
-            <div>
-              <h2>{explanationTitle}</h2>
-              <p className="formHint">{explanationBody}</p>
-            </div>
-          </div>
-          <div className="workspaceReviewerGrid">
-            {plainLanguageCards.map((card) => (
-              <article key={card.title} className="workspaceReviewerCard">
-                <span>Plain language</span>
-                <strong>{card.title}</strong>
-                <p>{card.detail}</p>
+                <span
+                  className={`workspaceActionPrimaryMarker${card.primary ? "" : " isPlaceholder"}`}
+                  data-testid={card.primary ? "workspace-primary-task-card" : undefined}
+                  aria-hidden={!card.primary}
+                >
+                  {card.primary ? "Current step" : "Step marker"}
+                </span>
+
+                <div className="workspaceActionCardCopy">
+                  <h2>{card.boardTitle}</h2>
+                  <p>{card.detail}</p>
+                </div>
+
+                <div className="workspaceActionCardMeta">{card.boardDestination}</div>
+
+                {card.disabled ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="landingButton secondaryButton workspaceActionButton"
+                    data-testid={`workspace-scenario-action-${card.key}`}
+                  >
+                    {card.actionLabel}
+                  </button>
+                ) : (
+                  <Link
+                    href={card.href}
+                    className="landingButton secondaryButton workspaceActionButton"
+                    data-testid={`workspace-scenario-action-${card.key}`}
+                  >
+                    {card.actionLabel}
+                  </Link>
+                )}
               </article>
             ))}
           </div>
-        </article>
+        </section>
 
         <div className="workspaceBannerStack">
           {error ? <div className="banner error">{error}</div> : null}
@@ -930,7 +860,7 @@ export default function HomePage() {
                     Local Docker {opsSnapshot.capabilities?.local_docker_enabled ? "enabled" : "disabled"}
                   </span>
                   <span>
-                    SSH trust {opsSnapshot.capabilities?.ssh_host_key_checking || "accept-new"}
+                    SSH trust {opsSnapshot.capabilities?.ssh_host_key_checking || "yes"}
                   </span>
                   <span>
                     Cred key {opsSnapshot.capabilities?.server_credentials_key_configured ? "configured" : "missing"}

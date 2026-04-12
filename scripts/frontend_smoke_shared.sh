@@ -35,11 +35,30 @@ frontend_smoke_url_alive() {
 }
 
 frontend_smoke_port_pids() {
-  if ! command -v lsof >/dev/null 2>&1; then
-    return 0
+  local pids=""
+
+  if command -v lsof >/dev/null 2>&1; then
+    pids="$(lsof -ti "tcp:${PORT}" 2>/dev/null | tr '\n' ' ' | xargs || true)"
+    if [ -n "$pids" ]; then
+      printf '%s\n' "$pids"
+      return 0
+    fi
   fi
 
-  lsof -ti "tcp:${PORT}" 2>/dev/null | tr '\n' ' ' | xargs || true
+  if command -v fuser >/dev/null 2>&1; then
+    pids="$(fuser -n tcp "$PORT" 2>/dev/null | tr '\n' ' ' | xargs || true)"
+    if [ -n "$pids" ]; then
+      printf '%s\n' "$pids"
+      return 0
+    fi
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp "sport = :${PORT}" 2>/dev/null \
+      | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' \
+      | tr '\n' ' ' \
+      | xargs || true
+  fi
 }
 
 frontend_smoke_kill_port() {

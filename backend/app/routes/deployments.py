@@ -48,6 +48,10 @@ from app.services.auth import (
     require_auth,
     user_is_admin,
 )
+from app.services.runtime_access import (
+    ensure_remote_runtime_action_allowed,
+    sanitize_remote_target_fields,
+)
 
 
 router = APIRouter(dependencies=[Depends(require_auth)])
@@ -135,6 +139,12 @@ def _get_user_deployment_or_404(deployment_id: str, user: dict) -> dict:
     raise HTTPException(status_code=404, detail="Deployment not found.")
 
 
+def _get_mutable_user_deployment_or_404(deployment_id: str, user: dict, *, action: str) -> dict:
+    deployment = _get_user_deployment_or_404(deployment_id, user)
+    ensure_remote_runtime_action_allowed(deployment, user, action=action)
+    return deployment
+
+
 @router.get("/deployments", response_model=List[DeploymentResponse])
 def list_deployments(
     status: str = Query(default="all", pattern="^(all|running|failed|pending)$"),
@@ -145,6 +155,8 @@ def list_deployments(
     deployments = _list_user_deployments(user)
     normalized_query = q.strip().lower()
     normalized_server_id = server_id.strip()
+    if normalized_server_id and not user_is_admin(user):
+        return []
     filtered = []
     for deployment in deployments:
         if status != "all" and deployment.get("status") != status:
@@ -158,15 +170,15 @@ def list_deployments(
                     [
                         deployment.get("image"),
                         deployment.get("container_name"),
-                        deployment.get("server_name"),
-                        deployment.get("server_host"),
+                        deployment.get("server_name") if user_is_admin(user) else None,
+                        deployment.get("server_host") if user_is_admin(user) else None,
                         deployment.get("status"),
                     ],
                 )
             ).lower()
             if normalized_query not in haystack:
                 continue
-        filtered.append(DeploymentResponse(**deployment))
+        filtered.append(DeploymentResponse(**sanitize_remote_target_fields(deployment, user)))
     return filtered
 
 
@@ -187,7 +199,11 @@ def redeploy_deployment(
     return _service_redeploy_deployment(
         deployment_id,
         payload,
-        get_deployment_record_or_404_fn=lambda current_id: _get_user_deployment_or_404(current_id, user),
+        get_deployment_record_or_404_fn=lambda current_id: _get_mutable_user_deployment_or_404(
+            current_id,
+            user,
+            action="Remote runtime changes",
+        ),
         get_server_or_404_fn=get_server_or_404,
         ensure_runtime_target_allowed_fn=ensure_runtime_target_allowed,
         ensure_docker_is_available_fn=ensure_docker_is_available,
@@ -205,14 +221,18 @@ def redeploy_deployment(
 @router.get("/deployments/{deployment_id}", response_model=DeploymentResponse)
 def get_deployment(deployment_id: str, user=Depends(require_auth)) -> DeploymentResponse:
     deployment = _get_user_deployment_or_404(deployment_id, user)
-    return DeploymentResponse(**deployment)
+    return DeploymentResponse(**sanitize_remote_target_fields(deployment, user))
 
 
 @router.delete("/deployments/{deployment_id}", response_model=DeploymentDeleteResponse)
 def delete_deployment(deployment_id: str, user=Depends(require_auth)) -> DeploymentDeleteResponse:
     return _service_delete_deployment(
         deployment_id,
-        get_deployment_record_or_404_fn=lambda current_id: _get_user_deployment_or_404(current_id, user),
+        get_deployment_record_or_404_fn=lambda current_id: _get_mutable_user_deployment_or_404(
+            current_id,
+            user,
+            action="Remote runtime deletion",
+        ),
         get_server_or_404_fn=get_server_or_404,
         ensure_docker_is_available_fn=ensure_docker_is_available,
         remove_container_if_exists_fn=remove_container_if_exists,

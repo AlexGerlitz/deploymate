@@ -1,6 +1,6 @@
 # DeployMate Handoff
 
-Updated: 2026-04-10
+Updated: 2026-04-11
 
 ## Web Terminal Pointer
 
@@ -12,6 +12,7 @@ Updated: 2026-04-10
 ## Current Product Goal
 
 - Главная цель сейчас: не просто наращивать deploy/control функции, а сделать путь понятным с первого прохода.
+- Долгоживущий стратегический source of truth теперь отдельно зафиксирован в [PRODUCT-STRATEGY.md](/Users/alexgerlitz/deploymate/PRODUCT-STRATEGY.md).
 - Ближайший продуктовый ориентир:
   - подключить сервер
   - увидеть, жив ли сервис
@@ -55,6 +56,7 @@ Updated: 2026-04-10
   - если локальный runner не видит staging по DNS/TLS, smoke можно и нужно запускать прямо на deploy host через SSH
 - Week 2 beginner story теперь уже началась в реальном UI:
   - `/app` объясняет three-step path и даёт plain-language meaning для `server`, `what to run`, и `healthy`
+  - `/app` теперь начинается как простой product-entry экран: large product statement, one next action, short signal strip, then the three-step path
   - `/app/server-review` теперь жёстко framed как один job: save one server target, run one check, then leave for Step 2
   - `/app/deployment-workflow` теперь явно framed как Step 2 with one-lane-at-a-time guidance instead of operator-first scanning
 - Task-first framing уже усилился ещё на один шаг:
@@ -86,8 +88,16 @@ Updated: 2026-04-10
   - first-time admin path: `/app -> /app/server-review -> /app/deployment-workflow`
   - member path under admin-managed server inventory
   - confirm that the next click is still obvious after login, after saving a server, and after the first deploy
+- Для следующего прохода уже есть явный артефакт и guardrail:
+  - manual checklist: [docs/beginner-walkthrough.md](/Users/alexgerlitz/deploymate/docs/beginner-walkthrough.md)
+  - local smoke: `npm --prefix frontend run smoke:beginner`
 - После walkthrough уже добивать remaining clarity gaps instead of blindly rewriting copy.
 - Параллельно не ослаблять новый release contract и не превращать его во временный workaround.
+- Следующий стратегический слой после beginner clarity уже зафиксирован:
+  - `first deploy in 10 minutes`
+  - `production-useful runtime`
+  - `team and agency fit`
+  - `deployment passport` как главный продуктовый differentiator
 
 ## Week 1 Result
 
@@ -121,11 +131,157 @@ Updated: 2026-04-10
   - `server-review` now reads as one job: save one server target, check it, then move on
   - opening a saved server now shows ordered tasks first, while edit/delete moved behind a secondary disclosure
   - `deployment-workflow` now explains Step 2 with one-lane-at-a-time guidance and simpler language around image, template, and health
+- The blocked member path is now more internally consistent:
+  - `/app` no longer presents Step 2 and Step 3 as if they were already open before admin Step 1 is complete
+  - `/app/server-review` no longer shows a false remote-only CTA into `Deployment Workflow`
+  - `/app/deployment-workflow` now opens the live lane directly when a blocked member already has deployments to review
+- The first-time admin overview is now stricter too:
+  - when no server is connected yet, `/app` no longer renders Step 2 as if app choice were already open
+  - `/app` also no longer renders Step 3 as if live runtime review already existed before the first deploy
+  - the new `smoke:beginner` guardrail now checks those blocked-step states directly
+- `server-review` is now stricter in the first saved-but-unconfirmed state too:
+  - once one server already exists, the live check queue now appears before the `add another server` form
+  - the page now stops competing with its own main action when the right next move is `run one check`
+  - `smoke:servers` now includes a pending-server fixture pass to hold that ordering in place
+- `deployment-workflow` is now stricter in the first-deploy-after-server-review state too:
+  - when Step 1 is already done and no deployment exists yet, the main CTA stays `Create deployment`
+  - an empty first draft no longer gets mislabeled as the primary blocker just because `Image` is still blank
+  - `smoke:beginner` now includes a server-ready first-deploy fixture so templates do not hijack the main lane again
+- The first manual walkthrough pass found one remaining Step 2 hesitation:
+  - screen: `/app/deployment-workflow` after coming from `Server Review`
+  - issue: the empty first draft still showed `Image is required.` before the user typed anything
+  - fix: preflight errors now wait until the user has actually started a rollout draft
+  - guardrail: the first-deploy beginner smoke now fails if that premature error comes back
+- The first Step 3 runtime walkthrough pass found one remaining healthy-detail hesitation:
+  - screen: `/deployments/smoke-deployment` with a running and healthy runtime
+  - issue: the primary action still pushed `Prepare rollout change` even though the safer next step was to open the running app and verify it
+  - fix: healthy runtimes with a live endpoint now make `Open running app` primary and keep rollout changes secondary
+  - guardrail: `smoke:runtime` now fails if a healthy runtime detail makes `Prepare rollout change` the main next-step action again
+- The failed-runtime walkthrough path is now review-first too:
+  - screen: `/app/deployment-workflow -> /deployments/review-worker`
+  - issue: the workflow queue exposed delete before the failed runtime had been reviewed, and smoke detail did not represent the failed deployment
+  - fix: failed cards now point to detail review before delete, and smoke detail resolves `review-worker` as a failed runtime
+  - guardrail: `smoke:runtime` now fails if the failed queue exposes early delete or if failed detail stops making `Review runtime issues` primary
+- The failed-runtime focus card now makes the review action explicit:
+  - screen: failed primary card on `/app/deployment-workflow`
+  - issue: the card no longer exposed delete first, but its main CTA still said `View details`, which left the safest next step too vague during a failed rollout
+  - fix: failed focus cards now make `Review runtime issues` the primary action and keep the inline warning aligned with that same review-first wording
+  - guardrail: `smoke:runtime` now fails if the failed focus card loses its primary `Review runtime issues` CTA
+- The live queue now uses one action hierarchy across focus and secondary cards:
+  - screen: `/app/deployment-workflow`
+  - issue: focus cards had started using review-first/open-first actions, but secondary cards still collapsed everything into low-emphasis `View details` and `Open app` links
+  - fix: runtime cards now follow one status-based matrix everywhere in the queue: failed cards make `Review runtime issues` primary, healthy cards with a URL make `Open app` primary, and detail review stays visibly secondary when the app is already reachable
+  - guardrail: `smoke:runtime` now checks healthy secondary cards, healthy focus cards, and a failed-secondary smoke scenario so queue action hierarchy stays aligned
+- The internal-only runtime path now follows the same review-first story:
+  - screen: `/app/deployment-workflow` and `/deployments/internal-runtime`
+  - issue: healthy runtimes without a public URL still fell back to vague `View details` language in the queue, while detail copy said the runtime was stable without making the review step explicit enough
+  - fix: no-public-URL runtime cards now make detail review the primary action, running internal-only cards use `Review stable runtime`, and internal-only detail now explains that overview/ports/health/activity review comes before rollout changes
+  - guardrail: `smoke:runtime` now checks an internal-only detail fixture plus focus/secondary workflow cards so private-runtime review cannot regress back into ambiguous queue copy
+- The blocked member overview CTA now says what the click actually does:
+  - screen: member remote-only `/app` before admin Step 1 is complete
+  - issue: the primary CTA still said `See what opens next`, which was directionally correct but too vague for a first-time user trying to understand why rollout is blocked
+  - fix: the blocked member overview now uses `Review rollout status`, matching the fact that the click opens the blocked deployment workflow state instead of a hidden next-step surprise
+  - guardrail: `smoke:beginner` now fails if the member waiting overview loses that explicit rollout-status action
+- The ready server-review state now points forward instead of backward:
+  - screen: ready server task panel on `/app/server-review`
+  - issue: once a server was already ready, the open task grid still kept `Check server readiness` as a primary action, so the page visually competed with the actual next move into app setup
+  - fix: ready server cards now make `Choose what to run` the primary CTA, while readiness check is demoted to an explicit recheck-only action
+  - guardrail: `smoke:servers` now runs a ready-server fixture and fails if the continue action stops being primary or the recheck action regains primary weight
+- The first-deploy workflow tabs now stop competing with the blank create path:
+  - screen: `/app/deployment-workflow` right after Step 1 is done and no deployment exists yet
+  - issue: the page still showed `Check live apps` and a neutral template tab before the first deploy existed, which made Step 2 read like several equal paths instead of one obvious first click
+  - fix: the live-review tab now stays hidden until at least one deployment exists, and the template path is explicitly framed as `Use saved setup instead` with a first-deploy fallback note
+  - guardrail: `smoke:beginner` now fails if the first-deploy fixture brings back the live tab or loses the explicit template-fallback framing
+- Template deploy success now lands on the same next step as manual create:
+  - screen: template deploy success banner on `/app/deployment-workflow`
+  - issue: manual create already made `Open runtime detail` the obvious next click, but template deploy success still fell back to low-emphasis `View details` copy without a secondary route back into the live queue
+  - fix: template deploy success now uses the same review-first wording as manual create, with `Open runtime detail` as the primary action and `Review live queue` as the secondary follow-up
+  - guardrail: `smoke:runtime` now runs a template-success workflow fixture and fails if runtime detail stops being the primary success action
+- The first runtime-detail screen now preserves the verify-first story after success:
+  - screen: `/app/deployment-workflow -> /deployments/*` after a fresh create/template success click
+  - issue: the success banner pointed to runtime detail correctly, but the detail page still immediately offered `Prepare rollout change` as the secondary path even when the rollout had just been created and still needed first verification
+  - fix: workflow success links now carry explicit `workflow-success` context, and healthy runtime detail uses that context to show a fresh-rollout review banner plus `Review runtime overview` instead of early change-prep
+  - guardrail: `smoke:runtime` now loads healthy runtime detail with `?source=workflow-success` and fails if the fresh-rollout bridge banner or review-first secondary action disappears
+- The fresh-rollout detail path now closes the verification loop more explicitly:
+  - screen: healthy `/deployments/*?source=workflow-success` and success banners on `/app/deployment-workflow`
+  - issue: even after the first bridge, a fresh rollout still landed on a fairly generic overview, and smoke did not yet prove that create/template success links were preserving the workflow-success context
+  - fix: fresh rollout detail now shows a dedicated `verify app / health / activity` checklist in overview, create success got its own smoke fixture, and both create/template success links are now held to the `workflow-success` href contract
+  - guardrail: `smoke:runtime` now fails if the fresh-rollout checklist disappears or if either success path stops linking into detail with `?source=workflow-success`
+- The member-safe pass found one blocked-path leak:
+  - screen: member `/app/deployment-workflow` and member runtime detail in remote-only mode
+  - issue: blocked create/template lanes and runtime mutation controls were hidden but still rendered in HTML
+  - fix: member remote-only workflow no longer renders blocked create/templates lanes, and admin-managed runtime detail no longer renders redeploy/delete controls
+  - guardrail: `smoke:beginner` now checks that member workflow/detail HTML stays free of those controls while preserving `Open running app` and `Review runtime issues`
+- The next member-safe pass closed one remaining identity leak:
+  - screen: member live queue on `/app/deployment-workflow` and member `/deployments/*` detail for admin-managed remote runtimes
+  - issue: the blocked/member-safe path still rendered admin-managed server labels like `Ops Batch` and `Smoke VPS` in review UI even after mutation controls were hidden
+  - fix: member-safe runtime review now falls back to generic admin-managed target labels instead of server inventory names/host labels
+  - guardrail: `smoke:beginner` now fails if the member workflow/detail fixtures expose those admin-managed server identities again
+- The member export/handoff pass closed the same boundary at generated-payload level:
+  - screen: member runtime detail utility/handoff layer
+  - issue: the visual UI was generic, but downloadable incident JSON/markdown and copy/export payloads could still be built from raw deployment/diagnostics/activity objects
+  - fix: member export payloads now strip server inventory fields, replace admin-managed targets with generic labels, redact matching activity/attention text, and omit remote suggested ports
+  - guardrail: `smoke:beginner` now imports the payload sanitizer directly and fails if member exports contain raw server inventory keys, server names, SSH targets, server ids, or suggested ports
+- The backend now enforces the same member boundary instead of relying on frontend sanitizers:
+  - issue: owned legacy/admin-managed remote deployments and templates could still expose `server_id`, `server_name`, `server_host`, or SSH target text through API reads/exports/activity, and member API calls could still reach remote runtime live actions
+  - fix: non-admin API reads/exports redact admin-managed server inventory fields, activity/notifications redact matching server identity text, and remote runtime diagnostics/logs/health/redeploy/delete now return admin-only `403`
+  - guardrail: `tests.test_member_ownership_isolation` now covers owned remote deployment/template reads, ops exports, notifications/activity redaction, and blocked remote live/mutation actions
+- The frontend now understands backend-redacted admin-managed runtimes:
+  - issue: once the backend hid `server_id`, member runtime detail could mistake an admin-managed remote runtime for a local target and show dead mutation/template controls
+  - fix: API responses include a non-sensitive `server_managed_by_admin` marker, and runtime detail uses it to hide redeploy/delete/local-template save, skip live diagnostics/logs/health calls, and show clear admin-managed live-check/template notices
+  - guardrail: `smoke:beginner` now renders a redacted `admin-managed-runtime` detail fixture and fails if mutation controls, local template save, local-runtime copy, or server identity returns
+- The member deployment workflow now separates two remote-only states:
+  - if member already has deployments, `/app/deployment-workflow` frames the page as live review with admin-managed targets instead of saying Step 2 is still waiting
+  - member live-search no longer matches hidden admin-managed server names/hosts
+  - if member has no deployments, the page still stays blocked on admin Step 1 and keeps create/templates/live cards out of the HTML
+  - guardrail: `smoke:beginner` now checks both the live-review member path and the waiting-for-admin member path
+- The member overview now follows the same split:
+  - if member already has deployments, `/app` makes live review the main path and keeps new remote deployment gated behind admin target control
+  - the smoke fixture for that path uses redacted admin-managed deployments so the overview does not reintroduce server identity leaks
+  - guardrail: `smoke:beginner` now checks the member overview live-review path separately from the waiting path
+- The admin overview now has an explicit server-ready/no-deployments guardrail:
+  - if one server is already connected and no deployments exist, `/app` points to first deployment instead of server setup
+  - guardrail: `smoke:beginner` now checks that the hero CTA is `Launch first deployment`, Step 2 is active, and `Add first server target` does not return as the primary action
+- The admin first-deploy bridge now keeps target context from overview into workflow:
+  - if overview knows exactly one ready server and no deployments exist, `/app` links into `deployment-workflow` with that target already selected
+  - `deployment-workflow` now explains when the first-deploy target came from Overview, not only from Server Review
+  - guardrail: `smoke:beginner` now follows the overview link, checks the preserved `server` query, and fails if Step 2 loses the selected target or shows a premature image error
+- The overview first screen now has a stronger product-entry hierarchy:
+  - screen: `/app`
+  - issue: the overview story was behaviorally clearer, but still felt too much like an admin/status dashboard with several similarly weighted cards
+  - fix: `/app` now opens with a large product statement, one focused next-step panel, a compact signal strip, and then the three-step path; ops/admin depth stays below the first-pass path
+  - guardrail: `smoke:beginner` now requires the product hero/signal strip and checks that hero -> next task -> three-step path render before operations depth
+- The overview first screen now reduces scroll friction:
+  - screen: `/app`
+  - issue: after the product-entry pass, the user still had to scroll down to understand the three-step usage model
+  - fix: the hero now includes a top quick-action rail for `Connect server`, `Deploy app`, and `Review health`, using the same real enabled/blocked state as the beginner path
+  - fix: the longer three-step explanation and plain-language copy are now collapsed details, so the first screen stays action-first instead of reading-first
+  - guardrail: `smoke:beginner` now requires the quick-action rail and checks it renders before the deeper path/ops sections
+- The overview quick-action layer now reads more like one premium step grid than a button strip:
+  - screen: `/app`
+  - issue: the first quick-action pass reduced scrolling, but the dark active middle button still looked like an extra primary CTA and made the top row feel visually uneven
+  - fix: the top layer is now a three-card glass grid with equal step cards, soft state tints, clearer `Start here / Ready / Locked` status labels, and a lighter current-step action treatment instead of a black active slab
+  - fix: the top surfaces now use a restrained glass treatment with soft neutral/ice/sage tones, while the rest of the page stays quiet and readable
+  - guardrail: the existing beginner smoke still holds the quick-action layer above the deeper overview/ops sections, and live browser smoke now validates the desktop grid/collapsed-detail shape before handoff
+- The product shell is now moving out of the page body and into a shared top bar:
+  - screen: `/app`, `/app/server-review`, `/app/deployment-workflow`, `/deployments/*`, `/change-password`
+  - issue: `/app` kept turning into a giant hero with secondary explanation blocks, while account/help controls were not anchored as one shared product shell
+  - fix: workspace routes now use one fixed top bar with a centered DeployMate badge, right-side `Help`, `Profile`, and `Logout`, while `/login` stays clean and separate
+  - fix: `/app` itself now starts as one full-width action board for `Step 1 / Step 2 / Step 3` instead of hero + signal strip + next panel; deeper ops/admin sections stay below the fold
+  - guardrail: `smoke:beginner` now checks the new action-surface structure and no longer depends on the old hero/next-panel markup
+- The healthy runtime happy path is now reinforced in workflow as well as detail:
+  - on the primary healthy runtime card in `deployment-workflow`, `Open app` now comes first and uses the primary action styling
+  - `smoke:runtime` now runs a healthy-only workflow fixture so the safe verify path is checked in live queue before detail review
+  - the existing detail guardrail still holds `Open running app` as the main next step on healthy runtime detail
+- Local frontend smoke for the beginner path passed after this slice:
+  - `scripts/frontend_beginner_smoke.sh`
+  - `scripts/frontend_servers_smoke.sh`
+  - `scripts/frontend_runtime_smoke.sh`
 - The remaining question is no longer "do we have the right frame?" but "does a real beginner now follow it without hesitation?"
 
 ## Current State
 
-- Local working branch for current product work: `codex/deploymate-staging-hardening`
+- Local working branch for current product work: `deploymate/product-wip`
 - Latest published `develop` commit: `0384fa3`
 - Staging host `deploymate`:
   - `/opt/deploymate` branch `develop` currently points to `0384fa3`
@@ -138,6 +294,8 @@ Updated: 2026-04-10
   - remote release smoke that can run on the deploy host and can pin host resolution explicitly
   - successful end-to-end staging walkthrough with runtime smoke create/health/diagnostics/logs/activity/delete
   - first-pass beginner story rewrite across overview, server step, and deployment step
+  - blocked member first-pass alignment across overview, server step, and deployment step
+  - local frontend smoke confirmation for `/app`, `/app/server-review`, `/app/deployment-workflow`, and deployment detail
 - Host-specific note:
   - saved runtime smoke server `prod-runtime-smoke` currently points to `103.88.241.103`
   - do not switch it back to `deploymatecloud.ru` until backend-container DNS resolution is explicitly re-verified
@@ -922,11 +1080,47 @@ Scaffold сначала нагенерил отдельный fake backend по�
 - `npm --prefix frontend run build` после shared reviewer-facing rollout copy layer -> ok
 - `FRONTEND_SMOKE_PORT=3006 npm --prefix frontend run smoke:runtime` после shared reviewer-facing rollout copy layer -> ok
 - `git diff --check` после shared reviewer-facing rollout copy layer -> ok
+- `npm --prefix frontend run build` после member live/waiting deployment workflow split -> ok
+- `npm --prefix frontend run smoke:beginner` после member live/waiting deployment workflow split -> ok
+- `npm --prefix frontend run build` после member overview live-review split -> ok
+- `npm --prefix frontend run smoke:beginner` после member overview live-review split -> ok
+- `npm --prefix frontend run build` после admin server-ready overview guardrail -> ok
+- `npm --prefix frontend run smoke:beginner` после admin server-ready overview guardrail -> ok
+- `npm --prefix frontend run build` после overview-to-workflow first-deploy bridge -> ok
+- `npm --prefix frontend run smoke:beginner` после overview-to-workflow first-deploy bridge -> ok
+- `npm --prefix frontend run build` после healthy workflow open-app priority slice -> ok
+- `npm --prefix frontend run smoke:runtime` после healthy workflow open-app priority slice -> ok
+- `npm --prefix frontend run build` после failed workflow review-first CTA slice -> ok
+- `npm --prefix frontend run smoke:runtime` после failed workflow review-first CTA slice -> ok
+- `npm --prefix frontend run build` после deployment workflow runtime queue consistency package -> ok
+- `npm --prefix frontend run smoke:runtime` после deployment workflow runtime queue consistency package -> ok
+- `npm --prefix frontend run build` после internal-only runtime review path package -> ok
+- `npm --prefix frontend run smoke:runtime` после internal-only runtime review path package -> ok
+- `npm --prefix frontend run build` после blocked member overview CTA wording slice -> ok
+- `npm --prefix frontend run smoke:beginner` после blocked member overview CTA wording slice -> ok
+- `npm --prefix frontend run build` после ready server-review CTA hierarchy slice -> ok
+- `npm --prefix frontend run smoke:servers` после ready server-review CTA hierarchy slice -> ok
+- `npm --prefix frontend run build` после first-deploy workflow tab hierarchy slice -> ok
+- `npm --prefix frontend run smoke:beginner` после first-deploy workflow tab hierarchy slice -> ok
+- `npm --prefix frontend run build` после template deploy success consistency slice -> ok
+- `npm --prefix frontend run smoke:runtime` после template deploy success consistency slice -> ok
+- `npm --prefix frontend run build` после fresh rollout detail verify-first bridge slice -> ok
+- `npm --prefix frontend run smoke:runtime` после fresh rollout detail verify-first bridge slice -> ok
+- `npm --prefix frontend run build` после fresh rollout detail verification checklist slice -> ok
+- `npm --prefix frontend run smoke:runtime` после fresh rollout detail verification checklist slice -> ok
+- `npm --prefix frontend run build` после overview product-entry hierarchy slice -> ok
+- `npm --prefix frontend run smoke:beginner` после overview product-entry hierarchy slice -> ok
+- `npm --prefix frontend run build` после overview quick-action rail slice -> ok
+- `npm --prefix frontend run smoke:beginner` после overview quick-action rail slice -> ok
+- `npm --prefix frontend run build` после overview glass step-grid slice -> ok
+- `npm --prefix frontend run smoke:beginner` после overview glass step-grid slice -> ok
+- `npm --prefix frontend run build` после workspace shell + action-board slice -> ok
+- `npm --prefix frontend run smoke:beginner` после workspace shell + action-board slice -> ok
 - `README.md` / `RUNBOOK.md` обновлены под `server-review` как основной server workspace
 
 Простой вывод:
 
-- текущий пакет по scaffold + server-review + runtime detail handoff + richer backend mutation trace + stronger restore preparation guardrails + structured restore preparation guidance + DeployMate-specific feature scaffold + import-review workspace + restore/import-review handoff + approval trail layer + preparation handoff layer + primary-action UX package + `/app` scenario-entry layer + recovery sequencing layer + upgrade inbox UX package + users dual-path UX package + dedicated deployment workflow split + deployment detail intent-first layer + template lifecycle bridge + create/redeploy consistency layer + redeploy review-first guardrails + shared risky-action language layer + shared reviewer-facing rollout copy layer находится в рабочем состоянии
+- текущий пакет по scaffold + server-review + runtime detail handoff + richer backend mutation trace + stronger restore preparation guardrails + structured restore preparation guidance + DeployMate-specific feature scaffold + import-review workspace + restore/import-review handoff + approval trail layer + preparation handoff layer + primary-action UX package + `/app` scenario-entry layer + recovery sequencing layer + upgrade inbox UX package + users dual-path UX package + dedicated deployment workflow split + deployment detail intent-first layer + template lifecycle bridge + create/redeploy consistency layer + redeploy-review guardrails + shared risky-action language layer + shared reviewer-facing rollout copy layer + overview product-entry hierarchy + overview quick-action rail + overview glass step-grid polish + workspace shell + action-board slice находится в рабочем состоянии
 
 ## Best Next Step
 

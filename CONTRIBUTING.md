@@ -33,9 +33,12 @@ npm run dev
 Frontend-focused changes:
 
 ```bash
+npm --prefix frontend run smoke:beginner
 npm --prefix frontend run smoke:admin
 npm --prefix frontend run build
 ```
+
+If the change does not touch `/app`, `/app/server-review`, or `/app/deployment-workflow`, you can skip `smoke:beginner`.
 
 Backend-focused changes:
 

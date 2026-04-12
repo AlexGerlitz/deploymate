@@ -162,6 +162,14 @@ npm --prefix frontend run smoke:servers
 
 That smoke covers the dedicated `/app/server-review` workspace, which is now the main UI path for create/edit/test/diagnostics/delete server actions.
 
+For beginner-path changes across `/app`, `/app/server-review`, or `/app/deployment-workflow`, also run:
+
+```bash
+npm --prefix frontend run smoke:beginner
+```
+
+That smoke checks the first-time admin path and the member remote-only blocked path.
+
 For a single remote deploy command that also runs post-deploy smoke:
 
 ```bash
@@ -370,6 +378,7 @@ bash scripts/production_env_audit.sh --env-file .env.production --require-runtim
 Local:
 
 ```bash
+npm --prefix frontend run smoke:beginner
 npm --prefix frontend run smoke:admin
 npm --prefix frontend run smoke:runtime
 npm --prefix frontend run build

@@ -270,7 +270,7 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
     else
       for frontend_smoke in "${frontend_fast_smokes[@]}"; do
         case "$frontend_smoke" in
-          auth|ops|runtime)
+          auth|beginner|ops|runtime|servers)
             ;;
           *)
             echo "[release] unknown frontend fast smoke target: $frontend_smoke" >&2
@@ -284,7 +284,7 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
     frontend_fast_port=3001
     for frontend_smoke in "${frontend_fast_smokes[@]}"; do
       case "$frontend_smoke" in
-        auth|ops|runtime)
+        auth|beginner|ops|runtime|servers)
           echo "[release] frontend ${frontend_smoke} smoke"
           FRONTEND_SMOKE_PORT="$frontend_fast_port" automation_frontend_npm run "smoke:${frontend_smoke}"
           frontend_fast_port=$((frontend_fast_port + 1))
@@ -302,7 +302,7 @@ if [ "$SURFACE" = "frontend" ] || [ "$SURFACE" = "full" ]; then
     shared_restore_port=3012
 
     run_frontend_smokes_shared "$shared_full_port" "/tmp/deploymate-frontend-full-smoke.log" ".next-smoke-full-${shared_full_port}" \
-      auth ops runtime admin admin-interactions servers templates
+      auth ops beginner runtime admin admin-interactions servers templates
 
     FRONTEND_SMOKE_PORT="$shared_restore_port" \
     FRONTEND_SMOKE_LOG="/tmp/deploymate-frontend-restore-shared.log" \

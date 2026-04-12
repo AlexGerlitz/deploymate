@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { AdminDisclosureSection } from "../../app/admin-ui";
 import { escapeCsvCell, triggerFileDownload } from "../../lib/admin-page-utils";
@@ -11,6 +11,8 @@ import {
   buildReviewConfirmationPhrase,
   buildReviewIntroText,
   buildRolloutDraftSummary,
+  buildAccessControlledRuntimeExportPayload,
+  formatAccessibleServerLabel,
   formatDate,
   formatSuggestedPorts,
   normalizeDeploymentActionError,
@@ -19,8 +21,10 @@ import {
 import {
   smokeActivity,
   smokeDeployment,
+  smokeDeployments,
   smokeDiagnostics,
   smokeHealth,
+  smokeInternalRuntimeDeployment,
   smokeMode,
   smokeUser,
 } from "../../lib/smoke-fixtures";
@@ -85,7 +89,7 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
     `Server: ${
       canAccessServers && deployment.server_name && deployment.server_host
         ? `${deployment.server_name} (${deployment.server_host})`
-        : deployment.server_id
+        : deployment.server_id || deployment.server_managed_by_admin
           ? "Managed by an admin"
           : "Local"
     }`,
@@ -99,7 +103,7 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
     `Diagnostics target: ${
       canAccessServers
         ? diagnostics?.server_target || "n/a"
-        : deployment.server_id
+        : deployment.server_id || deployment.server_managed_by_admin
           ? "Managed by an admin"
           : "n/a"
     }`,
@@ -161,7 +165,7 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
       ? diagnostics?.server_target
         ? `The deployment is tied to ${diagnostics.server_target} for diagnostics and runtime review.`
         : "No diagnostics target is available yet."
-      : deployment.server_id
+      : deployment.server_id || deployment.server_managed_by_admin
         ? "The deployment runs on an admin-managed server target."
         : "No diagnostics target is available yet.",
     latestEvent?.title
@@ -176,11 +180,11 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
 function buildIncidentSnapshotPayload(
   deployment,
   health,
-  diagnostics,
-  activity,
-  attentionItems,
-  suggestedPorts,
-  canAccessServers,
+  exportPayload,
+  runtimeSummaryText,
+  plainLanguageSummary,
+  nextStep,
+  status,
 ) {
   if (!deployment) {
     return null;
@@ -189,29 +193,16 @@ function buildIncidentSnapshotPayload(
   return {
     generated_at: new Date().toISOString(),
     deployment_id: deployment.id,
-    status: deployment.status || "unknown",
-    next_step: buildRecommendedNextStep(deployment, health, diagnostics, attentionItems),
-    human_summary: buildPlainLanguageSummary(
-      deployment,
-      health,
-      diagnostics,
-      attentionItems,
-      activity,
-      canAccessServers,
-    ),
-    runtime_summary: buildRuntimeSummaryText(
-      deployment,
-      health,
-      diagnostics,
-      activity,
-      canAccessServers,
-    ),
-    attention_items: attentionItems,
-    suggested_ports: suggestedPorts,
-    deployment,
-    health,
-    diagnostics,
-    activity,
+    status,
+    next_step: nextStep,
+    human_summary: plainLanguageSummary,
+    runtime_summary: runtimeSummaryText,
+    attention_items: exportPayload.attentionItems,
+    suggested_ports: exportPayload.suggestedPorts,
+    deployment: exportPayload.deployment,
+    health: exportPayload.health,
+    diagnostics: exportPayload.diagnostics,
+    activity: exportPayload.activity,
   };
 }
 
@@ -373,7 +364,7 @@ function buildRedeployImpactSummary({
       canAccessServers
         ? diagnostics?.server_target ||
           (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
-        : deployment.server_id
+        : deployment.server_id || deployment.server_managed_by_admin
           ? "Managed by an admin"
           : "Local Docker target"
     }`,
@@ -396,7 +387,31 @@ function buildRedeployImpactSummary({
   return lines.join("\n");
 }
 
-function buildRuntimeDecisionState(deployment, health, diagnostics, attentionItems, activity) {
+function buildActionReviewChecklist(action) {
+  if (action === "delete") {
+    return [
+      "What happens now: DeployMate will try to stop and remove the running container, then delete the saved deployment record.",
+      "What does not happen automatically: this review does not verify app health, preserve runtime state, or create a rollback.",
+      "Safe next step: only confirm delete after handoff notes, diagnostics, and any data/export checks are already complete.",
+    ].join("\n");
+  }
+
+  return [
+    "What happens now: DeployMate will apply the draft below as the next rollout for this runtime.",
+    "What does not happen automatically: this review does not prove the new rollout is healthy or user-safe yet.",
+    "Safe next step: confirm redeploy only when the draft is intentional, then verify app health and recent activity after the rollout finishes.",
+  ].join("\n");
+}
+
+function buildRuntimeDecisionState(
+  deployment,
+  health,
+  diagnostics,
+  attentionItems,
+  activity,
+  options = {},
+) {
+  const { canMutateRuntime = true, freshRolloutReview = false } = options;
   const latestEvent = Array.isArray(activity) && activity.length > 0 ? activity[0] : null;
   const recentFailureCount = diagnostics?.activity?.recent_failure_count || 0;
   const errorCount = attentionItems.filter((item) => item.status === "error").length;
@@ -468,18 +483,48 @@ function buildRuntimeDecisionState(deployment, health, diagnostics, attentionIte
     };
   }
 
+  const deploymentUrl = buildDeploymentUrl(deployment);
+  const freshRolloutWithPublicUrl = freshRolloutReview && Boolean(deploymentUrl);
+
   return {
     tone: "healthy",
-    label: "Ready",
-    focus: "Runtime looks stable enough for a deliberate change",
+    label: freshRolloutReview ? "Verify" : "Ready",
+    focus: deploymentUrl
+      ? freshRolloutReview
+        ? "Fresh rollout is live. Check it before treating this deploy as done"
+        : "Runtime is healthy. Open the app once before changing it"
+      : freshRolloutReview
+        ? "Fresh rollout is private. Review the stable service before treating this change as done"
+        : "Runtime is private. Review the stable service before changing it",
     why:
-      "No active runtime warnings are leading the page right now, so redeploy, handoff, and template actions can stay deliberate instead of reactive.",
+      deploymentUrl
+        ? freshRolloutReview
+          ? "This rollout was just created from Deployment Workflow. Verify the user-facing path and runtime signals now, while the change context is still fresh."
+          : "No active runtime warnings are leading the page right now. The safest next step is verifying the live app before opening change tools."
+        : freshRolloutReview
+          ? "This rollout was just created without a public URL. Review the stable runtime signals now, while the rollout context is still fresh."
+          : "No active runtime warnings are leading the page right now. Because there is no public URL to click from here, the safest next step is reviewing the stable runtime before opening change tools.",
     nextStep:
-      "Keep the current rollout stable, or prepare one explicit change in the redeploy form when you are ready to change image, ports, or env vars on purpose.",
-    primaryHref: "#runtime-detail-redeploy",
-    primaryAction: "Prepare rollout change",
-    secondaryHref: "#runtime-detail-handoff-tools",
-    secondaryAction: "Open handoff tools",
+      deploymentUrl
+        ? freshRolloutReview
+          ? "Open the running app, then return here and confirm health and recent activity before preparing another rollout change."
+          : "Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional."
+        : freshRolloutReview
+          ? "Review the current runtime overview, port mapping, health, and recent activity before preparing another rollout change."
+          : "Review the current runtime overview, port mapping, health, and recent activity first. Prepare a rollout change only after that review is intentional.",
+    primaryHref: deploymentUrl || "#runtime-detail-overview",
+    primaryExternal: Boolean(deploymentUrl),
+    primaryAction: deploymentUrl ? "Open running app" : "Review stable runtime",
+    secondaryHref: freshRolloutWithPublicUrl
+      ? "#runtime-detail-overview"
+      : canMutateRuntime
+        ? "#runtime-detail-redeploy"
+        : "#runtime-detail-handoff-tools",
+    secondaryAction: freshRolloutWithPublicUrl
+      ? "Review runtime overview"
+      : canMutateRuntime
+        ? "Prepare rollout change"
+        : "Open handoff tools",
     badges: [
       { label: "health", value: health?.status || "unknown", tone: "healthy" },
       { label: "attention", value: `${attentionItems.length}`, tone: "healthy" },
@@ -544,13 +589,201 @@ function buildChangeReadinessState(redeployPreflight, redeployChangeRows, form, 
 export default function DeploymentDetailsPage({ params }) {
   const { deploymentId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const smokeDetailDeployment = smokeMode
+    ? deploymentId === "internal-runtime"
+      ? smokeInternalRuntimeDeployment
+      : deploymentId === "admin-managed-runtime"
+      ? {
+          ...smokeDeployment,
+          id: "admin-managed-runtime",
+          server_id: null,
+          server_name: null,
+          server_host: null,
+          server_managed_by_admin: true,
+        }
+      : smokeDeployments.find((item) => item.id === deploymentId) || smokeDeployment
+    : null;
+  const smokeDetailIsFailed = smokeDetailDeployment?.status === "failed";
+  const smokeDetailIsAdminManaged = Boolean(smokeDetailDeployment?.server_managed_by_admin);
+  const smokeDetailIsInternalOnly = smokeDetailDeployment?.id === smokeInternalRuntimeDeployment.id;
+  const smokeDetailHealth =
+    smokeMode && smokeDetailIsAdminManaged
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          url: null,
+          status: "unavailable",
+          status_code: null,
+          error:
+            "Live health checks stay with admins for this admin-managed remote runtime.",
+          checked_at: smokeDetailDeployment.created_at,
+          response_time_ms: null,
+        }
+      : smokeMode && smokeDetailIsInternalOnly
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          url: null,
+          status: "healthy",
+          status_code: 200,
+          error: null,
+          checked_at: smokeDetailDeployment.created_at,
+          response_time_ms: 31,
+        }
+      : smokeMode && smokeDetailIsFailed
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          url: buildDeploymentUrl(smokeDetailDeployment),
+          status: "unhealthy",
+          status_code: null,
+          error: smokeDetailDeployment.error || "Deployment failed before health checks completed.",
+          checked_at: smokeDetailDeployment.created_at,
+          response_time_ms: null,
+        }
+      : smokeHealth;
+  const smokeDetailDiagnostics =
+    smokeMode && smokeDetailIsAdminManaged
+      ? null
+      : smokeMode && smokeDetailIsFailed
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          current_status: smokeDetailDeployment.status,
+          server_target: smokeDetailDeployment.server_host
+            ? `deploy@${smokeDetailDeployment.server_host}:22`
+            : "Managed by an admin",
+          checked_at: smokeDetailDeployment.created_at,
+          url: buildDeploymentUrl(smokeDetailDeployment),
+          health: smokeDetailHealth,
+          activity: {
+            total_events: 2,
+            success_events: 1,
+            error_events: 1,
+            recent_failure_count: 1,
+            recent_failure_titles: ["Review worker readiness failed"],
+            last_event_title: "Review worker readiness failed",
+            last_event_level: "error",
+            last_event_at: smokeDetailDeployment.created_at,
+          },
+          log_excerpt: smokeDetailDeployment.error || "Readiness failed before the worker stayed online.",
+          items: [
+            {
+              key: "deployment_status",
+              label: "Deployment status",
+              status: "error",
+              summary: "Current status is failed.",
+              details: smokeDetailDeployment.error || null,
+            },
+            {
+              key: "health",
+              label: "HTTP health",
+              status: "error",
+              summary: smokeDetailDeployment.error || "Health checks did not complete.",
+              details: buildDeploymentUrl(smokeDetailDeployment) || null,
+            },
+          ],
+        }
+      : smokeMode && smokeDetailIsInternalOnly
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          current_status: smokeDetailDeployment.status,
+          server_target: `deploy@${smokeDetailDeployment.server_host}:22`,
+          checked_at: smokeDetailDeployment.created_at,
+          url: null,
+          health: smokeDetailHealth,
+          activity: {
+            total_events: 2,
+            success_events: 2,
+            error_events: 0,
+            recent_failure_count: 0,
+            recent_failure_titles: [],
+            last_event_title: "Internal health check passed",
+            last_event_level: "success",
+            last_event_at: smokeDetailDeployment.created_at,
+          },
+          log_excerpt: "internal-api entered RUNNING state without a public endpoint.",
+          items: [
+            {
+              key: "deployment_status",
+              label: "Deployment status",
+              status: "ok",
+              summary: "Current status is running.",
+              details: null,
+            },
+            {
+              key: "health",
+              label: "Internal health",
+              status: "ok",
+              summary: "Internal health checks are stable even though no public URL is assigned yet.",
+              details: "Service is reachable through the runtime target and mapped internal port.",
+            },
+          ],
+        }
+      : smokeDiagnostics;
+  const smokeDetailActivity =
+    smokeMode && smokeDetailIsFailed
+      ? [
+          {
+            id: "review-worker-activity-2",
+            deployment_id: smokeDetailDeployment.id,
+            level: "error",
+            title: "Review worker readiness failed",
+            message: smokeDetailDeployment.error || "The worker failed before health checks passed.",
+            created_at: smokeDetailDeployment.created_at,
+            category: "health",
+          },
+          {
+            id: "review-worker-activity-1",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Deployment request accepted",
+            message: "DeployMate started the review-worker rollout before readiness failed.",
+            created_at: "2026-04-02T02:09:30Z",
+            category: "deploy",
+          },
+        ]
+      : smokeMode && smokeDetailIsInternalOnly
+      ? [
+          {
+            id: "internal-runtime-activity-2",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Internal health check passed",
+            message: "internal-api responded on the mapped internal port without exposing a public URL.",
+            created_at: smokeDetailDeployment.created_at,
+            category: "health",
+          },
+          {
+            id: "internal-runtime-activity-1",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Deployment succeeded",
+            message: "Deployment internal-runtime is running as an internal-only service.",
+            created_at: "2026-04-02T00:18:00Z",
+            category: "deploy",
+          },
+        ]
+      : smokeActivity;
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [currentUser, setCurrentUser] = useState(smokeMode ? smokeUser : null);
-  const [deployment, setDeployment] = useState(smokeMode ? smokeDeployment : null);
-  const [logs, setLogs] = useState(smokeMode ? "nginx entered RUNNING state" : "");
-  const [health, setHealth] = useState(smokeMode ? smokeHealth : null);
-  const [diagnostics, setDiagnostics] = useState(smokeMode ? smokeDiagnostics : null);
-  const [activity, setActivity] = useState(smokeMode ? smokeActivity : []);
+  const [deployment, setDeployment] = useState(smokeMode ? smokeDetailDeployment : null);
+  const [logs, setLogs] = useState(
+    smokeMode
+      ? smokeDetailIsAdminManaged
+        ? "Live logs stay with admins for this admin-managed remote runtime."
+        : smokeDetailIsInternalOnly
+        ? "internal-api entered RUNNING state without exposing a public URL."
+        : smokeDetailIsFailed
+        ? smokeDetailDeployment.error || "Readiness failed before the worker stayed online."
+        : "nginx entered RUNNING state"
+      : "",
+  );
+  const [health, setHealth] = useState(smokeMode ? smokeDetailHealth : null);
+  const [diagnostics, setDiagnostics] = useState(smokeMode ? smokeDetailDiagnostics : null);
+  const [activity, setActivity] = useState(smokeMode ? smokeDetailActivity : []);
   const [loading, setLoading] = useState(!smokeMode);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -586,33 +819,78 @@ export default function DeploymentDetailsPage({ params }) {
   });
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const canAccessServers = Boolean(currentUser?.is_admin);
+  const runtimeServerAccessBlocked = Boolean(deployment?.server_managed_by_admin) && !canAccessServers;
+  const canMutateRuntime =
+    canAccessServers || (!deployment?.server_id && !runtimeServerAccessBlocked);
   const deploymentUrl = buildDeploymentUrl(deployment);
-  const attentionItems = buildAttentionItems(deployment, health, diagnostics);
-  const runtimeSummaryText = buildRuntimeSummaryText(
+  const runtimeServerLabel = formatAccessibleServerLabel({
+    canAccessServers,
+    serverName: deployment?.server_name,
+    serverHost: deployment?.server_host,
+    serverId: deployment?.server_id,
+    serverManagedByAdmin: runtimeServerAccessBlocked,
+  });
+  const runtimeOverviewMetaText = deployment?.server_id
+    ? canAccessServers
+      ? `Server ${runtimeServerLabel}`
+      : "Target admin-managed"
+    : runtimeServerAccessBlocked
+      ? "Target admin-managed"
+      : "Target local";
+  const adminManagedRuntimeMessage =
+    "Live server checks for this runtime are admin-managed. You can review safe handoff context here, but diagnostics, logs, health checks, redeploy, and delete stay with admins.";
+  const rawAttentionItems = buildAttentionItems(deployment, health, diagnostics);
+  const runtimeExportPayload = buildAccessControlledRuntimeExportPayload({
     deployment,
     health,
     diagnostics,
     activity,
+    attentionItems: rawAttentionItems,
+    suggestedPorts,
+    canAccessServers,
+  });
+  const exportDiagnostics = runtimeExportPayload.diagnostics;
+  const exportActivity = runtimeExportPayload.activity;
+  const attentionItems = runtimeExportPayload.attentionItems;
+  const requestedSource = searchParams.get("source") || "";
+  const freshRolloutLatestEvent =
+    Array.isArray(exportActivity) && exportActivity.length > 0 ? exportActivity[0] : null;
+  const freshRolloutReview =
+    requestedSource === "workflow-success" &&
+    deployment?.status === "running" &&
+    (!health?.status || health.status === "healthy") &&
+    attentionItems.length === 0;
+  const runtimeSummaryText = buildRuntimeSummaryText(
+    deployment,
+    health,
+    exportDiagnostics,
+    exportActivity,
     canAccessServers,
   );
   const plainLanguageSummary = buildPlainLanguageSummary(
     deployment,
     health,
-    diagnostics,
+    exportDiagnostics,
     attentionItems,
-    activity,
+    exportActivity,
     canAccessServers,
+  );
+  const recommendedNextStep = buildRecommendedNextStep(
+    deployment,
+    health,
+    exportDiagnostics,
+    attentionItems,
   );
   const incidentSnapshot = buildIncidentSnapshotPayload(
     deployment,
     health,
-    diagnostics,
-    activity,
-    attentionItems,
-    suggestedPorts,
-    canAccessServers,
+    runtimeExportPayload,
+    runtimeSummaryText,
+    plainLanguageSummary,
+    recommendedNextStep,
+    deployment?.status || "unknown",
   );
-  const filteredActivity = [...activity]
+  const filteredActivity = [...exportActivity]
     .filter((item) => {
       if (activityLevelFilter !== "all" && (item.level || "unknown") !== activityLevelFilter) {
         return false;
@@ -666,13 +944,13 @@ export default function DeploymentDetailsPage({ params }) {
           canAccessServers
             ? diagnostics?.server_target ||
               (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
-            : deployment.server_id
-              ? "Managed by an admin"
-              : "Local Docker target"
+        : deployment.server_id || deployment.server_managed_by_admin
+          ? "Managed by an admin"
+          : "Local Docker target"
         }`,
         deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
         "",
-        "This action will try to remove the running container and then delete the saved deployment record.",
+        buildActionReviewChecklist("delete"),
       ].join("\n")
     : "";
   const detailPriority =
@@ -681,35 +959,45 @@ export default function DeploymentDetailsPage({ params }) {
       ? "Deployment is failed and needs a deliberate redeploy."
       : health?.status && health.status !== "healthy"
         ? `Health is currently ${health.status}.`
-        : "Runtime surface is stable enough for review.");
-  const recommendedNextStep = buildRecommendedNextStep(
-    deployment,
-    health,
-    diagnostics,
-    attentionItems,
-  );
+        : freshRolloutReview
+          ? "Fresh rollout is ready for first verification."
+          : "Runtime surface is stable enough for review.");
   const runtimeDecisionState = buildRuntimeDecisionState(
     deployment,
     health,
-    diagnostics,
+    exportDiagnostics,
     attentionItems,
-    activity,
+    exportActivity,
+    { canMutateRuntime, freshRolloutReview },
   );
   const runtimeHeroLead = deployment
     ? `${deployment.container_name || deployment.image || deploymentId}. ${detailPriority}`
     : "Review what is running, whether it is healthy, and what should happen next.";
   const runtimeOverviewTitle =
-    deployment?.status === "failed" ||
-    (health?.status && health.status !== "healthy") ||
-    attentionItems.length > 0
+    freshRolloutReview
+      ? "What to confirm before this rollout counts as done"
+      : deployment?.status === "failed" ||
+      (health?.status && health.status !== "healthy") ||
+      attentionItems.length > 0
       ? "Why this runtime still needs review"
       : "Why this runtime looks stable enough";
   const runtimeOverviewBody =
-    deployment?.status === "failed" ||
-    (health?.status && health.status !== "healthy") ||
-    attentionItems.length > 0
+    freshRolloutReview
+      ? "A successful deploy is not finished yet. Use the app, health, and activity signals below to verify this rollout before another change competes for attention."
+      : deployment?.status === "failed" ||
+      (health?.status && health.status !== "healthy") ||
+      attentionItems.length > 0
       ? "These signals explain why runtime review still comes before the next rollout change."
       : "These signals explain why the runtime currently looks stable enough for a deliberate change instead of reactive cleanup.";
+  const freshRolloutHealthSummary =
+    health?.status === "healthy"
+      ? `Latest health check passed${health?.response_time_ms || health?.response_time_ms === 0 ? ` in ${health.response_time_ms} ms` : ""}.`
+      : health?.status
+        ? `Current health status is ${health.status}.`
+        : "Health status has not been recorded yet.";
+  const freshRolloutActivitySummary = freshRolloutLatestEvent?.title
+    ? `Latest recorded event: "${freshRolloutLatestEvent.title}" at ${formatDate(freshRolloutLatestEvent.created_at)}.`
+    : "No runtime activity has been recorded yet.";
   const detailGlanceItems = [
     {
       label: "Endpoint",
@@ -736,10 +1024,73 @@ export default function DeploymentDetailsPage({ params }) {
           ? "Review runtime issues"
           : deployment?.status === "failed"
             ? "Redeploy deliberately"
-            : "Keep current rollout stable",
-      detail: detailPriority,
+            : freshRolloutReview
+              ? deploymentUrl
+                ? "Verify fresh rollout"
+                : "Review fresh runtime"
+            : deploymentUrl
+              ? "Open running app"
+              : "Review stable runtime",
+      detail: freshRolloutReview
+        ? deploymentUrl
+          ? "This rollout was just created. Verify the live app and runtime signals before queuing another change."
+          : "This rollout was just created. Verify the stable runtime signals before queuing another change."
+        : detailPriority,
     },
   ];
+  const runtimeReviewPathItems = [
+    {
+      label: "1. Is it alive?",
+      value:
+        deployment?.status === "failed"
+          ? "Failed"
+          : deploymentUrl
+            ? "Open app"
+            : "Review here",
+      detail:
+        deployment?.status === "failed"
+          ? "Start with the failure evidence instead of another rollout change."
+          : deploymentUrl
+            ? "Click the running app once, then come back to the runtime signals."
+            : "No public URL is available, so the first check stays on this page.",
+    },
+    {
+      label: "2. Is it quiet?",
+      value:
+        attentionItems.length > 0
+          ? `${attentionItems.length} warning${attentionItems.length === 1 ? "" : "s"}`
+          : health?.status || "Unknown",
+      detail:
+        attentionItems.length > 0
+          ? "Resolve the attention list before treating this deployment as settled."
+          : "Health and attention signals are not currently forcing an incident path.",
+    },
+    {
+      label: "3. What next?",
+      value: runtimeDecisionState.primaryAction,
+      detail: runtimeDecisionState.nextStep,
+    },
+  ];
+  const renderRuntimeDecisionPrimaryAction = (className, testId) =>
+    runtimeDecisionState.primaryExternal ? (
+      <a
+        href={runtimeDecisionState.primaryHref}
+        target="_blank"
+        rel="noreferrer"
+        className={className}
+        data-testid={testId}
+      >
+        {runtimeDecisionState.primaryAction}
+      </a>
+    ) : (
+      <Link
+        href={runtimeDecisionState.primaryHref}
+        className={className}
+        data-testid={testId}
+      >
+        {runtimeDecisionState.primaryAction}
+      </Link>
+    );
   const redeployPreflight = buildRedeployValidation(form, envRows);
   const redeployChangeRows = buildRedeployChangeRows(deployment, form, envRows);
   const changeReadinessState = buildChangeReadinessState(
@@ -760,6 +1111,8 @@ export default function DeploymentDetailsPage({ params }) {
     changeRows: redeployChangeRows,
     canAccessServers,
   });
+  const redeployReviewChecklist = buildActionReviewChecklist("redeploy");
+  const deleteReviewChecklist = buildActionReviewChecklist("delete");
 
   async function loadDeploymentDiagnostics() {
     setDiagnosticsLoading(true);
@@ -829,6 +1182,33 @@ export default function DeploymentDetailsPage({ params }) {
             }))
           : [{ key: "", value: "" }],
       );
+
+      if (deploymentData.server_managed_by_admin) {
+        setLogs("Live logs stay with admins for this admin-managed remote runtime.");
+        setHealth({
+          deployment_id: deploymentData.id,
+          container_name: deploymentData.container_name,
+          url: null,
+          status: "unavailable",
+          status_code: null,
+          error: "Live health checks stay with admins for this admin-managed remote runtime.",
+          checked_at: null,
+          response_time_ms: null,
+        });
+        setDiagnostics(null);
+        setDiagnosticsError("");
+
+        const activityResponse = await fetch(`${apiBaseUrl}/deployments/${deploymentId}/activity`, {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const activityData = await readJsonOrError(
+          activityResponse,
+          "Failed to load deployment activity.",
+        );
+        setActivity(Array.isArray(activityData) ? activityData : []);
+        return;
+      }
 
       const [logsResult, healthResult, activityResult, diagnosticsResult] = await Promise.allSettled([
         fetch(`${apiBaseUrl}/deployments/${deploymentId}/logs`, {
@@ -957,7 +1337,7 @@ export default function DeploymentDetailsPage({ params }) {
         return;
       }
 
-      if (!deployment?.server_id) {
+      if (!deployment?.server_id || runtimeServerAccessBlocked) {
         setSuggestedPorts([]);
         setSuggestedPortsLoading(false);
         return;
@@ -982,7 +1362,7 @@ export default function DeploymentDetailsPage({ params }) {
     }
 
     loadSuggestedPorts();
-  }, [deployment?.server_id]);
+  }, [deployment?.server_id, runtimeServerAccessBlocked]);
 
   function updateFormField(event) {
     const { name, value } = event.target;
@@ -1306,17 +1686,16 @@ export default function DeploymentDetailsPage({ params }) {
               </p>
             </div>
             <div className="buttonRow workspaceHeroActions" data-testid="runtime-detail-header-actions">
-              <Link
-                href={runtimeDecisionState.primaryHref}
-                className="landingButton primaryButton workspacePrimaryAction"
-                data-testid="runtime-detail-open-redeploy-button"
-              >
-                {runtimeDecisionState.primaryAction}
-              </Link>
+              {renderRuntimeDecisionPrimaryAction(
+                "landingButton primaryButton workspacePrimaryAction",
+                runtimeDecisionState.primaryAction === "Prepare rollout change"
+                  ? "runtime-detail-open-redeploy-button"
+                  : "runtime-detail-hero-primary-action",
+              )}
               <Link href="/app/deployment-workflow" className="linkButton workspaceSecondaryAction">
                 Back to deployment workflow
               </Link>
-              {deploymentUrl ? (
+              {deploymentUrl && !runtimeDecisionState.primaryExternal ? (
                 <a
                   href={deploymentUrl}
                   target="_blank"
@@ -1381,6 +1760,24 @@ export default function DeploymentDetailsPage({ params }) {
               .
             </div>
           ) : null}
+          {runtimeServerAccessBlocked ? (
+            <div
+              className="banner subtle"
+              data-testid="runtime-detail-admin-managed-live-checks-banner"
+            >
+              {adminManagedRuntimeMessage}
+            </div>
+          ) : null}
+          {freshRolloutReview ? (
+            <div
+              className="banner subtle"
+              data-testid="runtime-detail-fresh-rollout-banner"
+            >
+              {deploymentUrl
+                ? "Opened from deployment workflow: this rollout is still fresh. Open the app once, then confirm health and recent activity before preparing another change."
+                : "Opened from deployment workflow: this rollout is still fresh. Review overview, health, and recent activity before preparing another change."}
+            </div>
+          ) : null}
           {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
 
           <article
@@ -1407,13 +1804,10 @@ export default function DeploymentDetailsPage({ params }) {
                   <strong>{runtimeDecisionState.focus}</strong>
                   <p>{runtimeDecisionState.why}</p>
                   <div className="actionCluster">
-                    <Link
-                      href={runtimeDecisionState.primaryHref}
-                      className="landingButton primaryButton"
-                      data-testid="runtime-detail-main-next-step-action-focus"
-                    >
-                      {runtimeDecisionState.primaryAction}
-                    </Link>
+                    {renderRuntimeDecisionPrimaryAction(
+                      "landingButton primaryButton",
+                      "runtime-detail-main-next-step-action-focus",
+                    )}
                     <Link
                       href={runtimeDecisionState.secondaryHref}
                       className="secondaryButton"
@@ -1477,14 +1871,16 @@ export default function DeploymentDetailsPage({ params }) {
               >
                 Review runtime
               </button>
-              <button
-                type="button"
-                className={detailTab === "change" ? "active" : ""}
-                onClick={() => setDetailTab("change")}
-                data-testid="runtime-detail-tab-change"
-              >
-                Prepare change
-              </button>
+              {canMutateRuntime ? (
+                <button
+                  type="button"
+                  className={detailTab === "change" ? "active" : ""}
+                  onClick={() => setDetailTab("change")}
+                  data-testid="runtime-detail-tab-change"
+                >
+                  Prepare change
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={detailTab === "share" ? "active" : ""}
@@ -1510,6 +1906,32 @@ export default function DeploymentDetailsPage({ params }) {
         {deployment ? (
           <>
             <section hidden={detailTab !== "overview"}>
+            <article
+              className="card compactCard runtimeReviewPanel runtimeDetailReviewPanel"
+              data-testid="runtime-detail-review-path-card"
+            >
+              <div className="sectionHeader">
+                <div>
+                  <span className={`status ${runtimeDecisionState.tone}`}>
+                    {runtimeDecisionState.label}
+                  </span>
+                  <h2 data-testid="runtime-detail-review-path-title">Review in this order</h2>
+                  <p className="formHint">
+                    Keep Step 3 readable: first prove the service is alive, then check whether it is quiet, then decide whether to keep, share, or change it.
+                  </p>
+                </div>
+              </div>
+              <div className="workspaceReviewerGrid runtimeReviewGrid">
+                {runtimeReviewPathItems.map((item) => (
+                  <article className="workspaceReviewerCard" key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </article>
+
             <div
               className="overviewGrid"
               data-testid="runtime-detail-overview-grid"
@@ -1528,7 +1950,7 @@ export default function DeploymentDetailsPage({ params }) {
                 <strong className="overviewValue">{deployment.container_name || "Container pending"}</strong>
                 <div className="overviewMeta">
                   <span>Status {deployment.status || "unknown"}</span>
-                  <span>Server {deployment.server_name || "Local"}</span>
+                  <span>{runtimeOverviewMetaText}</span>
                 </div>
               </div>
               <div className="overviewCard" data-testid="runtime-detail-health-overview-card">
@@ -1552,6 +1974,55 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               </div>
             </div>
+
+            {freshRolloutReview ? (
+              <article className="card compactCard" data-testid="runtime-detail-fresh-rollout-checklist-card">
+                <div className="sectionHeader">
+                  <div>
+                    <h2 data-testid="runtime-detail-fresh-rollout-checklist-title">
+                      Verify this rollout before you move on
+                    </h2>
+                    <p className="formHint">
+                      Treat the first review as part of deployment completion. Check the app, health, and latest activity once while the rollout context is still fresh.
+                    </p>
+                  </div>
+                </div>
+                <div className="workspaceReviewerGrid">
+                  <article
+                    className="workspaceReviewerCard"
+                    data-testid="runtime-detail-fresh-rollout-checklist-app"
+                  >
+                    <span>1. App</span>
+                    <strong>{deploymentUrl ? "Open the live app" : "Stay in runtime review"}</strong>
+                    <p>
+                      {deploymentUrl
+                        ? "Use the primary action once, then come back here before opening change tools."
+                        : "There is no public URL for this rollout, so the first verification stays on this page."}
+                    </p>
+                  </article>
+                  <article
+                    className="workspaceReviewerCard"
+                    data-testid="runtime-detail-fresh-rollout-checklist-health"
+                  >
+                    <span>2. Health</span>
+                    <strong>{health?.status || "unknown"}</strong>
+                    <p>{freshRolloutHealthSummary}</p>
+                  </article>
+                  <article
+                    className="workspaceReviewerCard"
+                    data-testid="runtime-detail-fresh-rollout-checklist-activity"
+                  >
+                    <span>3. Activity</span>
+                    <strong>{freshRolloutLatestEvent?.title || "No activity yet"}</strong>
+                    <p>
+                      {freshRolloutLatestEvent
+                        ? `${freshRolloutActivitySummary} If that event looks wrong, open diagnostics before another rollout change.`
+                        : "Wait for one meaningful runtime event before assuming this rollout is settled."}
+                    </p>
+                  </article>
+                </div>
+              </article>
+            ) : null}
 
             <article className="card compactCard" data-testid="runtime-detail-risk-breakdown-card">
               <div className="sectionHeader">
@@ -1594,6 +2065,7 @@ export default function DeploymentDetailsPage({ params }) {
             </article>
             </section>
 
+        {canMutateRuntime ? (
         <section hidden={detailTab !== "change"}>
         <article className="card formCard" data-testid="runtime-detail-change-readiness-card">
           <div className="sectionHeader">
@@ -1797,6 +2269,9 @@ export default function DeploymentDetailsPage({ params }) {
                   {redeployPreflight.warnings.join(" ")}
                 </div>
               ) : null}
+              <pre className="logs expandedBlock" data-testid="runtime-detail-redeploy-review-checklist">
+                {redeployReviewChecklist}
+              </pre>
               <pre className="logs expandedBlock" data-testid="runtime-detail-redeploy-impact-summary">
                 {redeployImpactSummary}
               </pre>
@@ -1844,6 +2319,7 @@ export default function DeploymentDetailsPage({ params }) {
           {redeploySuccess ? <div className="banner success">{redeploySuccess}</div> : null}
         </article>
         </section>
+        ) : null}
 
             <section hidden={detailTab !== "share"}>
             <AdminDisclosureSection
@@ -1855,7 +2331,11 @@ export default function DeploymentDetailsPage({ params }) {
             <div id="runtime-detail-handoff-tools" />
             <AdminDisclosureSection
               title="Share and safety controls"
-              subtitle="Handoff actions, refresh, session exit, and deletion stay here so the main runtime path stays focused on review and rollout."
+              subtitle={
+                canMutateRuntime
+                  ? "Handoff actions, refresh, session exit, and deletion stay here so the main runtime path stays focused on review and rollout."
+                  : "Handoff actions, refresh, and session controls stay here while destructive runtime actions remain admin-managed."
+              }
               badge={deployment?.status || "unknown"}
               testId="runtime-detail-utility-disclosure"
             >
@@ -1935,24 +2415,29 @@ export default function DeploymentDetailsPage({ params }) {
                 <button type="button" className="secondaryButton" onClick={handleLogout}>
                   Logout
                 </button>
-                <button
-                  type="button"
-                  className="dangerButton"
-                  onClick={() => setDeleteReviewOpen((current) => !current)}
-                  disabled={deleting}
-                  data-testid="runtime-detail-delete-review-button"
-                  id="runtime-detail-delete-controls"
-                >
-                  {deleteReviewOpen ? "Hide delete review" : "Review delete"}
-                </button>
+                {canMutateRuntime ? (
+                  <button
+                    type="button"
+                    className="dangerButton"
+                    onClick={() => setDeleteReviewOpen((current) => !current)}
+                    disabled={deleting}
+                    data-testid="runtime-detail-delete-review-button"
+                    id="runtime-detail-delete-controls"
+                  >
+                    {deleteReviewOpen ? "Hide delete review" : "Review delete"}
+                  </button>
+                ) : null}
               </div>
-              {deleteReviewOpen ? (
+              {canMutateRuntime && deleteReviewOpen ? (
                 <div className="stackedValue" data-testid="runtime-detail-delete-review-panel">
                   <div className="banner error">
                     {buildReviewIntroText("delete", deleteConfirmationPhrase).split(deleteConfirmationPhrase)[0]}
                     <strong>{deleteConfirmationPhrase}</strong>
                     {buildReviewIntroText("delete", deleteConfirmationPhrase).split(deleteConfirmationPhrase)[1]}
                   </div>
+                  <pre className="logs expandedBlock" data-testid="runtime-detail-delete-review-checklist">
+                    {deleteReviewChecklist}
+                  </pre>
                   <pre className="logs expandedBlock" data-testid="runtime-detail-delete-impact-summary">
                     {deleteImpactSummary}
                   </pre>
@@ -2032,13 +2517,7 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
               <div className="row">
                 <span className="label">Server</span>
-                <span>
-                  {canAccessServers && deployment.server_name
-                    ? `${deployment.server_name} (${deployment.server_host})`
-                    : deployment.server_id
-                      ? "Managed by an admin"
-                      : "Local"}
-                </span>
+                <span>{runtimeServerLabel}</span>
               </div>
               <div className="row">
                 <span className="label">Created</span>
@@ -2114,12 +2593,26 @@ export default function DeploymentDetailsPage({ params }) {
             <article className="card compactCard" data-testid="runtime-detail-template-card">
               <div className="sectionHeader">
                 <div>
-                  <h2>Save as template</h2>
+                  <h2>
+                    {runtimeServerAccessBlocked
+                      ? "Template handoff is admin-managed"
+                      : "Save as template"}
+                  </h2>
                   <p className="formHint">
-                    Turn the current deployment settings into a reusable preset, then continue template review and reuse inside the deployment workflow.
+                    {runtimeServerAccessBlocked
+                      ? "This runtime belongs to an admin-managed remote target, so reusable rollout setup stays with admins until server sharing rules exist."
+                      : "Turn the current deployment settings into a reusable preset, then continue template review and reuse inside the deployment workflow."}
                   </p>
                 </div>
               </div>
+              {runtimeServerAccessBlocked ? (
+                <div
+                  className="banner subtle"
+                  data-testid="runtime-detail-template-admin-managed-banner"
+                >
+                  Ask an admin to create or share a reusable setup for this remote target. This keeps hidden server inventory from becoming a local template by mistake.
+                </div>
+              ) : (
               <div className="form">
                 <label className="field">
                   <span>Template name</span>
@@ -2134,13 +2627,14 @@ export default function DeploymentDetailsPage({ params }) {
                   </span>
                 </label>
                 <div className="formActions">
-                  <button
-                    type="button"
-                    onClick={handleSaveTemplate}
-                    disabled={templateSaving || !templateName.trim() || !form.image.trim()}
-                  >
-                    {templateSaving ? "Saving template..." : "Save as template"}
-                  </button>
+	                  <button
+	                    type="button"
+	                    onClick={handleSaveTemplate}
+	                    disabled={templateSaving || !templateName.trim() || !form.image.trim()}
+	                    data-testid="runtime-detail-save-template-button"
+	                  >
+	                    {templateSaving ? "Saving template..." : "Save as template"}
+	                  </button>
                   {savedTemplate?.id ? (
                     <Link
                       href={`/app/deployment-workflow?template=${savedTemplate.id}&template_action=preview&template_source=deployment-detail#templates`}
@@ -2149,9 +2643,10 @@ export default function DeploymentDetailsPage({ params }) {
                       Open in workflow
                     </Link>
                   ) : null}
-                </div>
-              </div>
-	              {savedTemplate?.id ? (
+	                </div>
+	              </div>
+              )}
+		              {savedTemplate?.id ? (
 	                <div className="banner subtle" data-testid="runtime-detail-template-bridge-banner">
 	                  Template "{savedTemplate.template_name}" is now part of the deployment workflow. Open it there to preview, reuse, or edit it in the main rollout screen.
 	                </div>
@@ -2205,9 +2700,9 @@ export default function DeploymentDetailsPage({ params }) {
                   <span>
                     {canAccessServers
                       ? diagnostics?.server_target || "N/A"
-                      : deployment.server_id
-                        ? "Managed by an admin"
-                        : "N/A"}
+                    : deployment.server_id || runtimeServerAccessBlocked
+                      ? "Managed by an admin"
+                      : "N/A"}
                   </span>
                   {canAccessServers && diagnostics?.server_target ? (
                     <button
@@ -2288,7 +2783,7 @@ export default function DeploymentDetailsPage({ params }) {
                     <span>
                       {canAccessServers
                         ? diagnostics.server_target || "N/A"
-                        : deployment.server_id
+                        : deployment.server_id || runtimeServerAccessBlocked
                           ? "Managed by an admin"
                           : "N/A"}
                     </span>
