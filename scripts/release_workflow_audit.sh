@@ -107,6 +107,42 @@ compare_lists() {
   return 1
 }
 
+audit_release_secrets_workflow_shape() {
+  python3 - "$SECRETS_AUDIT_WORKFLOW" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+required_jobs = [
+    "manual-audit",
+    "scheduled-production",
+    "scheduled-staging",
+    "incident-self-test",
+]
+for job in required_jobs:
+    if not re.search(rf"^  {re.escape(job)}:\s*$", text, flags=re.MULTILINE):
+        raise SystemExit(f"[release-audit] {path} is missing explicit job {job}")
+
+if re.search(r"^\s+strategy:\s*$", text, flags=re.MULTILINE):
+    raise SystemExit(f"[release-audit] {path} must not use strategy/matrix for audit modes")
+
+if re.search(r"^\s+matrix:\s*$", text, flags=re.MULTILINE):
+    raise SystemExit(f"[release-audit] {path} must not use strategy/matrix for audit modes")
+
+if "uses: actions/github-script@v8" in text:
+    raise SystemExit(f"[release-audit] {path} should call the local incident action instead of inline github-script")
+
+if text.count("uses: ./.github/actions/release-secrets-audit") != 3:
+    raise SystemExit(f"[release-audit] {path} should call the audit action from manual and scheduled jobs only")
+
+if text.count("uses: ./.github/actions/release-audit-incident") != 3:
+    raise SystemExit(f"[release-audit] {path} should call the incident action from both scheduled jobs and self-test")
+PY
+}
+
 TMP_DIR="$(mktemp -d)"
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -114,6 +150,7 @@ cleanup() {
 trap cleanup EXIT
 
 audit_cache_prepare
+audit_release_secrets_workflow_shape
 
 release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "release-workflow-audit" \

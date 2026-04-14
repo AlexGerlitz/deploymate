@@ -1,0 +1,41 @@
+name: Release audit incident triage
+description: Open, update, or close the release secrets audit incident issue.
+
+inputs:
+  target-environment:
+    description: Environment name associated with the audit.
+    required: true
+  job-status:
+    description: Effective audit status to triage.
+    required: true
+  self-test-action:
+    description: Optional controlled self-test action.
+    required: false
+    default: none
+  incident-assignee:
+    description: Optional GitHub username assigned to opened incidents.
+    required: false
+    default: ""
+  incident-failure-threshold:
+    description: Consecutive failure threshold before high-severity escalation.
+    required: false
+    default: "3"
+
+runs:
+  using: composite
+  steps:
+    - name: Triage release audit incident
+      uses: actions/github-script@v8
+      env:
+        TARGET_ENVIRONMENT: ${{ inputs.target-environment }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        COMMIT_SHA: ${{ github.sha }}
+        REF_NAME: ${{ github.ref_name }}
+        JOB_STATUS: ${{ inputs.job-status }}
+        INCIDENT_SELF_TEST_ACTION: ${{ inputs.self-test-action }}
+        INCIDENT_ASSIGNEE: ${{ inputs.incident-assignee }}
+        INCIDENT_FAILURE_THRESHOLD: ${{ inputs.incident-failure-threshold }}
+      with:
+        script: |
+          const { triageReleaseAuditIncident } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release_audit_incident.js`);
+          await triageReleaseAuditIncident({ github, context, core, env: process.env });
