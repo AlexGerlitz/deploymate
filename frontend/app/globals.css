@@ -2074,6 +2074,10 @@ code {
   min-height: 100%;
 }
 
+.runtimeDetailLowerGuide {
+  margin-bottom: 16px;
+}
+
 .runtimeReviewGrid .workspaceReviewerCard p,
 .runtimeDecisionNote p {
   overflow-wrap: anywhere;

@@ -46,6 +46,16 @@ if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Ope
   exit 1
 fi
 
+if ! grep -Eq 'data-testid="runtime-detail-share-order-title"[^>]*>Share this runtime in order<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail lost the ordered share/handoff guidance" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-evidence-order-title"[^>]*>Read evidence in order<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail lost the ordered evidence guidance" >&2
+  exit 1
+fi
+
 if grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Prepare rollout change<' "$DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] healthy runtime detail still makes rollout change the main next step" >&2
   exit 1

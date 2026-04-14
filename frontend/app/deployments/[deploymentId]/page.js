@@ -1072,6 +1072,71 @@ export default function DeploymentDetailsPage({ params }) {
       detail: runtimeDecisionState.nextStep,
     },
   ];
+  const handoffGuideItems = [
+    {
+      label: "1. Explain state",
+      value: plainLanguageSummary ? "Ready" : "Waiting",
+      detail:
+        "Start with the plain-language summary so the next person does not have to rebuild the story from diagnostics.",
+    },
+    {
+      label: "2. Save evidence",
+      value: incidentSnapshot ? "Snapshot ready" : "No snapshot",
+      detail:
+        "Download the snapshot or markdown only after the current status and recommended next step are clear.",
+    },
+    {
+      label: "3. Reuse only when stable",
+      value: runtimeServerAccessBlocked ? "Admin-managed" : health?.status || "Unknown",
+      detail:
+        runtimeServerAccessBlocked
+          ? "Reusable setup stays with admins while this runtime belongs to an admin-managed server target."
+          : "Save a template when this setup is useful again, not while the runtime still needs incident review.",
+    },
+    {
+      label: "4. Delete last",
+      value: canMutateRuntime ? "Guarded" : "Admin-only",
+      detail:
+        canMutateRuntime
+          ? "Use delete only after handoff notes, diagnostics, and any needed exports are already handled."
+          : "Destructive actions stay with admins for this runtime.",
+    },
+  ];
+  const evidenceGuideItems = [
+    {
+      label: "1. Attention",
+      value:
+        attentionItems.length > 0
+          ? `${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"}`
+          : "Clear",
+      detail:
+        attentionItems.length > 0
+          ? "Open the active warnings before reading broad logs."
+          : "No active warnings are leading the evidence path right now.",
+    },
+    {
+      label: "2. Diagnostics",
+      value: exportDiagnostics
+        ? `${exportDiagnostics.activity?.recent_failure_count || 0} recent failure${
+            exportDiagnostics.activity?.recent_failure_count === 1 ? "" : "s"
+          }`
+        : "Not available",
+      detail:
+        "Use diagnostics to confirm the target, health signal, and failure count before making a rollout decision.",
+    },
+    {
+      label: "3. Logs",
+      value: logs ? "Available" : "Empty",
+      detail:
+        "Read logs when a warning or diagnostic needs raw context. Do not let logs become the first screen.",
+    },
+    {
+      label: "4. Activity",
+      value: `${exportActivity.length} event${exportActivity.length === 1 ? "" : "s"}`,
+      detail:
+        "Finish with the timeline so the handoff includes what happened most recently and in what order.",
+    },
+  ];
   const renderRuntimeDecisionPrimaryAction = (className, testId) =>
     runtimeDecisionState.primaryExternal ? (
       <a
@@ -2330,6 +2395,35 @@ export default function DeploymentDetailsPage({ params }) {
               testId="runtime-detail-secondary-tools"
             >
             <div id="runtime-detail-handoff-tools" />
+            <article
+              className="card compactCard runtimeReviewPanel runtimeDetailLowerGuide"
+              data-testid="runtime-detail-share-order-card"
+            >
+              <div className="sectionHeader">
+                <div>
+                  <span className={`status ${runtimeDecisionState.tone}`}>
+                    {runtimeDecisionState.label}
+                  </span>
+                  <h2 data-testid="runtime-detail-share-order-title">Share this runtime in order</h2>
+                  <p className="formHint">
+                    Explain the state first, save evidence second, keep reusable setup deliberate, and leave delete as the final guarded action.
+                  </p>
+                </div>
+              </div>
+              <div className="workspaceReviewerGrid runtimeReviewGrid">
+                {handoffGuideItems.map((item, index) => (
+                  <article
+                    className="workspaceReviewerCard"
+                    data-testid={`runtime-detail-share-order-item-${index + 1}`}
+                    key={item.label}
+                  >
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </article>
             <AdminDisclosureSection
               title="Share and safety controls"
               subtitle={
@@ -2664,6 +2758,35 @@ export default function DeploymentDetailsPage({ params }) {
               testId="runtime-detail-tools-disclosure"
             >
             <div id="runtime-detail-activity-tools" />
+            <article
+              className="card compactCard runtimeReviewPanel runtimeDetailLowerGuide"
+              data-testid="runtime-detail-evidence-order-card"
+            >
+              <div className="sectionHeader">
+                <div>
+                  <span className={`status ${runtimeDecisionState.tone}`}>
+                    {runtimeDecisionState.label}
+                  </span>
+                  <h2 data-testid="runtime-detail-evidence-order-title">Read evidence in order</h2>
+                  <p className="formHint">
+                    Start with active warnings, confirm them with diagnostics, use logs for raw context, then close the loop with activity history.
+                  </p>
+                </div>
+              </div>
+              <div className="workspaceReviewerGrid runtimeReviewGrid">
+                {evidenceGuideItems.map((item, index) => (
+                  <article
+                    className="workspaceReviewerCard"
+                    data-testid={`runtime-detail-evidence-order-item-${index + 1}`}
+                    key={item.label}
+                  >
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </article>
             <article className="card compactCard" data-testid="runtime-detail-quick-reference-card">
               <div className="sectionHeader">
                 <h2 data-testid="runtime-detail-quick-reference-title">Quick reference</h2>
