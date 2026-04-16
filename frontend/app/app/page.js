@@ -145,7 +145,7 @@ export default function HomePage() {
   const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
     ? "Next best step: connect and verify one server."
     : overviewPrimaryPath.reason === "incident"
-      ? "Next best step: open live deployments and review the problem first."
+      ? "Next best step: review live apps and inspect the problem first."
       : overviewPrimaryPath.reason === "admin-target-needed"
         ? "Next best step: ask an admin to confirm one server target, then return to the workflow."
       : memberServerCopy
@@ -157,8 +157,7 @@ export default function HomePage() {
   const waitingForServerSetup = overviewPrimaryPath.reason === "server-setup";
   const memberNewDeploymentBlocked = memberHasLiveDeployments;
   const hasLiveDeployments = opsSnapshot.deployments.total > 0;
-  const stepTwoBlocked =
-    waitingForServerSetup || waitingForAdminTarget || memberNewDeploymentBlocked;
+  const stepTwoBlocked = waitingForServerSetup || waitingForAdminTarget;
   const stepThreeBlocked =
     waitingForServerSetup || waitingForAdminTarget || opsSnapshot.deployments.total === 0;
   const stepThreeIsPrimary =
@@ -196,21 +195,23 @@ export default function HomePage() {
     {
       key: "step-2",
       step: "Step 2",
-      title: "Choose your app",
+      title: memberNewDeploymentBlocked ? "New deploy needs admin target" : "Choose your app",
       detail: stepTwoBlocked
         ? waitingForAdminTarget
           ? "This step opens after an admin confirms one saved server target for the workspace."
           : memberNewDeploymentBlocked
             ? "New remote deployments need an admin-managed target. Review the live apps that already exist instead."
             : "This step opens after Step 1 is done and one server is already connected."
+        : memberNewDeploymentBlocked
+          ? "New remote deployments still need an admin-managed target. Use live review now, then ask an admin only when a new rollout is truly needed."
         : hasLiveDeployments
           ? "Use this only when you are ready to start another app after reviewing what is already live."
         : "Paste the app image you want to run, or pick a saved setup if you already have one.",
       href: singleServerFirstDeployTarget ? firstDeployWorkflowHref : "/app/deployment-workflow",
       actionLabel: stepTwoBlocked
-        ? memberNewDeploymentBlocked
-          ? "Ask admin for new deploy"
-          : "Opens after Step 1"
+        ? "Opens after Step 1"
+        : memberNewDeploymentBlocked
+          ? "Review live apps instead"
         : hasLiveDeployments
           ? "Start another deploy"
         : "Choose app to run",

@@ -1732,7 +1732,7 @@ function DeploymentWorkflowPageContent() {
           focus: "Live apps are available for review",
           nextStep:
             "Review the deployments that already exist. Creating new remote deployments and choosing saved server targets stay with admins.",
-          primaryAction: "Open live deployments",
+          primaryAction: "Review live apps instead",
           secondaryAction: "Copy next step",
           tone: "info",
         }
@@ -1749,13 +1749,13 @@ function DeploymentWorkflowPageContent() {
     serverAccessBlocked && !memberHasLiveDeployments
       ? { kind: "link", href: "/app", label: "Back to overview" }
       : serverAccessBlocked
-        ? { kind: "button", tab: "live", label: "Open live deployments" }
+        ? { kind: "button", tab: "live", label: "Review live apps instead" }
         : firstDeployHandoffFocusMode
           ? { kind: "focus-create", label: "Set image for first deploy" }
         : workflowState.mode === "prerequisite"
           ? { kind: "link", href: "/app/server-review", label: "Open server review" }
           : failedDeploymentCount > 0
-            ? { kind: "button", tab: "live", label: "Open live deployments" }
+            ? { kind: "button", tab: "live", label: "Review live apps instead" }
             : memberWorkflowNextStep.primaryAction === "Open templates"
               ? { kind: "button", tab: "templates", label: "Open saved setups" }
               : memberWorkflowNextStep.primaryAction === "Fix the create form"
@@ -1924,7 +1924,7 @@ function DeploymentWorkflowPageContent() {
             <div className="sectionHeader workspaceGuideHeader">
               <div>
                 <h2 data-testid="deployment-workflow-member-live-title">
-                  Review live deployments with admin-managed targets
+                  Review live apps with admin-managed targets
                 </h2>
                 <p className="formHint">
                   Existing deployments can be reviewed here. Creating new remote deployments and choosing saved server targets stay with admins.
@@ -1954,7 +1954,7 @@ function DeploymentWorkflowPageContent() {
                 className="landingButton primaryButton"
                 onClick={() => setWorkflowTab("live")}
               >
-                Open live deployments
+                Review live apps instead
               </button>
               <Link href="/app" className="landingButton secondaryButton">
                 Back to overview
@@ -1967,7 +1967,7 @@ function DeploymentWorkflowPageContent() {
               <div>
                 <h2>Server target is admin-managed</h2>
                 <p className="formHint">
-                  Members cannot access saved server inventory here. Ask an admin to confirm the remote target first, then come back when Step 2 is actually open.
+                  Members cannot access saved server inventory here. Ask an admin to confirm the remote target first, then return when a new deployment is actually needed.
                 </p>
               </div>
             </div>
@@ -1998,7 +1998,7 @@ function DeploymentWorkflowPageContent() {
                   className="landingButton secondaryButton"
                   onClick={() => setWorkflowTab("live")}
                 >
-                  Open live deployments
+                  Review live apps instead
                 </button>
               ) : null}
             </div>
