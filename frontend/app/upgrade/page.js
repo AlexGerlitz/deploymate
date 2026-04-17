@@ -27,29 +27,44 @@ async function readJsonOrError(response, fallbackMessage) {
   return payload;
 }
 
-const planCards = [
+const packageCards = [
   {
-    id: "trial",
-    title: "Trial",
-    price: "Free",
-    features: ["Up to 1 server", "Up to 3 deployments", "Email onboarding"],
+    id: "internal-team",
+    title: "Internal Team",
+    price: "Paid workspace",
+    detail: "For teams running Docker services on company-owned VPS, dedicated servers, or private cloud.",
+    features: [
+      "Path from evaluation to paid access",
+      "Guided onboarding on self-owned infrastructure",
+      "Commercial use covered explicitly",
+    ],
   },
   {
-    id: "solo",
-    title: "Solo",
-    price: "$29/mo",
-    features: ["Up to 3 servers", "Up to 15 deployments", "Priority setup help"],
+    id: "agency",
+    title: "Agency / Multi-client",
+    price: "Commercial package",
+    detail: "For agencies, integrators, and outsourced teams supporting services on client-owned infrastructure.",
+    features: [
+      "Client infrastructure support path",
+      "Packaging shaped around ongoing support and handoff",
+      "Conversation starts from delivery model, not from generic seat count",
+    ],
   },
   {
-    id: "team",
-    title: "Team",
-    price: "Custom",
-    features: ["Up to 10 servers", "Up to 100 deployments", "Custom onboarding"],
+    id: "custom",
+    title: "Custom / Redistribution",
+    price: "Separate agreement",
+    detail: "For managed service, SaaS embedding, redistribution, resale, or white-label style use.",
+    features: [
+      "Redistribution and resale review",
+      "Support and customization discussion",
+      "Explicit commercial licensing path",
+    ],
   },
 ];
 const commercialUseCases = [
-  "Internal company rollout tooling",
-  "Client project or agency delivery",
+  "Internal company deployment operations",
+  "Agency or client delivery on customer infrastructure",
   "Commercial SaaS or managed service",
   "Redistribution, white-label, or resale",
 ];
@@ -140,13 +155,13 @@ export default function UpgradePage() {
       <div className="container">
         <div className="header">
           <div>
-            <h1>Plans and commercial licensing</h1>
+            <h1>Packaging for teams running services on their own or client infrastructure</h1>
             <p>
               {loadingUser
-                ? "Loading plan..."
+                ? "Loading account state..."
                 : currentUser
-                  ? `Current plan: ${currentUser.plan}. Use this page to request the next level of access.`
-                  : "Start with a trial account first, then use this page to request paid or commercial access."}
+                  ? `Current account: ${currentUser.plan}. Use this page to move from evaluation into the paid or commercial path that matches your support model.`
+                  : "Start with the live product or trial first, then use this page to move into the paid or commercial path that matches your team."}
             </p>
           </div>
           <div className="buttonRow">
@@ -163,22 +178,24 @@ export default function UpgradePage() {
 
         <article className="card formCard">
           <div className="sectionHeader">
-            <h2>Plans</h2>
+            <h2>Business paths</h2>
             <p className="formHint">
-              Trial is the self-serve entry point. Paid plans and commercial use still go through a reviewed request path.
+              Trial stays the public evaluation entry point. This page is for the next step: internal team use, agency delivery, or custom commercial rights.
             </p>
           </div>
+          <div className="banner subtle">
+            We are framing packaging around the real buyer first: the team that supports Docker services on company-owned or client-owned infrastructure and needs a clearer deploy + handoff path.
+          </div>
           <div className="pricingGrid">
-            {planCards.map((plan) => (
+            {packageCards.map((plan) => (
               <article
                 key={plan.id}
-                className={`pricingCard ${plan.id === "solo" ? "pricingCardFeatured" : ""}`}
+                className={`pricingCard ${plan.id === "agency" ? "pricingCardFeatured" : ""}`}
               >
-                {currentUser?.plan === plan.id ? (
-                  <div className="pricingBadge">Current plan</div>
-                ) : null}
+                {plan.id === "agency" ? <div className="pricingBadge">Primary wedge</div> : null}
                 <h3>{plan.title}</h3>
                 <div className="priceLine">{plan.price}</div>
+                <p>{plan.detail}</p>
                 <ul className="featureList">
                   {plan.features.map((feature) => (
                     <li key={feature}>{feature}</li>
@@ -202,11 +219,9 @@ export default function UpgradePage() {
         <article className="card formCard onboardingCard">
           <div className="sectionHeader">
             <div>
-              <h2>Commercial use policy</h2>
+              <h2>How the path works</h2>
               <p className="formHint">
-                DeployMate is source-available under a noncommercial public license. Business use,
-                internal company use, client work, SaaS use, resale, and redistribution require a
-                separate commercial license.
+                The public product stays open for evaluation. Business use, internal company use, client work, SaaS use, resale, and redistribution still require an explicit paid or commercial agreement.
               </p>
             </div>
             <a
@@ -224,15 +239,15 @@ export default function UpgradePage() {
 
           <div className="overviewGrid">
             <article className="overviewCard">
-              <span className="overviewLabel">Use the public license when</span>
+              <span className="overviewLabel">Stay on the public path when</span>
               <div className="overviewMeta">
-                <span>Personal evaluation or hobby use</span>
-                <span>Research, learning, or noncommercial experimentation</span>
-                <span>Educational or internal noncommercial review</span>
+                <span>You are still evaluating the workflow</span>
+                <span>You want to see whether the product fits your infrastructure model</span>
+                <span>You are not yet using the code for business or client operations</span>
               </div>
             </article>
             <article className="overviewCard">
-              <span className="overviewLabel">Request a commercial license when</span>
+              <span className="overviewLabel">Move into a paid or commercial path when</span>
               <div className="overviewMeta">
                 {commercialUseCases.map((item) => (
                   <span key={item}>{item}</span>
@@ -245,21 +260,21 @@ export default function UpgradePage() {
         <article className="card formCard">
           <div className="sectionHeader">
             <div>
-              <h2>Request paid or commercial access</h2>
+              <h2>Start the access conversation</h2>
               <p className="formHint">
-                Use this form after trial when you want a paid plan, team onboarding, or a separate commercial license.
+                Use this form after evaluation when you want the right business path for your internal team, agency workflow, or custom commercial use.
               </p>
             </div>
           </div>
           <div className="banner subtle">
-            This is a review request, not an instant checkout. We read the request, confirm fit, and then move the account or license path forward.
+            This is not instant checkout. We use the request to understand infrastructure type, number of services, support model, and whether this should become a paid workspace or a separate commercial license.
           </div>
           <div className="banner subtle">
-            Prefer a direct explanation first? Start on{" "}
+            Prefer the legal summary first? Start on{" "}
             <Link href="/commercial-license" className="inlineLink">
               the commercial licensing page
             </Link>
-            {" "}for the policy, contact channels, and what happens next.
+            {" "}for the policy, package framing, contact channels, and what happens next.
           </div>
           <div className="banner subtle">
             Prefer email? Write to{" "}
@@ -312,13 +327,13 @@ export default function UpgradePage() {
                 value={form.use_case}
                 onChange={updateFormField}
                 disabled={submitting}
-                placeholder="What are you deploying, how many apps or servers do you need, and are you asking for a paid plan or a commercial license?"
+                placeholder="Describe your infrastructure, how many services or servers you support, whether this is internal team use or client delivery, and what kind of commercial path you need."
               />
             </label>
 
             <div className="formActions">
               <button type="submit" disabled={submitting}>
-                {submitting ? "Submitting..." : "Send access request"}
+                {submitting ? "Submitting..." : "Start packaging conversation"}
               </button>
             </div>
           </form>
@@ -327,7 +342,7 @@ export default function UpgradePage() {
           {success ? <div className="banner success">{success}</div> : null}
           {success ? (
             <div className="banner subtle">
-              Next step: we review scope, support needs, and whether this should become a paid plan change or a separate commercial license. If needed, you can also follow up through{" "}
+              Next step: we review infrastructure scope, support needs, and whether this should become an internal-team path, an agency package, or a separate commercial license. If needed, you can also follow up through{" "}
               <a
                 href={buildBusinessMailto("DeployMate commercial license follow-up")}
                 className="inlineLink"

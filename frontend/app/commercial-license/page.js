@@ -1,17 +1,26 @@
 import Link from "next/link";
+
 import { buildBusinessMailto, businessContactEmail } from "../lib/public-contact";
 
-const commercialUseCases = [
-  "Internal company deployment operations",
-  "Agency or client delivery",
-  "Commercial SaaS or managed hosting",
-  "Resale, redistribution, or white-label use",
+const businessPaths = [
+  {
+    label: "Internal Team",
+    detail: "For teams deploying Docker services on company-owned infrastructure and moving from evaluation to explicit business use.",
+  },
+  {
+    label: "Agency / Multi-client",
+    detail: "For agencies, integrators, and outsourced teams supporting services on client-owned infrastructure.",
+  },
+  {
+    label: "Custom / Redistribution",
+    detail: "For SaaS embedding, managed service, resale, redistribution, or white-label use.",
+  },
 ];
 
 const requestChecklist = [
   "Company or project name",
-  "Whether use is internal, client-facing, SaaS, or resale",
-  "Expected number of apps, servers, or environments",
+  "Whether the infrastructure is company-owned, client-owned, or mixed",
+  "Expected number of services, servers, or environments",
   "Whether you need support, customization, or redistribution rights",
 ];
 const contactChannels = [
@@ -42,26 +51,26 @@ export default function CommercialLicensePage() {
     <main className="page authPage">
       <div className="container authShell authShellSingle">
         <section className="authMarketingPanel">
-          <div className="eyebrow">Commercial licensing</div>
-          <h1>Use the product publicly for evaluation. Use the code commercially only with a separate license.</h1>
+          <div className="eyebrow">Business path</div>
+          <h1>Choose the right path for internal teams, agency delivery, or commercial redistribution.</h1>
           <p className="landingLead authLead">
-            DeployMate is source-available under a noncommercial public license. If you want to use
-            the code in a business, paid service, internal company workflow, client project, or resale
-            context, request a separate commercial license first.
+            DeployMate stays open for public evaluation, but business use of the code still
+            requires an explicit paid or commercial agreement. This page explains the buyer-facing
+            paths before you start that conversation.
           </p>
 
           <div className="authChecklist">
             <div className="authChecklistItem">
-              <strong>Public evaluation stays easy</strong>
-              <p>The live app, trial flow, and repository documentation remain available for product review.</p>
+              <strong>Evaluation stays self-serve</strong>
+              <p>The live app and trial path stay available when you are still deciding whether the workflow fits your team or clients.</p>
             </div>
             <div className="authChecklistItem">
-              <strong>Commercial rights are explicit</strong>
-              <p>Business use is not granted by the public license and must be handled through a separate agreement.</p>
+              <strong>Business use stays explicit</strong>
+              <p>Internal company operations, client delivery, SaaS embedding, resale, and redistribution are handled through a paid or commercial path.</p>
             </div>
             <div className="authChecklistItem">
-              <strong>The request path is already open</strong>
-              <p>Use the request flow below to start a licensing conversation with enough context to evaluate scope.</p>
+              <strong>The buyer path should feel clearer</strong>
+              <p>We frame the conversation around infrastructure type, support model, and rights needed instead of sending everyone through the same vague review wording.</p>
             </div>
           </div>
         </section>
@@ -70,21 +79,22 @@ export default function CommercialLicensePage() {
           <div className="authCardHeader">
             <div>
               <div className="eyebrow">Business use</div>
-              <h1>When you need a commercial license</h1>
+              <h1>Pick the path that matches how you support services</h1>
               <p className="formHint">
-                Request a commercial license before using DeployMate code for business operations, client delivery,
-                paid hosting, redistribution, or resale.
+                Use the public product to evaluate. Use one of the paths below when DeployMate becomes part of real business operations.
               </p>
             </div>
-            <div className="authCardBadge">Commercial path</div>
+            <div className="authCardBadge">Buyer-facing path</div>
           </div>
 
           <div className="overviewGrid">
             <article className="overviewCard">
-              <span className="overviewLabel">Typical use cases</span>
+              <span className="overviewLabel">Business paths</span>
               <div className="overviewMeta">
-                {commercialUseCases.map((item) => (
-                  <span key={item}>{item}</span>
+                {businessPaths.map((item) => (
+                  <span key={item.label}>
+                    <strong>{item.label}</strong>: {item.detail}
+                  </span>
                 ))}
               </div>
             </article>
@@ -113,35 +123,35 @@ export default function CommercialLicensePage() {
 
           <div className="authDecisionRow">
             <div className="authDecisionCard">
-              <strong>Need commercial rights?</strong>
-              <p>Go to the request page and describe your business use, deployment scale, and whether you need support or redistribution rights.</p>
+              <strong>Running services for your own company?</strong>
+              <p>Use the upgrade path to move from evaluation into an explicit Internal Team agreement instead of keeping business use implicit.</p>
             </div>
             <div className="authDecisionCard">
-              <strong>Just evaluating the product?</strong>
-              <p>You can keep using the live app, the public docs, and the trial flow without starting a licensing request.</p>
+              <strong>Supporting client infrastructure?</strong>
+              <p>The first wedge is the agency and integrator path: describe your delivery model, number of services, and what handoff/support shape you need.</p>
             </div>
           </div>
 
           <div className="authDecisionRow">
             <div className="authDecisionCard">
               <strong>What happens next?</strong>
-              <p>After you submit the request, the next step is a short scope review: intended use, deployment scale, support needs, and whether redistribution rights are required. The first reply usually comes within 2 business days.</p>
+              <p>After you submit the request, the next step is a short scope review: infrastructure type, deployment scale, support needs, and whether redistribution rights are required. The first reply usually comes within 2 business days.</p>
             </div>
             <div className="authDecisionCard">
               <strong>What to prepare</strong>
-              <p>Have your company/project name, commercial use case, estimated footprint, and any support or customization requirements ready before the conversation.</p>
+              <p>Have your company/project name, infrastructure model, estimated footprint, and any support or customization requirements ready before the conversation.</p>
             </div>
           </div>
 
           <div className="formActions authActions">
             <Link href="/upgrade" className="landingButton primaryButton authPrimaryAction">
-              Request commercial license
+              Start business path conversation
             </Link>
             <a
               href={buildBusinessMailto("DeployMate commercial license")}
               className="linkButton"
             >
-              Email licensing request
+              Email business use request
             </a>
             <a
               href="https://github.com/AlexGerlitz/deploymate/blob/main/COMMERCIAL-LICENSE.md"
@@ -160,7 +170,7 @@ export default function CommercialLicensePage() {
             <Link href="/" className="linkButton">
               Back to homepage
             </Link>
-            <span className="authFooterNote">Commercial use is handled through explicit permission, not implied by public repository access.</span>
+            <span className="authFooterNote">Evaluation stays easy. Business use stays explicit.</span>
           </div>
         </article>
       </div>

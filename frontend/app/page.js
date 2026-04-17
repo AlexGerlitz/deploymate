@@ -1,59 +1,61 @@
 import Link from "next/link";
-import { buildBusinessMailto } from "./lib/public-contact";
+
+import TrackedLink from "./tracked-link";
+import { FUNNEL_EVENT_NAMES } from "./lib/funnel-telemetry";
 
 const publicSignupEnabled =
   process.env.NEXT_PUBLIC_PUBLIC_SIGNUP_ENABLED === "1";
 const landingOperatingPrinciples = [
   {
-    label: "See the state",
-    title: "One screen should show what is live, what needs attention, and what to do next.",
+    label: "Own the infra",
+    title: "Deploy on infrastructure your team or client already owns instead of reshaping the whole stack around a platform vendor.",
   },
   {
-    label: "Move with confidence",
-    title: "Guided deploy and review paths reduce guesswork without hiding the deeper tools.",
+    label: "Keep the handoff visible",
+    title: "The next operator should understand what is live, what changed, and what to do next without a shell handoff ritual.",
   },
   {
-    label: "Keep the whole workflow visible",
-    title: "Runtime, admin review, exports, diagnostics, and recovery stay in the same product.",
+    label: "Stay out of Kubernetes",
+    title: "The core path stays centered on Docker services, clear runtime review, and safe next actions without platform sprawl.",
   },
 ];
 const landingProofPoints = [
-  "A live workspace with real deployment, server, and activity surfaces",
-  "Templates, diagnostics, team access, and upgrade review in the same app",
-  "Recovery prep and release checks around the product, not outside it",
+  "A live app already connects server review, guided deploy flow, and runtime detail",
+  "Deployment detail already leads with current state, health, diagnostics, and next-step review",
+  "Commercial path and onboarding already exist without pretending the product is a generic cloud platform",
 ];
 const landingQuickWins = [
   {
-    label: "Understand the current state",
-    title: "Open the workspace and immediately see live services, recent issues, and the next recommended action.",
+    label: "Bring one server under control",
+    title: "Save the target once, verify access, and keep the deployment destination explicit instead of tribal.",
   },
   {
-    label: "Ship without loose shell rituals",
-    title: "Use saved targets, templates, diagnostics, and guided deploy forms instead of remembering every step manually.",
+    label: "Deploy without SSH folklore",
+    title: "Use guided deploy flow, saved targets, and runtime review instead of rebuilding the rollout process from notes and shell history.",
   },
   {
-    label: "Review team and customer operations",
-    title: "Handle user access, upgrade requests, exports, and recovery prep from the same product surface.",
+    label: "Hand off the next action",
+    title: "Keep the next safe step visible so another operator can pick up the service without a long verbal walkthrough.",
   },
 ];
 const landingAudienceCards = [
   {
-    label: "For small product teams",
-    title: "A clearer control surface for the apps you already ship.",
+    label: "For agencies and integrators",
+    title: "A clearer control layer for services running on client-owned infrastructure.",
     detail:
-      "DeployMate is for teams that want less operational drift and fewer hidden steps between “ready to ship” and “it is live”.",
+      "DeployMate is being shaped for ongoing-support teams that need repeatable deploy and handoff without becoming a Kubernetes team for every client.",
   },
   {
-    label: "For founders and reviewers",
-    title: "Easy to understand without a long technical walkthrough.",
+    label: "For internal product teams",
+    title: "Still useful when your own team runs Docker services on its own VPS or private cloud.",
     detail:
-      "The first pass already shows a real product: live app, deployment views, admin workflows, and release discipline.",
+      "The same path works when the infrastructure is yours: connect a server, deploy a service, review runtime state, and keep the next action obvious.",
   },
   {
-    label: "For operators",
-    title: "Still deep enough when you need diagnostics, exports, and recovery prep.",
+    label: "For operator handoff",
+    title: "Readable enough for the next engineer, not only the one who shipped it.",
     detail:
-      "The product stays approachable first, then opens into the deeper operational surfaces only when you need them.",
+      "The runtime story is being pushed toward state, health, and next-step clarity before deeper admin and recovery tooling takes over the screen.",
   },
 ];
 
@@ -66,7 +68,7 @@ export default function LandingPage() {
             <span className="landingBrandMark">DM</span>
             <span className="landingBrandText">
               <strong>DeployMate</strong>
-              <span className="landingBrandSub">B2B deployment control</span>
+              <span className="landingBrandSub">Client infra deploy clarity</span>
             </span>
           </Link>
           <div className="buttonRow">
@@ -87,63 +89,80 @@ export default function LandingPage() {
         <div className="container landingShell">
           <div className="landingHeroGrid">
             <div className="landingHeroCopy">
-              <div className="eyebrow">Live product for small teams</div>
-              <h1>A simpler way to launch, monitor, and review Docker apps without living in the terminal.</h1>
+              <div className="eyebrow">Client infrastructure, minus SSH chaos</div>
+              <h1>Deploy Docker services on client-owned or self-owned infrastructure without Kubernetes overhead or shell folklore.</h1>
               <p className="landingLead">
-                DeployMate gives small teams one place to deploy services, see what is
-                healthy, review what needs attention, and handle team/admin follow-up
-                without bouncing between shell commands, notes, and separate internal tools.
+                DeployMate is being shaped for agencies, integrators, and small teams that
+                need one readable path to connect a server, deploy a service, see what is
+                healthy, and hand the next step to another operator without bouncing
+                between shell commands, notes, and ad-hoc internal rituals.
               </p>
 
               <div className="landingHeroSummary">
                 <div className="heroSummaryCard">
                   <span className="heroSummaryLabel">What it does</span>
-                  <strong>Turns deployment, monitoring, and review work into one readable product surface</strong>
+                  <strong>Turns deploy, runtime review, and handoff into one readable product surface</strong>
                 </div>
                 <div className="heroSummaryCard">
                   <span className="heroSummaryLabel">What it removes</span>
-                  <strong>Scattered shell steps, unclear ownership, and “where do I look first?” operational drift</strong>
+                  <strong>Provider lock-in pressure, scattered shell steps, and “who knows this service?” operational drift</strong>
                 </div>
               </div>
 
               <div className="landingPathGrid">
                 <article className="landingPathCard">
-                  <span className="heroSummaryLabel">In the first minute</span>
-                  <strong>See what is running, what is broken, and what the next action should be.</strong>
-                  <p>The workspace is built to answer the basic “what is going on?” question before anything else.</p>
+                  <span className="heroSummaryLabel">The first deploy path</span>
+                  <strong>Connect one server, choose what to run, and make the destination explicit.</strong>
+                  <p>The first pass is meant to feel like one clear story instead of a toolbox that assumes an operator already knows the system.</p>
                 </article>
                 <article className="landingPathCard">
-                  <span className="heroSummaryLabel">Then go deeper</span>
-                  <strong>Deploy again, inspect details, and review team/admin work without changing tools.</strong>
-                  <p>Templates, diagnostics, access review, exports, and recovery prep all stay inside the same app.</p>
+                  <span className="heroSummaryLabel">Then keep the runtime readable</span>
+                  <strong>Open runtime detail, review what is healthy, and understand the next safe action without reconstructing context from shell notes.</strong>
+                  <p>Templates, diagnostics, activity, and the commercial path stay inside the same product, but they stop competing with the main deploy story on first pass.</p>
                 </article>
               </div>
 
               <div className="buttonRow">
-                <Link href="/login" className="landingButton primaryButton">
+                <TrackedLink
+                  href="/login"
+                  className="landingButton primaryButton"
+                  eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                  eventProps={{ surface: "hero", cta: "open_live_product" }}
+                >
                   Open live product
-                </Link>
+                </TrackedLink>
                 {publicSignupEnabled ? (
-                  <Link href="/register" className="landingButton secondaryButton landingSecondaryCta">
-                    Create trial account
-                  </Link>
+                  <TrackedLink
+                    href="/register"
+                    className="landingButton secondaryButton landingSecondaryCta"
+                    eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                    eventProps={{ surface: "hero", cta: "start_evaluation" }}
+                  >
+                    Start evaluation
+                  </TrackedLink>
                 ) : (
-                  <Link href="/upgrade" className="landingButton secondaryButton landingSecondaryCta">
-                    Start trial / Request access
-                  </Link>
+                  <TrackedLink
+                    href="/upgrade"
+                    className="landingButton secondaryButton landingSecondaryCta"
+                    eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                    eventProps={{ surface: "hero", cta: "request_access" }}
+                  >
+                    Start evaluation / Request access
+                  </TrackedLink>
                 )}
               </div>
 
               <div className="landingHeroNote" data-testid="landing-hero-note">
-                <strong>Best first pass:</strong> open the live product, read the workspace, then inspect one deployment detail and one admin screen.
+                <strong>Best first pass:</strong> connect one server, deploy one service, then open runtime detail and decide whether the next step is finally obvious.
               </div>
 
               <div className="landingMetaRow">
                 <span className="landingMetaBadge">Live app</span>
-                <span className="landingMetaBadge">Public trial</span>
-                <span className="landingMetaBadge">Guided workspace</span>
-                <span className="landingMetaBadge">Admin review flows</span>
-                <span className="landingMetaBadge">Runtime visibility</span>
+                <span className="landingMetaBadge">Client-owned infra</span>
+                <span className="landingMetaBadge">Provider-agnostic</span>
+                <span className="landingMetaBadge">Guided deploy path</span>
+                <span className="landingMetaBadge">Runtime handoff</span>
+                <span className="landingMetaBadge">Public evaluation</span>
               </div>
 
               <div className="landingSignalRail" data-testid="landing-signal-rail">
@@ -164,24 +183,24 @@ export default function LandingPage() {
                 </div>
                 <div className="showcaseQuickTake">
                   <strong>What you should notice first</strong>
-                  <p>The app leads with current state, not setup complexity. You can understand the product before you understand its internals.</p>
+                  <p>The app leads with current state and next action, not with infrastructure trivia. You should understand why it exists before you understand its internals.</p>
                 </div>
 
                 <div className="showcaseScoreboard">
                   <div className="showcaseMetric">
                     <span>First look</span>
-                    <strong>Current state first</strong>
-                    <small>the workspace leads with live counts, priority, and the next obvious move</small>
+                    <strong>Server to runtime story</strong>
+                    <small>the workspace leads with connection, deploy, and review instead of a flat toolbox</small>
                   </div>
                   <div className="showcaseMetric">
                     <span>Deployments</span>
-                    <strong>Health + details</strong>
-                    <small>status, endpoints, logs, diagnostics, and activity stay together</small>
+                    <strong>Health + next action</strong>
+                    <small>status, endpoints, diagnostics, activity, and safer runtime review stay together</small>
                   </div>
                   <div className="showcaseMetric">
-                    <span>Admin</span>
-                    <strong>Access + requests</strong>
-                    <small>saved views, exports, audit trails, and review work feel productized</small>
+                    <span>Commercial path</span>
+                    <strong>Evaluation to business use</strong>
+                    <small>trial, team packaging, and commercial access already have explicit paths</small>
                   </div>
                 </div>
 
@@ -193,8 +212,8 @@ export default function LandingPage() {
                     </div>
                     <ul className="showcaseList">
                       <li>One obvious next action on each important screen</li>
-                      <li>Important state is visible before deeper tooling</li>
-                      <li>Runtime and admin work stay in the same mental model</li>
+                      <li>Client-owned and self-owned infrastructure stay explicit</li>
+                      <li>Runtime review is readable before deeper tooling opens</li>
                     </ul>
                   </div>
 
@@ -206,11 +225,11 @@ export default function LandingPage() {
                     <div className="showcaseTimeline">
                       <div>
                         <span className="timelineLabel">Real product flow</span>
-                        <p>Login, workspace, deployment detail, admin review, and release-aware surfaces are already live.</p>
+                        <p>Login, workspace, server review, deployment workflow, and runtime detail are already live.</p>
                       </div>
                       <div>
                         <span className="timelineLabel">Operational depth</span>
-                        <p>Templates, diagnostics, exports, recovery prep, and audit views make the product feel substantial.</p>
+                        <p>Templates, diagnostics, release discipline, and packaging path already make the product feel like more than a demo shell.</p>
                       </div>
                     </div>
                   </div>
@@ -220,7 +239,7 @@ export default function LandingPage() {
                   <div className="showcaseCommandHeader">
                     <div>
                       <span className="heroSummaryLabel">Operating posture</span>
-                      <strong>Built to read like a real product, not a loose collection of internal tools.</strong>
+                      <strong>Built to feel like a clearer deploy and handoff layer, not a generic infrastructure dashboard.</strong>
                     </div>
                     <span className="showcaseCommandStatus">Surface ready</span>
                   </div>
@@ -236,10 +255,10 @@ export default function LandingPage() {
               </article>
 
               <div className="floatingProofCard floatingProofCardPrimary">
-                <span>Designed to make sense to a founder, reviewer, or operator without a long explanation first.</span>
+                <span>Built for teams supporting client or self-owned infrastructure, not for teams looking to become a Kubernetes platform group.</span>
               </div>
               <div className="floatingProofCard floatingProofCardSecondary">
-                <span>More than a brochure: the login flow, app shell, admin surfaces, and release workflow already exist.</span>
+                <span>More than a brochure: the login flow, server review, deployment workflow, runtime detail, and commercial path already exist.</span>
               </div>
             </div>
           </div>
@@ -247,27 +266,27 @@ export default function LandingPage() {
           <div className="landingGrid">
             <article className="landingCard landingCardAccent">
               <span className="cardKicker">What you notice first</span>
-              <h2>It answers “what is happening?” before it asks you to learn the tool.</h2>
+              <h2>It answers “what is running and what do I do next?” before it asks you to learn the tool.</h2>
               <p>
                 The value is not only that something can deploy. The value is that
-                deployment and review work become easier to understand, easier to repeat,
-                and easier to hand off.
+                deployment and runtime review become easier to understand, easier to
+                repeat, and easier to hand off across operators.
               </p>
             </article>
             <article className="landingCard">
               <span className="cardKicker">Who it is for</span>
-              <h2>Small teams that want product-grade deployment tooling without platform sprawl.</h2>
+              <h2>Ongoing-support teams that need clarity on infrastructure they or their clients already own.</h2>
               <p>
-                Teams can onboard a target, launch services, inspect runtime state, and
-                keep access/review workflows explicit instead of tribal.
+                The first wedge is agencies, integrators, and outsourced teams that keep
+                several services alive without wanting provider lock-in or Kubernetes overhead.
               </p>
             </article>
             <article className="landingCard">
-              <span className="cardKicker">Why it demos well</span>
-              <h2>Strong enough to show before you explain architecture, ops policy, or release mechanics.</h2>
+              <span className="cardKicker">Why it matters</span>
+              <h2>Because client infra deploys often fail in the gap between one operator’s memory and the next person’s context.</h2>
               <p>
-                The interface leads with visible state and clear actions, so the product
-                feels tangible before deeper technical context enters the conversation.
+                DeployMate is trying to shrink that gap by keeping server, deployment,
+                health, and next-step review in one product story.
               </p>
             </article>
           </div>
@@ -277,11 +296,11 @@ export default function LandingPage() {
       <section className="landingSection">
         <div className="container">
           <div className="sectionIntro sectionIntroWide">
-            <div className="eyebrow">What you understand quickly</div>
+            <div className="eyebrow">What the first wedge wants</div>
             <h2>Three practical outcomes, visible on the first pass.</h2>
             <p className="sectionLead">
-              This is the shortest way to understand what the product is trying to improve
-              for a real team.
+              This is the shortest way to understand why an agency, integrator, or
+              internal operator would care about this product at all.
             </p>
           </div>
 
@@ -299,27 +318,27 @@ export default function LandingPage() {
       <section className="landingSection" id="product">
         <div className="container">
           <div className="sectionIntro sectionIntroWide">
-            <div className="eyebrow">What the product covers</div>
-            <h2>A calmer interface for deploy, review, and recovery work.</h2>
+            <div className="eyebrow">What the product covers today</div>
+            <h2>A calmer interface for server setup, deploy, runtime review, and handoff.</h2>
             <p className="sectionLead">
-              The strongest tools reduce cognitive noise. DeployMate is built around that
-              idea: visible state, understandable actions, and fewer hidden steps between
-              “we should ship” and “it is live”.
+              The strongest tools reduce cognitive noise. DeployMate is being pushed in
+              that direction first: explicit target, guided deploy path, readable runtime
+              detail, and a clearer commercial path for real teams.
             </p>
           </div>
 
           <div className="capabilityGrid">
             <article className="capabilityCard">
               <span className="capabilityLabel">Deployments</span>
-              <h3>Launch, redeploy, inspect logs, health, and the details behind each service.</h3>
+              <h3>Launch, redeploy, inspect logs, health, and review the current runtime from one place.</h3>
               <p>
-                The deployment detail surface is designed to help someone make a decision,
+                Deployment detail is being shaped to help someone make a runtime decision,
                 not just confirm that a record exists.
               </p>
             </article>
             <article className="capabilityCard">
               <span className="capabilityLabel">Templates</span>
-              <h3>Turn repeated setup into reusable deploy presets.</h3>
+              <h3>Turn repeated setup into reusable deploy presets instead of loose notes.</h3>
               <p>
                 Save common image, server, and port combinations once, then apply them
                 back into the deploy flow or launch straight from preview.
@@ -329,32 +348,32 @@ export default function LandingPage() {
               <span className="capabilityLabel">Servers</span>
               <h3>Keep target hosts visible with diagnostics, connection tests, and suggested ports.</h3>
               <p>
-                Instead of relying on shell knowledge alone, teams get a cleaner way to
-                validate targets before deploying to them.
+                Instead of relying on shell knowledge alone, teams get a clearer way to
+                validate client or self-owned targets before deploying to them.
               </p>
             </article>
             <article className="capabilityCard">
-              <span className="capabilityLabel">Admin review</span>
-              <h3>Saved views, exports, bulk actions, and audit-friendly review workflows.</h3>
+              <span className="capabilityLabel">Runtime review</span>
+              <h3>Keep state, diagnostics, activity, and safer next actions close together.</h3>
               <p>
-                Team access and upgrade demand stay in the same product instead of becoming
-                side spreadsheets or ad-hoc internal routines.
+                The product is being pushed toward readable runtime handoff before it opens
+                into denser operational surfaces.
               </p>
             </article>
             <article className="capabilityCard">
-              <span className="capabilityLabel">Recovery</span>
-              <h3>Backup bundles and restore dry-runs before any destructive recovery path.</h3>
+              <span className="capabilityLabel">Operational safety</span>
+              <h3>Release checks, smoke flows, and remote discipline already exist around the app.</h3>
               <p>
-                That gives the product more weight for teams that care about operational
-                risk, auditability, and future readiness.
+                This is not only a UI layer. The product is already being treated like
+                something that needs to survive real rollout and maintenance.
               </p>
             </article>
             <article className="capabilityCard">
-              <span className="capabilityLabel">Release discipline</span>
-              <h3>Checks, smoke tests, and remote release flows already exist around the app.</h3>
+              <span className="capabilityLabel">Business path</span>
+              <h3>Evaluation, internal team packaging, and agency/commercial access already have explicit paths.</h3>
               <p>
-                The product is not only presented well. It is being treated like something
-                that needs to survive real rollout and maintenance.
+                The goal is to make the buyer path easier to understand before the product
+                widens into broader packaging.
               </p>
             </article>
           </div>
@@ -365,7 +384,7 @@ export default function LandingPage() {
         <div className="container">
           <div className="sectionIntro">
             <div className="eyebrow">Simple first-run model</div>
-            <h2>From first target to managed deployment in three clear steps</h2>
+            <h2>From first target to clearer runtime in three steps</h2>
           </div>
           <div className="stepsGrid">
             <article className="stepCard">
@@ -375,13 +394,13 @@ export default function LandingPage() {
             </article>
             <article className="stepCard">
               <span className="stepNumber">2</span>
-              <h3>Standardize the setup</h3>
-              <p>Use templates, previews, and suggested ports to remove guesswork from repeat deploys.</p>
+              <h3>Deploy with less guesswork</h3>
+              <p>Use guided deploy flow, templates, previews, and suggested ports instead of rebuilding the process by memory.</p>
             </article>
             <article className="stepCard">
               <span className="stepNumber">3</span>
-              <h3>Operate from one place</h3>
-              <p>Track runtime state, inspect issues, and keep admin/recovery tooling visible in the same app.</p>
+              <h3>Review and hand off</h3>
+              <p>Track runtime state, inspect issues, and keep the next safe action visible for the next operator.</p>
             </article>
           </div>
         </div>
@@ -391,7 +410,7 @@ export default function LandingPage() {
         <div className="container">
           <div className="sectionIntro">
             <div className="eyebrow">Who the first pass is for</div>
-            <h2>Clear enough for non-technical reviewers, still useful for operators.</h2>
+            <h2>Clear enough for buyers, still useful for the people who have to keep services alive.</h2>
           </div>
           <div className="capabilityGrid">
             {landingAudienceCards.map((item) => (
@@ -409,26 +428,26 @@ export default function LandingPage() {
         <div className="container">
           <div className="sectionIntro sectionIntroWide">
             <div className="eyebrow">Why it feels real</div>
-            <h2>It is not a brochure site pretending to be software.</h2>
+            <h2>It is not a brochure pretending to solve deploy and handoff.</h2>
             <p className="sectionLead">
-              There is a real login flow, a real application shell, richer admin surfaces,
-              export and audit tooling, recovery preparation, and release rigor around the product.
-              That is what gives the interface weight.
+              There is a real login flow, a real application shell, server review,
+              deployment workflow, runtime detail, and release rigor around the product.
+              That is what gives the interface weight before broader packaging lands.
             </p>
           </div>
 
           <div className="proofGrid">
             <article className="proofCard">
               <strong>Visible workflows</strong>
-              <p>People can actually move through app states instead of clicking through static mock content.</p>
+              <p>People can actually move from target setup to deploy and runtime review instead of clicking through static mock content.</p>
             </article>
             <article className="proofCard">
               <strong>Operational credibility</strong>
-              <p>The product exposes runtime, diagnostics, and recovery concepts in a way that still feels readable.</p>
+              <p>The product exposes runtime, diagnostics, and release discipline in a way that still feels readable.</p>
             </article>
             <article className="proofCard">
-              <strong>Presentation value</strong>
-              <p>Someone non-technical can still feel that the product is real because the UI has scope, order, and a clear path.</p>
+              <strong>Buyer clarity</strong>
+              <p>The public path now pushes toward “what problem is this solving for my team or clients?” before deeper evaluator concerns.</p>
             </article>
           </div>
         </div>
@@ -437,120 +456,142 @@ export default function LandingPage() {
       <section className="landingSection pricingSection" id="pricing">
         <div className="container">
           <div className="sectionIntro">
-            <div className="eyebrow">Pricing</div>
-            <h2>Simple packaging for first customers</h2>
+            <div className="eyebrow">Packaging</div>
+            <h2>Three buyer-facing paths for the first wedge</h2>
           </div>
 
           <div className="landingCommercialStrip">
             <div>
-              <div className="eyebrow">Business use</div>
-              <strong>Need internal company use, SaaS rights, client delivery, or resale?</strong>
+              <div className="eyebrow">Evaluation first</div>
+              <strong>Start with a live evaluation, then choose the path that matches your infrastructure and support model.</strong>
               <p className="sectionLead">
-                The public product stays open for evaluation, but commercial code use goes through
-                a separate license. The fastest direct path is email or the request form.
+                The public product stays open for evaluation. Business use, client delivery,
+                and redistribution still need an explicit paid or commercial path, but the
+                packaging is now framed around who is actually buying.
               </p>
             </div>
             <div className="landingCommercialActions">
-              <a
-                href={buildBusinessMailto("DeployMate commercial license")}
+              <TrackedLink
+                href={publicSignupEnabled ? "/register" : "/login"}
                 className="landingButton primaryButton"
+                eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                eventProps={{ surface: "packaging_strip", cta: publicSignupEnabled ? "start_evaluation" : "open_live_product" }}
               >
-                Email licensing
-              </a>
-              <Link href="/commercial-license" className="landingButton secondaryButton">
-                See licensing terms
-              </Link>
+                {publicSignupEnabled ? "Start evaluation" : "Open live product"}
+              </TrackedLink>
+              <TrackedLink
+                href="/commercial-license"
+                className="landingButton secondaryButton"
+                eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                eventProps={{ surface: "packaging_strip", cta: "view_business_path" }}
+              >
+                See business path
+              </TrackedLink>
             </div>
             <div className="landingCommercialMeta">
-              <span>First reply usually within 2 business days.</span>
-              <span>Use `/upgrade` if you want plan and licensing discussion in one step.</span>
+              <span>Evaluation stays self-serve.</span>
+              <span>Business use still goes through an explicit request path.</span>
             </div>
           </div>
 
           <div className="pricingGrid">
             <article className="pricingCard">
-              <h3>Trial</h3>
-              <div className="priceLine">Free</div>
-              <p>For evaluation, demos, and first-pass validation of the product.</p>
+              <h3>Internal Team</h3>
+              <div className="priceLine">Paid workspace</div>
+              <p>For teams running Docker services on company-owned VPS, dedicated servers, or private cloud.</p>
               <ul className="featureList">
-                <li>Up to 1 server</li>
-                <li>Up to 3 deployments</li>
-                <li>Core admin surface</li>
-                <li>Backup dry-run preview</li>
+                <li>Path from evaluation to paid access</li>
+                <li>Focused on self-owned infrastructure</li>
+                <li>Guided onboarding and clearer runtime review</li>
+                <li>Commercial use handled explicitly</li>
               </ul>
-              {publicSignupEnabled ? (
-                <Link href="/register" className="landingButton secondaryButton">
-                  Create account
-                </Link>
-              ) : (
-                <Link href="/upgrade" className="landingButton secondaryButton">
-                  Request access
-                </Link>
-              )}
+              <TrackedLink
+                href="/upgrade"
+                className="landingButton secondaryButton"
+                eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                eventProps={{ surface: "pricing", cta: "internal_team_path" }}
+              >
+                Review team path
+              </TrackedLink>
             </article>
 
             <article className="pricingCard pricingCardFeatured">
-              <div className="pricingBadge">Most practical</div>
-              <h3>Solo</h3>
-              <div className="priceLine">$29/mo</div>
-              <p>For teams that want a simpler deploy-and-review workflow without overbuilding infrastructure.</p>
+              <div className="pricingBadge">Primary wedge</div>
+              <h3>Agency / Multi-client</h3>
+              <div className="priceLine">Commercial package</div>
+              <p>For agencies, integrators, and outsourced teams supporting multiple services on client-owned infrastructure.</p>
               <ul className="featureList">
-                <li>Up to 3 servers</li>
-                <li>Up to 15 deployments</li>
-                <li>Admin saved views and exports</li>
-                <li>Operational visibility surfaces</li>
+                <li>Client-owned infrastructure story</li>
+                <li>Ongoing support and handoff focus</li>
+                <li>Packaging aimed at multi-client work</li>
+                <li>Onboarding path shaped around support teams</li>
               </ul>
-              {publicSignupEnabled ? (
-                <Link href="/register" className="landingButton primaryButton">
-                  Start free trial
-                </Link>
-              ) : (
-                <Link href="/upgrade" className="landingButton primaryButton">
-                  Start trial
-                </Link>
-              )}
+              <TrackedLink
+                href="/upgrade"
+                className="landingButton primaryButton"
+                eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                eventProps={{ surface: "pricing", cta: "agency_path" }}
+              >
+                Talk through agency fit
+              </TrackedLink>
             </article>
 
             <article className="pricingCard">
-              <h3>Team</h3>
-              <div className="priceLine">Custom</div>
-              <p>For agencies and product teams managing multiple apps, environments, and internal operators.</p>
+              <h3>Custom / Redistribution</h3>
+              <div className="priceLine">Separate agreement</div>
+              <p>For SaaS embedding, managed service resale, redistribution, or white-label style commercial use.</p>
               <ul className="featureList">
-                <li>Up to 10 servers</li>
-                <li>Up to 100 deployments</li>
-                <li>Workflow tuning for internal teams</li>
-                <li>Custom onboarding</li>
-                <li>Commercial licensing path</li>
+                <li>Redistribution and resale review</li>
+                <li>Managed service and SaaS path</li>
+                <li>Support and customization discussion</li>
+                <li>Explicit commercial licensing process</li>
               </ul>
-              <Link href="/upgrade" className="landingButton secondaryButton">
-                Talk to sales / licensing
-              </Link>
-              <Link href="/commercial-license" className="linkButton">
-                Commercial license info
-              </Link>
+              <TrackedLink
+                href="/commercial-license"
+                className="landingButton secondaryButton"
+                eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                eventProps={{ surface: "pricing", cta: "custom_path" }}
+              >
+                Review custom path
+              </TrackedLink>
             </article>
           </div>
 
           <div className="landingClosingCta">
             <div>
               <div className="eyebrow">Ready to explore</div>
-              <h2>Open the product and decide quickly whether the workflow feels clearer.</h2>
+              <h2>Open the product and decide quickly whether this feels clearer than raw Docker plus SSH for your team or clients.</h2>
               <p className="sectionLead">
-                The fastest route is login, workspace, one deployment detail, then one admin review surface.
+                The fastest route is evaluation, one server target, one deploy flow, and one runtime detail review.
               </p>
             </div>
             <div className="buttonRow">
-              <Link href="/login" className="landingButton primaryButton">
-                View live app
-              </Link>
+              <TrackedLink
+                href="/login"
+                className="landingButton primaryButton"
+                eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                eventProps={{ surface: "closing", cta: "open_live_product" }}
+              >
+                Open live product
+              </TrackedLink>
               {publicSignupEnabled ? (
-                <Link href="/register" className="landingButton secondaryButton">
-                  Start trial
-                </Link>
+                <TrackedLink
+                  href="/register"
+                  className="landingButton secondaryButton"
+                  eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                  eventProps={{ surface: "closing", cta: "start_evaluation" }}
+                >
+                  Start evaluation
+                </TrackedLink>
               ) : (
-                <Link href="/upgrade" className="landingButton secondaryButton">
+                <TrackedLink
+                  href="/upgrade"
+                  className="landingButton secondaryButton"
+                  eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
+                  eventProps={{ surface: "closing", cta: "request_access" }}
+                >
                   Request access
-                </Link>
+                </TrackedLink>
               )}
             </div>
           </div>
