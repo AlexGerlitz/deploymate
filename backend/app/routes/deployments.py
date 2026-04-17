@@ -1,6 +1,7 @@
+import secrets
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.db import (
     create_activity_event,
@@ -17,6 +18,7 @@ from app.db import (
 from app.schemas import (
     DeploymentCreateRequest,
     DeploymentDeleteResponse,
+    DeploymentReleaseWebhookRequest,
     DeploymentResponse,
 )
 from app.services.deployments import (
@@ -28,11 +30,13 @@ from app.services.deployments import (
     run_container,
 )
 from app.services.deployment_mutations import (
+    build_release_metadata as _service_build_release_metadata,
     create_deployment as _service_create_deployment,
     delete_deployment as _service_delete_deployment,
     normalize_runtime_error as _service_normalize_runtime_error,
     redeploy_deployment as _service_redeploy_deployment,
 )
+from app.services.secrets import apply_masked_secret_view
 from app.services.deployment_observability import (
     build_activity_summary as _service_build_activity_summary,
     build_deployment_diagnostics as _service_build_deployment_diagnostics,
@@ -55,6 +59,7 @@ from app.services.runtime_access import (
 
 
 router = APIRouter(dependencies=[Depends(require_auth)])
+public_router = APIRouter()
 
 
 def _normalize_runtime_error(message: str | None, fallback: str) -> str:
@@ -81,6 +86,25 @@ def _create_deployment(
         create_notification_fn=create_notification,
         create_activity_event_fn=create_activity_event,
         get_deployment_record_or_404_fn=get_deployment_record_or_404,
+    )
+
+
+def _build_release_metadata(
+    *,
+    image: str,
+    source: str,
+    ref: str | None = None,
+    commit_sha: str | None = None,
+    image_digest: str | None = None,
+    triggered_by: str | None = None,
+) -> dict[str, object]:
+    return _service_build_release_metadata(
+        image=image,
+        source=source,
+        ref=ref,
+        commit_sha=commit_sha,
+        image_digest=image_digest,
+        triggered_by=triggered_by,
     )
 
 
@@ -145,6 +169,14 @@ def _get_mutable_user_deployment_or_404(deployment_id: str, user: dict, *, actio
     return deployment
 
 
+def _validate_release_webhook_token(deployment: dict, provided_token: str | None) -> None:
+    expected_token = deployment.get("release_webhook_token")
+    if not expected_token or not provided_token:
+        raise HTTPException(status_code=403, detail="Release webhook token is missing or invalid.")
+    if not secrets.compare_digest(expected_token, provided_token):
+        raise HTTPException(status_code=403, detail="Release webhook token is missing or invalid.")
+
+
 @router.get("/deployments", response_model=List[DeploymentResponse])
 def list_deployments(
     status: str = Query(default="all", pattern="^(all|running|failed|pending)$"),
@@ -178,7 +210,11 @@ def list_deployments(
             ).lower()
             if normalized_query not in haystack:
                 continue
-        filtered.append(DeploymentResponse(**sanitize_remote_target_fields(deployment, user)))
+        filtered.append(
+            DeploymentResponse(
+                **apply_masked_secret_view(sanitize_remote_target_fields(deployment, user))
+            )
+        )
     return filtered
 
 
@@ -215,13 +251,74 @@ def redeploy_deployment(
         run_container_fn=run_container,
         create_notification_fn=create_notification,
         create_activity_event_fn=create_activity_event,
+        release_metadata=_build_release_metadata(
+            image=payload.image,
+            source="manual",
+            triggered_by=user.get("username"),
+        ),
+    )
+
+
+@public_router.post("/deployments/{deployment_id}/release-webhook", response_model=DeploymentResponse)
+def trigger_release_webhook(
+    deployment_id: str,
+    payload: DeploymentReleaseWebhookRequest,
+    x_deploymate_webhook_token: str | None = Header(default=None),
+) -> DeploymentResponse:
+    deployment = get_deployment_record_or_404(deployment_id)
+    _validate_release_webhook_token(deployment, x_deploymate_webhook_token)
+
+    release_image = payload.image or deployment["image"]
+    release_payload = DeploymentCreateRequest(
+        image=release_image,
+        name=deployment.get("container_name"),
+        internal_port=deployment.get("internal_port"),
+        external_port=deployment.get("external_port"),
+        server_id=deployment.get("server_id"),
+        env=deployment.get("env") or {},
+        secrets=deployment.get("secrets") or {},
+    )
+    create_activity_event(
+        deployment_id=deployment_id,
+        level="success",
+        title="Release webhook received",
+        message=(
+            f"Accepted webhook-triggered release for {deployment_id}. "
+            f"Source image {release_image}. Ref {payload.ref or '-'}, commit {payload.commit_sha or '-'}."
+        ),
+    )
+    return _service_redeploy_deployment(
+        deployment_id,
+        release_payload,
+        get_deployment_record_or_404_fn=get_deployment_record_or_404,
+        get_server_or_404_fn=get_server_or_404,
+        ensure_runtime_target_allowed_fn=ensure_runtime_target_allowed,
+        ensure_docker_is_available_fn=ensure_docker_is_available,
+        ensure_external_port_is_available_fn=ensure_external_port_is_available,
+        ensure_container_name_is_available_fn=ensure_container_name_is_available,
+        remove_container_if_exists_fn=remove_container_if_exists,
+        update_deployment_configuration_fn=update_deployment_configuration,
+        update_deployment_record_fn=update_deployment_record,
+        run_container_fn=run_container,
+        create_notification_fn=create_notification,
+        create_activity_event_fn=create_activity_event,
+        release_metadata=_build_release_metadata(
+            image=release_image,
+            source="webhook",
+            ref=payload.ref,
+            commit_sha=payload.commit_sha,
+            image_digest=payload.image_digest,
+            triggered_by=payload.triggered_by or "webhook",
+        ),
     )
 
 
 @router.get("/deployments/{deployment_id}", response_model=DeploymentResponse)
 def get_deployment(deployment_id: str, user=Depends(require_auth)) -> DeploymentResponse:
     deployment = _get_user_deployment_or_404(deployment_id, user)
-    return DeploymentResponse(**sanitize_remote_target_fields(deployment, user))
+    return DeploymentResponse(
+        **apply_masked_secret_view(sanitize_remote_target_fields(deployment, user))
+    )
 
 
 @router.delete("/deployments/{deployment_id}", response_model=DeploymentDeleteResponse)

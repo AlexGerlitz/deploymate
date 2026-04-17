@@ -19,6 +19,7 @@ import {
   buildDeploymentWorkflowNextStep,
   buildDeploymentWorkflowState,
   buildEnvRowsFromObject,
+  buildSecretRowsFromObject,
   buildEnvIssues,
   buildRolloutDraftSummary,
   buildTemplateDiff,
@@ -502,6 +503,7 @@ function DeploymentWorkflowPageContent() {
   });
   const [templateName, setTemplateName] = useState("");
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
+  const [secretRows, setSecretRows] = useState([{ key: "", value: "" }]);
   const canAccessServers = Boolean(currentUser?.is_admin);
   const serverAccessBlocked = !canAccessServers && !localDeploymentsEnabled;
   const memberHasLiveDeployments = serverAccessBlocked && deployments.length > 0;
@@ -564,7 +566,7 @@ function DeploymentWorkflowPageContent() {
         template.server_name,
         template.server_host,
         Object.keys(template.env || {}).join(" "),
-        Object.values(template.env || {}).join(" "),
+        Object.keys(template.secrets || {}).join(" "),
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedTemplateQuery));
@@ -1081,6 +1083,18 @@ function DeploymentWorkflowPageContent() {
     setEnvRows((currentRows) => [...currentRows, { key: "", value: "" }]);
   }
 
+  function updateSecretRow(index, field, value) {
+    setSecretRows((currentRows) =>
+      currentRows.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row,
+      ),
+    );
+  }
+
+  function addSecretRow() {
+    setSecretRows((currentRows) => [...currentRows, { key: "", value: "" }]);
+  }
+
   function focusCreateForm(options = {}) {
     const { scrollBehavior = "smooth", focusImage = true } = options;
 
@@ -1121,6 +1135,16 @@ function DeploymentWorkflowPageContent() {
     });
   }
 
+  function removeSecretRow(index) {
+    setSecretRows((currentRows) => {
+      if (currentRows.length === 1) {
+        return [{ key: "", value: "" }];
+      }
+
+      return currentRows.filter((_, rowIndex) => rowIndex !== index);
+    });
+  }
+
   function buildEnvPayload(rows) {
     const env = {};
     for (const row of rows) {
@@ -1133,6 +1157,19 @@ function DeploymentWorkflowPageContent() {
     return env;
   }
 
+  function buildSecretPayload(rows) {
+    const secrets = {};
+    for (const row of rows) {
+      const key = row.key.trim();
+      const value = row.value;
+      if (!key || !value.trim()) {
+        continue;
+      }
+      secrets[key] = value;
+    }
+    return secrets;
+  }
+
   function buildCurrentDraft() {
     return {
       id: editingTemplateId || "",
@@ -1143,7 +1180,9 @@ function DeploymentWorkflowPageContent() {
       external_port: form.external_port.trim(),
       server_id: form.server_id,
       env: buildEnvPayload(envRows),
+      secrets: buildSecretPayload(secretRows),
       envRows,
+      secretRows,
     };
   }
 
@@ -1163,7 +1202,9 @@ function DeploymentWorkflowPageContent() {
           : String(template.external_port),
       server_id: template.server_id || "",
       env: template.env || {},
+      secrets: template.secrets || {},
       envRows: buildEnvRowsFromObject(template.env || {}),
+      secretRows: buildSecretRowsFromObject(template.secrets || {}),
     };
   }
 
@@ -1178,6 +1219,9 @@ function DeploymentWorkflowPageContent() {
     const internalPort = draft.internal_port.trim();
     const externalPort = draft.external_port.trim();
     const envIssues = buildEnvIssues(draft.envRows || []);
+    const secretIssues = buildEnvIssues(draft.secretRows || []).map((issue) =>
+      issue.replaceAll("Env var", "Secret"),
+    );
 
     if (!draft.image.trim()) {
       errors.push("Image is required.");
@@ -1196,6 +1240,7 @@ function DeploymentWorkflowPageContent() {
     }
 
     errors.push(...envIssues);
+    errors.push(...secretIssues);
 
     const matchingDeployment = deployments.find((deployment) => {
       if (!externalPort || !deployment.external_port) {
@@ -1261,6 +1306,7 @@ function DeploymentWorkflowPageContent() {
       server_id: template.server_id || "",
     });
     setEnvRows(buildEnvRowsFromObject(template.env || {}));
+    setSecretRows(buildSecretRowsFromObject(template.secrets || {}));
     setTemplateName(template.template_name || "");
     setTemplatePreviewId(template.id);
     setCreatedDeployment(null);
@@ -1295,6 +1341,7 @@ function DeploymentWorkflowPageContent() {
       template_name: draft.template_name,
       image: draft.image,
       env: draft.env,
+      secrets: draft.secrets,
     };
 
     if (draft.name) {
@@ -1343,6 +1390,7 @@ function DeploymentWorkflowPageContent() {
     const payload = {
       image: draft.image,
       env: draft.env,
+      secrets: draft.secrets,
     };
 
     if (draft.name) {
@@ -2577,6 +2625,44 @@ function DeploymentWorkflowPageContent() {
                 </div>
               </div>
 
+              <div className="field">
+                <span>Secrets</span>
+                <div className="list">
+                  {secretRows.map((row, index) => (
+                    <div className="envRow" key={`create-secret-${index}`}>
+                      <input
+                        value={row.key}
+                        onChange={(event) => updateSecretRow(index, "key", event.target.value)}
+                        placeholder="SECRET_KEY"
+                        disabled={submitting}
+                      />
+                      <input
+                        value={row.value}
+                        onChange={(event) => updateSecretRow(index, "value", event.target.value)}
+                        placeholder="new value"
+                        type="password"
+                        disabled={submitting}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSecretRow(index)}
+                        disabled={submitting}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="formActions">
+                  <button type="button" onClick={addSecretRow} disabled={submitting}>
+                    Add secret
+                  </button>
+                </div>
+                <span className="fieldHint">
+                  Secret values are masked after save and excluded from export payloads.
+                </span>
+              </div>
+
               {canAccessServers ? (
                 <label className="field">
                   <span>Server</span>
@@ -2614,7 +2700,7 @@ function DeploymentWorkflowPageContent() {
                   data-testid="create-template-name-input"
                 />
                 <span className="fieldHint">
-                  Save the current image, name, ports, server, and env vars as a reusable preset.
+                  Save the current image, name, ports, server, env vars, and secret keys as a reusable preset.
                 </span>
               </label>
             </section>

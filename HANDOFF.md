@@ -102,6 +102,16 @@ Updated: 2026-04-17
 - current instrumentation is intentionally narrow:
   - landing CTAs now emit structured funnel events
   - deeper runtime funnel events still remain for future slices
+- deployment runtime now also carries a first release trace:
+  - `release_source`
+  - `runtime_shape`
+  - ref/commit/image metadata
+  - triggered-at and triggered-by context
+  - generic token-based webhook entry for controlled deploys
+- config vars and secrets are now separate runtime concepts:
+  - secrets are masked in UI and exports
+  - redeploy keeps existing secrets unless a new value is supplied
+  - template and ops surfaces now preserve redaction instead of treating secrets as plain env
 - runtime today всё ещё фактически `single-container-first`.
 - Это теперь считать не допустимой долгоживущей моделью, а ceiling risk между production baseline и agency fit.
 - Stack/Compose layer для проекта теперь не optional polish, а следующий логичный потолок спроса.
@@ -152,7 +162,8 @@ Updated: 2026-04-17
 
 ## Next Recommended Packages
 
-- Уже закрыто в текущем незакоммиченном хвосте:
+- Уже зафиксировано на текущей ветке:
+  - strategy + 12-week execution order checkpoint
   - `Public funnel / ICP packaging v1`
   - `Webhook/release source v0`
   - `Secrets v1`

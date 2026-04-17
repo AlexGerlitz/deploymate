@@ -27,7 +27,18 @@ def _deployment_record(**overrides):
         "server_id": "srv-1",
         "server_name": "prod",
         "server_host": "deploymate.example",
+        "release_source": "manual",
+        "runtime_shape": "single",
+        "release_ref": None,
+        "release_commit_sha": None,
+        "release_image_tag": "latest",
+        "release_image_digest": None,
+        "release_triggered_at": "2026-04-02T10:00:00+00:00",
+        "release_triggered_by": "admin",
+        "release_webhook_token": "token-1",
         "env": {"MODE": "prod"},
+        "secrets": {"API_KEY": "secret-value"},
+        "secret_count": 1,
     }
     record.update(overrides)
     return record
@@ -62,6 +73,7 @@ class DeploymentRouteTests(unittest.TestCase):
             internal_port=80,
             external_port=8081,
             env={"MODE": "blue"},
+            secrets={"API_KEY": "rotated"},
         )
         existing = _deployment_record()
         saved = _deployment_record(
@@ -70,6 +82,7 @@ class DeploymentRouteTests(unittest.TestCase):
             container_id="container-2",
             external_port=8081,
             env={"MODE": "blue"},
+            secrets={"API_KEY": "rotated"},
         )
 
         with patch("app.routes.deployments.get_deployment_record_or_404", side_effect=[existing, saved]):
@@ -106,6 +119,14 @@ class DeploymentRouteTests(unittest.TestCase):
             internal_port=80,
             external_port=8081,
             env={"MODE": "blue"},
+            secrets={"API_KEY": "rotated"},
+            release_source="manual",
+            release_ref=None,
+            release_commit_sha=None,
+            release_image_tag="1.27",
+            release_image_digest=None,
+            release_triggered_at=update_config.call_args.kwargs["release_triggered_at"],
+            release_triggered_by="admin",
         )
         self.assertEqual(
             update_record.call_args_list[0].kwargs,
@@ -131,6 +152,7 @@ class DeploymentRouteTests(unittest.TestCase):
             internal_port=80,
             external_port=8081,
             env={"MODE": "blue"},
+            secrets={"API_KEY": "rotated"},
             server=_server_record(),
         )
         self.assertEqual(notify.call_args.kwargs["title"], "Redeploy succeeded")
@@ -146,6 +168,7 @@ class DeploymentRouteTests(unittest.TestCase):
             internal_port=80,
             external_port=8080,
             env={},
+            secrets={},
         )
         existing = _deployment_record()
         failed = _deployment_record(status="failed", container_id=None, error="port 8080 is already allocated")

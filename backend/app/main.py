@@ -10,6 +10,7 @@ from app.db import init_db
 from app.routes.auth import router as auth_router
 from app.routes.deployment_observability import router as deployment_observability_router
 from app.routes.deployment_templates import router as deployment_templates_router
+from app.routes.deployments import public_router as deployments_public_router
 from app.routes.deployments import router as deployments_router
 from app.routes.notifications import router as notifications_router
 from app.routes.ops import router as ops_router
@@ -90,6 +91,7 @@ def startup_event() -> None:
 
 app.include_router(root_router)
 app.include_router(auth_router)
+app.include_router(deployments_public_router)
 app.include_router(deployments_router)
 app.include_router(deployment_templates_router)
 app.include_router(deployment_observability_router)

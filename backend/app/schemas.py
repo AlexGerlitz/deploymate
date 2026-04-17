@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 
 
 DeploymentStatus = Literal["pending", "running", "failed"]
+ReleaseSource = Literal["manual", "webhook", "template", "compose"]
+RuntimeShape = Literal["single", "stack"]
 HealthStatus = Literal["healthy", "unhealthy"]
 NotificationLevel = Literal["success", "error"]
 ServerAuthType = Literal["password", "ssh_key"]
@@ -20,6 +22,15 @@ class DeploymentCreateRequest(BaseModel):
     external_port: Optional[int] = Field(default=None, ge=1, le=65535)
     server_id: Optional[str] = None
     env: Dict[str, str] = Field(default_factory=dict)
+    secrets: Dict[str, str] = Field(default_factory=dict)
+
+
+class DeploymentReleaseWebhookRequest(BaseModel):
+    image: Optional[str] = Field(default=None, min_length=1, description="Optional image override for this release")
+    ref: Optional[str] = Field(default=None, min_length=1)
+    commit_sha: Optional[str] = Field(default=None, min_length=7, max_length=64)
+    image_digest: Optional[str] = Field(default=None, min_length=1)
+    triggered_by: Optional[str] = Field(default=None, min_length=1)
 
 
 class DeploymentResponse(BaseModel):
@@ -36,7 +47,18 @@ class DeploymentResponse(BaseModel):
     server_name: Optional[str] = None
     server_host: Optional[str] = None
     server_managed_by_admin: bool = False
+    release_source: ReleaseSource = "manual"
+    runtime_shape: RuntimeShape = "single"
+    release_ref: Optional[str] = None
+    release_commit_sha: Optional[str] = None
+    release_image_tag: Optional[str] = None
+    release_image_digest: Optional[str] = None
+    release_triggered_at: Optional[str] = None
+    release_triggered_by: Optional[str] = None
+    release_webhook_token: Optional[str] = None
     env: Dict[str, str] = Field(default_factory=dict)
+    secrets: Dict[str, str] = Field(default_factory=dict)
+    secret_count: int = 0
 
 
 class DeploymentTemplateCreateRequest(BaseModel):
@@ -47,6 +69,7 @@ class DeploymentTemplateCreateRequest(BaseModel):
     external_port: Optional[int] = Field(default=None, ge=1, le=65535)
     server_id: Optional[str] = None
     env: Dict[str, str] = Field(default_factory=dict)
+    secrets: Dict[str, str] = Field(default_factory=dict)
 
 
 class DeploymentTemplateResponse(BaseModel):
@@ -61,6 +84,8 @@ class DeploymentTemplateResponse(BaseModel):
     server_host: Optional[str] = None
     server_managed_by_admin: bool = False
     env: Dict[str, str] = Field(default_factory=dict)
+    secrets: Dict[str, str] = Field(default_factory=dict)
+    secret_count: int = 0
     created_at: str
     updated_at: Optional[str] = None
     last_used_at: Optional[str] = None

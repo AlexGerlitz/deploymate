@@ -130,6 +130,7 @@ def run_container(
     internal_port: Optional[int],
     external_port: Optional[int],
     env: Dict[str, str],
+    secrets: Dict[str, str],
     server: Optional[dict] = None,
 ) -> subprocess.CompletedProcess:
     command: List[str] = ["docker", "run", "-d", "--name", container_name]
@@ -137,7 +138,9 @@ def run_container(
     if internal_port is not None and external_port is not None:
         command.extend(["-p", f"{external_port}:{internal_port}"])
 
-    for key, value in env.items():
+    runtime_env = {**env, **secrets}
+
+    for key, value in runtime_env.items():
         command.extend(["-e", f"{key}={value}"])
 
     command.append(image)

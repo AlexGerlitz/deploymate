@@ -67,14 +67,19 @@ class DeploymentApiFlowTests(unittest.TestCase):
 
     def _serialize_record(self, record):
         serialized = dict(record)
-        created_at = serialized.get("created_at")
-        if isinstance(created_at, datetime):
-            serialized["created_at"] = created_at.isoformat()
+        for key, value in list(serialized.items()):
+            if isinstance(value, datetime):
+                serialized[key] = value.isoformat()
         env = serialized.get("env")
         if isinstance(env, str):
             import json
 
             serialized["env"] = json.loads(env)
+        secrets = serialized.get("secrets")
+        if isinstance(secrets, str):
+            import json
+
+            serialized["secrets"] = json.loads(secrets)
         return serialized
 
     def _insert_deployment_record(self, record):
@@ -82,11 +87,11 @@ class DeploymentApiFlowTests(unittest.TestCase):
 
     def _update_deployment_record(self, deployment_id, **updates):
         self.assertEqual(deployment_id, self.deployment["id"])
-        self.deployment.update(updates)
+        self.deployment.update(self._serialize_record(updates))
 
     def _update_deployment_configuration(self, deployment_id, **updates):
         self.assertEqual(deployment_id, self.deployment["id"])
-        self.deployment.update(updates)
+        self.deployment.update(self._serialize_record(updates))
 
     def _get_deployment_record_or_404(self, deployment_id):
         if not self.deployment or self.deployment["id"] != deployment_id:
@@ -118,7 +123,7 @@ class DeploymentApiFlowTests(unittest.TestCase):
         self.assertEqual(deployment_id, self.deployment["id"])
         return list(self.activity)
 
-    def _run_container(self, image, container_name, internal_port, external_port, env, server=None):
+    def _run_container(self, image, container_name, internal_port, external_port, env, secrets, server=None):
         self.assertIsNone(server)
         self.assertEqual(image, self.deployment["image"])
         self.assertEqual(container_name, self.deployment["container_name"])
@@ -178,6 +183,12 @@ class DeploymentApiFlowTests(unittest.TestCase):
         self.assertEqual(created["status"], "running")
         self.assertEqual(created["container_id"], "container-flow-1")
         self.assertEqual(created["external_port"], 38080)
+        self.assertEqual(created["release_source"], "manual")
+        self.assertEqual(created["runtime_shape"], "single")
+        self.assertEqual(created["release_image_tag"], "alpine")
+        self.assertEqual(created["release_triggered_by"], "smoke-admin")
+        self.assertTrue(created["release_webhook_token"])
+        self.assertEqual(created["secret_count"], 0)
 
         health_response = self.client.get(f"/deployments/{deployment_id}/health")
         self.assertEqual(health_response.status_code, 200)
@@ -204,6 +215,7 @@ class DeploymentApiFlowTests(unittest.TestCase):
         self.assertIn("Deployment succeeded", titles)
         started_event = next(item for item in activity if item["title"] == "Deployment started")
         self.assertIn("Starting deployment for nginx:alpine", started_event["message"])
+        self.assertIn("Release trace: source manual", started_event["message"])
 
         delete_response = self.client.delete(f"/deployments/{deployment_id}")
         self.assertEqual(delete_response.status_code, 200)
@@ -235,6 +247,66 @@ class DeploymentApiFlowTests(unittest.TestCase):
 
         self.assertEqual(logs_response.status_code, 200)
         self.assertIn("could not be loaded", logs_response.json()["logs"])
+
+    def test_release_webhook_redeploys_existing_deployment_with_release_trace(self):
+        self.deployment = {
+            "id": "dep-webhook",
+            "status": "running",
+            "image": "nginx:alpine",
+            "container_name": "webhook-runtime",
+            "container_id": "container-flow-3",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "error": None,
+            "internal_port": 80,
+            "external_port": 38080,
+            "server_id": None,
+            "server_name": None,
+            "server_host": None,
+            "release_source": "manual",
+            "runtime_shape": "single",
+            "release_ref": None,
+            "release_commit_sha": None,
+            "release_image_tag": "alpine",
+            "release_image_digest": None,
+            "release_triggered_at": datetime.now(timezone.utc).isoformat(),
+            "release_triggered_by": "smoke-admin",
+            "release_webhook_token": "webhook-token-1",
+            "env": {"DEPLOYMATE_SMOKE": "1"},
+            "secrets": {"API_KEY": "super-secret"},
+            "secret_count": 1,
+        }
+
+        response = self.client.post(
+            "/deployments/dep-webhook/release-webhook",
+            headers={"x-deploymate-webhook-token": "webhook-token-1"},
+            json={
+                "image": "nginx:1.27",
+                "ref": "refs/heads/main",
+                "commit_sha": "abcdef1234567890",
+                "triggered_by": "github-actions",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["image"], "nginx:1.27")
+        self.assertEqual(payload["release_source"], "webhook")
+        self.assertEqual(payload["release_ref"], "refs/heads/main")
+        self.assertEqual(payload["release_commit_sha"], "abcdef1234567890")
+        self.assertEqual(payload["release_image_tag"], "1.27")
+        self.assertEqual(payload["release_triggered_by"], "github-actions")
+        self.assertEqual(payload["secret_count"], 1)
+        self.assertEqual(payload["secrets"]["API_KEY"], "••••••")
+
+        activity_response = self.client.get("/deployments/dep-webhook/activity")
+        self.assertEqual(activity_response.status_code, 200)
+        titles = [item["title"] for item in activity_response.json()]
+        self.assertIn("Release webhook received", titles)
+        succeeded_event = next(
+            item for item in activity_response.json() if item["title"] == "Redeploy succeeded"
+        )
+        self.assertIn("source webhook", succeeded_event["message"])
+        self.assertIn("refs/heads/main", succeeded_event["message"])
 
 
 if __name__ == "__main__":

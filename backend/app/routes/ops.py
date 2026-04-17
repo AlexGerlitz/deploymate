@@ -24,6 +24,7 @@ from app.services.runtime_access import (
     sanitize_notifications_for_user,
     sanitize_remote_target_fields,
 )
+from app.services.secrets import apply_masked_secret_view
 from app.services.server_credentials import SERVER_CREDENTIALS_KEY_ENV
 
 
@@ -118,21 +119,27 @@ def _sanitize_server_export(item: dict) -> dict:
 def _visible_deployments_for_user(user: dict, *, sanitize: bool = False) -> list[dict]:
     deployments = list_deployment_records()
     if user_is_admin(user):
-        return deployments
+        return [apply_masked_secret_view(item) for item in deployments]
     visible = [item for item in deployments if item.get("owner_user_id") == user["id"]]
     if sanitize:
-        return [sanitize_remote_target_fields(item, user) for item in visible]
-    return visible
+        return [
+            apply_masked_secret_view(sanitize_remote_target_fields(item, user))
+            for item in visible
+        ]
+    return [apply_masked_secret_view(item) for item in visible]
 
 
 def _visible_templates_for_user(user: dict, *, sanitize: bool = False) -> list[dict]:
     templates = list_deployment_templates()
     if user_is_admin(user):
-        return templates
+        return [apply_masked_secret_view(item) for item in templates]
     visible = [item for item in templates if item.get("owner_user_id") == user["id"]]
     if sanitize:
-        return [sanitize_remote_target_fields(item, user) for item in visible]
-    return visible
+        return [
+            apply_masked_secret_view(sanitize_remote_target_fields(item, user))
+            for item in visible
+        ]
+    return [apply_masked_secret_view(item) for item in visible]
 
 
 def _visible_notifications_for_user(
@@ -394,6 +401,7 @@ def export_deployments(
                 "internal_port",
                 "external_port",
                 "error",
+                "secret_count",
                 "created_at",
             ],
         )
@@ -446,6 +454,7 @@ def export_templates(
                 "server_host",
                 "internal_port",
                 "external_port",
+                "secret_count",
                 "use_count",
                 "last_used_at",
                 "updated_at",

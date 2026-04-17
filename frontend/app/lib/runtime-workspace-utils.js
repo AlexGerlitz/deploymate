@@ -194,6 +194,15 @@ export function buildEnvRowsFromObject(env) {
     : [{ key: "", value: "" }];
 }
 
+export function buildSecretRowsFromObject(secrets) {
+  return Object.keys(secrets || {}).length > 0
+    ? Object.keys(secrets || {}).map((key) => ({
+        key,
+        value: "",
+      }))
+    : [{ key: "", value: "" }];
+}
+
 export function countFilledEnvRows(rows) {
   return rows.filter((row) => row.key.trim()).length;
 }
@@ -704,6 +713,8 @@ export function buildTemplateDiff(template, currentDraft, servers) {
     servers.find((server) => server.id === currentDraft.server_id) || null;
   const envText = JSON.stringify(template.env || {}, null, 2);
   const currentEnvText = JSON.stringify(currentDraft.env || {}, null, 2);
+  const templateSecretCount = Object.keys(template.secrets || {}).length;
+  const currentSecretCount = Object.keys(currentDraft.secrets || {}).length;
   const rows = [
     {
       label: "Image",
@@ -732,6 +743,11 @@ export function buildTemplateDiff(template, currentDraft, servers) {
       label: "Env",
       templateValue: envText === "{}" ? "No env vars" : envText,
       currentValue: currentEnvText === "{}" ? "No env vars" : currentEnvText,
+    },
+    {
+      label: "Secrets",
+      templateValue: templateSecretCount === 0 ? "No secrets" : `${templateSecretCount} saved`,
+      currentValue: currentSecretCount === 0 ? "No secrets" : `${currentSecretCount} attached`,
     },
   ];
 

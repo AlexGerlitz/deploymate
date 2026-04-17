@@ -124,7 +124,16 @@ def init_db() -> None:
         created_at TIMESTAMPTZ NOT NULL,
         error TEXT NULL,
         internal_port INTEGER NULL,
-        external_port INTEGER NULL
+        external_port INTEGER NULL,
+        release_source TEXT NOT NULL DEFAULT 'manual',
+        runtime_shape TEXT NOT NULL DEFAULT 'single',
+        release_ref TEXT NULL,
+        release_commit_sha TEXT NULL,
+        release_image_tag TEXT NULL,
+        release_image_digest TEXT NULL,
+        release_triggered_at TIMESTAMPTZ NULL,
+        release_triggered_by TEXT NULL,
+        release_webhook_token TEXT NULL
     );
     """
 
@@ -138,9 +147,59 @@ def init_db() -> None:
     ADD COLUMN IF NOT EXISTS env TEXT NOT NULL DEFAULT '{}';
     """
 
+    alter_deployments_add_secrets_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS secrets TEXT NOT NULL DEFAULT '{}';
+    """
+
     alter_deployments_add_owner_user_id_sql = """
     ALTER TABLE deployments
     ADD COLUMN IF NOT EXISTS owner_user_id UUID NULL;
+    """
+
+    alter_deployments_add_release_source_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS release_source TEXT NOT NULL DEFAULT 'manual';
+    """
+
+    alter_deployments_add_runtime_shape_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS runtime_shape TEXT NOT NULL DEFAULT 'single';
+    """
+
+    alter_deployments_add_release_ref_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS release_ref TEXT NULL;
+    """
+
+    alter_deployments_add_release_commit_sha_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS release_commit_sha TEXT NULL;
+    """
+
+    alter_deployments_add_release_image_tag_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS release_image_tag TEXT NULL;
+    """
+
+    alter_deployments_add_release_image_digest_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS release_image_digest TEXT NULL;
+    """
+
+    alter_deployments_add_release_triggered_at_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS release_triggered_at TIMESTAMPTZ NULL;
+    """
+
+    alter_deployments_add_release_triggered_by_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS release_triggered_by TEXT NULL;
+    """
+
+    alter_deployments_add_release_webhook_token_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS release_webhook_token TEXT NULL;
     """
 
     create_notifications_table_sql = """
@@ -242,6 +301,7 @@ def init_db() -> None:
         server_id UUID NULL,
         owner_user_id UUID NULL,
         env TEXT NOT NULL DEFAULT '{}',
+        secrets TEXT NOT NULL DEFAULT '{}',
         created_at TIMESTAMPTZ NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL,
         last_used_at TIMESTAMPTZ NULL,
@@ -269,6 +329,11 @@ def init_db() -> None:
     ADD COLUMN IF NOT EXISTS owner_user_id UUID NULL;
     """
 
+    alter_templates_add_secrets_sql = """
+    ALTER TABLE deployment_templates
+    ADD COLUMN IF NOT EXISTS secrets TEXT NOT NULL DEFAULT '{}';
+    """
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(create_users_table_sql)
@@ -282,7 +347,17 @@ def init_db() -> None:
             cur.execute(create_deployments_table_sql)
             cur.execute(alter_deployments_add_server_id_sql)
             cur.execute(alter_deployments_add_env_sql)
+            cur.execute(alter_deployments_add_secrets_sql)
             cur.execute(alter_deployments_add_owner_user_id_sql)
+            cur.execute(alter_deployments_add_release_source_sql)
+            cur.execute(alter_deployments_add_runtime_shape_sql)
+            cur.execute(alter_deployments_add_release_ref_sql)
+            cur.execute(alter_deployments_add_release_commit_sha_sql)
+            cur.execute(alter_deployments_add_release_image_tag_sql)
+            cur.execute(alter_deployments_add_release_image_digest_sql)
+            cur.execute(alter_deployments_add_release_triggered_at_sql)
+            cur.execute(alter_deployments_add_release_triggered_by_sql)
+            cur.execute(alter_deployments_add_release_webhook_token_sql)
             cur.execute(create_notifications_table_sql)
             cur.execute(drop_notifications_fk_sql)
             cur.execute(create_deployment_activity_table_sql)
@@ -299,6 +374,7 @@ def init_db() -> None:
             cur.execute(alter_templates_add_last_used_at_sql)
             cur.execute(alter_templates_add_use_count_sql)
             cur.execute(alter_templates_add_owner_user_id_sql)
+            cur.execute(alter_templates_add_secrets_sql)
             _assert_server_credentials_policy(cur)
             _migrate_server_credentials_in_place(cur)
             _cleanup_orphaned_runtime_records(cur)
@@ -317,7 +393,7 @@ def _row_to_dict(cursor: psycopg.Cursor[Any], row: tuple[Any, ...]) -> dict[str,
     result: dict[str, Any] = {}
     for description, value in zip(cursor.description, row):
         serialized_value = _serialize_value(value)
-        if description.name == "env" and isinstance(serialized_value, str):
+        if description.name in {"env", "secrets"} and isinstance(serialized_value, str):
             try:
                 result[description.name] = json.loads(serialized_value)
             except json.JSONDecodeError:
@@ -341,10 +417,22 @@ def insert_deployment_record(deployment_record: dict[str, Any]) -> None:
         internal_port,
         external_port,
         server_id,
-        env
+        env,
+        secrets,
+        release_source,
+        runtime_shape,
+        release_ref,
+        release_commit_sha,
+        release_image_tag,
+        release_image_digest,
+        release_triggered_at,
+        release_triggered_by,
+        release_webhook_token
     )
     VALUES (%(id)s, %(status)s, %(image)s, %(container_name)s, %(container_id)s,
-            %(owner_user_id)s, %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(server_id)s, %(env)s);
+            %(owner_user_id)s, %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(server_id)s, %(env)s, %(secrets)s,
+            %(release_source)s, %(runtime_shape)s, %(release_ref)s, %(release_commit_sha)s, %(release_image_tag)s,
+            %(release_image_digest)s, %(release_triggered_at)s, %(release_triggered_by)s, %(release_webhook_token)s);
     """
 
     with get_db_connection() as conn:
@@ -380,6 +468,14 @@ def update_deployment_configuration(
     internal_port: int | None,
     external_port: int | None,
     env: dict[str, str],
+    secrets: dict[str, str],
+    release_source: str,
+    release_ref: str | None,
+    release_commit_sha: str | None,
+    release_image_tag: str | None,
+    release_image_digest: str | None,
+    release_triggered_at: datetime | None,
+    release_triggered_by: str | None,
 ) -> None:
     update_sql = """
     UPDATE deployments
@@ -387,7 +483,15 @@ def update_deployment_configuration(
         container_name = %s,
         internal_port = %s,
         external_port = %s,
-        env = %s
+        env = %s,
+        secrets = %s,
+        release_source = %s,
+        release_ref = %s,
+        release_commit_sha = %s,
+        release_image_tag = %s,
+        release_image_digest = %s,
+        release_triggered_at = %s,
+        release_triggered_by = %s
     WHERE id = %s;
     """
 
@@ -401,6 +505,14 @@ def update_deployment_configuration(
                     internal_port,
                     external_port,
                     json.dumps(env),
+                    json.dumps(secrets),
+                    release_source,
+                    release_ref,
+                    release_commit_sha,
+                    release_image_tag,
+                    release_image_digest,
+                    release_triggered_at,
+                    release_triggered_by,
                     deployment_id,
                 ),
             )
@@ -422,6 +534,16 @@ def get_deployment_record_or_404(deployment_id: str) -> dict[str, Any]:
         d.external_port,
         d.server_id,
         d.env,
+        d.secrets,
+        d.release_source,
+        d.runtime_shape,
+        d.release_ref,
+        d.release_commit_sha,
+        d.release_image_tag,
+        d.release_image_digest,
+        d.release_triggered_at,
+        d.release_triggered_by,
+        d.release_webhook_token,
         s.name AS server_name,
         s.host AS server_host
     FROM deployments d
@@ -455,6 +577,16 @@ def list_deployment_records() -> list[dict[str, Any]]:
         d.external_port,
         d.server_id,
         d.env,
+        d.secrets,
+        d.release_source,
+        d.runtime_shape,
+        d.release_ref,
+        d.release_commit_sha,
+        d.release_image_tag,
+        d.release_image_digest,
+        d.release_triggered_at,
+        d.release_triggered_by,
+        d.release_webhook_token,
         s.name AS server_name,
         s.host AS server_host
     FROM deployments d
@@ -505,6 +637,7 @@ def insert_deployment_template(template_record: dict[str, Any]) -> None:
         server_id,
         owner_user_id,
         env,
+        secrets,
         created_at,
         updated_at,
         last_used_at,
@@ -520,6 +653,7 @@ def insert_deployment_template(template_record: dict[str, Any]) -> None:
         %(server_id)s,
         %(owner_user_id)s,
         %(env)s,
+        %(secrets)s,
         %(created_at)s,
         %(updated_at)s,
         %(last_used_at)s,
@@ -545,6 +679,7 @@ def list_deployment_templates() -> list[dict[str, Any]]:
         t.server_id,
         t.owner_user_id,
         t.env,
+        t.secrets,
         t.created_at,
         t.updated_at,
         t.last_used_at,
@@ -575,6 +710,7 @@ def get_deployment_template_or_404(template_id: str) -> dict[str, Any]:
         t.server_id,
         t.owner_user_id,
         t.env,
+        t.secrets,
         t.created_at,
         t.updated_at,
         t.last_used_at,
@@ -619,6 +755,7 @@ def update_deployment_template(template_id: str, template_record: dict[str, Any]
         external_port = %(external_port)s,
         server_id = %(server_id)s,
         env = %(env)s,
+        secrets = %(secrets)s,
         updated_at = %(updated_at)s
     WHERE id = %(id)s;
     """

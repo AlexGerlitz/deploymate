@@ -1,4 +1,5 @@
 import json
+import secrets
 import uuid
 from datetime import datetime, timezone
 
@@ -6,6 +7,7 @@ from fastapi import HTTPException
 
 from app.schemas import DeploymentCreateRequest, DeploymentDeleteResponse, DeploymentResponse
 from app.services.deployments import build_container_name
+from app.services.secrets import apply_masked_secret_view
 
 
 def normalize_runtime_error(message: str | None, fallback: str) -> str:
@@ -45,23 +47,98 @@ def describe_env_shape(env: dict | None) -> str:
     return f"{count} env var{'s' if count != 1 else ''}"
 
 
-def build_create_start_message(payload: DeploymentCreateRequest, server: dict | None, container_name: str) -> str:
+def describe_secret_shape(secrets: dict | None) -> str:
+    count = len(secrets or {})
+    return f"{count} secret{'s' if count != 1 else ''}"
+
+
+def extract_release_image_tag(image: str | None) -> str | None:
+    if not image:
+        return None
+    if "@" in image:
+        return None
+    image_tail = image.rsplit("/", 1)[-1]
+    if ":" not in image_tail:
+        return None
+    return image_tail.rsplit(":", 1)[-1] or None
+
+
+def extract_release_image_digest(image: str | None) -> str | None:
+    if not image or "@" not in image:
+        return None
+    return image.rsplit("@", 1)[-1] or None
+
+
+def build_release_metadata(
+    *,
+    image: str,
+    source: str,
+    ref: str | None = None,
+    commit_sha: str | None = None,
+    image_digest: str | None = None,
+    triggered_by: str | None = None,
+) -> dict[str, object]:
+    return {
+        "release_source": source,
+        "release_ref": ref,
+        "release_commit_sha": commit_sha,
+        "release_image_tag": extract_release_image_tag(image),
+        "release_image_digest": image_digest or extract_release_image_digest(image),
+        "release_triggered_at": datetime.now(timezone.utc),
+        "release_triggered_by": triggered_by,
+    }
+
+
+def summarize_release_trace(metadata: dict | None) -> str:
+    if not metadata:
+        return "Release source: manual."
+
+    parts = [f"source {metadata.get('release_source') or 'manual'}"]
+    if metadata.get("release_ref"):
+        parts.append(f"ref {metadata['release_ref']}")
+    if metadata.get("release_commit_sha"):
+        parts.append(f"commit {str(metadata['release_commit_sha'])[:12]}")
+    if metadata.get("release_image_tag"):
+        parts.append(f"tag {metadata['release_image_tag']}")
+    if metadata.get("release_image_digest"):
+        parts.append(f"digest {str(metadata['release_image_digest'])[:18]}")
+    if metadata.get("release_triggered_by"):
+        parts.append(f"triggered by {metadata['release_triggered_by']}")
+    return "Release trace: " + ", ".join(parts) + "."
+
+
+def build_create_start_message(
+    payload: DeploymentCreateRequest,
+    server: dict | None,
+    container_name: str,
+    release_metadata: dict | None,
+) -> str:
     return (
         f"Starting deployment for {payload.image} as {container_name} on "
         f"{describe_runtime_target(server)} with ports "
         f"{describe_port_mapping(payload.internal_port, payload.external_port)} "
-        f"and {describe_env_shape(payload.env)}."
+        f"and {describe_env_shape(payload.env)} with {describe_secret_shape(payload.secrets)}. "
+        f"{summarize_release_trace(release_metadata)}"
     )
 
 
-def build_redeploy_start_message(existing: dict, payload: DeploymentCreateRequest, server: dict | None, container_name: str) -> str:
+def build_redeploy_start_message(
+    existing: dict,
+    payload: DeploymentCreateRequest,
+    server: dict | None,
+    container_name: str,
+    release_metadata: dict | None,
+    final_secrets: dict | None,
+) -> str:
     return (
         f"Starting redeploy for {existing['id']} from {existing.get('image') or 'unknown image'} "
         f"to {payload.image} on {describe_runtime_target(server)}. "
         f"Container: {existing.get('container_name') or existing['id']} -> {container_name}. "
         f"Ports: {describe_port_mapping(existing.get('internal_port'), existing.get('external_port'))} -> "
         f"{describe_port_mapping(payload.internal_port, payload.external_port)}. "
-        f"Env: {describe_env_shape(existing.get('env') or {})} -> {describe_env_shape(payload.env)}."
+        f"Env: {describe_env_shape(existing.get('env') or {})} -> {describe_env_shape(payload.env)}. "
+        f"Secrets: {describe_secret_shape(existing.get('secrets') or {})} -> {describe_secret_shape(final_secrets)}. "
+        f"{summarize_release_trace(release_metadata)}"
     )
 
 
@@ -106,6 +183,11 @@ def create_deployment(
     deployment_id = str(uuid.uuid4())
     container_name = build_container_name(payload.name, deployment_id)
     ensure_container_name_is_available_fn(container_name, server)
+    release_metadata = build_release_metadata(
+        image=payload.image,
+        source="manual",
+        triggered_by=user.get("username"),
+    )
 
     deployment_record = {
         "id": deployment_id,
@@ -120,6 +202,16 @@ def create_deployment(
         "external_port": payload.external_port,
         "server_id": payload.server_id,
         "env": json.dumps(payload.env),
+        "secrets": json.dumps(payload.secrets),
+        "release_source": release_metadata["release_source"],
+        "runtime_shape": "single",
+        "release_ref": release_metadata["release_ref"],
+        "release_commit_sha": release_metadata["release_commit_sha"],
+        "release_image_tag": release_metadata["release_image_tag"],
+        "release_image_digest": release_metadata["release_image_digest"],
+        "release_triggered_at": release_metadata["release_triggered_at"],
+        "release_triggered_by": release_metadata["release_triggered_by"],
+        "release_webhook_token": secrets.token_urlsafe(24),
     }
 
     insert_deployment_record_fn(deployment_record)
@@ -127,7 +219,7 @@ def create_deployment(
         deployment_id=deployment_id,
         level="success",
         title="Deployment started",
-        message=build_create_start_message(payload, server, container_name),
+        message=build_create_start_message(payload, server, container_name, release_metadata),
     )
 
     result = run_container_fn(
@@ -136,6 +228,7 @@ def create_deployment(
         internal_port=payload.internal_port,
         external_port=payload.external_port,
         env=payload.env,
+        secrets=payload.secrets,
         server=server,
     )
 
@@ -166,7 +259,7 @@ def create_deployment(
             ),
         )
         saved_record = get_deployment_record_or_404_fn(deployment_id)
-        return DeploymentResponse(**saved_record)
+        return DeploymentResponse(**apply_masked_secret_view(saved_record))
 
     container_id = result.stdout.strip()
     update_deployment_record_fn(
@@ -189,12 +282,13 @@ def create_deployment(
     )
 
     saved_record = get_deployment_record_or_404_fn(deployment_id)
-    return DeploymentResponse(**saved_record)
+    return DeploymentResponse(**apply_masked_secret_view(saved_record))
 
 
 def redeploy_deployment(
     deployment_id: str,
     payload: DeploymentCreateRequest,
+    release_metadata: dict[str, object] | None = None,
     *,
     get_deployment_record_or_404_fn,
     get_server_or_404_fn,
@@ -214,8 +308,16 @@ def redeploy_deployment(
             status_code=400,
             detail="internal_port and external_port must be provided together.",
         )
+    effective_release_metadata = release_metadata or build_release_metadata(
+        image=payload.image,
+        source="manual",
+    )
 
     existing_deployment = get_deployment_record_or_404_fn(deployment_id)
+    merged_secrets = {
+        **(existing_deployment.get("secrets") or {}),
+        **payload.secrets,
+    }
     server = get_server_or_404_fn(existing_deployment["server_id"]) if existing_deployment.get("server_id") else None
     ensure_runtime_target_allowed_fn(server)
     ensure_docker_is_available_fn(server)
@@ -236,6 +338,8 @@ def redeploy_deployment(
             payload,
             server,
             container_name,
+            effective_release_metadata,
+            merged_secrets,
         ),
     )
 
@@ -273,6 +377,34 @@ def redeploy_deployment(
         internal_port=payload.internal_port,
         external_port=payload.external_port,
         env=payload.env,
+        secrets=merged_secrets,
+        release_source=str(effective_release_metadata["release_source"]),
+        release_ref=(
+            str(effective_release_metadata["release_ref"])
+            if effective_release_metadata.get("release_ref")
+            else None
+        ),
+        release_commit_sha=(
+            str(effective_release_metadata["release_commit_sha"])
+            if effective_release_metadata.get("release_commit_sha")
+            else None
+        ),
+        release_image_tag=(
+            str(effective_release_metadata["release_image_tag"])
+            if effective_release_metadata.get("release_image_tag")
+            else None
+        ),
+        release_image_digest=(
+            str(effective_release_metadata["release_image_digest"])
+            if effective_release_metadata.get("release_image_digest")
+            else None
+        ),
+        release_triggered_at=effective_release_metadata.get("release_triggered_at"),
+        release_triggered_by=(
+            str(effective_release_metadata["release_triggered_by"])
+            if effective_release_metadata.get("release_triggered_by")
+            else None
+        ),
     )
     update_deployment_record_fn(
         deployment_id=deployment_id,
@@ -287,6 +419,7 @@ def redeploy_deployment(
         internal_port=payload.internal_port,
         external_port=payload.external_port,
         env=payload.env,
+        secrets=merged_secrets,
         server=server,
     )
 
@@ -313,11 +446,12 @@ def redeploy_deployment(
             title="Redeploy failed",
             message=(
                 f"Redeploy for {deployment_id} failed on {describe_runtime_target(server)} "
-                f"while starting {container_name}: {error_message}"
+                f"while starting {container_name}: {error_message}. "
+                f"{summarize_release_trace(effective_release_metadata)}"
             ),
         )
         saved_record = get_deployment_record_or_404_fn(deployment_id)
-        return DeploymentResponse(**saved_record)
+        return DeploymentResponse(**apply_masked_secret_view(saved_record))
 
     container_id = result.stdout.strip()
     update_deployment_record_fn(
@@ -336,11 +470,14 @@ def redeploy_deployment(
         deployment_id=deployment_id,
         level="success",
         title="Redeploy succeeded",
-        message=f"Deployment {deployment_id} was redeployed in container {container_name}.",
+        message=(
+            f"Deployment {deployment_id} was redeployed in container {container_name}. "
+            f"{summarize_release_trace(effective_release_metadata)}"
+        ),
     )
 
     saved_record = get_deployment_record_or_404_fn(deployment_id)
-    return DeploymentResponse(**saved_record)
+    return DeploymentResponse(**apply_masked_secret_view(saved_record))
 
 
 def delete_deployment(

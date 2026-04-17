@@ -8,6 +8,7 @@ import { escapeCsvCell, triggerFileDownload } from "../../lib/admin-page-utils";
 import {
   buildDeploymentUrl,
   buildEnvIssues,
+  buildSecretRowsFromObject,
   buildReviewConfirmationPhrase,
   buildReviewIntroText,
   buildRolloutDraftSummary,
@@ -76,6 +77,41 @@ function buildAttentionItems(deployment, health, diagnostics) {
   return items;
 }
 
+function formatReleaseSourceLabel(source) {
+  if (!source) {
+    return "manual";
+  }
+  return source.replaceAll("_", " ");
+}
+
+function formatCommitShort(commit) {
+  if (!commit) {
+    return "-";
+  }
+  return String(commit).slice(0, 12);
+}
+
+function buildReleaseTraceLine(deployment) {
+  if (!deployment) {
+    return "Release trace: n/a";
+  }
+
+  const parts = [`source ${formatReleaseSourceLabel(deployment.release_source)}`];
+  if (deployment.release_ref) {
+    parts.push(`ref ${deployment.release_ref}`);
+  }
+  if (deployment.release_commit_sha) {
+    parts.push(`commit ${formatCommitShort(deployment.release_commit_sha)}`);
+  }
+  if (deployment.release_image_tag) {
+    parts.push(`tag ${deployment.release_image_tag}`);
+  }
+  if (deployment.release_triggered_by) {
+    parts.push(`by ${deployment.release_triggered_by}`);
+  }
+  return `Release trace: ${parts.join(", ")}`;
+}
+
 function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canAccessServers) {
   if (!deployment) {
     return "";
@@ -95,6 +131,7 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
     }`,
     `URL: ${buildDeploymentUrl(deployment) || "n/a"}`,
     `Ports: ${deployment.internal_port || "-"} -> ${deployment.external_port || "-"}`,
+    buildReleaseTraceLine(deployment),
     `Health: ${health?.status || "unknown"}${
       health?.response_time_ms || health?.response_time_ms === 0
         ? ` in ${health.response_time_ms} ms`
@@ -168,6 +205,7 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
       : deployment.server_id || deployment.server_managed_by_admin
         ? "The deployment runs on an admin-managed server target."
         : "No diagnostics target is available yet.",
+    `Latest release trace: ${buildReleaseTraceLine(deployment).replace("Release trace: ", "")}.`,
     latestEvent?.title
       ? `The most recent recorded activity was "${latestEvent.title}" at ${formatDate(latestEvent.created_at)}.`
       : "No recent activity has been recorded for this deployment yet.",
@@ -278,12 +316,15 @@ function normalizeRedeployError(message) {
   return normalizeDeploymentActionError(message, "Failed to redeploy deployment.");
 }
 
-function buildRedeployValidation(form, envRows) {
+function buildRedeployValidation(form, envRows, secretRows) {
   const errors = [];
   const warnings = [];
   const internalPort = form.internal_port.trim();
   const externalPort = form.external_port.trim();
   const envIssues = buildEnvIssues(envRows);
+  const secretIssues = buildEnvIssues(secretRows).map((issue) =>
+    issue.replaceAll("Env var", "Secret"),
+  );
 
   if (!form.image.trim()) {
     errors.push("Image is required.");
@@ -294,6 +335,7 @@ function buildRedeployValidation(form, envRows) {
   }
 
   errors.push(...envIssues);
+  errors.push(...secretIssues);
 
   if (!externalPort && internalPort) {
     warnings.push("This rollout draft still has no public port mapping.");
@@ -302,7 +344,7 @@ function buildRedeployValidation(form, envRows) {
   return { errors, warnings };
 }
 
-function buildRedeployChangeRows(deployment, form, envRows) {
+function buildRedeployChangeRows(deployment, form, envRows, secretRows) {
   if (!deployment) {
     return [];
   }
@@ -319,6 +361,17 @@ function buildRedeployChangeRows(deployment, form, envRows) {
     2,
   );
   const currentEnv = JSON.stringify(deployment.env || {}, null, 2);
+  const currentSecretCount = deployment.secret_count || 0;
+  const nextSecretCount = Object.keys(
+    secretRows.reduce((secrets, row) => {
+      const key = row.key.trim();
+      const value = row.value.trim();
+      if (key && value) {
+        secrets[key] = value;
+      }
+      return secrets;
+    }, {}),
+  ).length;
   const rows = [
     {
       label: "Image",
@@ -339,6 +392,14 @@ function buildRedeployChangeRows(deployment, form, envRows) {
       label: "Env",
       currentValue: currentEnv === "{}" ? "No env vars" : currentEnv,
       nextValue: nextEnv === "{}" ? "No env vars" : nextEnv,
+    },
+    {
+      label: "Secrets",
+      currentValue: currentSecretCount === 0 ? "No saved secrets" : `${currentSecretCount} saved`,
+      nextValue:
+        nextSecretCount === 0
+          ? `Keep ${currentSecretCount} saved`
+          : `Rotate/add ${nextSecretCount} secret${nextSecretCount === 1 ? "" : "s"}`,
     },
   ];
 
@@ -804,6 +865,7 @@ export default function DeploymentDetailsPage({ params }) {
   const [logsExpanded, setLogsExpanded] = useState(false);
   const [diagnosticsLogsExpanded, setDiagnosticsLogsExpanded] = useState(false);
   const [envExpanded, setEnvExpanded] = useState(false);
+  const [secretsExpanded, setSecretsExpanded] = useState(false);
   const [suggestedPorts, setSuggestedPorts] = useState([]);
   const [suggestedPortsLoading, setSuggestedPortsLoading] = useState(false);
   const [deleteReviewOpen, setDeleteReviewOpen] = useState(false);
@@ -818,6 +880,7 @@ export default function DeploymentDetailsPage({ params }) {
     external_port: "",
   });
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
+  const [secretRows, setSecretRows] = useState([{ key: "", value: "" }]);
   const canAccessServers = Boolean(currentUser?.is_admin);
   const runtimeServerAccessBlocked = Boolean(deployment?.server_managed_by_admin) && !canAccessServers;
   const canMutateRuntime =
@@ -1157,8 +1220,8 @@ export default function DeploymentDetailsPage({ params }) {
         {runtimeDecisionState.primaryAction}
       </Link>
     );
-  const redeployPreflight = buildRedeployValidation(form, envRows);
-  const redeployChangeRows = buildRedeployChangeRows(deployment, form, envRows);
+  const redeployPreflight = buildRedeployValidation(form, envRows, secretRows);
+  const redeployChangeRows = buildRedeployChangeRows(deployment, form, envRows, secretRows);
   const changeReadinessState = buildChangeReadinessState(
     redeployPreflight,
     redeployChangeRows,
@@ -1248,6 +1311,7 @@ export default function DeploymentDetailsPage({ params }) {
             }))
           : [{ key: "", value: "" }],
       );
+      setSecretRows(buildSecretRowsFromObject(deploymentData.secrets || {}));
 
       if (deploymentData.server_managed_by_admin) {
         setLogs("Live logs stay with admins for this admin-managed remote runtime.");
@@ -1457,8 +1521,29 @@ export default function DeploymentDetailsPage({ params }) {
     setEnvRows((currentRows) => [...currentRows, { key: "", value: "" }]);
   }
 
+  function updateSecretRow(index, field, value) {
+    setSecretRows((currentRows) =>
+      currentRows.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row,
+      ),
+    );
+  }
+
+  function addSecretRow() {
+    setSecretRows((currentRows) => [...currentRows, { key: "", value: "" }]);
+  }
+
   function removeEnvRow(index) {
     setEnvRows((currentRows) => {
+      if (currentRows.length === 1) {
+        return [{ key: "", value: "" }];
+      }
+      return currentRows.filter((_, rowIndex) => rowIndex !== index);
+    });
+  }
+
+  function removeSecretRow(index) {
+    setSecretRows((currentRows) => {
       if (currentRows.length === 1) {
         return [{ key: "", value: "" }];
       }
@@ -1478,11 +1563,25 @@ export default function DeploymentDetailsPage({ params }) {
     return env;
   }
 
+  function buildSecretPayload(rows) {
+    const secrets = {};
+    for (const row of rows) {
+      const key = row.key.trim();
+      const value = row.value;
+      if (!key || !value.trim()) {
+        continue;
+      }
+      secrets[key] = value;
+    }
+    return secrets;
+  }
+
   function buildTemplatePayload() {
     const payload = {
       template_name: templateName.trim(),
       image: form.image.trim(),
       env: buildEnvPayload(envRows),
+      secrets: buildSecretPayload(secretRows),
     };
 
     if (form.name.trim()) {
@@ -1595,6 +1694,7 @@ export default function DeploymentDetailsPage({ params }) {
     const payload = {
       image: form.image,
       env: buildEnvPayload(envRows),
+      secrets: buildSecretPayload(secretRows),
     };
 
     if (form.name.trim()) {
@@ -2286,6 +2386,44 @@ export default function DeploymentDetailsPage({ params }) {
               </div>
             </div>
 
+            <div className="field">
+              <span>Secrets</span>
+              <div className="list">
+                {secretRows.map((row, index) => (
+                  <div className="envRow" key={`redeploy-secret-${index}`}>
+                    <input
+                      value={row.key}
+                      onChange={(event) => updateSecretRow(index, "key", event.target.value)}
+                      placeholder="SECRET_KEY"
+                      disabled={redeploying}
+                    />
+                    <input
+                      value={row.value}
+                      onChange={(event) => updateSecretRow(index, "value", event.target.value)}
+                      placeholder="leave blank to keep saved value"
+                      type="password"
+                      disabled={redeploying}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSecretRow(index)}
+                      disabled={redeploying}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="formActions">
+                <button type="button" onClick={addSecretRow} disabled={redeploying}>
+                  Add secret
+                </button>
+              </div>
+              <span className="formHint">
+                Saved secret values stay masked. Enter a new value only when you want to rotate it.
+              </span>
+            </div>
+
             <div className="formActions runtimePrimaryActions">
               <button
                 type="submit"
@@ -2627,6 +2765,37 @@ export default function DeploymentDetailsPage({ params }) {
                 <span>{deployment.internal_port || "-"} {"->"} {deployment.external_port || "-"}</span>
               </div>
               <div className="row">
+                <span className="label">Release source</span>
+                <span>{formatReleaseSourceLabel(deployment.release_source)}</span>
+              </div>
+              <div className="row">
+                <span className="label">Release ref</span>
+                <span>{deployment.release_ref || "-"}</span>
+              </div>
+              <div className="row">
+                <span className="label">Commit</span>
+                <span className="valueWithActions">
+                  <span>{deployment.release_commit_sha ? formatCommitShort(deployment.release_commit_sha) : "-"}</span>
+                  {deployment.release_commit_sha ? (
+                    <button
+                      type="button"
+                      className="smallButton"
+                      onClick={() => copyText(deployment.release_commit_sha, "Commit SHA")}
+                    >
+                      Copy
+                    </button>
+                  ) : null}
+                </span>
+              </div>
+              <div className="row">
+                <span className="label">Triggered</span>
+                <span>
+                  {deployment.release_triggered_at
+                    ? `${formatDate(deployment.release_triggered_at)}${deployment.release_triggered_by ? ` by ${deployment.release_triggered_by}` : ""}`
+                    : "-"}
+                </span>
+              </div>
+              <div className="row">
                 <span className="label">URL</span>
                 <span className="valueWithActions">
                   {deploymentUrl ? (
@@ -2653,6 +2822,35 @@ export default function DeploymentDetailsPage({ params }) {
                 </span>
               </div>
               <div className="row">
+                <span className="label">Webhook</span>
+                <span className="stackedValue">
+                  <span>{`${apiBaseUrl}/deployments/${deployment.id}/release-webhook`}</span>
+                  <div className="inlineActions">
+                    <button
+                      type="button"
+                      className="smallButton"
+                      onClick={() =>
+                        copyText(
+                          `${apiBaseUrl}/deployments/${deployment.id}/release-webhook`,
+                          "Webhook URL",
+                        )
+                      }
+                    >
+                      Copy URL
+                    </button>
+                    {deployment.release_webhook_token ? (
+                      <button
+                        type="button"
+                        className="smallButton"
+                        onClick={() => copyText(deployment.release_webhook_token, "Webhook token")}
+                      >
+                        Copy token
+                      </button>
+                    ) : null}
+                  </div>
+                </span>
+              </div>
+              <div className="row">
                 <span className="label">Env vars</span>
                 <span>
                   {Object.keys(deployment.env || {}).length > 0 ? (
@@ -2675,6 +2873,29 @@ export default function DeploymentDetailsPage({ params }) {
                       </div>
                       <pre className={`logs ${envExpanded ? "expandedBlock" : "collapsedBlock"}`}>
                         {JSON.stringify(deployment.env, null, 2)}
+                      </pre>
+                    </div>
+                  ) : (
+                    "-"
+                  )}
+                </span>
+              </div>
+              <div className="row">
+                <span className="label">Secrets</span>
+                <span>
+                  {Object.keys(deployment.secrets || {}).length > 0 ? (
+                    <div className="stackedValue">
+                      <div className="inlineActions">
+                        <button
+                          type="button"
+                          className="smallButton"
+                          onClick={() => setSecretsExpanded((current) => !current)}
+                        >
+                          {secretsExpanded ? "Show less" : "Show more"}
+                        </button>
+                      </div>
+                      <pre className={`logs ${secretsExpanded ? "expandedBlock" : "collapsedBlock"}`}>
+                        {JSON.stringify(deployment.secrets, null, 2)}
                       </pre>
                     </div>
                   ) : (

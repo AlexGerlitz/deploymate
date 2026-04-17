@@ -64,6 +64,7 @@ class TemplateApiFlowTests(unittest.TestCase):
                 "external_port": 38081,
                 "server_id": None,
                 "env": {"MODE": "popular"},
+                "secrets": {"API_KEY": "popular-secret"},
                 "created_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
                 "updated_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
                 "last_used_at": datetime.now(timezone.utc).isoformat(),
@@ -83,6 +84,9 @@ class TemplateApiFlowTests(unittest.TestCase):
         env = serialized.get("env")
         if isinstance(env, str):
             serialized["env"] = json.loads(env)
+        secrets = serialized.get("secrets")
+        if isinstance(secrets, str):
+            serialized["secrets"] = json.loads(secrets)
         return serialized
 
     def _insert_template(self, record):
@@ -126,6 +130,8 @@ class TemplateApiFlowTests(unittest.TestCase):
             "server_name": None,
             "server_host": None,
             "env": payload.env,
+            "secrets": {key: "••••••" for key in payload.secrets},
+            "secret_count": len(payload.secrets),
         }
         self.deployments.append(deployment)
         self.assertEqual(user["id"], self.user["id"])
@@ -148,6 +154,7 @@ class TemplateApiFlowTests(unittest.TestCase):
                 "internal_port": 80,
                 "external_port": 38080,
                 "env": {"APP_ENV": "smoke"},
+                "secrets": {"API_KEY": "smoke-secret"},
             },
         )
         self.assertEqual(create_response.status_code, 200)
@@ -155,6 +162,8 @@ class TemplateApiFlowTests(unittest.TestCase):
         template_id = created["id"]
         self.assertEqual(created["template_name"], "web-template")
         self.assertEqual(created["env"]["APP_ENV"], "smoke")
+        self.assertEqual(created["secret_count"], 1)
+        self.assertEqual(created["secrets"]["API_KEY"], "••••••")
 
         list_response = self.client.get("/deployment-templates?q=web-template")
         self.assertEqual(list_response.status_code, 200)
@@ -179,6 +188,7 @@ class TemplateApiFlowTests(unittest.TestCase):
                 "internal_port": 8080,
                 "external_port": 39090,
                 "env": {"APP_ENV": "updated"},
+                "secrets": {"API_KEY": "updated-secret"},
             },
         )
         self.assertEqual(update_response.status_code, 200)
@@ -202,6 +212,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         deployed = deploy_response.json()
         self.assertEqual(deployed["image"], "nginx:1.27-alpine")
         self.assertEqual(deployed["external_port"], 39090)
+        self.assertEqual(deployed["secret_count"], 1)
         self.assertEqual(self.templates[template_id]["use_count"], 1)
 
         delete_response = self.client.delete(f"/deployment-templates/{duplicate_id}")

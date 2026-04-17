@@ -11,6 +11,7 @@ from app.schemas import (
     DeploymentTemplateDuplicateRequest,
     DeploymentTemplateResponse,
 )
+from app.services.secrets import apply_masked_secret_view
 
 
 def build_template_record(
@@ -34,6 +35,7 @@ def build_template_record(
         "server_id": payload.server_id,
         "owner_user_id": owner_user_id,
         "env": json.dumps(payload.env),
+        "secrets": json.dumps(payload.secrets),
         "created_at": created,
         "updated_at": updated,
         "last_used_at": last_used_at,
@@ -101,14 +103,14 @@ def list_templates(
                         template.get("server_name"),
                         template.get("server_host"),
                         " ".join((template.get("env") or {}).keys()),
-                        " ".join(str(value) for value in (template.get("env") or {}).values()),
+                        " ".join((template.get("secrets") or {}).keys()),
                     ],
                 )
             ).lower()
             if normalized_query not in haystack:
                 continue
 
-        filtered.append(DeploymentTemplateResponse(**template))
+        filtered.append(DeploymentTemplateResponse(**apply_masked_secret_view(template)))
 
     if state == "popular":
         filtered.sort(key=lambda item: item.use_count, reverse=True)
@@ -131,7 +133,7 @@ def create_template(
     template_record = build_template_record(template_id, payload, owner_user_id=user["id"])
     insert_deployment_template_fn(template_record)
     saved_template = get_deployment_template_or_404_fn(template_id)
-    return DeploymentTemplateResponse(**saved_template)
+    return DeploymentTemplateResponse(**apply_masked_secret_view(saved_template))
 
 
 def update_template(
@@ -145,6 +147,10 @@ def update_template(
 ) -> DeploymentTemplateResponse:
     existing_template = get_deployment_template_or_404_fn(template_id)
     validate_template_payload_fn(payload, user)
+    merged_secrets = {
+        **(existing_template.get("secrets") or {}),
+        **payload.secrets,
+    }
     update_deployment_template_fn(
         template_id,
         {
@@ -155,13 +161,14 @@ def update_template(
             "external_port": payload.external_port,
             "server_id": payload.server_id,
             "env": json.dumps(payload.env),
+            "secrets": json.dumps(merged_secrets),
             "updated_at": datetime.now(timezone.utc),
         },
     )
     saved_template = get_deployment_template_or_404_fn(template_id)
     if saved_template["id"] != existing_template["id"]:
         raise HTTPException(status_code=500, detail="Template update failed.")
-    return DeploymentTemplateResponse(**saved_template)
+    return DeploymentTemplateResponse(**apply_masked_secret_view(saved_template))
 
 
 def duplicate_template(
@@ -189,6 +196,7 @@ def duplicate_template(
         "server_id": template.get("server_id"),
         "owner_user_id": user["id"],
         "env": json.dumps(template.get("env") or {}),
+        "secrets": json.dumps(template.get("secrets") or {}),
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
         "last_used_at": None,
@@ -196,7 +204,7 @@ def duplicate_template(
     }
     insert_deployment_template_fn(template_record)
     saved_template = get_deployment_template_or_404_fn(duplicate_id)
-    return DeploymentTemplateResponse(**saved_template)
+    return DeploymentTemplateResponse(**apply_masked_secret_view(saved_template))
 
 
 def deploy_from_template(
@@ -215,6 +223,7 @@ def deploy_from_template(
         external_port=template.get("external_port"),
         server_id=template.get("server_id"),
         env=template.get("env") or {},
+        secrets=template.get("secrets") or {},
     )
     deployment = create_deployment_fn(payload, user)
     mark_deployment_template_used_fn(template_id)
@@ -229,4 +238,4 @@ def delete_template(
 ) -> DeploymentTemplateResponse:
     template = get_deployment_template_or_404_fn(template_id)
     delete_deployment_template_record_fn(template_id)
-    return DeploymentTemplateResponse(**template)
+    return DeploymentTemplateResponse(**apply_masked_secret_view(template))
