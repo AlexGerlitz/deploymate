@@ -1,6 +1,6 @@
 # DeployMate Handoff
 
-Updated: 2026-04-11
+Updated: 2026-04-17
 
 ## Web Terminal Pointer
 
@@ -11,13 +11,56 @@ Updated: 2026-04-11
 
 ## Current Product Goal
 
-- Главная цель сейчас: не просто наращивать deploy/control функции, а сделать путь понятным с первого прохода.
+- Главная цель сейчас: не просто наращивать deploy/control функции, а превратить DeployMate в рыночно правдоподобный self-hosted runtime layer для ongoing-support команд на инфраструктуре клиента или своей инфраструктуре.
+- Beginner clarity остаётся обязательной, но теперь это только первый слой более узкого product wedge, а не весь стратегический трек.
+- Первый коммерческий wedge теперь зафиксирован узко:
+  - агентства
+  - интеграторы
+  - outsourced teams с ongoing support на client-owned/self-owned infra
+- Россия теперь первый packaging wedge:
+  - русскоязычный public funnel
+  - local provider presets
+  - Russian-language operator materials
 - Долгоживущий стратегический source of truth теперь отдельно зафиксирован в [PRODUCT-STRATEGY.md](/Users/alexgerlitz/deploymate/PRODUCT-STRATEGY.md).
-- Ближайший продуктовый ориентир:
-  - подключить сервер
-  - увидеть, жив ли сервис
-  - понять, что делать дальше без длинного скролла и лишнего жаргона
 - Для быстрой ресинхронизации Codex теперь использовать короткие команды из [CODEX-PROTOCOL.md](CODEX-PROTOCOL.md).
+
+## Current Main Track
+
+- Порядок на ближайшие 12 недель теперь фиксированный:
+  1. packaging and message-market fit
+  2. production baseline
+  3. stack ceiling removal
+  4. deployment passport
+  5. agency fit and packaging
+- Ближайшие три пакета тоже зафиксированы:
+  1. `Domains/SSL v1`
+  2. `Release review + rollback v1`
+  3. `Stack/Compose intake v0`
+- `README.md` и broad repo-root packaging пока deliberately deferred до реального public funnel rewrite, чтобы не создавать doc/product drift.
+
+## Autonomous Night Loop
+
+- Ночная работа теперь должна идти не как один изолированный проход, а как последовательный loop по текущему main track.
+- Базовое правило:
+  - если текущий пакет уже завершён и проверен, не ждать нового сообщения, а брать следующий пакет по фиксированному порядку
+- Порядок автономного продолжения сейчас такой:
+  1. `Domains/SSL v1`
+  2. `Release review + rollback v1`
+  3. `Stack/Compose intake v0`
+  4. `Stack deploy v0`
+  5. `Passport v1`
+  6. `Agency fit v1`
+- Для каждого ночного прохода expected loop один и тот же:
+  - reread `HANDOFF.md`
+  - взять один bounded package
+  - сделать минимальный coherent diff
+  - прогнать узкую meaningful verification
+  - обновить `HANDOFF.md`
+  - если нет risk/blocker, сразу перейти к следующему bounded package
+- Останавливаться нужно только если:
+  - нужен рискованный продуктовый выбор
+  - не хватает внешнего доступа / credentials / runtime
+  - verification ломается так, что безопасно продолжать уже нельзя
 
 ## Current Security Boundary
 
@@ -43,6 +86,31 @@ Updated: 2026-04-11
 - `/app/server-review` сейчас главный экран для подключения и review серверов.
 - `/app/deployment-workflow` сейчас главный runtime/deploy workspace.
 - `deployment detail` стал более decision-first, чем раньше.
+- public funnel now speaks more directly to the first wedge:
+  - landing now centers client-owned/self-owned infrastructure, no-Kubernetes framing, and handoff value
+  - `/upgrade` now frames buyer paths as `Internal Team`, `Agency / Multi-client`, and `Custom / Redistribution`
+  - `/commercial-license` now reads as a buyer-facing business path instead of a purely legal review wall
+- minimal funnel telemetry schema now exists in frontend:
+  - `landing_cta`
+  - `register_started`
+  - `register_completed`
+  - `server_created`
+  - `server_verified`
+  - `deployment_created`
+  - `healthy_reached`
+  - `deployment_detail_opened`
+- current instrumentation is intentionally narrow:
+  - landing CTAs now emit structured funnel events
+  - deeper runtime funnel events still remain for future slices
+- runtime today всё ещё фактически `single-container-first`.
+- Это теперь считать не допустимой долгоживущей моделью, а ceiling risk между production baseline и agency fit.
+- Stack/Compose layer для проекта теперь не optional polish, а следующий логичный потолок спроса.
+- Когда stack-support придёт, он должен прийти как одна coherent runtime unit:
+  - stack release identity
+  - primary service
+  - health target
+  - rollback unit
+- То есть stack нельзя моделировать как loose set of unrelated single-container deployments.
 - Week 1 now has a clearer first-pass story across the four main surfaces:
   - `/app` chooses the obvious next path instead of surfacing too many competing actions
   - `/app/server-review` now reads as `save -> verify -> deploy`
@@ -82,22 +150,20 @@ Updated: 2026-04-11
   - в `post_deploy_smoke.sh` отсутствовал `json_query()` helper
 - Важный operational вывод: release path нельзя считать здоровым, пока он не прогнан на реальном staging host, даже если локальные тесты зелёные.
 
-## Next Recommended Package
+## Next Recommended Packages
 
-- Проверить новый beginner story не только глазами автора, а живым walkthrough:
-  - first-time admin path: `/app -> /app/server-review -> /app/deployment-workflow`
-  - member path under admin-managed server inventory
-  - confirm that the next click is still obvious after login, after saving a server, and after the first deploy
-- Для следующего прохода уже есть явный артефакт и guardrail:
-  - manual checklist: [docs/beginner-walkthrough.md](/Users/alexgerlitz/deploymate/docs/beginner-walkthrough.md)
-  - local smoke: `npm --prefix frontend run smoke:beginner`
-- После walkthrough уже добивать remaining clarity gaps instead of blindly rewriting copy.
-- Параллельно не ослаблять новый release contract и не превращать его во временный workaround.
-- Следующий стратегический слой после beginner clarity уже зафиксирован:
-  - `first deploy in 10 minutes`
-  - `production-useful runtime`
-  - `team and agency fit`
-  - `deployment passport` как главный продуктовый differentiator
+- Уже закрыто в текущем незакоммиченном хвосте:
+  - `Public funnel / ICP packaging v1`
+  - `Webhook/release source v0`
+  - `Secrets v1`
+- Следующий bounded runtime порядок:
+  1. `Domains/SSL v1`
+  2. `Release review + rollback v1`
+  3. `Stack/Compose intake v0`
+- Guardrails на следующий проход:
+  - не центрировать Passport до release/domain/stack context
+  - не расширять agency/client surfaces до того, как baseline runtime станет product-believable
+  - не считать single-container deployments допустимым долгоживущим ceiling
 
 ## Week 1 Result
 
