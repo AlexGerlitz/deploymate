@@ -15,6 +15,7 @@ import {
   copyTextToClipboard,
 } from "../../lib/admin-page-utils";
 import {
+  buildCustomDomainIssues,
   buildDeploymentUrl,
   buildDeploymentWorkflowNextStep,
   buildDeploymentWorkflowState,
@@ -29,6 +30,7 @@ import {
   formatServerLabel,
   formatSuggestedPorts,
   isRecentDate,
+  normalizeCustomDomainValue,
   normalizeCreateDeploymentError,
   normalizeDeploymentActionError,
   readJsonOrError,
@@ -500,6 +502,8 @@ function DeploymentWorkflowPageContent() {
     internal_port: smokeMode ? smokeWorkflowFixture.form.internal_port : "",
     external_port: smokeMode ? smokeWorkflowFixture.form.external_port : "",
     server_id: smokeMode ? smokeWorkflowFixture.form.server_id : "",
+    custom_domain: smokeMode ? smokeWorkflowFixture.form.custom_domain || "" : "",
+    tls_enabled: smokeMode ? Boolean(smokeWorkflowFixture.form.tls_enabled) : false,
   });
   const [templateName, setTemplateName] = useState("");
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
@@ -930,6 +934,8 @@ function DeploymentWorkflowPageContent() {
     if (
       form.name.trim() ||
       form.internal_port.trim() ||
+      form.custom_domain.trim() ||
+      form.tls_enabled ||
       templateName.trim() ||
       rolloutDraftHasEnvRows ||
       editingTemplateId
@@ -938,8 +944,10 @@ function DeploymentWorkflowPageContent() {
     }
   }, [
     editingTemplateId,
+    form.custom_domain,
     form.internal_port,
     form.name,
+    form.tls_enabled,
     rolloutDraftHasEnvRows,
     templateName,
   ]);
@@ -1049,11 +1057,11 @@ function DeploymentWorkflowPageContent() {
   }, [shouldAutoFocusEntryImage]);
 
   function updateFormField(event) {
-    const { name, value } = event.target;
+    const { name, type, value, checked } = event.target;
     setForm((currentForm) => {
       const nextForm = {
         ...currentForm,
-        [name]: value,
+        [name]: type === "checkbox" ? checked : value,
       };
 
       if (name === "server_id" && !currentForm.external_port.trim()) {
@@ -1179,6 +1187,8 @@ function DeploymentWorkflowPageContent() {
       internal_port: form.internal_port.trim(),
       external_port: form.external_port.trim(),
       server_id: form.server_id,
+      custom_domain: normalizeCustomDomainValue(form.custom_domain),
+      tls_enabled: form.tls_enabled,
       env: buildEnvPayload(envRows),
       secrets: buildSecretPayload(secretRows),
       envRows,
@@ -1201,6 +1211,8 @@ function DeploymentWorkflowPageContent() {
           ? ""
           : String(template.external_port),
       server_id: template.server_id || "",
+      custom_domain: "",
+      tls_enabled: false,
       env: template.env || {},
       secrets: template.secrets || {},
       envRows: buildEnvRowsFromObject(template.env || {}),
@@ -1222,6 +1234,7 @@ function DeploymentWorkflowPageContent() {
     const secretIssues = buildEnvIssues(draft.secretRows || []).map((issue) =>
       issue.replaceAll("Env var", "Secret"),
     );
+    const customDomainIssues = buildCustomDomainIssues(draft.custom_domain, draft.tls_enabled);
 
     if (!draft.image.trim()) {
       errors.push("Image is required.");
@@ -1241,6 +1254,7 @@ function DeploymentWorkflowPageContent() {
 
     errors.push(...envIssues);
     errors.push(...secretIssues);
+    errors.push(...customDomainIssues);
 
     const matchingDeployment = deployments.find((deployment) => {
       if (!externalPort || !deployment.external_port) {
@@ -1304,6 +1318,8 @@ function DeploymentWorkflowPageContent() {
           ? ""
           : String(template.external_port),
       server_id: template.server_id || "",
+      custom_domain: "",
+      tls_enabled: false,
     });
     setEnvRows(buildEnvRowsFromObject(template.env || {}));
     setSecretRows(buildSecretRowsFromObject(template.secrets || {}));
@@ -1360,6 +1376,12 @@ function DeploymentWorkflowPageContent() {
       payload.server_id = draft.server_id;
     }
 
+    if (draft.custom_domain) {
+      payload.custom_domain = draft.custom_domain;
+    }
+
+    payload.tls_enabled = draft.tls_enabled;
+
     return payload;
   }
 
@@ -1409,6 +1431,12 @@ function DeploymentWorkflowPageContent() {
       payload.server_id = draft.server_id;
     }
 
+    if (draft.custom_domain) {
+      payload.custom_domain = draft.custom_domain;
+    }
+
+    payload.tls_enabled = draft.tls_enabled;
+
     try {
       const response = await fetch(`${apiBaseUrl}/deployments`, {
         method: "POST",
@@ -1427,6 +1455,8 @@ function DeploymentWorkflowPageContent() {
         internal_port: "",
         external_port: getSuggestedExternalPort(),
         server_id: form.server_id,
+        custom_domain: "",
+        tls_enabled: false,
       });
       setEnvRows([{ key: "", value: "" }]);
       setWorkflowTab("live");
@@ -1739,6 +1769,8 @@ function DeploymentWorkflowPageContent() {
       form.name.trim() ||
       form.internal_port.trim() ||
       form.external_port.trim() ||
+      form.custom_domain.trim() ||
+      form.tls_enabled ||
       templateName.trim() ||
       editingTemplateId ||
       rolloutDraftHasEnvRows,
@@ -1749,6 +1781,8 @@ function DeploymentWorkflowPageContent() {
     !form.image.trim() &&
     !form.name.trim() &&
     !form.internal_port.trim() &&
+    !form.custom_domain.trim() &&
+    !form.tls_enabled &&
     !templateName.trim() &&
     !editingTemplateId &&
     !rolloutDraftHasEnvRows;
@@ -2589,6 +2623,36 @@ function DeploymentWorkflowPageContent() {
                     </button>
                   ))}
                 </div>
+              </label>
+
+              <label className="field">
+                <span>Custom domain</span>
+                <input
+                  name="custom_domain"
+                  value={form.custom_domain}
+                  onChange={updateFormField}
+                  placeholder="app.example.com"
+                  disabled={submitting}
+                />
+                <span className="fieldHint">
+                  Store the primary domain here when DNS or a reverse proxy should point users at this service. This v1 does not edit DNS or proxy config automatically.
+                </span>
+              </label>
+
+              <label className="field checkboxField">
+                <span className="checkboxRow">
+                  <input
+                    name="tls_enabled"
+                    type="checkbox"
+                    checked={form.tls_enabled}
+                    onChange={updateFormField}
+                    disabled={submitting}
+                  />
+                  <span>Treat this domain as HTTPS</span>
+                </span>
+                <span className="fieldHint">
+                  Enable this only after the custom domain is expected to terminate TLS at your edge or proxy.
+                </span>
               </label>
 
               <div className="field">

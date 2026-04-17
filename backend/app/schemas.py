@@ -21,6 +21,8 @@ class DeploymentCreateRequest(BaseModel):
     internal_port: Optional[int] = Field(default=None, ge=1, le=65535)
     external_port: Optional[int] = Field(default=None, ge=1, le=65535)
     server_id: Optional[str] = None
+    custom_domain: Optional[str] = None
+    tls_enabled: bool = False
     env: Dict[str, str] = Field(default_factory=dict)
     secrets: Dict[str, str] = Field(default_factory=dict)
 
@@ -47,6 +49,8 @@ class DeploymentResponse(BaseModel):
     server_name: Optional[str] = None
     server_host: Optional[str] = None
     server_managed_by_admin: bool = False
+    custom_domain: Optional[str] = None
+    tls_enabled: bool = False
     release_source: ReleaseSource = "manual"
     runtime_shape: RuntimeShape = "single"
     release_ref: Optional[str] = None

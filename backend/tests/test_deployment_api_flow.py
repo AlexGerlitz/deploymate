@@ -157,7 +157,17 @@ class DeploymentApiFlowTests(unittest.TestCase):
         }
 
     def _probe_http_endpoint(self, url, timeout=5.0):
-        self.assertEqual(url, "http://127.0.0.1:38080")
+        if self.deployment.get("custom_domain"):
+            expected_url = (
+                f"{'https' if self.deployment.get('tls_enabled') else 'http'}://"
+                f"{self.deployment['custom_domain']}"
+            )
+        else:
+            expected_url = (
+                f"http://{self.deployment.get('server_host') or '127.0.0.1'}:"
+                f"{self.deployment['external_port']}"
+            )
+        self.assertEqual(url, expected_url)
         self.assertEqual(timeout, 5.0)
         return {
             "checked_at": 0,
@@ -174,6 +184,8 @@ class DeploymentApiFlowTests(unittest.TestCase):
                 "image": "nginx:alpine",
                 "internal_port": 80,
                 "external_port": 38080,
+                "custom_domain": "app.example.com",
+                "tls_enabled": True,
                 "env": {"DEPLOYMATE_SMOKE": "1"},
             },
         )
@@ -188,6 +200,8 @@ class DeploymentApiFlowTests(unittest.TestCase):
         self.assertEqual(created["release_image_tag"], "alpine")
         self.assertEqual(created["release_triggered_by"], "smoke-admin")
         self.assertTrue(created["release_webhook_token"])
+        self.assertEqual(created["custom_domain"], "app.example.com")
+        self.assertTrue(created["tls_enabled"])
         self.assertEqual(created["secret_count"], 0)
 
         health_response = self.client.get(f"/deployments/{deployment_id}/health")

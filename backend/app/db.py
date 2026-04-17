@@ -125,6 +125,8 @@ def init_db() -> None:
         error TEXT NULL,
         internal_port INTEGER NULL,
         external_port INTEGER NULL,
+        custom_domain TEXT NULL,
+        tls_enabled BOOLEAN NOT NULL DEFAULT FALSE,
         release_source TEXT NOT NULL DEFAULT 'manual',
         runtime_shape TEXT NOT NULL DEFAULT 'single',
         release_ref TEXT NULL,
@@ -155,6 +157,16 @@ def init_db() -> None:
     alter_deployments_add_owner_user_id_sql = """
     ALTER TABLE deployments
     ADD COLUMN IF NOT EXISTS owner_user_id UUID NULL;
+    """
+
+    alter_deployments_add_custom_domain_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS custom_domain TEXT NULL;
+    """
+
+    alter_deployments_add_tls_enabled_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS tls_enabled BOOLEAN NOT NULL DEFAULT FALSE;
     """
 
     alter_deployments_add_release_source_sql = """
@@ -349,6 +361,8 @@ def init_db() -> None:
             cur.execute(alter_deployments_add_env_sql)
             cur.execute(alter_deployments_add_secrets_sql)
             cur.execute(alter_deployments_add_owner_user_id_sql)
+            cur.execute(alter_deployments_add_custom_domain_sql)
+            cur.execute(alter_deployments_add_tls_enabled_sql)
             cur.execute(alter_deployments_add_release_source_sql)
             cur.execute(alter_deployments_add_runtime_shape_sql)
             cur.execute(alter_deployments_add_release_ref_sql)
@@ -416,6 +430,8 @@ def insert_deployment_record(deployment_record: dict[str, Any]) -> None:
         error,
         internal_port,
         external_port,
+        custom_domain,
+        tls_enabled,
         server_id,
         env,
         secrets,
@@ -430,7 +446,7 @@ def insert_deployment_record(deployment_record: dict[str, Any]) -> None:
         release_webhook_token
     )
     VALUES (%(id)s, %(status)s, %(image)s, %(container_name)s, %(container_id)s,
-            %(owner_user_id)s, %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(server_id)s, %(env)s, %(secrets)s,
+            %(owner_user_id)s, %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(custom_domain)s, %(tls_enabled)s, %(server_id)s, %(env)s, %(secrets)s,
             %(release_source)s, %(runtime_shape)s, %(release_ref)s, %(release_commit_sha)s, %(release_image_tag)s,
             %(release_image_digest)s, %(release_triggered_at)s, %(release_triggered_by)s, %(release_webhook_token)s);
     """
@@ -467,6 +483,8 @@ def update_deployment_configuration(
     container_name: str,
     internal_port: int | None,
     external_port: int | None,
+    custom_domain: str | None,
+    tls_enabled: bool,
     env: dict[str, str],
     secrets: dict[str, str],
     release_source: str,
@@ -483,6 +501,8 @@ def update_deployment_configuration(
         container_name = %s,
         internal_port = %s,
         external_port = %s,
+        custom_domain = %s,
+        tls_enabled = %s,
         env = %s,
         secrets = %s,
         release_source = %s,
@@ -504,6 +524,8 @@ def update_deployment_configuration(
                     container_name,
                     internal_port,
                     external_port,
+                    custom_domain,
+                    tls_enabled,
                     json.dumps(env),
                     json.dumps(secrets),
                     release_source,

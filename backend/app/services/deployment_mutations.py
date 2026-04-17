@@ -52,6 +52,51 @@ def describe_secret_shape(secrets: dict | None) -> str:
     return f"{count} secret{'s' if count != 1 else ''}"
 
 
+def normalize_custom_domain(domain: str | None) -> str | None:
+    if domain is None:
+        return None
+
+    normalized = domain.strip().lower().rstrip(".")
+    if not normalized:
+        return None
+
+    if "://" in normalized or "/" in normalized or " " in normalized:
+        raise HTTPException(
+            status_code=400,
+            detail="Custom domain must be a hostname like app.example.com.",
+        )
+
+    labels = normalized.split(".")
+    if len(labels) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Custom domain must include at least one dot.",
+        )
+
+    for label in labels:
+        if not label or label.startswith("-") or label.endswith("-"):
+            raise HTTPException(
+                status_code=400,
+                detail="Custom domain must use only valid hostname labels.",
+            )
+        if not all(character.isalnum() or character == "-" for character in label):
+            raise HTTPException(
+                status_code=400,
+                detail="Custom domain must use only letters, numbers, dots, and hyphens.",
+            )
+
+    return normalized
+
+
+def describe_public_endpoint(custom_domain: str | None, tls_enabled: bool, external_port: int | None) -> str:
+    if custom_domain:
+        scheme = "https" if tls_enabled else "http"
+        return f"{scheme}://{custom_domain}"
+    if external_port is not None:
+        return f"host port {external_port}"
+    return "no public address configured"
+
+
 def extract_release_image_tag(image: str | None) -> str | None:
     if not image:
         return None
@@ -112,12 +157,14 @@ def build_create_start_message(
     server: dict | None,
     container_name: str,
     release_metadata: dict | None,
+    custom_domain: str | None,
 ) -> str:
     return (
         f"Starting deployment for {payload.image} as {container_name} on "
         f"{describe_runtime_target(server)} with ports "
         f"{describe_port_mapping(payload.internal_port, payload.external_port)} "
         f"and {describe_env_shape(payload.env)} with {describe_secret_shape(payload.secrets)}. "
+        f"Public address: {describe_public_endpoint(custom_domain, payload.tls_enabled, payload.external_port)}. "
         f"{summarize_release_trace(release_metadata)}"
     )
 
@@ -129,6 +176,7 @@ def build_redeploy_start_message(
     container_name: str,
     release_metadata: dict | None,
     final_secrets: dict | None,
+    custom_domain: str | None,
 ) -> str:
     return (
         f"Starting redeploy for {existing['id']} from {existing.get('image') or 'unknown image'} "
@@ -138,6 +186,7 @@ def build_redeploy_start_message(
         f"{describe_port_mapping(payload.internal_port, payload.external_port)}. "
         f"Env: {describe_env_shape(existing.get('env') or {})} -> {describe_env_shape(payload.env)}. "
         f"Secrets: {describe_secret_shape(existing.get('secrets') or {})} -> {describe_secret_shape(final_secrets)}. "
+        f"Public address: {describe_public_endpoint(custom_domain, payload.tls_enabled, payload.external_port)}. "
         f"{summarize_release_trace(release_metadata)}"
     )
 
@@ -180,6 +229,13 @@ def create_deployment(
             detail="internal_port and external_port must be provided together.",
         )
 
+    custom_domain = normalize_custom_domain(payload.custom_domain)
+    if payload.tls_enabled and not custom_domain:
+        raise HTTPException(
+            status_code=400,
+            detail="Enable TLS only after setting a custom domain.",
+        )
+
     deployment_id = str(uuid.uuid4())
     container_name = build_container_name(payload.name, deployment_id)
     ensure_container_name_is_available_fn(container_name, server)
@@ -200,6 +256,8 @@ def create_deployment(
         "error": None,
         "internal_port": payload.internal_port,
         "external_port": payload.external_port,
+        "custom_domain": custom_domain,
+        "tls_enabled": payload.tls_enabled,
         "server_id": payload.server_id,
         "env": json.dumps(payload.env),
         "secrets": json.dumps(payload.secrets),
@@ -219,7 +277,13 @@ def create_deployment(
         deployment_id=deployment_id,
         level="success",
         title="Deployment started",
-        message=build_create_start_message(payload, server, container_name, release_metadata),
+        message=build_create_start_message(
+            payload,
+            server,
+            container_name,
+            release_metadata,
+            custom_domain,
+        ),
     )
 
     result = run_container_fn(
@@ -308,6 +372,12 @@ def redeploy_deployment(
             status_code=400,
             detail="internal_port and external_port must be provided together.",
         )
+    custom_domain = normalize_custom_domain(payload.custom_domain)
+    if payload.tls_enabled and not custom_domain:
+        raise HTTPException(
+            status_code=400,
+            detail="Enable TLS only after setting a custom domain.",
+        )
     effective_release_metadata = release_metadata or build_release_metadata(
         image=payload.image,
         source="manual",
@@ -340,6 +410,7 @@ def redeploy_deployment(
             container_name,
             effective_release_metadata,
             merged_secrets,
+            custom_domain,
         ),
     )
 
@@ -376,6 +447,8 @@ def redeploy_deployment(
         container_name=container_name,
         internal_port=payload.internal_port,
         external_port=payload.external_port,
+        custom_domain=custom_domain,
+        tls_enabled=payload.tls_enabled,
         env=payload.env,
         secrets=merged_secrets,
         release_source=str(effective_release_metadata["release_source"]),

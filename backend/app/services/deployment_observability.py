@@ -60,22 +60,28 @@ def build_deployment_health_response(
     deployment_id = deployment["id"]
     container_name = deployment["container_name"]
     external_port = deployment.get("external_port")
+    custom_domain = deployment.get("custom_domain")
+    tls_enabled = bool(deployment.get("tls_enabled"))
     checked_at = _now_iso()
 
-    if not external_port:
+    url = None
+    if custom_domain:
+        url = f"{'https' if tls_enabled else 'http'}://{custom_domain}"
+    elif external_port:
+        host = deployment.get("server_host") or "127.0.0.1"
+        url = f"http://{host}:{external_port}"
+
+    if not url:
         return DeploymentHealthResponse(
             deployment_id=deployment_id,
             container_name=container_name,
             url=None,
             status="unhealthy",
             status_code=None,
-            error="Health check is unavailable because this deployment has no external port.",
+            error="Health check is unavailable because this deployment has no public address yet.",
             checked_at=checked_at,
             response_time_ms=None,
         )
-
-    host = deployment.get("server_host") or "127.0.0.1"
-    url = f"http://{host}:{external_port}"
 
     if deployment.get("status") != "running" or not deployment.get("container_id"):
         return DeploymentHealthResponse(

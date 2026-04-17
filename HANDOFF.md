@@ -33,9 +33,9 @@ Updated: 2026-04-17
   4. deployment passport
   5. agency fit and packaging
 - Ближайшие три пакета тоже зафиксированы:
-  1. `Domains/SSL v1`
-  2. `Release review + rollback v1`
-  3. `Stack/Compose intake v0`
+  1. `Release review + rollback v1`
+  2. `Stack/Compose intake v0`
+  3. `Stack deploy v0`
 - `README.md` и broad repo-root packaging пока deliberately deferred до реального public funnel rewrite, чтобы не создавать doc/product drift.
 
 ## Autonomous Night Loop
@@ -44,12 +44,11 @@ Updated: 2026-04-17
 - Базовое правило:
   - если текущий пакет уже завершён и проверен, не ждать нового сообщения, а брать следующий пакет по фиксированному порядку
 - Порядок автономного продолжения сейчас такой:
-  1. `Domains/SSL v1`
-  2. `Release review + rollback v1`
-  3. `Stack/Compose intake v0`
-  4. `Stack deploy v0`
-  5. `Passport v1`
-  6. `Agency fit v1`
+  1. `Release review + rollback v1`
+  2. `Stack/Compose intake v0`
+  3. `Stack deploy v0`
+  4. `Passport v1`
+  5. `Agency fit v1`
 - Для каждого ночного прохода expected loop один и тот же:
   - reread `HANDOFF.md`
   - взять один bounded package
@@ -108,6 +107,11 @@ Updated: 2026-04-17
   - ref/commit/image metadata
   - triggered-at and triggered-by context
   - generic token-based webhook entry for controlled deploys
+- deployment runtime now also carries a first custom-domain contract:
+  - `custom_domain`
+  - `tls_enabled`
+  - health and primary URL now follow the configured domain when it exists
+  - workflow/detail now treat domain + TLS as a first-class readiness review instead of a side note
 - config vars and secrets are now separate runtime concepts:
   - secrets are masked in UI and exports
   - redeploy keeps existing secrets unless a new value is supplied
@@ -167,10 +171,11 @@ Updated: 2026-04-17
   - `Public funnel / ICP packaging v1`
   - `Webhook/release source v0`
   - `Secrets v1`
+  - `Domains/SSL v1`
 - Следующий bounded runtime порядок:
-  1. `Domains/SSL v1`
-  2. `Release review + rollback v1`
-  3. `Stack/Compose intake v0`
+  1. `Release review + rollback v1`
+  2. `Stack/Compose intake v0`
+  3. `Stack deploy v0`
 - Guardrails на следующий проход:
   - не центрировать Passport до release/domain/stack context
   - не расширять agency/client surfaces до того, как baseline runtime станет product-believable

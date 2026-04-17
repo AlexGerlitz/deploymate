@@ -24,11 +24,46 @@ export function formatDate(value) {
 }
 
 export function buildDeploymentUrl(deployment) {
+  if (deployment?.custom_domain) {
+    return `${deployment.tls_enabled ? "https" : "http"}://${deployment.custom_domain}`;
+  }
+
   if (!deployment?.server_host || !deployment?.external_port) {
     return "";
   }
 
   return `http://${deployment.server_host}:${deployment.external_port}`;
+}
+
+export function normalizeCustomDomainValue(value) {
+  return String(value || "").trim().toLowerCase().replace(/\.$/, "");
+}
+
+export function buildCustomDomainIssues(domain, tlsEnabled) {
+  const normalizedDomain = normalizeCustomDomainValue(domain);
+  const issues = [];
+
+  if (tlsEnabled && !normalizedDomain) {
+    issues.push("Enable HTTPS only after setting a custom domain.");
+  }
+
+  if (!normalizedDomain) {
+    return issues;
+  }
+
+  if (normalizedDomain.includes("://") || normalizedDomain.includes("/") || /\s/.test(normalizedDomain)) {
+    issues.push("Custom domain must be a hostname like app.example.com.");
+    return issues;
+  }
+
+  const hostnamePattern =
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
+
+  if (!hostnamePattern.test(normalizedDomain)) {
+    issues.push("Custom domain must contain only valid hostname labels.");
+  }
+
+  return issues;
 }
 
 export function formatSuggestedPorts(ports) {

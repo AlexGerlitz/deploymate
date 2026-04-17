@@ -24,6 +24,8 @@ def _deployment_record(**overrides):
         "error": None,
         "internal_port": 80,
         "external_port": 8080,
+        "custom_domain": None,
+        "tls_enabled": False,
         "server_id": "srv-1",
         "server_name": "prod",
         "server_host": "deploymate.example",
@@ -72,6 +74,8 @@ class DeploymentRouteTests(unittest.TestCase):
             name="demo-v2",
             internal_port=80,
             external_port=8081,
+            custom_domain="app.example.com",
+            tls_enabled=True,
             env={"MODE": "blue"},
             secrets={"API_KEY": "rotated"},
         )
@@ -81,6 +85,8 @@ class DeploymentRouteTests(unittest.TestCase):
             container_name="demo-v2",
             container_id="container-2",
             external_port=8081,
+            custom_domain="app.example.com",
+            tls_enabled=True,
             env={"MODE": "blue"},
             secrets={"API_KEY": "rotated"},
         )
@@ -118,6 +124,8 @@ class DeploymentRouteTests(unittest.TestCase):
             container_name="demo-v2",
             internal_port=80,
             external_port=8081,
+            custom_domain="app.example.com",
+            tls_enabled=True,
             env={"MODE": "blue"},
             secrets={"API_KEY": "rotated"},
             release_source="manual",
@@ -279,7 +287,7 @@ class DeploymentRouteTests(unittest.TestCase):
                         diagnostics = _build_deployment_diagnostics(deployment)
 
         self.assertEqual(diagnostics.health.status, "unhealthy")
-        self.assertIn("no external port", diagnostics.health.error.lower())
+        self.assertIn("no public address", diagnostics.health.error.lower())
         self.assertEqual(diagnostics.server_target, "deploy@deploymate.example:22")
         self.assertEqual(diagnostics.activity.error_events, 1)
         self.assertEqual(diagnostics.log_excerpt, "")
@@ -302,7 +310,7 @@ class DeploymentRouteTests(unittest.TestCase):
 
         self.assertEqual(health.status, "unhealthy")
         self.assertIsNone(health.url)
-        self.assertIn("no external port", health.error.lower())
+        self.assertIn("no public address", health.error.lower())
 
     def test_build_deployment_diagnostics_keeps_working_when_server_record_is_missing(self):
         deployment = _deployment_record(

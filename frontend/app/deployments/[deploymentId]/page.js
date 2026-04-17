@@ -6,6 +6,7 @@ import { use, useEffect, useState } from "react";
 import { AdminDisclosureSection } from "../../app/admin-ui";
 import { escapeCsvCell, triggerFileDownload } from "../../lib/admin-page-utils";
 import {
+  buildCustomDomainIssues,
   buildDeploymentUrl,
   buildEnvIssues,
   buildSecretRowsFromObject,
@@ -16,6 +17,7 @@ import {
   formatAccessibleServerLabel,
   formatDate,
   formatSuggestedPorts,
+  normalizeCustomDomainValue,
   normalizeDeploymentActionError,
   readJsonOrError,
 } from "../../lib/runtime-workspace-utils";
@@ -130,6 +132,11 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
           : "Local"
     }`,
     `URL: ${buildDeploymentUrl(deployment) || "n/a"}`,
+    `Custom domain: ${
+      deployment.custom_domain
+        ? `${deployment.custom_domain}${deployment.tls_enabled ? " (HTTPS)" : " (HTTP)"}`
+        : "not set"
+    }`,
     `Ports: ${deployment.internal_port || "-"} -> ${deployment.external_port || "-"}`,
     buildReleaseTraceLine(deployment),
     `Health: ${health?.status || "unknown"}${
@@ -189,6 +196,9 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
     endpoint
       ? `People can currently reach it at ${endpoint}.`
       : "This deployment does not currently have a public URL.",
+    deployment?.custom_domain
+      ? `The configured primary domain is ${deployment.custom_domain}${deployment.tls_enabled ? " with HTTPS expected at the edge." : " and it is still marked as HTTP-only."}`
+      : "No custom domain is configured for this deployment yet.",
     health?.status === "healthy"
       ? `The latest health check passed${health?.response_time_ms || health?.response_time_ms === 0 ? ` in ${health.response_time_ms} ms` : ""}.`
       : `The latest health check needs review${health?.status ? ` because the status is ${health.status}` : ""}${health?.error ? `: ${health.error}` : "."}`,
@@ -325,6 +335,7 @@ function buildRedeployValidation(form, envRows, secretRows) {
   const secretIssues = buildEnvIssues(secretRows).map((issue) =>
     issue.replaceAll("Env var", "Secret"),
   );
+  const customDomainIssues = buildCustomDomainIssues(form.custom_domain, form.tls_enabled);
 
   if (!form.image.trim()) {
     errors.push("Image is required.");
@@ -336,6 +347,7 @@ function buildRedeployValidation(form, envRows, secretRows) {
 
   errors.push(...envIssues);
   errors.push(...secretIssues);
+  errors.push(...customDomainIssues);
 
   if (!externalPort && internalPort) {
     warnings.push("This rollout draft still has no public port mapping.");
@@ -372,6 +384,13 @@ function buildRedeployChangeRows(deployment, form, envRows, secretRows) {
       return secrets;
     }, {}),
   ).length;
+  const nextCustomDomain = normalizeCustomDomainValue(form.custom_domain);
+  const currentPublicAddress = deployment.custom_domain
+    ? `${deployment.tls_enabled ? "https" : "http"}://${deployment.custom_domain}`
+    : `${deployment.external_port || "-"}:${deployment.internal_port || "-"}`;
+  const nextPublicAddress = nextCustomDomain
+    ? `${form.tls_enabled ? "https" : "http"}://${nextCustomDomain}`
+    : `${form.external_port.trim() || "-"}:${form.internal_port.trim() || "-"}`;
   const rows = [
     {
       label: "Image",
@@ -387,6 +406,11 @@ function buildRedeployChangeRows(deployment, form, envRows, secretRows) {
       label: "Ports",
       currentValue: `${deployment.external_port || "-"}:${deployment.internal_port || "-"}`,
       nextValue: `${form.external_port.trim() || "-"}:${form.internal_port.trim() || "-"}`,
+    },
+    {
+      label: "Primary address",
+      currentValue: currentPublicAddress,
+      nextValue: nextPublicAddress,
     },
     {
       label: "Env",
@@ -878,6 +902,8 @@ export default function DeploymentDetailsPage({ params }) {
     name: "",
     internal_port: "",
     external_port: "",
+    custom_domain: "",
+    tls_enabled: false,
   });
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const [secretRows, setSecretRows] = useState([{ key: "", value: "" }]);
@@ -1302,6 +1328,8 @@ export default function DeploymentDetailsPage({ params }) {
           deploymentData.external_port === undefined
             ? ""
             : String(deploymentData.external_port),
+        custom_domain: deploymentData.custom_domain || "",
+        tls_enabled: Boolean(deploymentData.tls_enabled),
       });
       setEnvRows(
         Object.entries(deploymentData.env || {}).length > 0
@@ -1495,10 +1523,10 @@ export default function DeploymentDetailsPage({ params }) {
   }, [deployment?.server_id, runtimeServerAccessBlocked]);
 
   function updateFormField(event) {
-    const { name, value } = event.target;
+    const { name, value, type, checked } = event.target;
     setForm((currentForm) => ({
       ...currentForm,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
     }));
   }
 
@@ -1595,6 +1623,12 @@ export default function DeploymentDetailsPage({ params }) {
     if (form.external_port.trim()) {
       payload.external_port = Number(form.external_port);
     }
+
+    if (normalizeCustomDomainValue(form.custom_domain)) {
+      payload.custom_domain = normalizeCustomDomainValue(form.custom_domain);
+    }
+
+    payload.tls_enabled = form.tls_enabled;
 
     if (deployment?.server_id) {
       payload.server_id = deployment.server_id;
@@ -1708,6 +1742,12 @@ export default function DeploymentDetailsPage({ params }) {
     if (form.external_port.trim()) {
       payload.external_port = Number(form.external_port);
     }
+
+    if (normalizeCustomDomainValue(form.custom_domain)) {
+      payload.custom_domain = normalizeCustomDomainValue(form.custom_domain);
+    }
+
+    payload.tls_enabled = form.tls_enabled;
 
     try {
       const response = await fetch(
@@ -2107,8 +2147,20 @@ export default function DeploymentDetailsPage({ params }) {
                 <span className="overviewLabel">Endpoint</span>
                 <strong className="overviewValue">{deploymentUrl || "No public URL"}</strong>
                 <div className="overviewMeta">
-                  <span>Internal {deployment.internal_port || "-"}</span>
-                  <span>External {deployment.external_port || "-"}</span>
+                  <span>
+                    {deployment.custom_domain
+                      ? `Domain ${deployment.custom_domain}`
+                      : `Internal ${deployment.internal_port || "-"}`
+                    }
+                  </span>
+                  <span>
+                    {deployment.custom_domain
+                      ? deployment.tls_enabled
+                        ? "TLS expected"
+                        : "HTTP only"
+                      : `External ${deployment.external_port || "-"}`
+                    }
+                  </span>
                 </div>
               </div>
               <div className="overviewCard" data-testid="runtime-detail-runtime-card">
@@ -2350,6 +2402,36 @@ export default function DeploymentDetailsPage({ params }) {
                   </button>
                 ))}
               </div>
+            </label>
+
+            <label className="field">
+              <span>Custom domain</span>
+              <input
+                name="custom_domain"
+                value={form.custom_domain}
+                onChange={updateFormField}
+                placeholder="app.example.com"
+                disabled={redeploying}
+              />
+              <span className="fieldHint">
+                Use this when a reverse proxy or edge route should become the primary public address for this runtime. This v1 stores the address and reviews readiness, but does not edit DNS or proxy config automatically.
+              </span>
+            </label>
+
+            <label className="field checkboxField">
+              <span className="checkboxRow">
+                <input
+                  name="tls_enabled"
+                  type="checkbox"
+                  checked={form.tls_enabled}
+                  onChange={updateFormField}
+                  disabled={redeploying}
+                />
+                <span>Treat this domain as HTTPS</span>
+              </span>
+              <span className="fieldHint">
+                Enable this only when the custom domain is expected to terminate TLS at your edge or proxy.
+              </span>
             </label>
 
             <div className="field">
