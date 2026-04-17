@@ -127,6 +127,7 @@ def init_db() -> None:
         external_port INTEGER NULL,
         custom_domain TEXT NULL,
         tls_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        previous_release_snapshot TEXT NULL,
         release_source TEXT NOT NULL DEFAULT 'manual',
         runtime_shape TEXT NOT NULL DEFAULT 'single',
         release_ref TEXT NULL,
@@ -167,6 +168,11 @@ def init_db() -> None:
     alter_deployments_add_tls_enabled_sql = """
     ALTER TABLE deployments
     ADD COLUMN IF NOT EXISTS tls_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+    """
+
+    alter_deployments_add_previous_release_snapshot_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS previous_release_snapshot TEXT NULL;
     """
 
     alter_deployments_add_release_source_sql = """
@@ -363,6 +369,7 @@ def init_db() -> None:
             cur.execute(alter_deployments_add_owner_user_id_sql)
             cur.execute(alter_deployments_add_custom_domain_sql)
             cur.execute(alter_deployments_add_tls_enabled_sql)
+            cur.execute(alter_deployments_add_previous_release_snapshot_sql)
             cur.execute(alter_deployments_add_release_source_sql)
             cur.execute(alter_deployments_add_runtime_shape_sql)
             cur.execute(alter_deployments_add_release_ref_sql)
@@ -407,7 +414,7 @@ def _row_to_dict(cursor: psycopg.Cursor[Any], row: tuple[Any, ...]) -> dict[str,
     result: dict[str, Any] = {}
     for description, value in zip(cursor.description, row):
         serialized_value = _serialize_value(value)
-        if description.name in {"env", "secrets"} and isinstance(serialized_value, str):
+        if description.name in {"env", "secrets", "previous_release_snapshot"} and isinstance(serialized_value, str):
             try:
                 result[description.name] = json.loads(serialized_value)
             except json.JSONDecodeError:
@@ -432,6 +439,7 @@ def insert_deployment_record(deployment_record: dict[str, Any]) -> None:
         external_port,
         custom_domain,
         tls_enabled,
+        previous_release_snapshot,
         server_id,
         env,
         secrets,
@@ -446,7 +454,7 @@ def insert_deployment_record(deployment_record: dict[str, Any]) -> None:
         release_webhook_token
     )
     VALUES (%(id)s, %(status)s, %(image)s, %(container_name)s, %(container_id)s,
-            %(owner_user_id)s, %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(custom_domain)s, %(tls_enabled)s, %(server_id)s, %(env)s, %(secrets)s,
+            %(owner_user_id)s, %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(custom_domain)s, %(tls_enabled)s, %(previous_release_snapshot)s, %(server_id)s, %(env)s, %(secrets)s,
             %(release_source)s, %(runtime_shape)s, %(release_ref)s, %(release_commit_sha)s, %(release_image_tag)s,
             %(release_image_digest)s, %(release_triggered_at)s, %(release_triggered_by)s, %(release_webhook_token)s);
     """
@@ -535,6 +543,28 @@ def update_deployment_configuration(
                     release_image_digest,
                     release_triggered_at,
                     release_triggered_by,
+                    deployment_id,
+                ),
+            )
+        conn.commit()
+
+
+def update_deployment_previous_release_snapshot(
+    deployment_id: str,
+    previous_release_snapshot: dict[str, Any] | None,
+) -> None:
+    update_sql = """
+    UPDATE deployments
+    SET previous_release_snapshot = %s
+    WHERE id = %s;
+    """
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                update_sql,
+                (
+                    json.dumps(previous_release_snapshot) if previous_release_snapshot else None,
                     deployment_id,
                 ),
             )

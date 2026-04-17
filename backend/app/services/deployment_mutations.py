@@ -97,6 +97,28 @@ def describe_public_endpoint(custom_domain: str | None, tls_enabled: bool, exter
     return "no public address configured"
 
 
+def build_previous_release_snapshot(deployment: dict) -> dict[str, object]:
+    custom_domain = deployment.get("custom_domain")
+    tls_enabled = bool(deployment.get("tls_enabled"))
+    summary = (
+        f"{deployment.get('image') or 'unknown image'} via "
+        f"{describe_public_endpoint(custom_domain, tls_enabled, deployment.get('external_port'))} "
+        f"with {describe_env_shape(deployment.get('env') or {})} and "
+        f"{describe_secret_shape(deployment.get('secrets') or {})}"
+    )
+    return {
+        "image": deployment.get("image"),
+        "name": deployment.get("container_name"),
+        "internal_port": deployment.get("internal_port"),
+        "external_port": deployment.get("external_port"),
+        "custom_domain": custom_domain,
+        "tls_enabled": tls_enabled,
+        "env": deployment.get("env") or {},
+        "secrets": deployment.get("secrets") or {},
+        "summary": summary,
+    }
+
+
 def extract_release_image_tag(image: str | None) -> str | None:
     if not image:
         return None
@@ -258,6 +280,7 @@ def create_deployment(
         "external_port": payload.external_port,
         "custom_domain": custom_domain,
         "tls_enabled": payload.tls_enabled,
+        "previous_release_snapshot": None,
         "server_id": payload.server_id,
         "env": json.dumps(payload.env),
         "secrets": json.dumps(payload.secrets),
@@ -366,6 +389,8 @@ def redeploy_deployment(
     run_container_fn,
     create_notification_fn,
     create_activity_event_fn,
+    update_previous_release_snapshot_fn,
+    capture_previous_release_snapshot: bool = True,
 ) -> DeploymentResponse:
     if (payload.internal_port is None) != (payload.external_port is None):
         raise HTTPException(
@@ -388,6 +413,11 @@ def redeploy_deployment(
         **(existing_deployment.get("secrets") or {}),
         **payload.secrets,
     }
+    if capture_previous_release_snapshot and existing_deployment.get("status") == "running":
+        update_previous_release_snapshot_fn(
+            deployment_id,
+            build_previous_release_snapshot(existing_deployment),
+        )
     server = get_server_or_404_fn(existing_deployment["server_id"]) if existing_deployment.get("server_id") else None
     ensure_runtime_target_allowed_fn(server)
     ensure_docker_is_available_fn(server)

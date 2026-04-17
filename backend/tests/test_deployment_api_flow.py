@@ -37,6 +37,10 @@ class DeploymentApiFlowTests(unittest.TestCase):
             patch("app.routes.deployments.insert_deployment_record", side_effect=self._insert_deployment_record),
             patch("app.routes.deployments.update_deployment_record", side_effect=self._update_deployment_record),
             patch("app.routes.deployments.update_deployment_configuration", side_effect=self._update_deployment_configuration),
+            patch(
+                "app.routes.deployments.update_deployment_previous_release_snapshot",
+                side_effect=self._update_previous_release_snapshot,
+            ),
             patch("app.routes.deployments.get_deployment_record_or_404", side_effect=self._get_deployment_record_or_404),
             patch("app.routes.deployments.delete_deployment_record", side_effect=self._delete_deployment_record),
             patch("app.routes.deployments.create_notification", side_effect=self._create_notification),
@@ -92,6 +96,12 @@ class DeploymentApiFlowTests(unittest.TestCase):
     def _update_deployment_configuration(self, deployment_id, **updates):
         self.assertEqual(deployment_id, self.deployment["id"])
         self.deployment.update(self._serialize_record(updates))
+
+    def _update_previous_release_snapshot(self, deployment_id, previous_release_snapshot):
+        self.assertEqual(deployment_id, self.deployment["id"])
+        self.deployment["previous_release_snapshot"] = self._serialize_record(
+            previous_release_snapshot
+        ) if previous_release_snapshot else None
 
     def _get_deployment_record_or_404(self, deployment_id):
         if not self.deployment or self.deployment["id"] != deployment_id:
@@ -203,6 +213,8 @@ class DeploymentApiFlowTests(unittest.TestCase):
         self.assertEqual(created["custom_domain"], "app.example.com")
         self.assertTrue(created["tls_enabled"])
         self.assertEqual(created["secret_count"], 0)
+        self.assertFalse(created["rollback_available"])
+        self.assertIsNone(created["rollback_summary"])
 
         health_response = self.client.get(f"/deployments/{deployment_id}/health")
         self.assertEqual(health_response.status_code, 200)
@@ -321,6 +333,40 @@ class DeploymentApiFlowTests(unittest.TestCase):
         )
         self.assertIn("source webhook", succeeded_event["message"])
         self.assertIn("refs/heads/main", succeeded_event["message"])
+
+    def test_rollback_restores_previous_release_snapshot(self):
+        create_response = self.client.post(
+            "/deployments",
+            json={
+                "image": "nginx:alpine",
+                "internal_port": 80,
+                "external_port": 38080,
+            },
+        )
+        deployment_id = create_response.json()["id"]
+
+        redeploy_response = self.client.post(
+            f"/deployments/{deployment_id}/redeploy",
+            json={
+                "image": "nginx:1.27",
+                "name": "runtime-v2",
+                "internal_port": 80,
+                "external_port": 38080,
+                "env": {"MODE": "v2"},
+                "secrets": {},
+            },
+        )
+        self.assertEqual(redeploy_response.status_code, 200)
+        redeployed = redeploy_response.json()
+        self.assertTrue(redeployed["rollback_available"])
+        self.assertIn("nginx:alpine", redeployed["rollback_summary"])
+
+        rollback_response = self.client.post(f"/deployments/{deployment_id}/rollback")
+        self.assertEqual(rollback_response.status_code, 200)
+        rolled_back = rollback_response.json()
+        self.assertEqual(rolled_back["image"], "nginx:alpine")
+        self.assertEqual(rolled_back["release_source"], "rollback")
+        self.assertFalse(rolled_back["rollback_available"])
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from app.db import (
     list_deployment_activity,
     list_deployment_records,
     update_deployment_configuration,
+    update_deployment_previous_release_snapshot,
     update_deployment_record,
 )
 from app.schemas import (
@@ -251,6 +252,7 @@ def redeploy_deployment(
         run_container_fn=run_container,
         create_notification_fn=create_notification,
         create_activity_event_fn=create_activity_event,
+        update_previous_release_snapshot_fn=update_deployment_previous_release_snapshot,
         release_metadata=_build_release_metadata(
             image=payload.image,
             source="manual",
@@ -275,6 +277,8 @@ def trigger_release_webhook(
         internal_port=deployment.get("internal_port"),
         external_port=deployment.get("external_port"),
         server_id=deployment.get("server_id"),
+        custom_domain=deployment.get("custom_domain"),
+        tls_enabled=bool(deployment.get("tls_enabled")),
         env=deployment.get("env") or {},
         secrets=deployment.get("secrets") or {},
     )
@@ -302,6 +306,7 @@ def trigger_release_webhook(
         run_container_fn=run_container,
         create_notification_fn=create_notification,
         create_activity_event_fn=create_activity_event,
+        update_previous_release_snapshot_fn=update_deployment_previous_release_snapshot,
         release_metadata=_build_release_metadata(
             image=release_image,
             source="webhook",
@@ -311,6 +316,63 @@ def trigger_release_webhook(
             triggered_by=payload.triggered_by or "webhook",
         ),
     )
+
+
+@router.post("/deployments/{deployment_id}/rollback", response_model=DeploymentResponse)
+def rollback_deployment(
+    deployment_id: str,
+    user=Depends(require_auth),
+) -> DeploymentResponse:
+    deployment = _get_mutable_user_deployment_or_404(
+        deployment_id,
+        user,
+        action="Remote runtime changes",
+    )
+    previous_release_snapshot = deployment.get("previous_release_snapshot") or {}
+    if not previous_release_snapshot:
+        raise HTTPException(status_code=400, detail="No previous release snapshot is available yet.")
+
+    rollback_payload = DeploymentCreateRequest(
+        image=str(previous_release_snapshot.get("image") or deployment.get("image") or ""),
+        name=previous_release_snapshot.get("name"),
+        internal_port=previous_release_snapshot.get("internal_port"),
+        external_port=previous_release_snapshot.get("external_port"),
+        server_id=deployment.get("server_id"),
+        custom_domain=previous_release_snapshot.get("custom_domain"),
+        tls_enabled=bool(previous_release_snapshot.get("tls_enabled")),
+        env=previous_release_snapshot.get("env") or {},
+        secrets=previous_release_snapshot.get("secrets") or {},
+    )
+    response = _service_redeploy_deployment(
+        deployment_id,
+        rollback_payload,
+        get_deployment_record_or_404_fn=get_deployment_record_or_404,
+        get_server_or_404_fn=get_server_or_404,
+        ensure_runtime_target_allowed_fn=ensure_runtime_target_allowed,
+        ensure_docker_is_available_fn=ensure_docker_is_available,
+        ensure_external_port_is_available_fn=ensure_external_port_is_available,
+        ensure_container_name_is_available_fn=ensure_container_name_is_available,
+        remove_container_if_exists_fn=remove_container_if_exists,
+        update_deployment_configuration_fn=update_deployment_configuration,
+        update_deployment_record_fn=update_deployment_record,
+        run_container_fn=run_container,
+        create_notification_fn=create_notification,
+        create_activity_event_fn=create_activity_event,
+        update_previous_release_snapshot_fn=update_deployment_previous_release_snapshot,
+        capture_previous_release_snapshot=False,
+        release_metadata=_build_release_metadata(
+            image=rollback_payload.image,
+            source="rollback",
+            triggered_by=user.get("username"),
+        ),
+    )
+    if response.status == "running":
+        update_deployment_previous_release_snapshot(deployment_id, None)
+        refreshed = _get_user_deployment_or_404(deployment_id, user)
+        return DeploymentResponse(
+            **apply_masked_secret_view(sanitize_remote_target_fields(refreshed, user))
+        )
+    return response
 
 
 @router.get("/deployments/{deployment_id}", response_model=DeploymentResponse)

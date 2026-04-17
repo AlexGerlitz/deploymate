@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 DeploymentStatus = Literal["pending", "running", "failed"]
-ReleaseSource = Literal["manual", "webhook", "template", "compose"]
+ReleaseSource = Literal["manual", "webhook", "template", "compose", "rollback"]
 RuntimeShape = Literal["single", "stack"]
 HealthStatus = Literal["healthy", "unhealthy"]
 NotificationLevel = Literal["success", "error"]
@@ -60,6 +60,8 @@ class DeploymentResponse(BaseModel):
     release_triggered_at: Optional[str] = None
     release_triggered_by: Optional[str] = None
     release_webhook_token: Optional[str] = None
+    rollback_available: bool = False
+    rollback_summary: Optional[str] = None
     env: Dict[str, str] = Field(default_factory=dict)
     secrets: Dict[str, str] = Field(default_factory=dict)
     secret_count: int = 0

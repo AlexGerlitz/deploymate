@@ -32,6 +32,10 @@ Updated: 2026-04-17
   3. stack ceiling removal
   4. deployment passport
   5. agency fit and packaging
+- Текущий активный пакет now in progress:
+  - `Release review + rollback v1`
+  - backend-first checkpoint started: previous release snapshot + rollback endpoint draft
+  - frontend rollback surface and end-to-end verification are still pending
 - Ближайшие три пакета тоже зафиксированы:
   1. `Release review + rollback v1`
   2. `Stack/Compose intake v0`
@@ -172,6 +176,10 @@ Updated: 2026-04-17
   - `Webhook/release source v0`
   - `Secrets v1`
   - `Domains/SSL v1`
+- Текущий незавершённый checkpoint:
+  - `Release review + rollback v1`
+  - backend snapshot/rollback contract is partially implemented
+  - route tests and frontend rollback surface still need finishing before this package can be considered done
 - Следующий bounded runtime порядок:
   1. `Release review + rollback v1`
   2. `Stack/Compose intake v0`
