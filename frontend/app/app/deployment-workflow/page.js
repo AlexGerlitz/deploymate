@@ -10,6 +10,7 @@ import {
   smokeServers,
   smokeTemplates,
   smokeUser,
+  smokeWorkflowDiskPressureOpsOverview,
 } from "../../lib/smoke-fixtures";
 import {
   copyTextToClipboard,
@@ -18,6 +19,7 @@ import {
   buildCustomDomainIssues,
   buildDeploymentReviewTarget,
   buildDeploymentUrl,
+  buildHostDiskPressureGuardrail,
   buildDeploymentWorkflowNextStep,
   buildDeploymentWorkflowState,
   buildEnvRowsFromObject,
@@ -81,6 +83,10 @@ const smokeFailedQueueReviewDeployments = smokeReviewWorkerDeployment
       ...smokeRunningDeployments,
     ]
   : smokeRunningDeployments;
+const smokeWorkflowOpsOverview =
+  smokeMode && smokeWorkflowScenario === "disk-pressure-blocked"
+    ? smokeWorkflowDiskPressureOpsOverview
+    : null;
 const smokeWorkflowFixture =
   smokeMode && smokeWorkflowScenario === "first-deploy-after-server-review"
     ? {
@@ -159,6 +165,25 @@ const smokeWorkflowFixture =
           },
           workflowMessage: "",
           workflowTab: "live",
+          submitSuccess: "",
+          createdDeployment: null,
+          templateDeploySuccess: "",
+          templateCreatedDeployment: null,
+        }
+    : smokeMode && smokeWorkflowScenario === "disk-pressure-blocked"
+      ? {
+          deployments: smokeRunningDeployments,
+          servers: smokeServers,
+          templates: smokeTemplates,
+          form: {
+            image: "",
+            name: "",
+            internal_port: "",
+            external_port: "",
+            server_id: "",
+          },
+          workflowMessage: "",
+          workflowTab: "create",
           submitSuccess: "",
           createdDeployment: null,
           templateDeploySuccess: "",
@@ -925,6 +950,8 @@ function DeploymentWorkflowPageContent() {
   const [loading, setLoading] = useState(!smokeMode);
   const [serversLoading, setServersLoading] = useState(!smokeMode);
   const [templatesLoading, setTemplatesLoading] = useState(!smokeMode);
+  const [opsOverviewLoading, setOpsOverviewLoading] = useState(!smokeMode);
+  const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeWorkflowOpsOverview : null);
   const [error, setError] = useState("");
   const [serversError, setServersError] = useState("");
   const [templatesError, setTemplatesError] = useState("");
@@ -1034,6 +1061,9 @@ function DeploymentWorkflowPageContent() {
   });
   const runningDeploymentCount = deployments.filter((deployment) => deployment.status === "running").length;
   const failedDeploymentCount = deployments.filter((deployment) => deployment.status === "failed").length;
+  const deployBlocker = buildHostDiskPressureGuardrail(opsOverview, {
+    deploymentsTotal: deployments.length,
+  });
   const normalizedTemplateQuery = templateQuery.trim().toLowerCase();
   const filteredTemplates = [...templates]
     .filter((template) => {
@@ -1134,12 +1164,15 @@ function DeploymentWorkflowPageContent() {
     deploymentsTotal: deployments.length,
     failedDeployments: failedDeploymentCount,
     serversTotal: servers.length,
+    deployBlocker,
   });
   const workflowPriority =
     serverAccessBlocked
       ? "Admins manage the saved server target here. Your job on this page is still choosing what app should run next."
       : workflowState.mode === "prerequisite"
       ? "Before Step 2 can start for a remote rollout, Step 1 needs one saved server target."
+      : workflowState.mode === "guardrail"
+        ? "The DeployMate host needs disk cleanup before another rollout starts from this workspace."
       : workflowState.mode === "live"
         ? "One rollout needs attention. Review what is already running before you start another one."
         : templates.length > 0
@@ -1188,6 +1221,8 @@ function DeploymentWorkflowPageContent() {
       ? "Keep this page focused on the rollout itself. The saved server target stays with admins until they confirm it."
       : workflowState.mode === "prerequisite"
         ? "Do not overthink this page yet. Save one server in Step 1 first, then come back and keep Step 2 focused on the app you want to start."
+      : workflowState.mode === "guardrail"
+        ? "Do not start another rollout from here until the DeployMate host has enough free space again."
       : workflowPrimaryMode === "live"
         ? "Because something already needs review, start by checking the live queue before you create another deployment."
         : "Keep Step 2 simple: choose one app image, a compose stack intake, or a saved setup first, then open advanced fields only if the rollout really needs them.";
@@ -1345,6 +1380,34 @@ function DeploymentWorkflowPageContent() {
     }
   }
 
+  async function loadOpsOverview(silent = false) {
+    if (!silent) {
+      setOpsOverviewLoading(true);
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/ops/overview?notifications_limit=100`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const data = await readJsonOrError(response, "Failed to load workspace overview.");
+      setOpsOverview(data);
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      if (!silent) {
+        setOpsOverview(null);
+      }
+    } finally {
+      if (!silent) {
+        setOpsOverviewLoading(false);
+      }
+    }
+  }
+
   async function refreshWorkspace(silent = false) {
     if (smokeMode) {
       return;
@@ -1355,6 +1418,7 @@ function DeploymentWorkflowPageContent() {
       loadDeployments(silent),
       loadServers(user, silent),
       loadTemplates(silent),
+      loadOpsOverview(silent),
     ]);
   }
 
@@ -2036,6 +2100,12 @@ function DeploymentWorkflowPageContent() {
     setSubmitSuccess("");
     setCreatedDeployment(null);
 
+    if (deployBlocker?.blocker) {
+      setSubmitError(deployBlocker.nextStep);
+      setSubmitting(false);
+      return;
+    }
+
     const draft = buildCurrentDraft();
     const preflight = validateTemplateDraft(draft, { forDeployment: true, canAccessServers });
 
@@ -2362,6 +2432,12 @@ function DeploymentWorkflowPageContent() {
     setTemplateCreatedDeployment(null);
     setDeployingTemplateId(templateId);
 
+    if (deployBlocker?.blocker) {
+      setTemplateDeployError(deployBlocker.nextStep);
+      setDeployingTemplateId("");
+      return;
+    }
+
     if (template && !templateCanDeployDirectly(template)) {
       setTemplateDeployError(
         "Add a client or operating context label before deploying directly from this template.",
@@ -2445,6 +2521,12 @@ function DeploymentWorkflowPageContent() {
     setSubmitError("");
     setSubmitSuccess("");
     setCreatedDeployment(null);
+
+    if (deployBlocker?.blocker) {
+      setStackIntakeError(deployBlocker.nextStep);
+      setStackSubmitting(false);
+      return;
+    }
 
     const validation = buildComposeIntakeValidation(stackDraft, {
       localDeploymentsEnabled,
@@ -2561,14 +2643,17 @@ function DeploymentWorkflowPageContent() {
     Boolean(selectedCreateServer) &&
     firstDeployImageDraftPending;
   const firstDeployHandoffCompact = firstDeployHandoffFocusMode && !form.image.trim();
+  const imageFirstCompactMode = firstDeployHandoffCompact && !deployBlocker?.blocker;
   const showLiveTab = deployments.length > 0;
   const createDeploymentBlocked =
     submitting ||
     deploymentLimitReached ||
+    Boolean(deployBlocker?.blocker) ||
     (!localDeploymentsEnabled && !form.server_id);
   const stackDeploymentBlocked =
     stackSubmitting ||
     deploymentLimitReached ||
+    Boolean(deployBlocker?.blocker) ||
     composeIntakeValidation.errors.length > 0;
   const workflowNextStep = buildDeploymentWorkflowNextStep({
     workflowState,
@@ -2577,6 +2662,7 @@ function DeploymentWorkflowPageContent() {
     filteredDeployments,
     templatesCount: templates.length,
     serversCount: servers.length,
+    deployBlocker,
     form,
     templateName,
     templateFormPreflight,
@@ -2605,10 +2691,14 @@ function DeploymentWorkflowPageContent() {
       ? { kind: "link", href: "/app", label: "Back to overview" }
       : serverAccessBlocked
         ? { kind: "button", tab: "live", label: "Review live apps instead" }
-        : firstDeployHandoffFocusMode
-          ? { kind: "focus-create", label: "Set image for first deploy" }
         : workflowState.mode === "prerequisite"
           ? { kind: "link", href: "/app/server-review", label: "Open server review" }
+          : memberWorkflowNextStep.primaryAction === "Back to overview"
+            ? { kind: "link", href: "/app", label: "Back to overview" }
+            : memberWorkflowNextStep.primaryAction === "Review live deployments"
+              ? { kind: "button", tab: "live", label: "Review live apps instead" }
+              : firstDeployHandoffFocusMode
+                ? { kind: "focus-create", label: "Set image for first deploy" }
           : failedDeploymentCount > 0
             ? { kind: "button", tab: "live", label: "Review live apps instead" }
             : memberWorkflowNextStep.primaryAction === "Open templates"
@@ -2616,7 +2706,16 @@ function DeploymentWorkflowPageContent() {
               : memberWorkflowNextStep.primaryAction === "Fix the create form"
                 ? { kind: "button", tab: "create", label: "Fix the create form" }
                 : { kind: "button", tab: "create", label: "Create deployment" };
-  const showMainNextStepPrimaryAction = !firstDeployHandoffFocusMode;
+  const showMainNextStepPrimaryAction = !firstDeployHandoffFocusMode || Boolean(deployBlocker?.blocker);
+  const primaryTemplateDeployLabel = deployBlocker?.blocker
+    ? "Blocked by low disk"
+    : deployingTemplateId === primaryTemplate?.id
+      ? "Deploying..."
+      : primaryTemplateCanDeployDirectly
+        ? "Deploy saved setup"
+        : primaryTemplateOwnership?.foreign
+          ? "Duplicate before deploy"
+          : "Add context before deploy";
   const previewDiffRows = buildTemplateDiff(primaryTemplate, currentDraft, servers);
 
   if (!authChecked) {
@@ -2660,15 +2759,15 @@ function DeploymentWorkflowPageContent() {
               <div className="eyebrow">Step 2</div>
               <h1 data-testid="deployment-workflow-title">Step 2: Choose what to run and deploy it</h1>
               <p className="formHint">{stepTwoLead}</p>
-              {!firstDeployHandoffCompact ? <p className="formHint">{stepTwoSupport}</p> : null}
+              {!imageFirstCompactMode ? <p className="formHint">{stepTwoSupport}</p> : null}
               <p className="formHint">
                 Right now:{" "}
                 <strong>
-                  {firstDeployHandoffCompact
+                  {imageFirstCompactMode
                     ? "Set the image for the first deploy."
                     : memberWorkflowNextStep.focus}
                 </strong>
-                {firstDeployHandoffCompact
+                {imageFirstCompactMode
                   ? " Save templates and advanced setup for later if the rollout really needs them."
                   : null}
               </p>
@@ -2713,10 +2812,10 @@ function DeploymentWorkflowPageContent() {
               <button
                 type="button"
                 onClick={() => refreshWorkspace()}
-                disabled={loading || serversLoading || templatesLoading}
+                disabled={loading || serversLoading || templatesLoading || opsOverviewLoading}
                 className="secondaryButton"
               >
-                {loading || serversLoading || templatesLoading ? "Refreshing..." : "Refresh"}
+                {loading || serversLoading || templatesLoading || opsOverviewLoading ? "Refreshing..." : "Refresh"}
               </button>
             </div>
           </div>
@@ -2772,6 +2871,48 @@ function DeploymentWorkflowPageContent() {
               <Link href="/app" className="landingButton secondaryButton">
                 Back to overview
               </Link>
+            </div>
+          </article>
+        ) : workflowState.mode === "guardrail" ? (
+          <article className="card formCard workspaceGuidePanel" data-testid="deployment-workflow-disk-guardrail-card">
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <h2 data-testid="deployment-workflow-disk-guardrail-title">{workflowState.title}</h2>
+                <p className="formHint">
+                  {workflowState.detail} Clear space on the DeployMate host first, then return here when overview no longer flags low disk.
+                </p>
+              </div>
+            </div>
+            <div className="workspaceReviewerGrid">
+              <article className="workspaceReviewerCard">
+                <span>1. Free space</span>
+                <strong>Clear builder cache and logs</strong>
+                <p>Do not treat another rollout as safe while the DeployMate host is already close to full.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>2. Confirm signal</span>
+                <strong>Refresh overview</strong>
+                <p>Use the main workspace attention surface to confirm the low-disk warning has actually disappeared.</p>
+              </article>
+              <article className="workspaceReviewerCard">
+                <span>3. Return here</span>
+                <strong>Resume rollout work</strong>
+                <p>Only after the host has headroom again should this page become the place for another deliberate rollout.</p>
+              </article>
+            </div>
+            <div className="formActions">
+              <Link href="/app" className="landingButton primaryButton">
+                Back to overview
+              </Link>
+              {filteredDeployments.length > 0 ? (
+                <button
+                  type="button"
+                  className="landingButton secondaryButton"
+                  onClick={() => setWorkflowTab("live")}
+                >
+                  Review live apps instead
+                </button>
+              ) : null}
             </div>
           </article>
         ) : memberHasLiveDeployments ? (
@@ -2865,7 +3006,7 @@ function DeploymentWorkflowPageContent() {
             <div>
               <h2 data-testid="deployment-workflow-main-next-step-title">Do this now</h2>
               <p className="formHint">
-                {firstDeployHandoffCompact
+                {imageFirstCompactMode
                   ? "Set one app image first. Keep everything else secondary until that draft exists."
                   : "Use one lane at a time on this page. Finish the current job before you open the others."}
               </p>
@@ -2874,7 +3015,7 @@ function DeploymentWorkflowPageContent() {
           <div className="row">
             <span className="label">Current focus</span>
             <span data-testid="deployment-workflow-main-next-step-focus">
-              {firstDeployHandoffCompact
+              {imageFirstCompactMode
                 ? "Set the image for the first deploy"
                 : memberWorkflowNextStep.focus}
             </span>
@@ -2882,7 +3023,7 @@ function DeploymentWorkflowPageContent() {
           <div className="row">
             <span className="label">What to do</span>
             <span data-testid="deployment-workflow-main-next-step-copy">
-              {firstDeployHandoffCompact
+              {imageFirstCompactMode
                 ? firstDeployHandoffSummary || memberWorkflowNextStep.nextStep
                 : memberWorkflowNextStep.nextStep}
             </span>
@@ -2891,7 +3032,7 @@ function DeploymentWorkflowPageContent() {
             {requestedWithServerContext && selectedCreateServer ? (
               <span className="status info">{selectedServerLabel}</span>
             ) : null}
-            {!firstDeployHandoffCompact ? (
+            {!imageFirstCompactMode ? (
               <>
                 <span className={`status ${memberWorkflowNextStep.tone}`}>filtered {filteredDeployments.length}</span>
                 <span className="status healthy">running {runningDeploymentCount}</span>
@@ -2900,6 +3041,14 @@ function DeploymentWorkflowPageContent() {
             ) : null}
             {templates.length > 0 ? <span className="status info">templates {templates.length}</span> : null}
           </div>
+          {deployBlocker?.blocker ? (
+            <div
+              className="banner error inlineBanner"
+              data-testid="deployment-workflow-disk-guardrail-banner"
+            >
+              {deployBlocker.nextStep}
+            </div>
+          ) : null}
           {firstDeployCreatePriority && templates.length > 0 ? (
             <div
               className="banner subtle inlineBanner"
@@ -3424,6 +3573,11 @@ function DeploymentWorkflowPageContent() {
               {composeIntakeValidation.warnings.join(" ")}
             </div>
           ) : null}
+          {deployBlocker?.blocker ? (
+            <div className="banner error" data-testid="stack-intake-disk-guardrail-banner">
+              {deployBlocker.nextStep}
+            </div>
+          ) : null}
           {composeIntakeSummary ? (
             <pre className="logs expandedBlock" data-testid="stack-intake-summary">
               {composeIntakeSummary}
@@ -3506,7 +3660,7 @@ function DeploymentWorkflowPageContent() {
               ? "Members cannot choose saved servers here. Ask an admin to confirm the target, then keep this form focused on the app itself."
               : workflowState.mode === "prerequisite"
                 ? "This becomes the main path as soon as Step 1 has one saved server target. When that is done, start with the image first and open advanced setup only if needed."
-                : firstDeployHandoffCompact
+                : imageFirstCompactMode
                   ? "Set one image first. Leave advanced setup closed unless this rollout really needs more."
                 : "For a first pass, start with the image first. Leave advanced setup closed unless you need custom ports, env vars, server targeting, or a saved setup."}
           </p>
@@ -3517,7 +3671,11 @@ function DeploymentWorkflowPageContent() {
                 : "This environment is running in remote-only mode. Local host deployments are disabled."}
             </div>
           ) : null}
-          {serverAccessBlocked ? (
+          {deployBlocker?.blocker ? (
+            <div className="banner error" data-testid="create-deployment-disk-guardrail-banner">
+              {deployBlocker.nextStep}
+            </div>
+          ) : serverAccessBlocked ? (
             <div className="banner subtle" data-testid="create-deployment-prerequisite-banner">
               Server selection is managed by an admin for this workspace. Ask an admin to confirm the target before creating a remote deployment.
             </div>
@@ -3961,6 +4119,11 @@ function DeploymentWorkflowPageContent() {
               </p>
             </div>
           </div>
+          {deployBlocker?.blocker ? (
+            <div className="banner error" data-testid="templates-disk-guardrail-banner">
+              {deployBlocker.nextStep}
+            </div>
+          ) : null}
 
           <article className="card compactCard runtimeReviewPanel" data-testid="templates-team-asset-card">
             <div className="sectionHeader">
@@ -4163,17 +4326,12 @@ function DeploymentWorkflowPageContent() {
                   disabled={
                     deployingTemplateId === primaryTemplate.id ||
                     deploymentLimitReached ||
+                    Boolean(deployBlocker?.blocker) ||
                     !primaryTemplateCanDeployDirectly
                   }
                   data-testid="template-preview-deploy-button"
                 >
-                  {deployingTemplateId === primaryTemplate.id
-                    ? "Deploying..."
-                    : primaryTemplateCanDeployDirectly
-                      ? "Deploy saved setup"
-                      : primaryTemplateOwnership?.foreign
-                        ? "Duplicate before deploy"
-                        : "Add context before deploy"}
+                  {primaryTemplateDeployLabel}
                 </button>
                 <button
                   type="button"
@@ -4181,17 +4339,12 @@ function DeploymentWorkflowPageContent() {
                   disabled={
                     deployingTemplateId === primaryTemplate.id ||
                     deploymentLimitReached ||
+                    Boolean(deployBlocker?.blocker) ||
                     !primaryTemplateCanDeployDirectly
                   }
                   data-testid={`template-deploy-button-${primaryTemplate.id}`}
                 >
-                  {deployingTemplateId === primaryTemplate.id
-                    ? "Deploying..."
-                    : primaryTemplateCanDeployDirectly
-                      ? "Deploy saved setup"
-                      : primaryTemplateOwnership?.foreign
-                        ? "Duplicate before deploy"
-                        : "Add context before deploy"}
+                  {primaryTemplateDeployLabel}
                 </button>
                 <button
                   type="button"

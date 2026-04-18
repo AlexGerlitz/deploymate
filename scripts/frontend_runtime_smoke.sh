@@ -15,6 +15,7 @@ FAILED_DETAIL_HTML="$(mktemp)"
 ADMIN_MANAGED_DETAIL_HTML="$(mktemp)"
 HEALTHY_WORKFLOW_HTML="$(mktemp)"
 FAILED_WORKFLOW_HTML="$(mktemp)"
+DISK_BLOCKED_WORKFLOW_HTML="$(mktemp)"
 INTERNAL_DETAIL_HTML="$(mktemp)"
 INTERNAL_WORKFLOW_HTML="$(mktemp)"
 TEMPLATE_SUCCESS_WORKFLOW_HTML="$(mktemp)"
@@ -31,7 +32,7 @@ cleanup() {
   if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
     stop_frontend_smoke_server
   fi
-  rm -f "$APP_HTML" "$DETAIL_HTML" "$STACK_DETAIL_HTML" "$STACK_INCIDENT_HTML" "$FRESH_DETAIL_HTML" "$FAILED_DETAIL_HTML" "$ADMIN_MANAGED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML" "$CREATE_SUCCESS_WORKFLOW_HTML"
+  rm -f "$APP_HTML" "$DETAIL_HTML" "$STACK_DETAIL_HTML" "$STACK_INCIDENT_HTML" "$FRESH_DETAIL_HTML" "$FAILED_DETAIL_HTML" "$ADMIN_MANAGED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$DISK_BLOCKED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML" "$CREATE_SUCCESS_WORKFLOW_HTML"
 }
 
 trap cleanup EXIT
@@ -951,7 +952,88 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_FAILED_RUNTIME_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 1))}"
+  export PORT="${FRONTEND_SMOKE_DISK_BLOCKED_RUNTIME_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 1))}"
+  export BASE_URL="http://127.0.0.1:${PORT}"
+  export SERVER_LOG="${FRONTEND_SMOKE_DISK_BLOCKED_RUNTIME_LOG:-/tmp/deploymate-frontend-disk-blocked-runtime-smoke.log}"
+  export DIST_DIR="${FRONTEND_SMOKE_DISK_BLOCKED_RUNTIME_DIST_DIR:-.next-smoke-disk-blocked-runtime-${PORT}}"
+  export FRONTEND_SMOKE_PORT="$PORT"
+  export FRONTEND_SMOKE_LOG="$SERVER_LOG"
+  export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
+  export FRONTEND_SMOKE_REUSE_SERVER=0
+  export NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=disk-pressure-blocked
+
+  cleanup_disk_blocked_runtime() {
+    stop_frontend_smoke_server
+  }
+
+  trap cleanup_disk_blocked_runtime EXIT
+
+  start_frontend_smoke_server
+  wait_for_frontend_smoke_url "/app/deployment-workflow"
+
+  curl -sS "${BASE_URL}/app/deployment-workflow" > "$DISK_BLOCKED_WORKFLOW_HTML"
+
+  if ! grep -Eq 'data-testid="deployment-workflow-disk-guardrail-card"' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow lost the dedicated guardrail card" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-focus"[^>]*>DeployMate host root disk is 86% full<' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow lost the host-disk next-step focus" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'Free space on the DeployMate host, refresh overview, and only then start another rollout from this workspace\.' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow lost the explicit cleanup-first action path" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-hero-primary-action"[^>]*>Review live apps instead<' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow lost the review-live fallback CTA" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="create-deployment-disk-guardrail-banner"' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow lost the create-form guardrail banner" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="stack-intake-disk-guardrail-banner"' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow lost the stack guardrail banner" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="templates-disk-guardrail-banner"' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow lost the template guardrail banner" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<button[^>]*data-testid="create-deployment-submit-button"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="create-deployment-submit-button")' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow still leaves create deployment enabled" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<button[^>]*data-testid="stack-intake-deploy-button"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="stack-intake-deploy-button")' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow still leaves stack deploy enabled" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<button[^>]*data-testid="template-deploy-button-smoke-template"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="template-deploy-button-smoke-template")' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow still leaves template deploy enabled" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '>Blocked by low disk<' "$DISK_BLOCKED_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] disk-pressure workflow lost the blocked template deploy label" >&2
+    exit 1
+  fi
+)
+
+(
+  set -euo pipefail
+  source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+
+  export PORT="${FRONTEND_SMOKE_FAILED_RUNTIME_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 2))}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_FAILED_RUNTIME_LOG:-/tmp/deploymate-frontend-failed-runtime-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_FAILED_RUNTIME_DIST_DIR:-.next-smoke-failed-runtime-${PORT}}"
@@ -987,7 +1069,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_INTERNAL_RUNTIME_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 2))}"
+  export PORT="${FRONTEND_SMOKE_INTERNAL_RUNTIME_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 3))}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_INTERNAL_RUNTIME_LOG:-/tmp/deploymate-frontend-internal-runtime-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_INTERNAL_RUNTIME_DIST_DIR:-.next-smoke-internal-runtime-${PORT}}"
@@ -1043,7 +1125,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_ADMIN_MANAGED_RUNTIME_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 3))}"
+  export PORT="${FRONTEND_SMOKE_ADMIN_MANAGED_RUNTIME_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 4))}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_ADMIN_MANAGED_RUNTIME_LOG:-/tmp/deploymate-frontend-admin-managed-runtime-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_ADMIN_MANAGED_RUNTIME_DIST_DIR:-.next-smoke-admin-managed-runtime-${PORT}}"
@@ -1094,7 +1176,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 4))}"
+  export PORT="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 5))}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_LOG:-/tmp/deploymate-frontend-template-success-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_DIST_DIR:-.next-smoke-template-success-${PORT}}"
@@ -1150,7 +1232,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_CREATE_SUCCESS_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 5))}"
+  export PORT="${FRONTEND_SMOKE_CREATE_SUCCESS_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 6))}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_CREATE_SUCCESS_LOG:-/tmp/deploymate-frontend-create-success-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_CREATE_SUCCESS_DIST_DIR:-.next-smoke-create-success-${PORT}}"

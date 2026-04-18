@@ -202,6 +202,13 @@ class OpsRuntimeCapabilitiesSummary(BaseModel):
     remote_only_recommended: bool = True
 
 
+class OpsHostRuntimeSummary(BaseModel):
+    root_disk_status: DiagnosticStatus = "unknown"
+    root_disk_usage_percent: Optional[int] = None
+    root_disk_free: Optional[str] = None
+    root_disk_detail: Optional[str] = None
+
+
 class OpsOverviewResponse(BaseModel):
     generated_at: str
     user: Optional[OpsUserSummary] = None
@@ -210,6 +217,7 @@ class OpsOverviewResponse(BaseModel):
     notifications: OpsNotificationsSummary = Field(default_factory=OpsNotificationsSummary)
     templates: OpsTemplatesSummary = Field(default_factory=OpsTemplatesSummary)
     capabilities: OpsRuntimeCapabilitiesSummary = Field(default_factory=OpsRuntimeCapabilitiesSummary)
+    host_runtime: OpsHostRuntimeSummary = Field(default_factory=OpsHostRuntimeSummary)
     attention_items: list[OpsAttentionItem] = Field(default_factory=list)
 
 

@@ -37,6 +37,14 @@ Updated: 2026-04-18
   - `Phase 5: Commercial Packaging` now has an honest closure point: the buyer path already shows a clear self-hosted commercial offer, explicit agency/multi-client packaging, Russian-language install/operator materials, and a concrete pilot onboarding/support motion instead of leaving that commercial story inside author narration
   - `deployment passport` now has an honest closure point: steady-state review, fresh-rollout verification, single-runtime incident framing, single-runtime recovery choice, stable stack recovery posture, and stack-specific incident framing all live inside one operator artifact instead of being split across lower cards
   - the first proactive ownership slice is now closed inside template review without widening into server sharing: admins can still review every handoff asset, but foreign-owned baselines are now duplicate-first for direct deploy and mutation
+  - latest dense-night-shift rerun on `2026-04-18 20:45 +07` closed `deployment workflow host disk guardrail v0` on the current dirty tree:
+    - disk pressure is no longer just a warning on `/app` and Step 1 review: ops overview now exports one structured `host_runtime` root-disk summary, and Step 2 uses that explicit signal instead of parsing raw attention-item copy
+    - `Deployment Workflow` now turns low space on the DeployMate host into a real rollout guardrail: the main next-step card switches to cleanup-first guidance, the page shows a dedicated disk-pressure guardrail card, and create, stack deploy, and direct template deploy all stay blocked until the host has headroom again while review/edit/template-save paths remain available
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_ops_api_flow`
+    - `npm --prefix frontend run smoke:ops`
+    - `npm --prefix frontend run smoke:runtime`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: low disk now has one explicit action path across overview, server review, and deploy decision, so the next bounded gap should be either a direct cleanup action/runbook surface or external validation on the live host, not more passive warning copy
   - latest dense-night-shift rerun on `2026-04-18 20:18 +07` closed `ops overview local disk pressure alert v0` on the current dirty tree:
     - `/app` no longer hides low space on the DeployMate host behind SSH-only investigation: ops overview now adds one explicit attention item when the local root filesystem crosses the same warning/error thresholds used by server diagnostics
     - the overview path stays cheap because it reads only the current host disk state, not remote server diagnostics, so admins see the same disk-pressure story on the main workspace page without turning overview refresh into another SSH sweep

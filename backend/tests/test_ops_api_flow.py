@@ -6,6 +6,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas import OpsHostRuntimeSummary
 from app.services.auth import require_auth
 
 
@@ -159,12 +160,13 @@ class OpsApiFlowTests(unittest.TestCase):
             clear=False,
         ):
             with patch(
-                "app.routes.ops._build_local_root_disk_attention_item",
-                return_value={
-                    "level": "warn",
-                    "title": "DeployMate host root disk is 86% full",
-                    "detail": "7G free on /. Clear old builder cache before the next release.",
-                },
+                "app.routes.ops._read_local_root_disk_summary",
+                return_value=OpsHostRuntimeSummary(
+                    root_disk_status="warn",
+                    root_disk_usage_percent=86,
+                    root_disk_free="7G",
+                    root_disk_detail="7G free on /. Clear old builder cache before the next release.",
+                ),
             ):
                 overview_response = self.client.get("/ops/overview?notifications_limit=100")
                 self.assertEqual(overview_response.status_code, 200)
@@ -179,6 +181,9 @@ class OpsApiFlowTests(unittest.TestCase):
                 self.assertEqual(overview["capabilities"]["ssh_host_key_checking"], "yes")
                 self.assertTrue(overview["capabilities"]["strict_known_hosts_configured"])
                 self.assertTrue(overview["capabilities"]["server_credentials_key_configured"])
+                self.assertEqual(overview["host_runtime"]["root_disk_status"], "warn")
+                self.assertEqual(overview["host_runtime"]["root_disk_usage_percent"], 86)
+                self.assertEqual(overview["host_runtime"]["root_disk_free"], "7G")
                 self.assertGreaterEqual(len(overview["attention_items"]), 4)
                 titles = [item["title"] for item in overview["attention_items"]]
                 self.assertIn("DeployMate host root disk is 86% full", titles)

@@ -12,6 +12,7 @@ from app.db import list_deployment_records, list_deployment_templates, list_noti
 from app.schemas import (
     OpsAttentionItem,
     OpsDeploymentsSummary,
+    OpsHostRuntimeSummary,
     OpsNotificationsSummary,
     OpsOverviewResponse,
     OpsRuntimeCapabilitiesSummary,
@@ -106,7 +107,7 @@ def _build_runtime_capabilities_summary() -> OpsRuntimeCapabilitiesSummary:
     )
 
 
-def _build_local_root_disk_attention_item() -> OpsAttentionItem | None:
+def _read_local_root_disk_summary() -> OpsHostRuntimeSummary:
     try:
         result = subprocess.run(
             ["df", "-h", "/"],
@@ -115,44 +116,69 @@ def _build_local_root_disk_attention_item() -> OpsAttentionItem | None:
             check=False,
         )
     except OSError:
-        return None
+        return OpsHostRuntimeSummary()
 
     output = (result.stdout or result.stderr or "").strip()
     if result.returncode != 0 or not output:
-        return None
+        return OpsHostRuntimeSummary()
 
     lines = output.splitlines()
     if len(lines) < 2:
-        return None
+        return OpsHostRuntimeSummary()
 
     parts = lines[-1].split()
     if len(parts) < 6 or not parts[4].endswith("%"):
-        return None
+        return OpsHostRuntimeSummary()
 
     try:
         usage_percent = int(parts[4][:-1])
     except ValueError:
-        return None
+        return OpsHostRuntimeSummary()
 
     avail = parts[3]
+    detail = f"{avail} free on /."
 
     if usage_percent >= ROOT_DISK_ERROR_PERCENT:
-        return OpsAttentionItem(
-            level="error",
-            title=f"DeployMate host root disk is {usage_percent}% full",
-            detail=(
-                f"{avail} free on /. Clear Docker builder cache and old logs before the next release."
+        return OpsHostRuntimeSummary(
+            root_disk_status="error",
+            root_disk_usage_percent=usage_percent,
+            root_disk_free=avail,
+            root_disk_detail=(
+                f"{detail} Clear Docker builder cache and old logs before the next release."
             ),
         )
 
     if usage_percent >= ROOT_DISK_WARN_PERCENT:
-        return OpsAttentionItem(
-            level="warn",
-            title=f"DeployMate host root disk is {usage_percent}% full",
-            detail=f"{avail} free on /. Clear old builder cache before the next release.",
+        return OpsHostRuntimeSummary(
+            root_disk_status="warn",
+            root_disk_usage_percent=usage_percent,
+            root_disk_free=avail,
+            root_disk_detail=f"{detail} Clear old builder cache before the next release.",
         )
 
-    return None
+    return OpsHostRuntimeSummary(
+        root_disk_status="ok",
+        root_disk_usage_percent=usage_percent,
+        root_disk_free=avail,
+        root_disk_detail=f"{detail} Root disk still has headroom for the next release.",
+    )
+
+
+def _build_local_root_disk_attention_item(host_runtime: OpsHostRuntimeSummary) -> OpsAttentionItem | None:
+    if host_runtime.root_disk_status not in {"warn", "error"}:
+        return None
+
+    usage_percent = host_runtime.root_disk_usage_percent
+    if usage_percent is None:
+        return None
+
+    level = "error" if host_runtime.root_disk_status == "error" else "warn"
+    return OpsAttentionItem(
+        level=level,
+        title=f"DeployMate host root disk is {usage_percent}% full",
+        detail=host_runtime.root_disk_detail
+        or "Free space on / is too low for another safe rollout.",
+    )
 
 
 def _sanitize_server_export(item: dict) -> dict:
@@ -266,6 +292,7 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
     )
     top_template = popular_templates[0] if popular_templates else None
     capabilities = _build_runtime_capabilities_summary()
+    host_runtime = _read_local_root_disk_summary()
 
     if user.get("must_change_password"):
         attention_items.append(
@@ -294,7 +321,7 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
             )
         )
 
-    local_root_disk_attention = _build_local_root_disk_attention_item()
+    local_root_disk_attention = _build_local_root_disk_attention_item(host_runtime)
     if local_root_disk_attention is not None:
         attention_items.append(local_root_disk_attention)
 
@@ -405,6 +432,7 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
             top_template_use_count=int((top_template or {}).get("use_count") or 0),
         ),
         capabilities=capabilities,
+        host_runtime=host_runtime,
         attention_items=attention_items,
     )
 

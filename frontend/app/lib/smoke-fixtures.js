@@ -86,6 +86,12 @@ export const smokeOverviewOpsOverview = {
     server_credentials_key_configured: true,
     remote_only_recommended: true,
   },
+  host_runtime: {
+    root_disk_status: "warn",
+    root_disk_usage_percent: 86,
+    root_disk_free: "7G",
+    root_disk_detail: "7G free on /. Clear old builder cache before the next release.",
+  },
   attention_items: [
     {
       level: "info",
@@ -481,6 +487,12 @@ export const smokeOpsOverview = {
     server_credentials_key_configured: true,
     remote_only_recommended: true,
   },
+  host_runtime: {
+    root_disk_status: "ok",
+    root_disk_usage_percent: 42,
+    root_disk_free: "29G",
+    root_disk_detail: "29G free on /. Root disk still has headroom for the next release.",
+  },
   attention_items: [
     {
       level: "error",
@@ -491,6 +503,40 @@ export const smokeOpsOverview = {
       level: "info",
       title: "Billing API template is the current rollout default",
       detail: "Open template preview or create flow to show the repeatable deployment path.",
+    },
+  ],
+};
+
+export const smokeWorkflowDiskPressureOpsOverview = {
+  ...smokeOpsOverview,
+  deployments: {
+    total: 3,
+    running: 3,
+    failed: 0,
+    pending: 0,
+    local: 0,
+    remote: 3,
+    exposed: 2,
+    public_urls: 2,
+  },
+  notifications: {
+    total: 3,
+    success: 3,
+    error: 0,
+    latest_error_title: null,
+    latest_error_at: null,
+  },
+  host_runtime: {
+    root_disk_status: "warn",
+    root_disk_usage_percent: 86,
+    root_disk_free: "7G",
+    root_disk_detail: "7G free on /. Clear old builder cache before the next release.",
+  },
+  attention_items: [
+    {
+      level: "warn",
+      title: "DeployMate host root disk is 86% full",
+      detail: "7G free on /. Clear old builder cache before the next release.",
     },
   ],
 };

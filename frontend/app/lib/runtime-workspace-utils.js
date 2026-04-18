@@ -1194,12 +1194,49 @@ export function buildOverviewPrimaryPath({
   };
 }
 
+export function buildHostDiskPressureGuardrail(opsOverview, options = {}) {
+  const hostRuntime = opsOverview?.host_runtime || null;
+  const rootDiskStatus = hostRuntime?.root_disk_status;
+
+  if (rootDiskStatus !== "warn" && rootDiskStatus !== "error") {
+    return null;
+  }
+
+  const usagePercent = Number.isFinite(Number(hostRuntime?.root_disk_usage_percent))
+    ? Number(hostRuntime.root_disk_usage_percent)
+    : null;
+  const freeSpace = String(hostRuntime?.root_disk_free || "").trim();
+  const title = usagePercent
+    ? `DeployMate host root disk is ${usagePercent}% full`
+    : rootDiskStatus === "error"
+      ? "DeployMate host root disk is critically full"
+      : "DeployMate host root disk needs cleanup";
+  const detail =
+    String(hostRuntime?.root_disk_detail || "").trim() ||
+    (freeSpace
+      ? `${freeSpace} free on /. Clear space before the next rollout.`
+      : "Clear space on the DeployMate host before the next rollout.");
+  const hasLiveDeployments = Number(options.deploymentsTotal || 0) > 0;
+
+  return {
+    key: "host-disk-pressure",
+    title,
+    detail,
+    nextStep: `${detail} Free space on the DeployMate host, refresh overview, and only then start another rollout from this workspace.`,
+    tone: rootDiskStatus === "error" ? "error" : "warn",
+    actionLabel: hasLiveDeployments ? "Review live deployments" : "Back to overview",
+    href: hasLiveDeployments ? "#runtime-deployments" : "/app",
+    blocker: true,
+  };
+}
+
 export function buildDeploymentWorkflowState({
   isAdmin,
   localDeploymentsEnabled,
   deploymentsTotal,
   failedDeployments,
   serversTotal,
+  deployBlocker,
 }) {
   if (failedDeployments > 0) {
     return {
@@ -1223,6 +1260,18 @@ export function buildDeploymentWorkflowState({
       href: "/app/server-review",
       actionLabel: "Open server review",
       bannerTone: "blocking",
+      blocker: true,
+    };
+  }
+
+  if (deployBlocker?.blocker) {
+    return {
+      mode: "guardrail",
+      title: deployBlocker.title,
+      detail: deployBlocker.detail,
+      href: deployBlocker.href,
+      actionLabel: deployBlocker.actionLabel,
+      bannerTone: deployBlocker.tone,
       blocker: true,
     };
   }
@@ -1339,6 +1388,7 @@ export function buildDeploymentWorkflowNextStep({
   filteredDeployments,
   templatesCount,
   serversCount,
+  deployBlocker,
   form,
   templateName,
   templateFormPreflight,
@@ -1383,6 +1433,16 @@ export function buildDeploymentWorkflowNextStep({
       primaryAction: "Review live deployments",
       secondaryAction: "Copy next step",
       tone: "error",
+    };
+  }
+
+  if (deployBlocker?.blocker) {
+    return {
+      focus: deployBlocker.title,
+      nextStep: deployBlocker.nextStep,
+      primaryAction: deployBlocker.actionLabel,
+      secondaryAction: "Copy next step",
+      tone: deployBlocker.tone,
     };
   }
 
