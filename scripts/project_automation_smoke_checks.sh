@@ -417,6 +417,8 @@ automation_smoke_templates_checks() {
 /app/deployment-workflow|template preview card|data-testid="template-preview-card"
 /app/deployment-workflow|template preview title|data-testid="template-preview-title"
 /app/deployment-workflow|template preview context|data-testid="template-preview-context"
+/app/deployment-workflow|template preview owner|data-testid="template-preview-owner"
+/app/deployment-workflow|template preview owner copy|Your asset
 /app/deployment-workflow|template context boundary banner|data-testid="template-context-boundary-banner"
 /app/deployment-workflow|template preview content|data-testid="template-preview-diff-list"|data-testid="template-preview-match-banner"
 /app/deployment-workflow|template preview actions|data-testid="template-preview-actions"
@@ -426,6 +428,10 @@ automation_smoke_templates_checks() {
 /app/deployment-workflow|outside context queue section|data-testid="template-queue-section-outside-context"
 /app/deployment-workflow|outside context queue title|Outside this context
 /app/deployment-workflow|outside context queue detail|duplicate and relabel for a new handoff\.
+/app/deployment-workflow|foreign owner queue row|data-testid="template-queue-owner-billing-api-template"
+/app/deployment-workflow|foreign owner queue copy|Another operator
+/app/deployment-workflow|foreign owner edit disabled|(<button[^>]*data-testid="template-edit-button-billing-api-template"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="template-edit-button-billing-api-template")
+/app/deployment-workflow|foreign owner delete disabled|(<button[^>]*data-testid="template-delete-button-billing-api-template"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="template-delete-button-billing-api-template")
 /app/deployment-workflow|create deployment card|data-testid="create-deployment-card"
 /app/deployment-workflow|create deployment title|data-testid="create-deployment-title"
 /app/deployment-workflow|template name input|data-testid="create-template-name-input"

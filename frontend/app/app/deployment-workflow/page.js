@@ -527,6 +527,54 @@ function buildTemplateAssetState(template) {
   };
 }
 
+function normalizeTemplateOwnerId(template) {
+  return String(template?.owner_user_id || "").trim();
+}
+
+function templateOwnedByCurrentUser(template, currentUser) {
+  const ownerUserId = normalizeTemplateOwnerId(template);
+  const currentUserId = String(currentUser?.id || "").trim();
+  return Boolean(ownerUserId && currentUserId && ownerUserId === currentUserId);
+}
+
+function templateHasForeignOwner(template, currentUser) {
+  const ownerUserId = normalizeTemplateOwnerId(template);
+  const currentUserId = String(currentUser?.id || "").trim();
+  return Boolean(ownerUserId && currentUserId && ownerUserId !== currentUserId);
+}
+
+function buildTemplateOwnershipSummary(template, currentUser) {
+  if (templateHasForeignOwner(template, currentUser)) {
+    return {
+      label: "Another operator's asset",
+      detail:
+        "Duplicate this baseline into your own handoff before deploying it directly or turning it into your working variant.",
+      foreign: true,
+      owned: false,
+      legacy: false,
+    };
+  }
+
+  if (templateOwnedByCurrentUser(template, currentUser)) {
+    return {
+      label: "Your asset",
+      detail: "This saved baseline belongs to your current operator account.",
+      foreign: false,
+      owned: true,
+      legacy: false,
+    };
+  }
+
+  return {
+    label: "Legacy asset",
+    detail:
+      "Owner is not recorded on this baseline yet. Review carefully and duplicate before repurposing it for another operator or client.",
+    foreign: false,
+    owned: false,
+    legacy: true,
+  };
+}
+
 function normalizeTemplateContextLabel(value) {
   return String(value || "").trim();
 }
@@ -637,6 +685,44 @@ function buildTemplateContextQueue(primaryTemplate, secondaryTemplates) {
         : "This focused asset still needs a context label before it becomes the trusted boundary for this queue.",
     sections,
   };
+}
+
+function templateCanDeployDirectly(template, currentUser) {
+  return Boolean(normalizeTemplateContextLabel(template?.context_label)) && !templateHasForeignOwner(template, currentUser);
+}
+
+function buildFocusedTemplateDeployGuardrail(template, currentUser) {
+  if (!normalizeTemplateContextLabel(template?.context_label)) {
+    return "Add a client or operating context label before this asset becomes a direct deploy baseline again.";
+  }
+
+  if (templateHasForeignOwner(template, currentUser)) {
+    return "Duplicate this baseline into your own handoff before deploying directly from another operator's asset.";
+  }
+
+  return "";
+}
+
+function buildTemplateQueueGuardrail(template, queueSectionId, currentUser) {
+  const contextLabel = normalizeTemplateContextLabel(template?.context_label);
+
+  if (!contextLabel) {
+    return "Direct deploy stays off until this asset has a client or operating context label.";
+  }
+
+  if (templateHasForeignOwner(template, currentUser)) {
+    if (queueSectionId === "outside-context") {
+      return `Direct deploy stays off here. This baseline belongs to another operator, so duplicate it into your own handoff before switching away from ${contextLabel}.`;
+    }
+
+    return "Direct deploy stays off here. Duplicate this baseline into your own handoff before bringing it back into focus.";
+  }
+
+  if (queueSectionId === "outside-context") {
+    return `Direct deploy stays off here. Switch focus to ${contextLabel} or duplicate and relabel it for the current handoff first.`;
+  }
+
+  return "Direct deploy opens only after you bring this asset into focus first.";
 }
 
 function extractComposeServiceNames(composeYaml) {
@@ -908,7 +994,9 @@ function DeploymentWorkflowPageContent() {
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const [secretRows, setSecretRows] = useState([{ key: "", value: "" }]);
   const [requestedWorkflowQuery, setRequestedWorkflowQuery] = useState(() =>
-    buildRequestedWorkflowQuery(),
+    smokeMode
+      ? buildRequestedWorkflowQuery(process.env.NEXT_PUBLIC_SMOKE_WORKFLOW_QUERY || "")
+      : buildRequestedWorkflowQuery(),
   );
   const canAccessServers = Boolean(currentUser?.is_admin);
   const serverAccessBlocked = !canAccessServers && !localDeploymentsEnabled;
@@ -1000,13 +1088,20 @@ function DeploymentWorkflowPageContent() {
   const templateAssetMode = currentUser?.plan === "team" ? "team asset" : "workspace asset";
   const templateLaneTitle =
     currentUser?.plan === "team"
-      ? "Step 2B: Review shared rollout assets"
+      ? "Step 2B: Review team handoff assets"
       : "Step 2B: Review reusable rollout setups";
   const primaryTemplateAssetState = primaryTemplate
     ? buildTemplateAssetState(primaryTemplate)
     : null;
+  const primaryTemplateOwnership = primaryTemplate
+    ? buildTemplateOwnershipSummary(primaryTemplate, currentUser)
+    : null;
   const primaryTemplateContext = buildTemplateContextSummary(primaryTemplate);
   const templateContextQueue = buildTemplateContextQueue(primaryTemplate, secondaryTemplates);
+  const primaryTemplateDeployGuardrail = buildFocusedTemplateDeployGuardrail(primaryTemplate, currentUser);
+  const primaryTemplateCanDeployDirectly = templateCanDeployDirectly(primaryTemplate, currentUser);
+  const primaryTemplateCanEditDirectly = !primaryTemplateOwnership?.foreign;
+  const primaryTemplateCanDeleteDirectly = !primaryTemplateOwnership?.foreign;
   const templateLaneGuideItems = [
     {
       label: "1. Review asset",
@@ -1024,7 +1119,7 @@ function DeploymentWorkflowPageContent() {
       label: "3. Edit or duplicate",
       value: currentUser?.plan === "team" ? "Protect the baseline" : "Keep changes deliberate",
       detail:
-        "Edit when the shared setup should change for everyone. Duplicate first when one client or one handoff needs a variant.",
+        "Edit when the focused baseline is still yours and should change for future runs. Duplicate first when another operator, one client, or one handoff needs a variant.",
     },
     {
       label: "4. Delete last",
@@ -1817,7 +1912,13 @@ function DeploymentWorkflowPageContent() {
     setTemplateSubmitSuccess("");
   }
 
-  function renderTemplateQueueCard(template) {
+  function renderTemplateQueueCard(template, queueSectionId) {
+    const ownership = buildTemplateOwnershipSummary(template, currentUser);
+    const templateContext = buildTemplateContextSummary(template);
+    const queueGuardrail = buildTemplateQueueGuardrail(template, queueSectionId, currentUser);
+    const canEditDirectly = !ownership.foreign;
+    const canDeleteDirectly = !ownership.foreign;
+
     return (
       <div key={template.id} className="card compactCard" data-testid={`template-card-${template.id}`}>
         <div className="row">
@@ -1830,7 +1931,11 @@ function DeploymentWorkflowPageContent() {
         </div>
         <div className="row">
           <span className="label">Context</span>
-          <span>{buildTemplateContextSummary(template).label}</span>
+          <span>{templateContext.label}</span>
+        </div>
+        <div className="row">
+          <span className="label">Owner</span>
+          <span data-testid={`template-queue-owner-${template.id}`}>{ownership.label}</span>
         </div>
         <div className="row">
           <span className="label">Server</span>
@@ -1844,6 +1949,9 @@ function DeploymentWorkflowPageContent() {
           <span className="label">Last used</span>
           <span>{template.last_used_at ? formatDate(template.last_used_at) : "Not reused yet"}</span>
         </div>
+        <div className="banner subtle" data-testid={`template-queue-guardrail-${template.id}`}>
+          {queueGuardrail}
+        </div>
         <div className="actions">
           <button
             type="button"
@@ -1854,18 +1962,11 @@ function DeploymentWorkflowPageContent() {
           </button>
           <button
             type="button"
-            onClick={() => handleDeployTemplate(template.id)}
-            disabled={deployingTemplateId === template.id || deploymentLimitReached}
-            data-testid={`template-deploy-button-${template.id}`}
-          >
-            {deployingTemplateId === template.id ? "Deploying..." : "Deploy shared setup"}
-          </button>
-          <button
-            type="button"
             onClick={() => applyTemplateToForm(template, { startEditing: true })}
+            disabled={!canEditDirectly}
             data-testid={`template-edit-button-${template.id}`}
           >
-            Edit baseline
+            {canEditDirectly ? "Edit baseline" : "Duplicate to edit"}
           </button>
           <button
             type="button"
@@ -1879,10 +1980,14 @@ function DeploymentWorkflowPageContent() {
             type="button"
             className="dangerButton"
             onClick={() => handleDeleteTemplate(template.id)}
-            disabled={deletingTemplateId === template.id}
+            disabled={deletingTemplateId === template.id || !canDeleteDirectly}
             data-testid={`template-delete-button-${template.id}`}
           >
-            {deletingTemplateId === template.id ? "Deleting..." : "Delete"}
+            {deletingTemplateId === template.id
+              ? "Deleting..."
+              : canDeleteDirectly
+                ? "Delete"
+                : "Owner keeps delete"}
           </button>
         </div>
       </div>
@@ -2256,6 +2361,14 @@ function DeploymentWorkflowPageContent() {
     setTemplateDeploySuccess("");
     setTemplateCreatedDeployment(null);
     setDeployingTemplateId(templateId);
+
+    if (template && !templateCanDeployDirectly(template)) {
+      setTemplateDeployError(
+        "Add a client or operating context label before deploying directly from this template.",
+      );
+      setDeployingTemplateId("");
+      return;
+    }
 
     if (preflight.errors.length > 0) {
       setTemplateDeployError(preflight.errors[0]);
@@ -3952,6 +4065,10 @@ function DeploymentWorkflowPageContent() {
                 <span data-testid="template-preview-context">{primaryTemplateContext.label}</span>
               </div>
               <div className="row">
+                <span className="label">Owner</span>
+                <span data-testid="template-preview-owner">{primaryTemplateOwnership?.label || "Legacy asset"}</span>
+              </div>
+              <div className="row">
                 <span className="label">Server</span>
                 <span>{formatServerLabel(primaryTemplate.server_name, primaryTemplate.server_host)}</span>
               </div>
@@ -3978,9 +4095,19 @@ function DeploymentWorkflowPageContent() {
               <div className="banner subtle" data-testid="template-preview-asset-banner">
                 {buildTemplateAssetState(primaryTemplate).detail}
               </div>
+              {!primaryTemplateOwnership?.owned ? (
+                <div className="banner subtle" data-testid="template-preview-ownership-banner">
+                  {primaryTemplateOwnership?.detail}
+                </div>
+              ) : null}
               {primaryTemplateContext.missing ? (
                 <div className="banner subtle" data-testid="template-preview-context-banner">
                   {primaryTemplateContext.detail}
+                </div>
+              ) : null}
+              {primaryTemplateDeployGuardrail ? (
+                <div className="banner subtle" data-testid="template-preview-deploy-guardrail">
+                  {primaryTemplateDeployGuardrail}
                 </div>
               ) : null}
               <div className="banner subtle" data-testid="template-context-boundary-banner">
@@ -4025,32 +4152,54 @@ function DeploymentWorkflowPageContent() {
                 <button
                   type="button"
                   onClick={() => applyTemplateToForm(primaryTemplate, { startEditing: true })}
+                  disabled={!primaryTemplateCanEditDirectly}
                   data-testid="template-preview-edit-button"
                 >
-                  Edit baseline in form
+                  {primaryTemplateCanEditDirectly ? "Edit baseline in form" : "Duplicate to edit"}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeployTemplate(primaryTemplate.id)}
-                  disabled={deployingTemplateId === primaryTemplate.id || deploymentLimitReached}
+                  disabled={
+                    deployingTemplateId === primaryTemplate.id ||
+                    deploymentLimitReached ||
+                    !primaryTemplateCanDeployDirectly
+                  }
                   data-testid="template-preview-deploy-button"
                 >
-                  {deployingTemplateId === primaryTemplate.id ? "Deploying..." : "Deploy shared setup"}
+                  {deployingTemplateId === primaryTemplate.id
+                    ? "Deploying..."
+                    : primaryTemplateCanDeployDirectly
+                      ? "Deploy saved setup"
+                      : primaryTemplateOwnership?.foreign
+                        ? "Duplicate before deploy"
+                        : "Add context before deploy"}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeployTemplate(primaryTemplate.id)}
-                  disabled={deployingTemplateId === primaryTemplate.id || deploymentLimitReached}
+                  disabled={
+                    deployingTemplateId === primaryTemplate.id ||
+                    deploymentLimitReached ||
+                    !primaryTemplateCanDeployDirectly
+                  }
                   data-testid={`template-deploy-button-${primaryTemplate.id}`}
                 >
-                  {deployingTemplateId === primaryTemplate.id ? "Deploying..." : "Deploy shared setup"}
+                  {deployingTemplateId === primaryTemplate.id
+                    ? "Deploying..."
+                    : primaryTemplateCanDeployDirectly
+                      ? "Deploy saved setup"
+                      : primaryTemplateOwnership?.foreign
+                        ? "Duplicate before deploy"
+                        : "Add context before deploy"}
                 </button>
                 <button
                   type="button"
                   onClick={() => applyTemplateToForm(primaryTemplate, { startEditing: true })}
+                  disabled={!primaryTemplateCanEditDirectly}
                   data-testid={`template-edit-button-${primaryTemplate.id}`}
                 >
-                  Edit baseline
+                  {primaryTemplateCanEditDirectly ? "Edit baseline" : "Duplicate to edit"}
                 </button>
                 <button
                   type="button"
@@ -4064,10 +4213,14 @@ function DeploymentWorkflowPageContent() {
                   type="button"
                   className="dangerButton"
                   onClick={() => handleDeleteTemplate(primaryTemplate.id)}
-                  disabled={deletingTemplateId === primaryTemplate.id}
+                  disabled={deletingTemplateId === primaryTemplate.id || !primaryTemplateCanDeleteDirectly}
                   data-testid={`template-delete-button-${primaryTemplate.id}`}
                 >
-                  {deletingTemplateId === primaryTemplate.id ? "Deleting..." : "Delete"}
+                  {deletingTemplateId === primaryTemplate.id
+                    ? "Deleting..."
+                    : primaryTemplateCanDeleteDirectly
+                      ? "Delete"
+                      : "Owner keeps delete"}
                 </button>
               </div>
             </div>
@@ -4084,7 +4237,7 @@ function DeploymentWorkflowPageContent() {
                         <p className="formHint">{section.detail}</p>
                       </div>
                     </div>
-                    {section.templates.map((template) => renderTemplateQueueCard(template))}
+                    {section.templates.map((template) => renderTemplateQueueCard(template, section.id))}
                   </div>
                 ))
               ) : (

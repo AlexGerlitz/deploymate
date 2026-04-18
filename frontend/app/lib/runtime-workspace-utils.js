@@ -1,3 +1,5 @@
+import { escapeCsvCell } from "./admin-page-utils.js";
+
 export function formatDate(value) {
   if (!value) {
     return "N/A";
@@ -121,6 +123,751 @@ export function formatAccessibleServerLabel({
   }
 
   return serverId || serverManagedByAdmin ? managedLabel : localLabel;
+}
+
+export function formatReleaseSourceLabel(source) {
+  if (!source) {
+    return "manual";
+  }
+  return source.replaceAll("_", " ");
+}
+
+export function formatCommitShort(commit) {
+  if (!commit) {
+    return "-";
+  }
+  return String(commit).slice(0, 12);
+}
+
+export function buildReleaseTraceLine(deployment) {
+  if (!deployment) {
+    return "Release trace: n/a";
+  }
+
+  const parts = [`source ${formatReleaseSourceLabel(deployment.release_source)}`];
+  if (deployment.release_ref) {
+    parts.push(`ref ${deployment.release_ref}`);
+  }
+  if (deployment.release_commit_sha) {
+    parts.push(`commit ${formatCommitShort(deployment.release_commit_sha)}`);
+  }
+  if (deployment.release_image_tag) {
+    parts.push(`tag ${deployment.release_image_tag}`);
+  }
+  if (deployment.release_triggered_by) {
+    parts.push(`by ${deployment.release_triggered_by}`);
+  }
+  return `Release trace: ${parts.join(", ")}`;
+}
+
+export function buildRuntimeOwnershipExportRecord(ownershipSummary) {
+  const value = String(ownershipSummary?.value || "").trim() || "Unknown";
+  const detail =
+    String(ownershipSummary?.detail || "").trim() || "Ownership is not available yet.";
+
+  return {
+    value,
+    detail,
+  };
+}
+
+export function buildRuntimeReviewTargetExportRecord(reviewTarget) {
+  const kind = reviewTarget?.kind === "health" ? "health" : reviewTarget?.kind === "app" ? "app" : "runtime";
+  const href = String(reviewTarget?.href || "").trim();
+
+  if (kind === "health") {
+    return {
+      kind,
+      value: href ? "Saved health target" : "Health target missing",
+      href,
+      detail: href
+        ? "Open the saved health target first, then confirm health and recent activity."
+        : "No health target is saved yet. Review runtime signals on the detail page first.",
+    };
+  }
+
+  if (kind === "app") {
+    return {
+      kind,
+      value: href ? "Live endpoint" : "Private runtime",
+      href,
+      detail: href
+        ? "Open the live endpoint first, then confirm health and recent activity."
+        : "No public URL is assigned yet. Review runtime signals on the detail page first.",
+    };
+  }
+
+  return {
+    kind: "runtime",
+    value: "Runtime detail only",
+    href: "",
+    detail: "No external review target is available yet. Review runtime signals on the detail page first.",
+  };
+}
+
+export function buildRuntimeIdentityExportRecord(
+  deployment,
+  { locationSummary = "" } = {},
+) {
+  if (!deployment) {
+    return {
+      value: "Deployment pending",
+      detail: "Runtime identity is not available yet.",
+      runtime_shape: "",
+      image: "",
+      container_name: "",
+      stack_name: "",
+      primary_service: "",
+      location: "",
+    };
+  }
+
+  const isStack = deployment.runtime_shape === "stack";
+  const value = isStack
+    ? deployment.stack_name || deployment.container_name || deployment.id || "Stack pending"
+    : deployment.container_name || deployment.image || deployment.id || "Deployment pending";
+  const detailBase = isStack
+    ? `Primary service ${deployment.primary_service || deployment.container_name || "unknown"}. Compose-backed stack runtime.`
+    : `${deployment.image || "Image pending"} is the current runtime source.`;
+
+  return {
+    value: String(value),
+    detail: [detailBase, String(locationSummary || "").trim()].filter(Boolean).join(" "),
+    runtime_shape: String(deployment.runtime_shape || "single"),
+    image: String(deployment.image || ""),
+    container_name: String(deployment.container_name || ""),
+    stack_name: String(deployment.stack_name || ""),
+    primary_service: String(deployment.primary_service || ""),
+    location: String(locationSummary || "").trim(),
+  };
+}
+
+export function buildRuntimeRecentActivityExportRecord(activityItems) {
+  const latestEvent =
+    Array.isArray(activityItems) && activityItems.length > 0 ? activityItems[0] : null;
+
+  if (!latestEvent) {
+    return {
+      value: "No activity yet",
+      detail: "No runtime activity has been recorded yet.",
+      created_at: "",
+      level: "",
+      category: "",
+      title: "",
+      message: "",
+    };
+  }
+
+  return {
+    value: String(latestEvent.title || "Recent runtime event"),
+    detail: [
+      latestEvent.message || "Most recent runtime event recorded.",
+      latestEvent.created_at ? `Logged ${formatDate(latestEvent.created_at)}.` : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    created_at: String(latestEvent.created_at || ""),
+    level: String(latestEvent.level || ""),
+    category: String(latestEvent.category || ""),
+    title: String(latestEvent.title || ""),
+    message: String(latestEvent.message || ""),
+  };
+}
+
+export function buildRuntimeActivityTrailExportRecord(activityItems) {
+  const items = Array.isArray(activityItems) ? activityItems : [];
+  const latestEvent = items[0] || null;
+  const latestProblem =
+    latestEvent?.level === "error" || latestEvent?.level === "warn"
+      ? latestEvent
+      : items.find((item) => item?.level === "error" || item?.level === "warn") || null;
+  const latestSuccess =
+    latestEvent?.level === "success"
+      ? null
+      : items.find((item) => item?.level === "success") || null;
+  const errorCount = items.filter((item) => item?.level === "error").length;
+  const warnCount = items.filter((item) => item?.level === "warn").length;
+  const successCount = items.filter((item) => item?.level === "success").length;
+  const totalCount = items.length;
+
+  if (totalCount === 0) {
+    return {
+      value: "No activity trail yet",
+      detail: "No runtime activity has been recorded yet.",
+      total_count: "0",
+      error_count: "0",
+      warn_count: "0",
+      success_count: "0",
+      latest_title: "",
+      latest_level: "",
+      latest_created_at: "",
+      latest_problem_title: "",
+      latest_problem_created_at: "",
+      latest_success_title: "",
+      latest_success_created_at: "",
+    };
+  }
+
+  const counts = [];
+  if (errorCount > 0) {
+    counts.push(`${errorCount} error${errorCount === 1 ? "" : "s"}`);
+  }
+  if (warnCount > 0) {
+    counts.push(`${warnCount} warning${warnCount === 1 ? "" : "s"}`);
+  }
+  if (successCount > 0) {
+    counts.push(`${successCount} success${successCount === 1 ? "" : "es"}`);
+  }
+
+  const detailParts = [
+    latestEvent?.title
+      ? `Latest: ${latestEvent.title}${latestEvent.created_at ? ` at ${formatDate(latestEvent.created_at)}` : ""}.`
+      : null,
+    latestProblem && latestProblem.id !== latestEvent?.id
+      ? `Last problem: ${latestProblem.title || "Runtime warning"}${
+          latestProblem.created_at ? ` at ${formatDate(latestProblem.created_at)}` : ""
+        }.`
+      : null,
+    latestSuccess
+      ? `Last success: ${latestSuccess.title || "Runtime success"}${
+          latestSuccess.created_at ? ` at ${formatDate(latestSuccess.created_at)}` : ""
+        }.`
+      : null,
+  ].filter(Boolean);
+
+  return {
+    value: `${totalCount} event${totalCount === 1 ? "" : "s"}${
+      counts.length > 0 ? `, ${counts.join(", ")}` : ""
+    }`,
+    detail: detailParts.join(" "),
+    total_count: String(totalCount),
+    error_count: String(errorCount),
+    warn_count: String(warnCount),
+    success_count: String(successCount),
+    latest_title: String(latestEvent?.title || ""),
+    latest_level: String(latestEvent?.level || ""),
+    latest_created_at: String(latestEvent?.created_at || ""),
+    latest_problem_title: String(latestProblem?.title || ""),
+    latest_problem_created_at: String(latestProblem?.created_at || ""),
+    latest_success_title: String(latestSuccess?.title || ""),
+    latest_success_created_at: String(latestSuccess?.created_at || ""),
+  };
+}
+
+export function buildRuntimeAttentionExportRecord(attentionItems) {
+  const items = Array.isArray(attentionItems) ? attentionItems : [];
+  const primaryItem = items[0] || null;
+  const errorCount = items.filter((item) => item?.status === "error").length;
+  const warnCount = items.filter((item) => item?.status === "warn").length;
+  const totalCount = items.length;
+
+  if (totalCount === 0) {
+    return {
+      value: "0 active warnings",
+      detail: "No active runtime warnings right now.",
+      total_count: "0",
+      error_count: "0",
+      warn_count: "0",
+      primary_label: "",
+      primary_message: "",
+    };
+  }
+
+  let value = `${totalCount} attention item${totalCount === 1 ? "" : "s"}`;
+  if (errorCount > 0 && warnCount > 0) {
+    value = `${errorCount} error${errorCount === 1 ? "" : "s"}, ${warnCount} warning${warnCount === 1 ? "" : "s"}`;
+  } else if (errorCount > 0) {
+    value = `${errorCount} error${errorCount === 1 ? "" : "s"}`;
+  } else if (warnCount > 0) {
+    value = `${warnCount} warning${warnCount === 1 ? "" : "s"}`;
+  }
+
+  return {
+    value,
+    detail: primaryItem
+      ? `${primaryItem.label || "Runtime attention"}: ${primaryItem.message || "Attention is needed."}`
+      : `${totalCount} runtime attention item${totalCount === 1 ? "" : "s"} need review.`,
+    total_count: String(totalCount),
+    error_count: String(errorCount),
+    warn_count: String(warnCount),
+    primary_label: String(primaryItem?.label || ""),
+    primary_message: String(primaryItem?.message || ""),
+  };
+}
+
+export function buildRuntimeNextStepExportRecord(primaryAction, nextStep) {
+  const value = String(primaryAction || "").trim() || "Review runtime";
+  const detail = String(nextStep || "").trim() || "Review the runtime before making the next change.";
+
+  return {
+    value,
+    detail,
+  };
+}
+
+export function buildRuntimeHealthProofExportRecord(health, reviewTarget = null) {
+  const value = String(health?.status || "").trim() || "unknown";
+  const checkedAt = String(health?.checked_at || "").trim();
+  const reviewTargetHref = String(reviewTarget?.href || "").trim();
+  const error = String(health?.error || "").trim();
+  const hasStatusCode = health?.status_code || health?.status_code === 0;
+  const hasResponseTime = health?.response_time_ms || health?.response_time_ms === 0;
+
+  if (checkedAt) {
+    const clauses = [`Checked ${formatDate(checkedAt)}`];
+    if (hasStatusCode) {
+      clauses.push(`with HTTP ${health.status_code}`);
+    }
+    if (hasResponseTime) {
+      clauses.push(`in ${health.response_time_ms} ms`);
+    }
+
+    return {
+      value,
+      detail: `${clauses.join(" ")}.${error ? ` Latest error: ${error}.` : ""}`,
+      checked_at: checkedAt,
+      status_code: hasStatusCode ? String(health.status_code) : "",
+      response_time_ms: hasResponseTime ? String(health.response_time_ms) : "",
+      error,
+    };
+  }
+
+  return {
+    value,
+    detail: reviewTargetHref
+      ? `Saved review target: ${reviewTargetHref}. No completed health check yet.`
+      : "No completed health check has been recorded yet.",
+    checked_at: "",
+    status_code: hasStatusCode ? String(health.status_code) : "",
+    response_time_ms: hasResponseTime ? String(health.response_time_ms) : "",
+    error,
+  };
+}
+
+export function buildRuntimeReleaseTraceExportRecord(deployment) {
+  if (!deployment) {
+    return {
+      value: "n/a",
+      detail: "Release source and rollout metadata are not available yet.",
+      source: "",
+      ref: "",
+      commit_sha: "",
+      image_tag: "",
+      triggered_at: "",
+      triggered_by: "",
+    };
+  }
+
+  const hasExtraTrace =
+    Boolean(deployment.release_ref) ||
+    Boolean(deployment.release_commit_sha) ||
+    Boolean(deployment.release_image_tag) ||
+    Boolean(deployment.release_triggered_by) ||
+    Boolean(deployment.release_triggered_at);
+
+  return {
+    value: buildReleaseTraceLine(deployment).replace("Release trace: ", ""),
+    detail: deployment.release_triggered_at
+      ? `Triggered ${formatDate(deployment.release_triggered_at)}.`
+      : hasExtraTrace
+        ? "The current runtime has partial release metadata but no recorded trigger time."
+        : "No saved ref, commit, image tag, or trigger time for the current runtime yet.",
+    source: String(deployment.release_source || "manual"),
+    ref: String(deployment.release_ref || ""),
+    commit_sha: String(deployment.release_commit_sha || ""),
+    image_tag: String(deployment.release_image_tag || ""),
+    triggered_at: String(deployment.release_triggered_at || ""),
+    triggered_by: String(deployment.release_triggered_by || ""),
+  };
+}
+
+export function buildActivityExportCsv(
+  items,
+  {
+    deploymentId = "",
+    deployment = null,
+    identityRecord = null,
+    recentActivityRecord = null,
+    activityTrailRecord = null,
+    attentionRecord = null,
+    nextStepRecord = null,
+    health = null,
+    ownershipSummary = null,
+    reviewTarget = null,
+  } = {},
+) {
+  const runtimeIdentity = identityRecord || buildRuntimeIdentityExportRecord(deployment);
+  const recentActivity = recentActivityRecord || buildRuntimeRecentActivityExportRecord(items);
+  const activityTrail = activityTrailRecord || buildRuntimeActivityTrailExportRecord(items);
+  const attentionCue = attentionRecord || buildRuntimeAttentionExportRecord(items);
+  const nextStepCue = nextStepRecord || buildRuntimeNextStepExportRecord("", "");
+  const ownership = buildRuntimeOwnershipExportRecord(ownershipSummary);
+  const normalizedReviewTarget = buildRuntimeReviewTargetExportRecord(reviewTarget);
+  const healthProof = buildRuntimeHealthProofExportRecord(health, reviewTarget);
+  const releaseTrace = buildRuntimeReleaseTraceExportRecord(deployment);
+  const rows = [
+    [
+      "deployment_id",
+      "runtime_identity_value",
+      "runtime_identity_detail",
+      "runtime_shape",
+      "runtime_image",
+      "runtime_container_name",
+      "runtime_stack_name",
+      "runtime_primary_service",
+      "runtime_location",
+      "recent_activity_value",
+      "recent_activity_detail",
+      "recent_activity_created_at",
+      "recent_activity_level",
+      "recent_activity_category",
+      "recent_activity_title",
+      "recent_activity_message",
+      "activity_trail_value",
+      "activity_trail_detail",
+      "activity_trail_total_count",
+      "activity_trail_error_count",
+      "activity_trail_warn_count",
+      "activity_trail_success_count",
+      "activity_trail_latest_title",
+      "activity_trail_latest_level",
+      "activity_trail_latest_created_at",
+      "activity_trail_latest_problem_title",
+      "activity_trail_latest_problem_created_at",
+      "activity_trail_latest_success_title",
+      "activity_trail_latest_success_created_at",
+      "attention_cue_value",
+      "attention_cue_detail",
+      "attention_total_count",
+      "attention_error_count",
+      "attention_warn_count",
+      "attention_primary_label",
+      "attention_primary_message",
+      "next_step_value",
+      "next_step_detail",
+      "ownership_status",
+      "ownership_detail",
+      "review_target_kind",
+      "review_target_status",
+      "review_target_href",
+      "review_target_detail",
+      "health_proof_status",
+      "health_proof_detail",
+      "health_checked_at",
+      "health_status_code",
+      "health_response_time_ms",
+      "health_error",
+      "release_trace_summary",
+      "release_trace_detail",
+      "release_source",
+      "release_ref",
+      "release_commit_sha",
+      "release_image_tag",
+      "release_triggered_at",
+      "release_triggered_by",
+      "created_at",
+      "level",
+      "category",
+      "title",
+      "message",
+    ],
+    ...(Array.isArray(items) ? items : []).map((item) => [
+      item.deployment_id || deploymentId || "",
+      runtimeIdentity.value,
+      runtimeIdentity.detail,
+      runtimeIdentity.runtime_shape,
+      runtimeIdentity.image,
+      runtimeIdentity.container_name,
+      runtimeIdentity.stack_name,
+      runtimeIdentity.primary_service,
+      runtimeIdentity.location,
+      recentActivity.value,
+      recentActivity.detail,
+      recentActivity.created_at,
+      recentActivity.level,
+      recentActivity.category,
+      recentActivity.title,
+      recentActivity.message,
+      activityTrail.value,
+      activityTrail.detail,
+      activityTrail.total_count,
+      activityTrail.error_count,
+      activityTrail.warn_count,
+      activityTrail.success_count,
+      activityTrail.latest_title,
+      activityTrail.latest_level,
+      activityTrail.latest_created_at,
+      activityTrail.latest_problem_title,
+      activityTrail.latest_problem_created_at,
+      activityTrail.latest_success_title,
+      activityTrail.latest_success_created_at,
+      attentionCue.value,
+      attentionCue.detail,
+      attentionCue.total_count,
+      attentionCue.error_count,
+      attentionCue.warn_count,
+      attentionCue.primary_label,
+      attentionCue.primary_message,
+      nextStepCue.value,
+      nextStepCue.detail,
+      ownership.value,
+      ownership.detail,
+      normalizedReviewTarget.kind,
+      normalizedReviewTarget.value,
+      normalizedReviewTarget.href,
+      normalizedReviewTarget.detail,
+      healthProof.value,
+      healthProof.detail,
+      healthProof.checked_at,
+      healthProof.status_code,
+      healthProof.response_time_ms,
+      healthProof.error,
+      releaseTrace.value,
+      releaseTrace.detail,
+      releaseTrace.source,
+      releaseTrace.ref,
+      releaseTrace.commit_sha,
+      releaseTrace.image_tag,
+      releaseTrace.triggered_at,
+      releaseTrace.triggered_by,
+      item.created_at || "",
+      item.level || "",
+      item.category || "",
+      item.title || "",
+      item.message || "",
+    ]),
+  ];
+
+  return rows
+    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
+    .join("\n");
+}
+
+export function buildIncidentSnapshotPayload({
+  deployment,
+  health,
+  exportPayload,
+  identityRecord,
+  recentActivityRecord,
+  activityTrailRecord,
+  attentionRecord,
+  nextStepRecord,
+  ownershipSummary,
+  reviewTarget,
+  runtimeSummaryText,
+  plainLanguageSummary,
+  nextStep,
+  status,
+}) {
+  if (!deployment) {
+    return null;
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    deployment_id: deployment.id,
+    status,
+    runtime_identity: identityRecord || buildRuntimeIdentityExportRecord(deployment),
+    recent_activity: recentActivityRecord || buildRuntimeRecentActivityExportRecord(exportPayload.activity),
+    activity_trail: activityTrailRecord || buildRuntimeActivityTrailExportRecord(exportPayload.activity),
+    attention_cue: attentionRecord || buildRuntimeAttentionExportRecord(exportPayload.attentionItems),
+    next_step_cue: nextStepRecord || buildRuntimeNextStepExportRecord("", nextStep),
+    ownership: buildRuntimeOwnershipExportRecord(ownershipSummary),
+    review_target: buildRuntimeReviewTargetExportRecord(reviewTarget),
+    health_proof: buildRuntimeHealthProofExportRecord(health, reviewTarget),
+    release_trace: buildRuntimeReleaseTraceExportRecord(deployment),
+    next_step: nextStep,
+    human_summary: plainLanguageSummary,
+    runtime_summary: runtimeSummaryText,
+    attention_items: exportPayload.attentionItems,
+    suggested_ports: exportPayload.suggestedPorts,
+    deployment: exportPayload.deployment,
+    health: exportPayload.health,
+    diagnostics: exportPayload.diagnostics,
+    activity: exportPayload.activity,
+  };
+}
+
+export function buildIncidentMarkdown(snapshot) {
+  if (!snapshot) {
+    return "";
+  }
+
+  const ownershipValue = snapshot.ownership?.value || "Unknown";
+  const ownershipDetail = snapshot.ownership?.detail || "Ownership is not available yet.";
+  const runtimeIdentityValue = snapshot.runtime_identity?.value || "Deployment pending";
+  const runtimeIdentityDetail =
+    snapshot.runtime_identity?.detail || "Runtime identity is not available yet.";
+  const recentActivityValue = snapshot.recent_activity?.value || "No activity yet";
+  const recentActivityDetail =
+    snapshot.recent_activity?.detail || "No runtime activity has been recorded yet.";
+  const activityTrailValue = snapshot.activity_trail?.value || "No activity trail yet";
+  const activityTrailDetail =
+    snapshot.activity_trail?.detail || "No runtime activity has been recorded yet.";
+  const attentionCueValue = snapshot.attention_cue?.value || "0 active warnings";
+  const attentionCueDetail =
+    snapshot.attention_cue?.detail || "No active runtime warnings right now.";
+  const nextStepCueValue = snapshot.next_step_cue?.value || "Review runtime";
+  const nextStepCueDetail =
+    snapshot.next_step_cue?.detail || snapshot.next_step || "Review the runtime before making the next change.";
+  const reviewTargetValue = snapshot.review_target?.value || "Unknown";
+  const reviewTargetHref = snapshot.review_target?.href || "";
+  const reviewTargetDetail =
+    snapshot.review_target?.detail || "Review target is not available yet.";
+  const healthProofValue = snapshot.health_proof?.value || "unknown";
+  const healthProofDetail =
+    snapshot.health_proof?.detail || "Health proof is not available yet.";
+  const releaseTraceValue = snapshot.release_trace?.value || "n/a";
+  const releaseTraceDetail =
+    snapshot.release_trace?.detail || "Release trace is not available yet.";
+
+  const lines = [
+    `# Deployment Incident Handoff`,
+    ``,
+    `Generated: ${formatDate(snapshot.generated_at)}`,
+    `Deployment ID: ${snapshot.deployment_id}`,
+    `Status: ${snapshot.status}`,
+    ``,
+    `## Plain-Language Summary`,
+    ``,
+    ...snapshot.human_summary.split("\n"),
+    ``,
+    `## Ownership`,
+    ``,
+    `Status: ${ownershipValue}`,
+    `Detail: ${ownershipDetail}`,
+    ``,
+    `## Runtime Identity`,
+    ``,
+    `Value: ${runtimeIdentityValue}`,
+    `Detail: ${runtimeIdentityDetail}`,
+    `Runtime shape: ${snapshot.runtime_identity?.runtime_shape || "n/a"}`,
+    `Image: ${snapshot.runtime_identity?.image || "n/a"}`,
+    `Container: ${snapshot.runtime_identity?.container_name || "n/a"}`,
+    `Stack: ${snapshot.runtime_identity?.stack_name || "n/a"}`,
+    `Primary service: ${snapshot.runtime_identity?.primary_service || "n/a"}`,
+    `Location: ${snapshot.runtime_identity?.location || "n/a"}`,
+    ``,
+    `## Recent Activity Cue`,
+    ``,
+    `Value: ${recentActivityValue}`,
+    `Detail: ${recentActivityDetail}`,
+    `Logged at: ${
+      snapshot.recent_activity?.created_at ? formatDate(snapshot.recent_activity.created_at) : "n/a"
+    }`,
+    `Level: ${snapshot.recent_activity?.level || "n/a"}`,
+    `Category: ${snapshot.recent_activity?.category || "n/a"}`,
+    `Title: ${snapshot.recent_activity?.title || "n/a"}`,
+    `Message: ${snapshot.recent_activity?.message || "n/a"}`,
+    ``,
+    `## Activity Trail`,
+    ``,
+    `Value: ${activityTrailValue}`,
+    `Detail: ${activityTrailDetail}`,
+    `Total count: ${snapshot.activity_trail?.total_count || "0"}`,
+    `Error count: ${snapshot.activity_trail?.error_count || "0"}`,
+    `Warn count: ${snapshot.activity_trail?.warn_count || "0"}`,
+    `Success count: ${snapshot.activity_trail?.success_count || "0"}`,
+    `Latest event: ${snapshot.activity_trail?.latest_title || "n/a"}`,
+    `Latest level: ${snapshot.activity_trail?.latest_level || "n/a"}`,
+    `Latest at: ${
+      snapshot.activity_trail?.latest_created_at ? formatDate(snapshot.activity_trail.latest_created_at) : "n/a"
+    }`,
+    `Latest problem: ${snapshot.activity_trail?.latest_problem_title || "n/a"}`,
+    `Latest problem at: ${
+      snapshot.activity_trail?.latest_problem_created_at
+        ? formatDate(snapshot.activity_trail.latest_problem_created_at)
+        : "n/a"
+    }`,
+    `Latest success: ${snapshot.activity_trail?.latest_success_title || "n/a"}`,
+    `Latest success at: ${
+      snapshot.activity_trail?.latest_success_created_at
+        ? formatDate(snapshot.activity_trail.latest_success_created_at)
+        : "n/a"
+    }`,
+    ``,
+    `## Attention Cue`,
+    ``,
+    `Value: ${attentionCueValue}`,
+    `Detail: ${attentionCueDetail}`,
+    `Total count: ${snapshot.attention_cue?.total_count || "0"}`,
+    `Error count: ${snapshot.attention_cue?.error_count || "0"}`,
+    `Warn count: ${snapshot.attention_cue?.warn_count || "0"}`,
+    `Primary label: ${snapshot.attention_cue?.primary_label || "n/a"}`,
+    `Primary message: ${snapshot.attention_cue?.primary_message || "n/a"}`,
+    ``,
+    `## Next Safe Action Cue`,
+    ``,
+    `Value: ${nextStepCueValue}`,
+    `Detail: ${nextStepCueDetail}`,
+    ``,
+    `## Review Target`,
+    ``,
+    `Status: ${reviewTargetValue}`,
+    `Href: ${reviewTargetHref || "n/a"}`,
+    `Detail: ${reviewTargetDetail}`,
+    ``,
+    `## Health Proof`,
+    ``,
+    `Status: ${healthProofValue}`,
+    `Detail: ${healthProofDetail}`,
+    `Checked at: ${
+      snapshot.health_proof?.checked_at ? formatDate(snapshot.health_proof.checked_at) : "n/a"
+    }`,
+    `HTTP status: ${snapshot.health_proof?.status_code || "n/a"}`,
+    `Response time: ${
+      snapshot.health_proof?.response_time_ms || snapshot.health_proof?.response_time_ms === 0
+        ? `${snapshot.health_proof.response_time_ms} ms`
+        : "n/a"
+    }`,
+    `Error: ${snapshot.health_proof?.error || "n/a"}`,
+    ``,
+    `## Release Trace`,
+    ``,
+    `Summary: ${releaseTraceValue}`,
+    `Detail: ${releaseTraceDetail}`,
+    `Source: ${snapshot.release_trace?.source || "manual"}`,
+    `Ref: ${snapshot.release_trace?.ref || "n/a"}`,
+    `Commit: ${snapshot.release_trace?.commit_sha || "n/a"}`,
+    `Image tag: ${snapshot.release_trace?.image_tag || "n/a"}`,
+    `Triggered at: ${
+      snapshot.release_trace?.triggered_at ? formatDate(snapshot.release_trace.triggered_at) : "n/a"
+    }`,
+    `Triggered by: ${snapshot.release_trace?.triggered_by || "n/a"}`,
+    ``,
+    `## Next Step`,
+    ``,
+    snapshot.next_step,
+    ``,
+    `## Runtime Snapshot`,
+    ``,
+    ...snapshot.runtime_summary.split("\n"),
+    ``,
+    `## Attention Items`,
+    ``,
+  ];
+
+  if (snapshot.attention_items.length === 0) {
+    lines.push(`- No active runtime warnings.`);
+  } else {
+    snapshot.attention_items.forEach((item) => {
+      lines.push(`- ${item.label}: ${item.message}`);
+    });
+  }
+
+  lines.push(``, `## Recent Activity`, ``);
+
+  if (!Array.isArray(snapshot.activity) || snapshot.activity.length === 0) {
+    lines.push(`- No activity recorded yet.`);
+  } else {
+    snapshot.activity.slice(0, 10).forEach((item) => {
+      lines.push(
+        `- ${formatDate(item.created_at)} · ${item.level || "unknown"} · ${item.title || "-"} · ${item.message || "-"}`,
+      );
+    });
+  }
+
+  return lines.join("\n");
 }
 
 function redactRuntimeInventoryText(value, sensitiveValues) {

@@ -40,6 +40,13 @@ while IFS= read -r line; do
   fi
 done < <(automation_smoke_templates_checks)
 
+for blocked_template_id in billing-api-template review-worker-template; do
+  if grep -Eq "data-testid=\"template-deploy-button-${blocked_template_id}\"" "$HTML_FILE"; then
+    echo "[frontend-templates-smoke] unexpected secondary queue deploy CTA: $blocked_template_id" >&2
+    exit 1
+  fi
+done
+
 echo "[frontend-templates-smoke] template list rendered"
 echo "[frontend-templates-smoke] template preview rendered"
 echo "[frontend-templates-smoke] create-form template controls rendered"

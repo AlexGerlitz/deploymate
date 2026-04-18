@@ -4,19 +4,34 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { AdminDisclosureSection } from "../../app/admin-ui";
-import { escapeCsvCell, triggerFileDownload } from "../../lib/admin-page-utils";
+import { triggerFileDownload } from "../../lib/admin-page-utils";
 import {
   buildCustomDomainIssues,
+  buildActivityExportCsv,
+  buildIncidentMarkdown,
+  buildIncidentSnapshotPayload,
+  buildReleaseTraceLine,
   buildDeploymentReviewTarget,
   buildDeploymentUrl,
   buildEnvIssues,
+  buildRuntimeActivityTrailExportRecord,
+  buildRuntimeAttentionExportRecord,
+  buildRuntimeIdentityExportRecord,
+  buildRuntimeNextStepExportRecord,
+  buildRuntimeRecentActivityExportRecord,
   buildSecretRowsFromObject,
+  buildRuntimeHealthProofExportRecord,
+  buildRuntimeOwnershipExportRecord,
+  buildRuntimeReleaseTraceExportRecord,
+  buildRuntimeReviewTargetExportRecord,
   buildReviewConfirmationPhrase,
   buildReviewIntroText,
   buildRolloutDraftSummary,
   buildAccessControlledRuntimeExportPayload,
   formatAccessibleServerLabel,
+  formatCommitShort,
   formatDate,
+  formatReleaseSourceLabel,
   formatSuggestedPorts,
   normalizeCustomDomainValue,
   normalizeDeploymentActionError,
@@ -80,42 +95,98 @@ function buildAttentionItems(deployment, health, diagnostics) {
   return items;
 }
 
-function formatReleaseSourceLabel(source) {
-  if (!source) {
-    return "manual";
-  }
-  return source.replaceAll("_", " ");
-}
-
-function formatCommitShort(commit) {
-  if (!commit) {
-    return "-";
-  }
-  return String(commit).slice(0, 12);
-}
-
-function buildReleaseTraceLine(deployment) {
+function buildRuntimeOwnershipSummary(
+  deployment,
+  currentUser,
+  { canAccessServers = false, runtimeServerAccessBlocked = false } = {},
+) {
   if (!deployment) {
-    return "Release trace: n/a";
+    return {
+      value: "Unknown",
+      detail: "Runtime ownership is not available yet.",
+      summaryLine: "Ownership is not available yet.",
+    };
   }
 
-  const parts = [`source ${formatReleaseSourceLabel(deployment.release_source)}`];
-  if (deployment.release_ref) {
-    parts.push(`ref ${deployment.release_ref}`);
+  const ownerUserId = String(deployment.owner_user_id || "").trim();
+  const currentUserId = String(currentUser?.id || "").trim();
+  const ownedByCurrentUser = Boolean(ownerUserId && currentUserId && ownerUserId === currentUserId);
+  const ownedByAnotherOperator = Boolean(ownerUserId && currentUserId && ownerUserId !== currentUserId);
+
+  if (runtimeServerAccessBlocked) {
+    if (ownedByCurrentUser) {
+      return {
+        value: "Your runtime on admin-managed target",
+        detail:
+          "You own the deployment record, but live health, logs, change, delete, and reusable setup stay with admins until server sharing exists.",
+        summaryLine:
+          "Ownership: you own this deployment record, but live health, logs, change, delete, and reusable setup stay with admins until server sharing exists.",
+      };
+    }
+
+    if (ownedByAnotherOperator) {
+      return {
+        value: "Another operator on admin-managed target",
+        detail:
+          "Another operator owns the deployment record, and the remote target also stays admin-managed until server sharing exists.",
+        summaryLine:
+          "Ownership: another operator owns this deployment record, and the remote target still stays admin-managed until server sharing exists.",
+      };
+    }
+
+    return {
+      value: "Admin-managed target",
+      detail:
+        "This runtime is tied to an admin-managed remote target, so live health, logs, change, delete, and reusable setup stay with admins.",
+      summaryLine:
+        "Ownership: this runtime is tied to an admin-managed remote target, so live health, logs, change, delete, and reusable setup stay with admins.",
+    };
   }
-  if (deployment.release_commit_sha) {
-    parts.push(`commit ${formatCommitShort(deployment.release_commit_sha)}`);
+
+  if (ownedByAnotherOperator) {
+    return {
+      value: "Another operator's runtime",
+      detail:
+        "This deployment record belongs to another operator. Review the current state deliberately before changing, exporting, or reusing it.",
+      summaryLine:
+        "Ownership: another operator owns this deployment record, so review the current state deliberately before changing, exporting, or reusing it.",
+    };
   }
-  if (deployment.release_image_tag) {
-    parts.push(`tag ${deployment.release_image_tag}`);
+
+  if (ownedByCurrentUser) {
+    return {
+      value: deployment.server_id ? "Your remote runtime" : "Your workspace runtime",
+      detail: deployment.server_id
+        ? canAccessServers
+          ? "You own the deployment record and can review the live target directly from this page."
+          : "You own the deployment record for this remote runtime."
+        : "You own this deployment record and manage it directly from this workspace.",
+      summaryLine: deployment.server_id
+        ? canAccessServers
+          ? "Ownership: you own this deployment record and can review the live target directly from this page."
+          : "Ownership: you own this deployment record for this remote runtime."
+        : "Ownership: you own this deployment record and manage it directly from this workspace.",
+    };
   }
-  if (deployment.release_triggered_by) {
-    parts.push(`by ${deployment.release_triggered_by}`);
-  }
-  return `Release trace: ${parts.join(", ")}`;
+
+  return {
+    value: deployment.server_id ? "Legacy remote runtime" : "Legacy workspace runtime",
+    detail:
+      "This deployment predates explicit owner tagging. Treat it as a legacy runtime until it is recreated or explicitly handed off.",
+    summaryLine:
+      "Ownership: this deployment predates explicit owner tagging, so treat it as a legacy runtime until it is recreated or explicitly handed off.",
+  };
 }
 
-function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canAccessServers) {
+function buildRuntimeSummaryText(
+  deployment,
+  health,
+  diagnostics,
+  activity,
+  canAccessServers,
+  ownershipSummary,
+  reviewTargetSummary,
+) {
   if (!deployment) {
     return "";
   }
@@ -134,6 +205,15 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
         : deployment.server_id || deployment.server_managed_by_admin
           ? "Managed by an admin"
           : "Local"
+    }`,
+    `Ownership: ${ownershipSummary?.value || "Unknown"}${
+      ownershipSummary?.detail ? `. ${ownershipSummary.detail}` : ""
+    }`,
+    `Review target: ${reviewTargetSummary?.value || "Unknown"}${
+      reviewTargetSummary?.href ? ` -> ${reviewTargetSummary.href}` : ""
+    }`,
+    `Review target detail: ${
+      reviewTargetSummary?.detail || "Review target is not available yet."
     }`,
     `URL: ${buildDeploymentUrl(deployment) || "n/a"}`,
     `Custom domain: ${
@@ -198,7 +278,169 @@ function buildRecommendedNextStep(deployment, health, diagnostics, attentionItem
     : "Keep the current rollout stable, and only redeploy when you are ready to change image, ports, or env vars deliberately.";
 }
 
-function buildPlainLanguageSummary(deployment, health, diagnostics, attentionItems, activity, canAccessServers) {
+function buildPassportIncidentMode(
+  deployment,
+  health,
+  diagnostics,
+  attentionItems,
+  activity,
+  reviewTarget,
+  runtimeDecisionState,
+  { canMutateRuntime = true } = {},
+) {
+  const recentFailureCount = diagnostics?.activity?.recent_failure_count || 0;
+  const isStackRuntime = deployment?.runtime_shape === "stack";
+  const active =
+    deployment?.status === "failed" ||
+    Boolean(health?.status && health.status !== "healthy") ||
+    attentionItems.length > 0 ||
+    recentFailureCount > 0;
+
+  if (!active) {
+    return null;
+  }
+
+  const primaryAttention = attentionItems[0] || null;
+  const latestEvent =
+    Array.isArray(activity) && activity.length > 0 ? activity[0] : null;
+  const reviewTargetHref = String(reviewTarget?.href || "").trim();
+  const stackName =
+    String(deployment?.stack_name || deployment?.container_name || deployment?.id || "this stack").trim();
+  const stackService =
+    String(deployment?.primary_service || deployment?.container_name || "primary service").trim();
+
+  let likelyCauseValue = isStackRuntime ? "Stack incident" : "Runtime incident";
+  let likelyCauseDetail =
+    isStackRuntime
+      ? "The stack still needs review before another replacement decision competes for attention."
+      : "The runtime still needs review before another rollout change.";
+  let firstChecksDetail =
+    isStackRuntime
+      ? "Review the saved health target, stack diagnostics, and recent activity before another replacement decision."
+      : "Review the active warnings, diagnostics, and recent activity before another change.";
+
+  if (isStackRuntime) {
+    if (deployment?.status === "failed") {
+      likelyCauseValue = "Stack rollout failed";
+      likelyCauseDetail =
+        String(deployment.error || "").trim() ||
+        primaryAttention?.message ||
+        latestEvent?.message ||
+        `The stack ${stackName} failed before ${stackService} proved it was healthy.`;
+      firstChecksDetail = reviewTargetHref
+        ? `Open the saved health target at ${reviewTargetHref}, then compare recent activity and stack diagnostics before deciding whether the whole stack must be replaced.`
+        : "Review stack diagnostics, recent activity, and the primary service state before deciding whether the whole stack must be replaced.";
+    } else if (health?.status && health.status !== "healthy") {
+      likelyCauseValue = `Stack health ${health.status}`;
+      likelyCauseDetail =
+        String(health.error || "").trim() ||
+        primaryAttention?.message ||
+        latestEvent?.message ||
+        `The saved health target still shows ${health.status} for ${stackService}.`;
+      firstChecksDetail = reviewTargetHref
+        ? `Open the saved health target at ${reviewTargetHref}, then read recent activity and stack diagnostics before deciding whether the whole stack needs replacement.`
+        : "Read stack health proof, recent activity, and diagnostics before deciding whether the whole stack needs replacement.";
+    } else if (primaryAttention) {
+      likelyCauseValue = primaryAttention.label || "Stack warning";
+      likelyCauseDetail =
+        primaryAttention.message ||
+        latestEvent?.message ||
+        `At least one stack warning still needs explanation for ${stackName}.`;
+      firstChecksDetail = reviewTargetHref
+        ? `Open the saved health target at ${reviewTargetHref}, then review the matching stack diagnostics and recent activity before planning any whole-stack replacement.`
+        : "Work through the current stack warnings first, then confirm stack diagnostics and recent activity before planning any replacement.";
+    } else if (recentFailureCount > 0) {
+      likelyCauseValue = `${recentFailureCount} recent stack failure${recentFailureCount === 1 ? "" : "s"}`;
+      likelyCauseDetail =
+        latestEvent?.message ||
+        `Recent failure history still needs explanation for ${stackName} before any replacement.`;
+      firstChecksDetail = reviewTargetHref
+        ? `Open the saved health target at ${reviewTargetHref}, then review recent activity and stack diagnostics before planning any replacement.`
+        : "Review recent activity and stack diagnostics first, then use logs only if the stack failure story is still unclear.";
+    }
+  } else if (deployment?.status === "failed") {
+    likelyCauseValue = "Runtime failed";
+    likelyCauseDetail =
+      String(deployment.error || "").trim() ||
+      primaryAttention?.message ||
+      latestEvent?.message ||
+      "The runtime entered a failed state before it proved it was healthy.";
+    firstChecksDetail =
+      "Start with attention, diagnostics, and recent activity. Use logs only if those still do not explain why the runtime failed.";
+  } else if (health?.status && health.status !== "healthy") {
+    likelyCauseValue = `Health ${health.status}`;
+    likelyCauseDetail =
+      String(health.error || "").trim() ||
+      primaryAttention?.message ||
+      latestEvent?.message ||
+      "The latest health signal is degraded and still needs explanation.";
+    firstChecksDetail = reviewTargetHref
+      ? `Check the saved review target at ${reviewTargetHref}, then read health proof and recent activity before another change.`
+      : "Check the latest health proof, diagnostics, and recent activity before another change.";
+  } else if (primaryAttention) {
+    likelyCauseValue = primaryAttention.label || "Runtime warning";
+    likelyCauseDetail =
+      primaryAttention.message ||
+      latestEvent?.message ||
+      "At least one runtime warning still needs explanation.";
+    firstChecksDetail =
+      "Work through the current attention items first, then confirm diagnostics and recent activity before treating the runtime as stable.";
+  } else if (recentFailureCount > 0) {
+    likelyCauseValue = `${recentFailureCount} recent failure${recentFailureCount === 1 ? "" : "s"}`;
+    likelyCauseDetail =
+      latestEvent?.message ||
+      "Recent failure history still needs explanation before another rollout change.";
+    firstChecksDetail =
+      "Review diagnostics history and recent activity first, then use logs only if the failure story is still unclear.";
+  }
+
+  const escalationPathValue = !canMutateRuntime
+    ? isStackRuntime
+      ? "Admin stack escalation"
+      : "Admin escalation"
+    : isStackRuntime
+      ? "Handoff before stack replacement"
+      : "Handoff before recovery";
+  const escalationPathDetail = !canMutateRuntime
+    ? isStackRuntime
+      ? "If the cause is still not concrete after those checks, copy the deployment passport summary and export the incident snapshot for the admins who control live stack recovery actions."
+      : "If the cause is still not concrete after those checks, copy the deployment passport summary and export the incident snapshot for the admins who control live recovery actions."
+    : isStackRuntime
+      ? "If the cause is still not concrete after those checks, copy the deployment passport summary and export the incident snapshot before any guarded whole-stack delete or replacement."
+      : "If the cause is still not concrete after those checks, copy the deployment passport summary and export the incident snapshot before attempting redeploy or rollback.";
+
+  return {
+    likelyCause: {
+      value: likelyCauseValue,
+      detail: likelyCauseDetail,
+    },
+    firstChecks: {
+      value: "Attention, diagnostics, activity",
+      detail: firstChecksDetail,
+    },
+    safeActionNow: {
+      value: runtimeDecisionState?.primaryAction || "Review runtime",
+      detail:
+        runtimeDecisionState?.nextStep ||
+        "Review runtime signals before making another change.",
+    },
+    escalationPath: {
+      value: escalationPathValue,
+      detail: escalationPathDetail,
+    },
+  };
+}
+
+function buildPlainLanguageSummary(
+  deployment,
+  health,
+  diagnostics,
+  attentionItems,
+  activity,
+  canAccessServers,
+  ownershipSummary,
+  reviewTargetSummary,
+) {
   if (!deployment) {
     return "";
   }
@@ -236,6 +478,12 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
       : deployment.server_id || deployment.server_managed_by_admin
         ? "The deployment runs on an admin-managed server target."
         : "No diagnostics target is available yet.",
+    ownershipSummary?.summaryLine || "Ownership is not available yet.",
+    reviewTargetSummary?.href
+      ? `The clearest review target right now is ${reviewTargetSummary.href}. ${reviewTargetSummary.detail}`
+      : `The clearest review target right now stays inside deployment detail. ${
+          reviewTargetSummary?.detail || "Review target is not available yet."
+        }`,
     `Latest release trace: ${buildReleaseTraceLine(deployment).replace("Release trace: ", "")}.`,
     latestEvent?.title
       ? `The most recent recorded activity was "${latestEvent.title}" at ${formatDate(latestEvent.created_at)}.`
@@ -244,103 +492,6 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
   ];
 
   return lines.join("\n");
-}
-
-function buildIncidentSnapshotPayload(
-  deployment,
-  health,
-  exportPayload,
-  runtimeSummaryText,
-  plainLanguageSummary,
-  nextStep,
-  status,
-) {
-  if (!deployment) {
-    return null;
-  }
-
-  return {
-    generated_at: new Date().toISOString(),
-    deployment_id: deployment.id,
-    status,
-    next_step: nextStep,
-    human_summary: plainLanguageSummary,
-    runtime_summary: runtimeSummaryText,
-    attention_items: exportPayload.attentionItems,
-    suggested_ports: exportPayload.suggestedPorts,
-    deployment: exportPayload.deployment,
-    health: exportPayload.health,
-    diagnostics: exportPayload.diagnostics,
-    activity: exportPayload.activity,
-  };
-}
-
-function buildIncidentMarkdown(snapshot) {
-  if (!snapshot) {
-    return "";
-  }
-
-  const lines = [
-    `# Deployment Incident Handoff`,
-    ``,
-    `Generated: ${formatDate(snapshot.generated_at)}`,
-    `Deployment ID: ${snapshot.deployment_id}`,
-    `Status: ${snapshot.status}`,
-    ``,
-    `## Plain-Language Summary`,
-    ``,
-    ...snapshot.human_summary.split("\n"),
-    ``,
-    `## Next Step`,
-    ``,
-    snapshot.next_step,
-    ``,
-    `## Runtime Snapshot`,
-    ``,
-    ...snapshot.runtime_summary.split("\n"),
-    ``,
-    `## Attention Items`,
-    ``,
-  ];
-
-  if (snapshot.attention_items.length === 0) {
-    lines.push(`- No active runtime warnings.`);
-  } else {
-    snapshot.attention_items.forEach((item) => {
-      lines.push(`- ${item.label}: ${item.message}`);
-    });
-  }
-
-  lines.push(``, `## Recent Activity`, ``);
-
-  if (!Array.isArray(snapshot.activity) || snapshot.activity.length === 0) {
-    lines.push(`- No activity recorded yet.`);
-  } else {
-    snapshot.activity.slice(0, 10).forEach((item) => {
-      lines.push(
-        `- ${formatDate(item.created_at)} · ${item.level || "unknown"} · ${item.title || "-"} · ${item.message || "-"}`,
-      );
-    });
-  }
-
-  return lines.join("\n");
-}
-
-function buildActivityExportCsv(items) {
-  const rows = [
-    ["created_at", "level", "category", "title", "message"],
-    ...items.map((item) => [
-      item.created_at || "",
-      item.level || "",
-      item.category || "",
-      item.title || "",
-      item.message || "",
-    ]),
-  ];
-
-  return rows
-    .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
-    .join("\n");
 }
 
 function normalizeRedeployError(message) {
@@ -813,6 +964,7 @@ export default function DeploymentDetailsPage({ params }) {
   const { deploymentId } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const requestedSource = searchParams.get("source") || "";
   const smokeDetailDeployment = smokeMode
     ? deploymentId === "internal-runtime"
       ? smokeInternalRuntimeDeployment
@@ -820,6 +972,7 @@ export default function DeploymentDetailsPage({ params }) {
       ? {
           ...smokeDeployment,
           id: "admin-managed-runtime",
+          owner_user_id: smokeUser.id,
           server_id: null,
           server_name: null,
           server_host: null,
@@ -831,6 +984,7 @@ export default function DeploymentDetailsPage({ params }) {
   const smokeDetailIsAdminManaged = Boolean(smokeDetailDeployment?.server_managed_by_admin);
   const smokeDetailIsInternalOnly = smokeDetailDeployment?.id === smokeInternalRuntimeDeployment.id;
   const smokeDetailIsStack = smokeDetailDeployment?.runtime_shape === "stack";
+  const smokeDetailIsStackIncident = smokeDetailIsStack && requestedSource === "stack-incident";
   const smokeDetailHealth =
     smokeMode && smokeDetailIsAdminManaged
       ? {
@@ -843,6 +997,17 @@ export default function DeploymentDetailsPage({ params }) {
             "Live health checks stay with admins for this admin-managed remote runtime.",
           checked_at: smokeDetailDeployment.created_at,
           response_time_ms: null,
+        }
+      : smokeMode && smokeDetailIsStackIncident
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          url: smokeDetailDeployment.health_target,
+          status: "unhealthy",
+          status_code: 502,
+          error: "Saved health target returned 502 from primary service web.",
+          checked_at: smokeDetailDeployment.created_at,
+          response_time_ms: 641,
         }
       : smokeMode && smokeDetailIsStack
       ? {
@@ -881,6 +1046,54 @@ export default function DeploymentDetailsPage({ params }) {
   const smokeDetailDiagnostics =
     smokeMode && smokeDetailIsAdminManaged
       ? null
+      : smokeMode && smokeDetailIsStackIncident
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          current_status: smokeDetailDeployment.status,
+          server_target: `deploy@${smokeDetailDeployment.server_host}:22`,
+          checked_at: smokeDetailDeployment.created_at,
+          url: smokeDetailDeployment.health_target,
+          health: smokeDetailHealth,
+          activity: {
+            total_events: 3,
+            success_events: 1,
+            error_events: 2,
+            recent_failure_count: 2,
+            recent_failure_titles: [
+              "Primary service web returned 502 on saved health target",
+              "Queue worker backlog crossed the recovery threshold",
+            ],
+            last_event_title: "Stack health check failed",
+            last_event_level: "error",
+            last_event_at: smokeDetailDeployment.created_at,
+          },
+          log_excerpt:
+            "customer-portal-web-1 returned 502 from /health while the queue worker backlog kept growing.",
+          items: [
+            {
+              key: "deployment_status",
+              label: "Deployment status",
+              status: "warn",
+              summary: "Current status is running, but the stack is not healthy enough to treat as stable.",
+              details: "Primary service web is still live, but the saved health target is failing.",
+            },
+            {
+              key: "health",
+              label: "Stack health",
+              status: "error",
+              summary: "Saved health target returned 502 from primary service web.",
+              details: smokeDetailDeployment.health_target,
+            },
+            {
+              key: "queue",
+              label: "Queue backlog",
+              status: "warn",
+              summary: "Background worker lag crossed the recovery threshold.",
+              details: "Review the worker backlog and recent activity before replacing the whole stack.",
+            },
+          ],
+        }
       : smokeMode && smokeDetailIsStack
       ? {
           deployment_id: smokeDetailDeployment.id,
@@ -996,7 +1209,37 @@ export default function DeploymentDetailsPage({ params }) {
         }
       : smokeDiagnostics;
   const smokeDetailActivity =
-    smokeMode && smokeDetailIsStack
+    smokeMode && smokeDetailIsStackIncident
+      ? [
+          {
+            id: "stack-incident-activity-3",
+            deployment_id: smokeDetailDeployment.id,
+            level: "error",
+            title: "Stack health check failed",
+            message: "Saved health target returned 502 from primary service web.",
+            created_at: smokeDetailDeployment.created_at,
+            category: "health",
+          },
+          {
+            id: "stack-incident-activity-2",
+            deployment_id: smokeDetailDeployment.id,
+            level: "warn",
+            title: "Queue worker lag crossed recovery threshold",
+            message: "Background worker lag grew fast enough that the whole stack now needs operator review.",
+            created_at: "2026-04-02T00:43:00Z",
+            category: "worker",
+          },
+          {
+            id: "stack-incident-activity-1",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Stack deployment succeeded",
+            message: "customer-portal is still running, but the latest runtime proof no longer looks believable enough to treat as stable.",
+            created_at: "2026-04-02T00:41:00Z",
+            category: "deploy",
+          },
+        ]
+      : smokeMode && smokeDetailIsStack
       ? [
           {
             id: "stack-activity-2",
@@ -1067,6 +1310,8 @@ export default function DeploymentDetailsPage({ params }) {
     smokeMode
       ? smokeDetailIsAdminManaged
         ? "Live logs stay with admins for this admin-managed remote runtime."
+        : smokeDetailIsStackIncident
+        ? "customer-portal-web-1 returned 502 from /health while queue-worker-1 lag kept growing."
         : smokeDetailIsStack
         ? "customer-portal-web-1 entered RUNNING state under compose project customer-portal."
         : smokeDetailIsInternalOnly
@@ -1176,7 +1421,6 @@ export default function DeploymentDetailsPage({ params }) {
   const exportDiagnostics = runtimeExportPayload.diagnostics;
   const exportActivity = runtimeExportPayload.activity;
   const attentionItems = runtimeExportPayload.attentionItems;
-  const requestedSource = searchParams.get("source") || "";
   const freshRolloutLatestEvent =
     Array.isArray(exportActivity) && exportActivity.length > 0 ? exportActivity[0] : null;
   const freshRolloutReview =
@@ -1185,12 +1429,52 @@ export default function DeploymentDetailsPage({ params }) {
     (!health?.status || health.status === "healthy") &&
     attentionItems.length === 0;
   const showChangeTab = canMutateRuntime && !freshRolloutReview;
+  const runtimeOwnershipSummary = buildRuntimeOwnershipSummary(deployment, currentUser, {
+    canAccessServers,
+    runtimeServerAccessBlocked,
+  });
+  const identityExport = buildRuntimeIdentityExportRecord(deployment, {
+    locationSummary: runtimeLocationSummary,
+  });
+  const runtimeOwnershipExport = buildRuntimeOwnershipExportRecord(runtimeOwnershipSummary);
+  const reviewTargetExport = buildRuntimeReviewTargetExportRecord(reviewTarget);
+  const healthProofExport = buildRuntimeHealthProofExportRecord(health, reviewTarget);
+  const releaseTraceExport = buildRuntimeReleaseTraceExportRecord(deployment);
+  const runtimeIdentityReferenceText = [
+    identityExport.value,
+    identityExport.detail,
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const runtimeOwnershipReferenceText = [
+    runtimeOwnershipExport.value,
+    runtimeOwnershipExport.detail,
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const runtimeReviewTargetReferenceText = reviewTargetExport.href
+    ? `${reviewTargetExport.value}: ${reviewTargetExport.href}. ${reviewTargetExport.detail}`
+    : `${reviewTargetExport.value}. ${reviewTargetExport.detail}`;
+  const runtimeHealthProofReferenceText = [
+    healthProofExport.value,
+    healthProofExport.detail,
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const runtimeReleaseTraceReferenceText = [
+    releaseTraceExport.value,
+    releaseTraceExport.detail,
+  ]
+    .filter(Boolean)
+    .join(". ");
   const runtimeSummaryText = buildRuntimeSummaryText(
     deployment,
     health,
     exportDiagnostics,
     exportActivity,
     canAccessServers,
+    runtimeOwnershipSummary,
+    reviewTargetExport,
   );
   const plainLanguageSummary = buildPlainLanguageSummary(
     deployment,
@@ -1199,6 +1483,8 @@ export default function DeploymentDetailsPage({ params }) {
     attentionItems,
     exportActivity,
     canAccessServers,
+    runtimeOwnershipSummary,
+    reviewTargetExport,
   );
   const recommendedNextStep = buildRecommendedNextStep(
     deployment,
@@ -1206,44 +1492,180 @@ export default function DeploymentDetailsPage({ params }) {
     exportDiagnostics,
     attentionItems,
   );
-  const passportIdentityValue =
-    deployment?.runtime_shape === "stack"
-      ? deployment?.stack_name || deployment?.container_name || deployment?.id || "Stack pending"
-      : deployment?.container_name || deployment?.image || deployment?.id || "Deployment pending";
-  const passportIdentityDetail =
-    deployment?.runtime_shape === "stack"
-      ? `Primary service ${deployment?.primary_service || deployment?.container_name || "unknown"}. Compose-backed stack runtime. ${runtimeLocationSummary}`
-      : `${deployment?.image || "Image pending"} is the current runtime source. ${runtimeLocationSummary}`;
-  const passportHealthValue = health?.status || "unknown";
-  const passportHealthDetail = health?.checked_at
-    ? `Checked ${formatDate(health.checked_at)}${
-        health?.response_time_ms || health?.response_time_ms === 0
-          ? ` in ${health.response_time_ms} ms`
-          : ""
-      }.${reviewTarget.href ? ` Review target: ${reviewTarget.href}.` : ""}`
-    : reviewTarget.href
-      ? `Saved review target: ${reviewTarget.href}. No completed health check yet.`
-      : "No completed health check has been recorded yet.";
-  const passportRecentActivityValue = freshRolloutLatestEvent?.title || "No activity yet";
-  const passportRecentActivityDetail = freshRolloutLatestEvent
-    ? [
-        freshRolloutLatestEvent.message || "Most recent runtime event recorded.",
-        freshRolloutLatestEvent.created_at
-          ? `Logged ${formatDate(freshRolloutLatestEvent.created_at)}.`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(" ")
-    : "Wait for one meaningful runtime event before treating this deployment as settled.";
-  const incidentSnapshot = buildIncidentSnapshotPayload(
+  const runtimeDecisionState = buildRuntimeDecisionState(
     deployment,
     health,
-    runtimeExportPayload,
+    exportDiagnostics,
+    attentionItems,
+    exportActivity,
+    { canMutateRuntime, freshRolloutReview },
+  );
+  const passportIdentityValue = identityExport.value;
+  const passportIdentityDetail = identityExport.detail;
+  const recentActivityExport = buildRuntimeRecentActivityExportRecord(exportActivity);
+  const activityTrailExport = buildRuntimeActivityTrailExportRecord(exportActivity);
+  const attentionExport = buildRuntimeAttentionExportRecord(attentionItems);
+  const passportReviewTargetValue = reviewTargetExport.value;
+  const passportReviewTargetDetail = reviewTargetExport.href
+    ? `${reviewTargetExport.href}. ${reviewTargetExport.detail}`
+    : reviewTargetExport.detail;
+  const passportReleaseTraceValue = releaseTraceExport.value;
+  const passportReleaseTraceDetail = releaseTraceExport.detail;
+  const passportAttentionValue = attentionExport.value;
+  const passportAttentionDetail = attentionExport.detail;
+  const passportOwnershipValue = runtimeOwnershipSummary.value;
+  const passportOwnershipDetail = runtimeOwnershipSummary.detail;
+  const passportHealthValue = healthProofExport.value;
+  const passportHealthDetail = healthProofExport.detail;
+  const nextStepExport = buildRuntimeNextStepExportRecord(
+    runtimeDecisionState.primaryAction,
+    runtimeDecisionState.nextStep,
+  );
+  const runtimeRecentActivityReferenceText = [
+    recentActivityExport.value,
+    recentActivityExport.detail,
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const runtimeActivityTrailReferenceText = [
+    activityTrailExport.value,
+    activityTrailExport.detail,
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const passportRecentActivityValue = recentActivityExport.value;
+  const passportRecentActivityDetail = recentActivityExport.detail;
+  const runtimeAttentionReferenceText = [
+    attentionExport.value,
+    attentionExport.detail,
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const passportSafeChangeValue = !canMutateRuntime
+    ? "Admin-managed"
+    : deployment?.runtime_shape === "stack"
+      ? "Change paused for stack v0"
+      : freshRolloutReview
+        ? "Verify before change"
+        : Boolean(deployment?.rollback_available)
+          ? "Rollback ready"
+          : "Redeploy review";
+  const passportSafeChangeDetail = !canMutateRuntime
+    ? "Review and hand off from this passport first. Live redeploy, rollback, and delete stay with admins until server sharing exists."
+    : deployment?.runtime_shape === "stack"
+      ? "Stack redeploy and rollback stay paused until DeployMate can preserve the whole stack as one safe change unit."
+      : freshRolloutReview
+        ? "This rollout is still fresh. Verify the app, health, and recent activity first. Only after that open guarded redeploy review or rollback if this release is clearly worse than the last running one."
+        : Boolean(deployment?.rollback_available)
+          ? "Rollback is ready if the current rollout is clearly worse than the previous running release. Otherwise use guarded redeploy review for deliberate image, port, env, or name changes."
+          : "No previous running release snapshot exists yet. Use guarded redeploy review for deliberate image, port, env, or name changes.";
+  const passportRecoveryPathValue = !canMutateRuntime
+    ? "Admin-managed recovery"
+    : deployment?.runtime_shape === "stack"
+      ? freshRolloutReview
+        ? "No stack recovery decision yet"
+        : deployment?.status === "failed" ||
+            Boolean(health?.status && health.status !== "healthy") ||
+            attentionItems.length > 0 ||
+            (exportDiagnostics?.activity?.recent_failure_count || 0) > 0
+          ? "Diagnose, then replace stack"
+          : "Guarded stack replacement"
+      : deployment?.status === "failed" ||
+          Boolean(health?.status && health.status !== "healthy") ||
+          attentionItems.length > 0 ||
+          (exportDiagnostics?.activity?.recent_failure_count || 0) > 0
+        ? Boolean(deployment?.rollback_available)
+          ? "Review rollback first"
+          : "Diagnose, then review redeploy"
+        : freshRolloutReview
+          ? "No recovery decision yet"
+          : Boolean(deployment?.rollback_available)
+            ? "Review rollback"
+            : "Review redeploy";
+  const rollbackSummaryText = String(deployment?.rollback_summary || "").trim();
+  const passportRecoveryPathDetail = !canMutateRuntime
+    ? "Copy the deployment passport summary and incident snapshot first. Admins control live redeploy, rollback, and delete for this runtime."
+    : deployment?.runtime_shape === "stack"
+      ? freshRolloutReview
+        ? `${reviewTargetExport.href ? `Review the saved health target at ${reviewTargetExport.href}, then confirm recent activity and health proof before deciding whether this fresh stack rollout is believable enough to keep. ` : "Review the current stack runtime, recent activity, and health proof before deciding whether this fresh stack rollout is believable enough to keep. "}Guided redeploy and rollback stay paused for stack v0, so recovery should not become a replacement decision yet.`
+        : deployment?.status === "failed" ||
+            Boolean(health?.status && health.status !== "healthy") ||
+            attentionItems.length > 0 ||
+            (exportDiagnostics?.activity?.recent_failure_count || 0) > 0
+          ? `${reviewTargetExport.href ? `Review the saved health target at ${reviewTargetExport.href}, then confirm diagnostics and recent activity before deciding whether the whole stack must be replaced. ` : "Review the current stack runtime, diagnostics, and recent activity before deciding whether the whole stack must be replaced. "}Guided redeploy and rollback stay paused for stack v0, so safe recovery here means diagnosis first and guarded delete only if replacement is truly required.`
+          : `${reviewTargetExport.href ? `Review the saved health target at ${reviewTargetExport.href} and recent activity before planning any replacement. ` : "Review the current stack runtime and recent activity before planning any replacement. "}Guided redeploy and rollback stay paused for stack v0, so recovery stays a guarded stack replacement path rather than a single-container rollback or redeploy.`
+      : deployment?.status === "failed" ||
+          Boolean(health?.status && health.status !== "healthy") ||
+          attentionItems.length > 0 ||
+          (exportDiagnostics?.activity?.recent_failure_count || 0) > 0
+        ? Boolean(deployment?.rollback_available)
+          ? `${rollbackSummaryText ? `Saved rollback point: ${rollbackSummaryText}. ` : ""}Use Review rollback when the current rollout is clearly worse than that saved release. Otherwise finish diagnosis first, then use Review redeploy.`
+          : "No previous running release snapshot is available yet. Explain the failure first, then use Review redeploy with the impact summary instead of guessing."
+        : freshRolloutReview
+          ? "This rollout is still being verified. Finish the first app, health, and activity review before deciding whether rollback or redeploy should become the recovery path."
+          : Boolean(deployment?.rollback_available)
+            ? `${rollbackSummaryText ? `Saved rollback point: ${rollbackSummaryText}. ` : ""}If a later rollout is clearly worse, use Review rollback. Otherwise use Review redeploy for a deliberate change.`
+            : "No previous running release snapshot is available yet. Recovery currently means a guarded Review redeploy path until a later successful change creates a saved rollback point.";
+  const passportIncidentMode = buildPassportIncidentMode(
+    deployment,
+    health,
+    exportDiagnostics,
+    attentionItems,
+    exportActivity,
+    reviewTargetExport,
+    runtimeDecisionState,
+    { canMutateRuntime },
+  );
+  const passportIncidentItems = passportIncidentMode
+    ? [
+        {
+          key: "likely-cause",
+          label: "Likely cause",
+          value: passportIncidentMode.likelyCause.value,
+          detail: passportIncidentMode.likelyCause.detail,
+        },
+        {
+          key: "first-checks",
+          label: "First checks",
+          value: passportIncidentMode.firstChecks.value,
+          detail: passportIncidentMode.firstChecks.detail,
+        },
+        {
+          key: "safe-action-now",
+          label: "Safe action now",
+          value: passportIncidentMode.safeActionNow.value,
+          detail: passportIncidentMode.safeActionNow.detail,
+        },
+        {
+          key: "escalation-path",
+          label: "Escalation path",
+          value: passportIncidentMode.escalationPath.value,
+          detail: passportIncidentMode.escalationPath.detail,
+        },
+      ]
+    : [];
+  const runtimeNextStepReferenceText = [
+    nextStepExport.value,
+    nextStepExport.detail,
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const incidentSnapshot = buildIncidentSnapshotPayload({
+    deployment,
+    health,
+    exportPayload: runtimeExportPayload,
+    identityRecord: identityExport,
+    recentActivityRecord: recentActivityExport,
+    activityTrailRecord: activityTrailExport,
+    attentionRecord: attentionExport,
+    nextStepRecord: nextStepExport,
+    ownershipSummary: runtimeOwnershipSummary,
+    reviewTarget,
     runtimeSummaryText,
     plainLanguageSummary,
-    recommendedNextStep,
-    deployment?.status || "unknown",
-  );
+    nextStep: recommendedNextStep,
+    status: deployment?.status || "unknown",
+  });
   const filteredActivity = [...exportActivity]
     .filter((item) => {
       if (activityLevelFilter !== "all" && (item.level || "unknown") !== activityLevelFilter) {
@@ -1285,6 +1707,7 @@ export default function DeploymentDetailsPage({ params }) {
 
       return rightTime - leftTime;
     });
+  const filteredActivityTrailExport = buildRuntimeActivityTrailExportRecord(filteredActivity);
   const deleteConfirmationTarget = deployment?.container_name || deployment?.id || "";
   const deleteConfirmationPhrase = buildReviewConfirmationPhrase(
     "delete",
@@ -1307,14 +1730,6 @@ export default function DeploymentDetailsPage({ params }) {
         : freshRolloutReview
           ? "Fresh rollout is ready for first verification."
           : "Runtime surface is stable enough for review.");
-  const runtimeDecisionState = buildRuntimeDecisionState(
-    deployment,
-    health,
-    exportDiagnostics,
-    attentionItems,
-    exportActivity,
-    { canMutateRuntime, freshRolloutReview },
-  );
   const runtimeHeroLead = deployment
     ? `${deployment.container_name || deployment.image || deploymentId}. ${detailPriority}`
     : "Review what is running, whether it is healthy, and what should happen next.";
@@ -1417,6 +1832,24 @@ export default function DeploymentDetailsPage({ params }) {
       detail: passportIdentityDetail,
     },
     {
+      key: "review-target",
+      label: "Review target",
+      value: passportReviewTargetValue,
+      detail: passportReviewTargetDetail,
+    },
+    {
+      key: "release-trace",
+      label: "Release trace",
+      value: passportReleaseTraceValue,
+      detail: passportReleaseTraceDetail,
+    },
+    {
+      key: "ownership",
+      label: "Ownership",
+      value: passportOwnershipValue,
+      detail: passportOwnershipDetail,
+    },
+    {
       key: "health",
       label: "Health proof",
       value: passportHealthValue,
@@ -1429,10 +1862,28 @@ export default function DeploymentDetailsPage({ params }) {
       detail: passportRecentActivityDetail,
     },
     {
+      key: "attention",
+      label: "Current risk",
+      value: passportAttentionValue,
+      detail: passportAttentionDetail,
+    },
+    {
       key: "next-step",
       label: "Next safe action",
-      value: runtimeDecisionState.primaryAction,
-      detail: runtimeDecisionState.nextStep,
+      value: nextStepExport.value,
+      detail: nextStepExport.detail,
+    },
+    {
+      key: "safe-change",
+      label: "Safe change path",
+      value: passportSafeChangeValue,
+      detail: passportSafeChangeDetail,
+    },
+    {
+      key: "recovery-path",
+      label: "Recovery path",
+      value: passportRecoveryPathValue,
+      detail: passportRecoveryPathDetail,
     },
   ];
   const deploymentPassportSummary = [
@@ -1440,12 +1891,38 @@ export default function DeploymentDetailsPage({ params }) {
     plainLanguageSummary ? `Summary: ${plainLanguageSummary}` : null,
     `Runtime identity: ${passportIdentityValue}`,
     `Identity detail: ${passportIdentityDetail}`,
+    `Ownership: ${passportOwnershipValue}`,
+    `Ownership detail: ${passportOwnershipDetail}`,
+    `Review target: ${reviewTargetExport.value}`,
+    `Review target href: ${reviewTargetExport.href || "n/a"}`,
+    `Review target detail: ${reviewTargetExport.detail}`,
+    `Release trace: ${releaseTraceExport.value}`,
+    `Release detail: ${releaseTraceExport.detail}`,
     `Health proof: ${passportHealthValue}`,
     `Health detail: ${passportHealthDetail}`,
     `Recent activity: ${passportRecentActivityValue}`,
     `Activity detail: ${passportRecentActivityDetail}`,
-    `Next safe action: ${runtimeDecisionState.primaryAction}`,
-    `Next-step detail: ${runtimeDecisionState.nextStep}`,
+    `Attention cue: ${attentionExport.value}`,
+    `Attention detail: ${attentionExport.detail}`,
+    `Next safe action: ${nextStepExport.value}`,
+    `Next-step detail: ${nextStepExport.detail}`,
+    `Safe change path: ${passportSafeChangeValue}`,
+    `Safe change detail: ${passportSafeChangeDetail}`,
+    `Recovery path: ${passportRecoveryPathValue}`,
+    `Recovery detail: ${passportRecoveryPathDetail}`,
+    ...(passportIncidentMode
+      ? [
+          "Incident mode: active",
+          `Likely cause: ${passportIncidentMode.likelyCause.value}`,
+          `Likely cause detail: ${passportIncidentMode.likelyCause.detail}`,
+          `First checks: ${passportIncidentMode.firstChecks.value}`,
+          `First-check detail: ${passportIncidentMode.firstChecks.detail}`,
+          `Safe action now: ${passportIncidentMode.safeActionNow.value}`,
+          `Safe action detail: ${passportIncidentMode.safeActionNow.detail}`,
+          `Escalation path: ${passportIncidentMode.escalationPath.value}`,
+          `Escalation detail: ${passportIncidentMode.escalationPath.detail}`,
+        ]
+      : []),
   ]
     .filter(Boolean)
     .join("\n");
@@ -1959,7 +2436,7 @@ export default function DeploymentDetailsPage({ params }) {
   }
 
   async function handleCopyRuntimeNextStep() {
-    await copyText(runtimeDecisionState.nextStep, "Runtime next step");
+    await copyText(runtimeNextStepReferenceText, "Runtime next step");
   }
 
   function handleDownloadIncidentSnapshot() {
@@ -1993,9 +2470,25 @@ export default function DeploymentDetailsPage({ params }) {
   function handleDownloadFilteredActivityCsv() {
     triggerFileDownload(
       `deploymate-deployment-${deploymentId}-activity.csv`,
-      new Blob([buildActivityExportCsv(filteredActivity)], {
-        type: "text/csv;charset=utf-8",
-      }),
+      new Blob(
+        [
+          buildActivityExportCsv(filteredActivity, {
+            deploymentId,
+            deployment,
+            identityRecord: identityExport,
+            recentActivityRecord: recentActivityExport,
+            activityTrailRecord: filteredActivityTrailExport,
+            attentionRecord: attentionExport,
+            nextStepRecord: nextStepExport,
+            health,
+            ownershipSummary: runtimeOwnershipExport,
+            reviewTarget,
+          }),
+        ],
+        {
+          type: "text/csv;charset=utf-8",
+        },
+      ),
     );
     showTransientMessage("Current activity view exported.");
   }
@@ -2469,7 +2962,9 @@ export default function DeploymentDetailsPage({ params }) {
                   </span>
                   <h2 data-testid="runtime-detail-passport-title">Deployment passport</h2>
                   <p className="formHint">
-                    Keep runtime identity, health proof, recent activity, and the next safe action in one handoff block.
+                    {passportIncidentMode
+                      ? "This passport is in incident mode. Keep likely cause, first checks, safe action now, and escalation path visible here until the runtime is believable again."
+                      : "Keep what is running, where to look, what changed, current risk, and the next safe action in one operator block."}
                   </p>
                 </div>
                 <div className="actionCluster">
@@ -2486,6 +2981,32 @@ export default function DeploymentDetailsPage({ params }) {
               {plainLanguageSummary ? (
                 <div className="banner subtle" data-testid="runtime-detail-passport-summary">
                   {plainLanguageSummary}
+                </div>
+              ) : null}
+              {passportIncidentMode ? (
+                <div className="stackedValue" data-testid="runtime-detail-passport-incident-card">
+                  <div className="sectionHeader">
+                    <div>
+                      <span className={`status ${runtimeDecisionState.tone}`}>Incident mode</span>
+                      <strong data-testid="runtime-detail-passport-incident-title">Use the passport as the incident brief</strong>
+                      <p className="formHint">
+                        Keep likely cause, first checks, safe action now, and escalation path here before another rollout change competes for attention.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="workspaceReviewerGrid runtimeReviewGrid">
+                    {passportIncidentItems.map((item) => (
+                      <article
+                        className="workspaceReviewerCard"
+                        key={item.key}
+                        data-testid={`runtime-detail-passport-incident-item-${item.key}`}
+                      >
+                        <span>{item.label}</span>
+                        <strong>{item.value}</strong>
+                        <p>{item.detail}</p>
+                      </article>
+                    ))}
+                  </div>
                 </div>
               ) : null}
               <div className="workspaceReviewerGrid runtimeReviewGrid">
@@ -3206,9 +3727,142 @@ export default function DeploymentDetailsPage({ params }) {
                   </pre>
                 </div>
               </div>
-              <div className="row">
-                <span className="label">Recommended next step</span>
-                <span data-testid="runtime-detail-next-step">{incidentSnapshot?.next_step || detailPriority}</span>
+              <div className="row" data-testid="runtime-detail-handoff-next-step-row">
+                <span className="label">Next safe action</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-next-step">
+                    <span data-testid="runtime-detail-handoff-next-step">
+                      {runtimeNextStepReferenceText}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={handleCopyRuntimeNextStep}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row" data-testid="runtime-detail-handoff-ownership-row">
+                <span className="label">Ownership boundary</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-handoff-ownership">
+                    {runtimeOwnershipReferenceText}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeOwnershipReferenceText, "Ownership boundary")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row" data-testid="runtime-detail-handoff-identity-row">
+                <span className="label">Runtime identity</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-handoff-identity">
+                    {runtimeIdentityReferenceText}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeIdentityReferenceText, "Runtime identity")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row" data-testid="runtime-detail-handoff-recent-activity-row">
+                <span className="label">Recent activity</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-handoff-recent-activity">
+                    {runtimeRecentActivityReferenceText}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeRecentActivityReferenceText, "Recent activity")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row" data-testid="runtime-detail-handoff-activity-trail-row">
+                <span className="label">Activity trail</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-handoff-activity-trail">
+                    {runtimeActivityTrailReferenceText}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeActivityTrailReferenceText, "Activity trail")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row" data-testid="runtime-detail-handoff-attention-row">
+                <span className="label">Attention</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-handoff-attention">
+                    {runtimeAttentionReferenceText}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeAttentionReferenceText, "Attention")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row" data-testid="runtime-detail-handoff-review-target-row">
+                <span className="label">Review target</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-handoff-review-target">
+                    {runtimeReviewTargetReferenceText}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeReviewTargetReferenceText, "Review target")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row" data-testid="runtime-detail-handoff-health-proof-row">
+                <span className="label">Health proof</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-handoff-health-proof">
+                    {runtimeHealthProofReferenceText}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeHealthProofReferenceText, "Health proof")}
+                  >
+                    Copy
+                  </button>
+                </span>
+              </div>
+              <div className="row" data-testid="runtime-detail-handoff-release-trace-row">
+                <span className="label">Release trace</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-handoff-release-trace">
+                    {runtimeReleaseTraceReferenceText}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeReleaseTraceReferenceText, "Release trace")}
+                  >
+                    Copy
+                  </button>
+                </span>
               </div>
               <div className="actionCluster">
                 <button
@@ -3735,11 +4389,19 @@ export default function DeploymentDetailsPage({ params }) {
                 <span>{suggestedPorts.length > 0 ? formatSuggestedPorts(suggestedPorts) : "-"}</span>
               </div>
               <div className="row">
-                <span className="label">Activity heartbeat</span>
-                <span>
-                  {diagnostics?.activity?.last_event_title
-                    ? `${diagnostics.activity.last_event_title} · ${formatDate(diagnostics.activity.last_event_at)}`
-                    : "No activity heartbeat yet."}
+                <span className="label">Activity trail</span>
+                <span className="valueWithActions">
+                  <span data-testid="runtime-detail-activity-trail-reference">
+                    {runtimeActivityTrailReferenceText || "No runtime activity has been recorded yet."}
+                  </span>
+                  <button
+                    type="button"
+                    className="smallButton"
+                    onClick={() => copyText(runtimeActivityTrailReferenceText, "Activity trail")}
+                    disabled={!runtimeActivityTrailReferenceText}
+                  >
+                    Copy
+                  </button>
                 </span>
               </div>
             </article>
@@ -4012,7 +4674,7 @@ export default function DeploymentDetailsPage({ params }) {
                 </div>
               </div>
               <p className="formHint" data-testid="runtime-detail-activity-summary">
-                Showing {filteredActivity.length} of {activity.length} activity event{activity.length === 1 ? "" : "s"}.
+                Showing {filteredActivity.length} of {activity.length} activity event{activity.length === 1 ? "" : "s"}. Current trail: {filteredActivityTrailExport.value}. {filteredActivityTrailExport.detail}
               </p>
 
               {filteredActivity.length === 0 ? (

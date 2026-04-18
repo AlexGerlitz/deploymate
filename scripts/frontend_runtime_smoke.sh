@@ -9,8 +9,10 @@ DIST_DIR="${FRONTEND_SMOKE_DIST_DIR:-.next-smoke-${PORT}}"
 APP_HTML="$(mktemp)"
 DETAIL_HTML="$(mktemp)"
 STACK_DETAIL_HTML="$(mktemp)"
+STACK_INCIDENT_HTML="$(mktemp)"
 FRESH_DETAIL_HTML="$(mktemp)"
 FAILED_DETAIL_HTML="$(mktemp)"
+ADMIN_MANAGED_DETAIL_HTML="$(mktemp)"
 HEALTHY_WORKFLOW_HTML="$(mktemp)"
 FAILED_WORKFLOW_HTML="$(mktemp)"
 INTERNAL_DETAIL_HTML="$(mktemp)"
@@ -29,10 +31,424 @@ cleanup() {
   if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
     stop_frontend_smoke_server
   fi
-  rm -f "$APP_HTML" "$DETAIL_HTML" "$STACK_DETAIL_HTML" "$FRESH_DETAIL_HTML" "$FAILED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML" "$CREATE_SUCCESS_WORKFLOW_HTML"
+  rm -f "$APP_HTML" "$DETAIL_HTML" "$STACK_DETAIL_HTML" "$STACK_INCIDENT_HTML" "$FRESH_DETAIL_HTML" "$FAILED_DETAIL_HTML" "$ADMIN_MANAGED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML" "$CREATE_SUCCESS_WORKFLOW_HTML"
 }
 
 trap cleanup EXIT
+
+run_runtime_export_handoff_smoke() {
+  (
+    set -euo pipefail
+    cd "$REPO_ROOT"
+
+    node --input-type=module <<'NODE'
+import {
+  buildActivityExportCsv,
+  buildIncidentMarkdown,
+  buildIncidentSnapshotPayload,
+  buildRuntimeActivityTrailExportRecord,
+  buildRuntimeAttentionExportRecord,
+  buildRuntimeIdentityExportRecord,
+  buildRuntimeNextStepExportRecord,
+  buildRuntimeRecentActivityExportRecord,
+  buildRuntimeHealthProofExportRecord,
+  buildRuntimeOwnershipExportRecord,
+  buildRuntimeReleaseTraceExportRecord,
+  buildRuntimeReviewTargetExportRecord,
+} from "./frontend/app/lib/runtime-workspace-utils.js";
+import {
+  smokeActivity,
+  smokeDeployment,
+  smokeDiagnostics,
+  smokeHealth,
+} from "./frontend/app/lib/smoke-fixtures.js";
+
+const ownership = buildRuntimeOwnershipExportRecord({
+  value: "Your remote runtime",
+  detail: "You own the deployment record and can review the live target directly from this page.",
+});
+
+if (ownership.value !== "Your remote runtime") {
+  throw new Error("runtime ownership export record lost the ownership label");
+}
+
+if (!ownership.detail.includes("review the live target directly")) {
+  throw new Error("runtime ownership export record lost the ownership detail");
+}
+
+const reviewTarget = buildRuntimeReviewTargetExportRecord({
+  kind: "app",
+  href: smokeHealth.url,
+});
+
+if (reviewTarget.value !== "Live endpoint") {
+  throw new Error("runtime review target export record lost the target label");
+}
+
+if (reviewTarget.href !== smokeHealth.url) {
+  throw new Error("runtime review target export record lost the href");
+}
+
+if (!reviewTarget.detail.includes("Open the live endpoint first")) {
+  throw new Error("runtime review target export record lost the detail");
+}
+
+const healthReviewTarget = buildRuntimeReviewTargetExportRecord({
+  kind: "health",
+  href: "https://customer-portal.example.com/health",
+});
+
+if (healthReviewTarget.value !== "Saved health target") {
+  throw new Error("runtime review target export record lost the health-target label");
+}
+
+if (healthReviewTarget.href !== "https://customer-portal.example.com/health") {
+  throw new Error("runtime review target export record lost the health-target href");
+}
+
+const identity = buildRuntimeIdentityExportRecord(smokeDeployment, {
+  locationSummary: "Running on Smoke VPS (smoke.example.com).",
+});
+
+if (identity.value !== "smoke-runtime") {
+  throw new Error("runtime identity export record lost the value");
+}
+
+if (identity.detail !== "nginx:alpine is the current runtime source. Running on Smoke VPS (smoke.example.com).") {
+  throw new Error("runtime identity export record lost the detail");
+}
+
+const recentActivity = buildRuntimeRecentActivityExportRecord(smokeActivity);
+
+if (recentActivity.value !== "Deployment succeeded") {
+  throw new Error("runtime recent activity export record lost the value");
+}
+
+if (
+  recentActivity.detail !==
+  "Deployment smoke-deployment is running in container smoke-runtime. Logged 02.04.2026, 00:01:00 UTC."
+) {
+  throw new Error("runtime recent activity export record lost the detail");
+}
+
+const activityTrail = buildRuntimeActivityTrailExportRecord(smokeActivity);
+
+if (activityTrail.value !== "2 events, 2 successes") {
+  throw new Error("runtime activity trail export record lost the value");
+}
+
+if (activityTrail.detail !== "Latest: Deployment succeeded at 02.04.2026, 00:01:00 UTC.") {
+  throw new Error("runtime activity trail export record lost the detail");
+}
+
+const attentionCue = buildRuntimeAttentionExportRecord([]);
+
+if (attentionCue.value !== "0 active warnings") {
+  throw new Error("runtime attention export record lost the value");
+}
+
+if (attentionCue.detail !== "No active runtime warnings right now.") {
+  throw new Error("runtime attention export record lost the detail");
+}
+
+const nextStepCue = buildRuntimeNextStepExportRecord(
+  "Open running app",
+  "Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional.",
+);
+
+if (nextStepCue.value !== "Open running app") {
+  throw new Error("runtime next-step export record lost the value");
+}
+
+if (
+  nextStepCue.detail !==
+  "Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional."
+) {
+  throw new Error("runtime next-step export record lost the detail");
+}
+
+const healthProof = buildRuntimeHealthProofExportRecord(smokeHealth, {
+  kind: "app",
+  href: smokeHealth.url,
+});
+
+if (healthProof.value !== "healthy") {
+  throw new Error("runtime health proof export record lost the status");
+}
+
+if (healthProof.detail !== "Checked 02.04.2026, 00:03:00 UTC with HTTP 200 in 42 ms.") {
+  throw new Error("runtime health proof export record lost the proof detail");
+}
+
+const releaseTrace = buildRuntimeReleaseTraceExportRecord(smokeDeployment);
+
+if (
+  releaseTrace.value !==
+  "source webhook, ref refs/heads/main, commit 7d9c4a2b1f0e, tag ghcr.io/deploymate/smoke-runtime:2026.04.02, by smoke-ci"
+) {
+  throw new Error("runtime release trace export record lost the summary");
+}
+
+if (releaseTrace.detail !== "Triggered 02.04.2026, 00:05:00 UTC.") {
+  throw new Error("runtime release trace export record lost the trigger detail");
+}
+
+const snapshot = buildIncidentSnapshotPayload({
+  deployment: smokeDeployment,
+  health: smokeHealth,
+  exportPayload: {
+    deployment: smokeDeployment,
+    health: smokeHealth,
+    diagnostics: smokeDiagnostics,
+    activity: smokeActivity.slice(0, 1),
+    attentionItems: [],
+    suggestedPorts: [],
+  },
+  identityRecord: identity,
+  recentActivityRecord: recentActivity,
+  activityTrailRecord: activityTrail,
+  attentionRecord: attentionCue,
+  nextStepRecord: nextStepCue,
+  ownershipSummary: ownership,
+  reviewTarget: {
+    kind: "app",
+    href: smokeHealth.url,
+  },
+  runtimeSummaryText: `Review target: ${reviewTarget.value} -> ${reviewTarget.href}`,
+  plainLanguageSummary: `Open ${reviewTarget.href} before the next rollout change.`,
+  nextStep: "Open the live endpoint and confirm the user-facing path works.",
+  status: smokeDeployment.status,
+});
+
+if (snapshot.review_target?.href !== smokeHealth.url) {
+  throw new Error("incident snapshot lost the exported review target href");
+}
+
+if (snapshot.runtime_identity?.container_name !== "smoke-runtime") {
+  throw new Error("incident snapshot lost the exported runtime identity");
+}
+
+if (snapshot.recent_activity?.title !== "Deployment succeeded") {
+  throw new Error("incident snapshot lost the exported recent activity cue");
+}
+
+if (snapshot.activity_trail?.value !== "2 events, 2 successes") {
+  throw new Error("incident snapshot lost the exported activity trail cue");
+}
+
+if (snapshot.attention_cue?.total_count !== "0") {
+  throw new Error("incident snapshot lost the exported attention cue");
+}
+
+if (snapshot.next_step_cue?.value !== "Open running app") {
+  throw new Error("incident snapshot lost the exported next-step cue");
+}
+
+if (snapshot.health_proof?.status_code !== "200") {
+  throw new Error("incident snapshot lost the exported health proof status code");
+}
+
+if (snapshot.release_trace?.commit_sha !== smokeDeployment.release_commit_sha) {
+  throw new Error("incident snapshot lost the exported release trace commit");
+}
+
+const markdown = buildIncidentMarkdown(snapshot);
+
+for (const value of [
+  "## Runtime Identity",
+  "Value: smoke-runtime",
+  "Detail: nginx:alpine is the current runtime source. Running on Smoke VPS (smoke.example.com).",
+  "Runtime shape: single",
+  "Image: nginx:alpine",
+  "Container: smoke-runtime",
+  "Location: Running on Smoke VPS (smoke.example.com).",
+  "## Recent Activity Cue",
+  "Value: Deployment succeeded",
+  "Detail: Deployment smoke-deployment is running in container smoke-runtime. Logged 02.04.2026, 00:01:00 UTC.",
+  "Logged at: 02.04.2026, 00:01:00 UTC",
+  "Level: success",
+  "Category: deploy",
+  "Title: Deployment succeeded",
+  "Message: Deployment smoke-deployment is running in container smoke-runtime.",
+  "## Activity Trail",
+  "Value: 2 events, 2 successes",
+  "Detail: Latest: Deployment succeeded at 02.04.2026, 00:01:00 UTC.",
+  "Total count: 2",
+  "Error count: 0",
+  "Warn count: 0",
+  "Success count: 2",
+  "Latest event: Deployment succeeded",
+  "Latest level: success",
+  "Latest at: 02.04.2026, 00:01:00 UTC",
+  "Latest problem: n/a",
+  "Latest problem at: n/a",
+  "Latest success: n/a",
+  "Latest success at: n/a",
+  "## Attention Cue",
+  "Value: 0 active warnings",
+  "Detail: No active runtime warnings right now.",
+  "Total count: 0",
+  "Error count: 0",
+  "Warn count: 0",
+  "Primary label: n/a",
+  "Primary message: n/a",
+  "## Next Safe Action Cue",
+  "Value: Open running app",
+  "Detail: Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional.",
+  "## Review Target",
+  "Status: Live endpoint",
+  `Href: ${smokeHealth.url}`,
+  "Detail: Open the live endpoint first, then confirm health and recent activity.",
+  "## Health Proof",
+  "Status: healthy",
+  "Detail: Checked 02.04.2026, 00:03:00 UTC with HTTP 200 in 42 ms.",
+  "Checked at: 02.04.2026, 00:03:00 UTC",
+  "HTTP status: 200",
+  "Response time: 42 ms",
+  "Error: n/a",
+  "## Release Trace",
+  "Summary: source webhook, ref refs/heads/main, commit 7d9c4a2b1f0e, tag ghcr.io/deploymate/smoke-runtime:2026.04.02, by smoke-ci",
+  "Source: webhook",
+  "Commit: 7d9c4a2b1f0e6d5c4b3a29181716151413121110",
+  "Triggered at: 02.04.2026, 00:05:00 UTC",
+  "Triggered by: smoke-ci",
+]) {
+  if (!markdown.includes(value)) {
+    throw new Error(`runtime handoff markdown lost ${value}`);
+  }
+}
+
+const csv = buildActivityExportCsv(smokeActivity.slice(0, 1), {
+  deploymentId: smokeDeployment.id,
+  deployment: smokeDeployment,
+  identityRecord: identity,
+  recentActivityRecord: recentActivity,
+  activityTrailRecord: activityTrail,
+  attentionRecord: attentionCue,
+  nextStepRecord: nextStepCue,
+  health: smokeHealth,
+  ownershipSummary: ownership,
+  reviewTarget: {
+    kind: "app",
+    href: smokeHealth.url,
+  },
+});
+
+for (const value of [
+  "deployment_id",
+  "runtime_identity_value",
+  "runtime_identity_detail",
+  "runtime_shape",
+  "runtime_image",
+  "runtime_container_name",
+  "runtime_stack_name",
+  "runtime_primary_service",
+  "runtime_location",
+  "recent_activity_value",
+  "recent_activity_detail",
+  "recent_activity_created_at",
+  "recent_activity_level",
+  "recent_activity_category",
+  "recent_activity_title",
+  "recent_activity_message",
+  "activity_trail_value",
+  "activity_trail_detail",
+  "activity_trail_total_count",
+  "activity_trail_error_count",
+  "activity_trail_warn_count",
+  "activity_trail_success_count",
+  "activity_trail_latest_title",
+  "activity_trail_latest_level",
+  "activity_trail_latest_created_at",
+  "activity_trail_latest_problem_title",
+  "activity_trail_latest_problem_created_at",
+  "activity_trail_latest_success_title",
+  "activity_trail_latest_success_created_at",
+  "attention_cue_value",
+  "attention_cue_detail",
+  "attention_total_count",
+  "attention_error_count",
+  "attention_warn_count",
+  "attention_primary_label",
+  "attention_primary_message",
+  "next_step_value",
+  "next_step_detail",
+  "ownership_status",
+  "ownership_detail",
+  "review_target_kind",
+  "review_target_status",
+  "review_target_href",
+  "review_target_detail",
+  "health_proof_status",
+  "health_proof_detail",
+  "health_checked_at",
+  "health_status_code",
+  "health_response_time_ms",
+  "health_error",
+  "release_trace_summary",
+  "release_trace_detail",
+  "release_source",
+  "release_ref",
+  "release_commit_sha",
+  "release_image_tag",
+  "release_triggered_at",
+  "release_triggered_by",
+  "smoke-deployment",
+  "smoke-runtime",
+  "nginx:alpine is the current runtime source. Running on Smoke VPS (smoke.example.com).",
+  "single",
+  "nginx:alpine",
+  "Running on Smoke VPS (smoke.example.com).",
+  "Deployment succeeded",
+  "Deployment smoke-deployment is running in container smoke-runtime. Logged 02.04.2026, 00:01:00 UTC.",
+  "2026-04-02T00:01:00Z",
+  "success",
+  "deploy",
+  "Deployment succeeded",
+  "Deployment smoke-deployment is running in container smoke-runtime.",
+  "2 events, 2 successes",
+  "Latest: Deployment succeeded at 02.04.2026, 00:01:00 UTC.",
+  "2",
+  "0",
+  "0",
+  "2",
+  "Deployment succeeded",
+  "success",
+  "2026-04-02T00:01:00Z",
+  "0 active warnings",
+  "No active runtime warnings right now.",
+  "0",
+  "0",
+  "0",
+  "Open running app",
+  "Open the running app and confirm the user-facing path works. Only prepare a rollout change after that check is intentional.",
+  "Your remote runtime",
+  "You own the deployment record and can review the live target directly from this page.",
+  "app",
+  "Live endpoint",
+  smokeHealth.url,
+  "Open the live endpoint first, then confirm health and recent activity.",
+  "healthy",
+  "Checked 02.04.2026, 00:03:00 UTC with HTTP 200 in 42 ms.",
+  "2026-04-02T00:03:00Z",
+  "200",
+  "42",
+  "source webhook, ref refs/heads/main, commit 7d9c4a2b1f0e, tag ghcr.io/deploymate/smoke-runtime:2026.04.02, by smoke-ci",
+  "Triggered 02.04.2026, 00:05:00 UTC.",
+  "webhook",
+  "refs/heads/main",
+  "7d9c4a2b1f0e6d5c4b3a29181716151413121110",
+  "ghcr.io/deploymate/smoke-runtime:2026.04.02",
+  "2026-04-02T00:05:00Z",
+  "smoke-ci",
+]) {
+  if (!csv.includes(value)) {
+    throw new Error(`runtime activity export lost ${value}`);
+  }
+}
+NODE
+  )
+}
 
 if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
   start_frontend_smoke_server
@@ -49,6 +465,98 @@ fi
 
 if ! grep -Eq 'data-testid="runtime-detail-share-order-title"[^>]*>Share this runtime in order<' "$DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] runtime detail lost the ordered share/handoff guidance" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-handoff-review-target"[^>]*>Live endpoint: http://smoke\.example\.com:38080\. Open the live endpoint first, then confirm health and recent activity\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail handoff card lost the explicit review target cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-handoff-identity"[^>]*>smoke-runtime\. nginx:alpine is the current runtime source\. Running on Smoke VPS \(smoke\.example\.com\)\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail handoff card lost the explicit runtime identity cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-handoff-recent-activity"[^>]*>Deployment succeeded\. Deployment smoke-deployment is running in container smoke-runtime\. Logged 02\.04\.2026, 00:01:00 UTC\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail handoff card lost the explicit recent activity cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-handoff-activity-trail"[^>]*>2 events, 2 successes\. Latest: Deployment succeeded at 02\.04\.2026, 00:01:00 UTC\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail handoff card lost the explicit activity trail cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-handoff-attention"[^>]*>0 active warnings\. No active runtime warnings right now\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail handoff card lost the explicit attention cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-activity-trail-reference"[^>]*>2 events, 2 successes\. Latest: Deployment succeeded at 02\.04\.2026, 00:01:00 UTC\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail quick reference lost the activity trail summary" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-handoff-next-step"[^>]*>Open running app\. Open the running app and confirm the user-facing path works\. Only prepare a rollout change after that check is intentional\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail handoff card lost the explicit next-step cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-handoff-health-proof"[^>]*>healthy\. Checked 02\.04\.2026, 00:03:00 UTC with HTTP 200 in 42 ms\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail handoff card lost the explicit health proof cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-handoff-release-trace"[^>]*>source webhook, ref refs/heads/main, commit 7d9c4a2b1f0e, tag ghcr\.io/deploymate/smoke-runtime:2026\.04\.02, by smoke-ci\. Triggered 02\.04\.2026, 00:05:00 UTC\.<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail handoff card lost the explicit release trace cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-review-target"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] deployment passport lost the on-screen review target cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-release-trace"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] deployment passport lost the on-screen release trace cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-attention"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] deployment passport lost the on-screen current risk cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-safe-change"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] deployment passport lost the safe change path cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-recovery-path"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] deployment passport lost the recovery path cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-activity-summary"' "$DETAIL_HTML" || \
+  ! grep -Eq 'Current trail: <!-- -->2 events, 2 successes<!-- -->\.' "$DETAIL_HTML" || \
+  ! grep -Eq 'Latest: Health check passed at 02\.04\.2026, 00:03:00 UTC\.' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail activity card lost the explicit activity trail summary" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Review rollback<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] healthy deployment passport lost the explicit rollback recovery path" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Rollback ready<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] healthy deployment passport lost the rollback-ready change path" >&2
+  exit 1
+fi
+
+if grep -Eq 'data-testid="runtime-detail-passport-incident-card"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] healthy deployment passport should not render incident mode" >&2
   exit 1
 fi
 
@@ -138,8 +646,79 @@ if ! grep -Eq 'data-testid="runtime-detail-review-target-link"[^>]*>https://cust
   exit 1
 fi
 
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-recovery-path"' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime passport lost the recovery path cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Guarded stack replacement<' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime passport lost the guarded stack replacement label" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'Review the saved health target at https://customer-portal.example.com/health and recent activity before planning any replacement\.' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime passport lost the health-target-first recovery detail" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'Guided redeploy and rollback stay paused for stack v0' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime passport lost the paused-stack-recovery guardrail" >&2
+  exit 1
+fi
+
 if grep -Eq '>Prepare rollout change<' "$STACK_DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] stack runtime detail still suggests the disabled single-app change flow as the next action" >&2
+  exit 1
+fi
+
+if grep -Eq 'data-testid="runtime-detail-passport-incident-card"' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] healthy stack runtime detail should stay out of incident mode" >&2
+  exit 1
+fi
+
+curl -sS "${BASE_URL}/deployments/smoke-stack-runtime?source=stack-incident" > "$STACK_INCIDENT_HTML"
+if ! grep -Eq 'data-testid="runtime-detail-passport-incident-card"' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the passport incident mode card" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-incident-item-likely-cause"' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the likely-cause incident cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Stack health unhealthy<' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the stack-specific likely-cause label" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'Saved health target returned 502 from primary service web\.' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the saved-health-target failure detail" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'Open the saved health target at https://customer-portal.example.com/health, then read recent activity and stack diagnostics before deciding whether the whole stack needs replacement\.' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the stack-specific first-checks guidance" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Review health and warnings<' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the review-first safe action" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Handoff before stack replacement<' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the stack-specific escalation path label" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'before any guarded whole-stack delete or replacement\.' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the guarded whole-stack escalation boundary" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Diagnose, then replace stack<' "$STACK_INCIDENT_HTML"; then
+  echo "[frontend-runtime-smoke] stack incident detail lost the stack recovery-path incident state" >&2
   exit 1
 fi
 
@@ -161,6 +740,31 @@ fi
 
 if ! grep -Eq 'data-testid="runtime-detail-passport-title"[^>]*>Deployment passport<' "$FRESH_DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] fresh rollout detail lost the deployment passport title" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-safe-change"' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout passport lost the safe change path cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-recovery-path"' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout passport lost the recovery path cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Verify before change<' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout passport lost the verify-before-change path" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>No recovery decision yet<' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout passport lost the no-recovery-yet cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'Verify the app, health, and recent activity first\.' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout passport lost the explicit verify-first change guidance" >&2
   exit 1
 fi
 
@@ -223,6 +827,61 @@ fi
 
 if grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>(Prepare rollout change|Open running app)<' "$FAILED_DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] failed runtime detail exposes a non-review main next step" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-incident-card"' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport did not switch into incident mode" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-incident-title"[^>]*>Use the passport as the incident brief<' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the incident brief title" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-incident-item-likely-cause"' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the likely-cause cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'Container exited after readiness timeout on port 9090\.' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the concrete likely cause detail" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-incident-item-safe-action-now"' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the safe-action cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Review runtime issues<' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the review-first safe action" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-incident-item-escalation-path"' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the escalation cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'copy the deployment passport summary and export the incident snapshot before attempting redeploy or rollback\.' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the escalation path detail" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-item-recovery-path"' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the recovery path cue" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Diagnose, then review redeploy<' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the explicit redeploy-first recovery path" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'No previous running release snapshot is available yet\.' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport lost the no-rollback recovery explanation" >&2
   exit 1
 fi
 
@@ -384,7 +1043,58 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 3))}"
+  export PORT="${FRONTEND_SMOKE_ADMIN_MANAGED_RUNTIME_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 3))}"
+  export BASE_URL="http://127.0.0.1:${PORT}"
+  export SERVER_LOG="${FRONTEND_SMOKE_ADMIN_MANAGED_RUNTIME_LOG:-/tmp/deploymate-frontend-admin-managed-runtime-smoke.log}"
+  export DIST_DIR="${FRONTEND_SMOKE_ADMIN_MANAGED_RUNTIME_DIST_DIR:-.next-smoke-admin-managed-runtime-${PORT}}"
+  export FRONTEND_SMOKE_PORT="$PORT"
+  export FRONTEND_SMOKE_LOG="$SERVER_LOG"
+  export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
+  export FRONTEND_SMOKE_REUSE_SERVER=0
+  export NEXT_PUBLIC_SMOKE_USER_ROLE=member
+
+  cleanup_admin_managed_runtime() {
+    stop_frontend_smoke_server
+  }
+
+  trap cleanup_admin_managed_runtime EXIT
+
+  start_frontend_smoke_server
+  wait_for_frontend_smoke_url "/deployments/admin-managed-runtime"
+
+  curl -sS "${BASE_URL}/deployments/admin-managed-runtime" > "$ADMIN_MANAGED_DETAIL_HTML"
+
+  if ! grep -Eq 'data-testid="runtime-detail-admin-managed-live-checks-banner"' "$ADMIN_MANAGED_DETAIL_HTML"; then
+    echo "[frontend-runtime-smoke] member admin-managed runtime detail lost the live-check ownership banner" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="runtime-detail-passport-item-ownership"' "$ADMIN_MANAGED_DETAIL_HTML"; then
+    echo "[frontend-runtime-smoke] member admin-managed runtime detail lost the passport ownership item" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '>Your runtime on admin-managed target<' "$ADMIN_MANAGED_DETAIL_HTML"; then
+    echo "[frontend-runtime-smoke] member admin-managed runtime detail lost the explicit ownership cue" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="runtime-detail-handoff-ownership"[^>]*>Your runtime on admin-managed target\. You own the deployment record, but live health, logs, change, delete, and reusable setup stay with admins until server sharing exists\.<' "$ADMIN_MANAGED_DETAIL_HTML"; then
+    echo "[frontend-runtime-smoke] member admin-managed runtime detail lost the handoff ownership export cue" >&2
+    exit 1
+  fi
+
+  if grep -Eq 'data-testid="runtime-detail-tab-change"' "$ADMIN_MANAGED_DETAIL_HTML"; then
+    echo "[frontend-runtime-smoke] member admin-managed runtime detail still exposes the change tab" >&2
+    exit 1
+  fi
+)
+
+(
+  set -euo pipefail
+  source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+
+  export PORT="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 4))}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_LOG:-/tmp/deploymate-frontend-template-success-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_TEMPLATE_SUCCESS_DIST_DIR:-.next-smoke-template-success-${PORT}}"
@@ -440,7 +1150,7 @@ fi
   set -euo pipefail
   source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
 
-  export PORT="${FRONTEND_SMOKE_CREATE_SUCCESS_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 4))}"
+  export PORT="${FRONTEND_SMOKE_CREATE_SUCCESS_PORT:-$((RUNTIME_SCENARIO_PORT_BASE + 5))}"
   export BASE_URL="http://127.0.0.1:${PORT}"
   export SERVER_LOG="${FRONTEND_SMOKE_CREATE_SUCCESS_LOG:-/tmp/deploymate-frontend-create-success-smoke.log}"
   export DIST_DIR="${FRONTEND_SMOKE_CREATE_SUCCESS_DIST_DIR:-.next-smoke-create-success-${PORT}}"
@@ -482,12 +1192,16 @@ fi
   fi
 )
 
+run_runtime_export_handoff_smoke
+
 echo "[frontend-runtime-smoke] app runtime surface rendered"
 echo "[frontend-runtime-smoke] deployment detail surface rendered"
 echo "[frontend-runtime-smoke] internal-only runtime detail rendered"
 echo "[frontend-runtime-smoke] healthy workflow happy path rendered"
 echo "[frontend-runtime-smoke] failed secondary workflow review path rendered"
 echo "[frontend-runtime-smoke] internal-only workflow review path rendered"
+echo "[frontend-runtime-smoke] member admin-managed runtime ownership cue rendered"
+echo "[frontend-runtime-smoke] runtime export handoff helper rendered"
 echo "[frontend-runtime-smoke] template deploy success path rendered"
 echo "[frontend-runtime-smoke] create deploy success path rendered"
 echo "[frontend-runtime-smoke] complete"

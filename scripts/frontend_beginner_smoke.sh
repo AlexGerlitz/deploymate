@@ -4,36 +4,45 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+source "${SCRIPT_DIR}/lib/frontend_smoke_checks.sh"
 
-frontend_smoke_browser_bin() {
-  if [ -n "${FRONTEND_SMOKE_BROWSER_BIN:-}" ] && [ -x "${FRONTEND_SMOKE_BROWSER_BIN}" ]; then
-    printf '%s\n' "${FRONTEND_SMOKE_BROWSER_BIN}"
-    return 0
-  fi
+BUILT_DIST_DIRS=()
 
-  for browser in google-chrome chromium chromium-browser; do
-    if command -v "$browser" >/dev/null 2>&1; then
-      command -v "$browser"
-      return 0
-    fi
+cleanup() {
+  local dist_dir=""
+
+  for dist_dir in "${BUILT_DIST_DIRS[@]}"; do
+    rm -rf "${REPO_ROOT}/frontend/${dist_dir}"
   done
-
-  if [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
-    printf '%s\n' "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    return 0
-  fi
-
-  echo "[frontend-beginner-smoke] no headless browser found for hydrated DOM checks" >&2
-  return 1
 }
 
-frontend_smoke_dump_dom() {
-  local url="$1"
-  local output_file="$2"
-  local browser_bin=""
+trap cleanup EXIT
 
-  browser_bin="$(frontend_smoke_browser_bin)"
-  "$browser_bin" --headless=new --disable-gpu --dump-dom "$url" >"$output_file" 2>/dev/null
+build_beginner_static_dist() {
+  local smoke_name="$1"
+  local dist_dir="$2"
+  local build_log="/tmp/${smoke_name}.log"
+
+  shift 2
+  rm -rf "${REPO_ROOT}/frontend/${dist_dir}"
+
+  if ! env \
+    NEXT_PUBLIC_SMOKE_TEST_MODE=1 \
+    NEXT_FONT_GOOGLE_MOCKED_RESPONSES="$GOOGLE_FONT_MOCK_RESPONSES" \
+    NEXT_DIST_DIR="$dist_dir" \
+    "$@" \
+    npm --prefix "${REPO_ROOT}/frontend" run build >"$build_log" 2>&1; then
+    echo "[${smoke_name}] static build failed" >&2
+    cat "$build_log" >&2
+    exit 1
+  fi
+
+  BUILT_DIST_DIRS+=("$dist_dir")
+}
+
+beginner_static_html_file() {
+  frontend_smoke_static_html_file "$REPO_ROOT" "$1" "$2"
 }
 
 assert_first_deploy_handoff_workflow() {
@@ -183,34 +192,23 @@ NODE
 }
 
 run_beginner_admin_smoke() {
-  (
-    set -euo pipefail
-    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
-    source "${SCRIPT_DIR}/lib/frontend_smoke_checks.sh"
+  local smoke_name="frontend-beginner-admin-smoke"
+  local dist_dir=".next-smoke-beginner-admin-static"
+  local overview_html=""
 
-    export PORT="${FRONTEND_SMOKE_BEGINNER_ADMIN_PORT:-3005}"
-    export BASE_URL="http://127.0.0.1:${PORT}"
-    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_ADMIN_LOG:-/tmp/deploymate-frontend-beginner-admin-smoke.log}"
-    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_ADMIN_DIST_DIR:-.next-smoke-beginner-admin-${PORT}}"
-    export FRONTEND_SMOKE_PORT="$PORT"
-    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
-    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
-    export FRONTEND_SMOKE_REUSE_SERVER=0
-    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
 
-    cleanup_admin() {
-      stop_frontend_smoke_server
-    }
+  frontend_smoke_assert_static_checks \
+    "$smoke_name" \
+    "$REPO_ROOT" \
+    "$dist_dir" \
+    automation_smoke_beginner_admin_checks
 
-    trap cleanup_admin EXIT
-
-    start_frontend_smoke_server
-    wait_for_frontend_smoke_url "/app"
-    frontend_smoke_assert_checks "frontend-beginner-admin-smoke" "$BASE_URL" automation_smoke_beginner_admin_checks
-
-    overview_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app" > "$overview_html"
-    python3 - "$overview_html" <<'PY'
+  overview_html="$(beginner_static_html_file "$dist_dir" "/app")"
+  python3 - "$overview_html" <<'PY'
 import sys
 from pathlib import Path
 
@@ -230,126 +228,83 @@ for marker in required_order:
 if positions != sorted(positions):
     raise SystemExit("overview primary product blocks no longer render before operations depth")
 PY
-    rm -f "$overview_html"
-  )
 }
 
 run_beginner_admin_server_ready_smoke() {
-  (
-    set -euo pipefail
-    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+  local smoke_name="frontend-beginner-admin-server-ready-smoke"
+  local dist_dir=".next-smoke-beginner-admin-server-ready-static"
+  local overview_html=""
+  local workflow_html=""
 
-    export PORT="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_PORT:-3016}"
-    export BASE_URL="http://127.0.0.1:${PORT}"
-    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_LOG:-/tmp/deploymate-frontend-beginner-admin-server-ready-smoke.log}"
-    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_ADMIN_SERVER_READY_DIST_DIR:-.next-smoke-beginner-admin-server-ready-${PORT}}"
-    export FRONTEND_SMOKE_PORT="$PORT"
-    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
-    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
-    export FRONTEND_SMOKE_REUSE_SERVER=0
-    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
-    export NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-server-ready-first-deploy
-    export NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=first-deploy-after-overview
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-server-ready-first-deploy \
+    NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=first-deploy-after-overview \
+    "NEXT_PUBLIC_SMOKE_WORKFLOW_QUERY=server=smoke-server&source=overview-first-deploy"
 
-    cleanup_admin_server_ready() {
-      stop_frontend_smoke_server
-    }
+  overview_html="$(beginner_static_html_file "$dist_dir" "/app")"
+  workflow_html="$(beginner_static_html_file "$dist_dir" "/app/deployment-workflow")"
 
-    trap cleanup_admin_server_ready EXIT
+  if ! grep -Eq 'data-testid="workspace-scenario-action-step-2"[^>]*>Choose app to run<' "$overview_html"; then
+    echo "[${smoke_name}] overview did not point the ready-server admin to first deployment" >&2
+    exit 1
+  fi
 
-    start_frontend_smoke_server
-    wait_for_frontend_smoke_url "/app"
+  if ! grep -Eq 'data-testid="workspace-scenario-primary-action"[^>]*>Choose app to run<' "$overview_html"; then
+    echo "[${smoke_name}] overview lost the top-level first-deploy action" >&2
+    exit 1
+  fi
 
-    overview_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app" > "$overview_html"
+  if ! grep -Eq 'href="/app/deployment-workflow\?server=smoke-server&amp;source=overview-first-deploy"' "$overview_html"; then
+    echo "[${smoke_name}] overview did not preserve the ready server into the first-deploy link" >&2
+    exit 1
+  fi
 
-    if ! grep -Eq 'data-testid="workspace-scenario-action-step-2"[^>]*>Choose app to run<' "$overview_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] overview did not point the ready-server admin to first deployment" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
+  if grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Add first server target<' "$overview_html"; then
+    echo "[${smoke_name}] overview regressed to server setup after a server was ready" >&2
+    exit 1
+  fi
 
-    if ! grep -Eq 'data-testid="workspace-scenario-primary-action"[^>]*>Choose app to run<' "$overview_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] overview lost the top-level first-deploy action" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
+  if ! grep -Eq 'data-testid="workspace-scenario-item-step-1".*Server ready.*already connected' "$overview_html"; then
+    echo "[${smoke_name}] overview lost the explicit ready-server demotion copy on Step 1" >&2
+    exit 1
+  fi
 
-    if ! grep -Eq 'href="/app/deployment-workflow\?server=smoke-server&amp;source=overview-first-deploy"' "$overview_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] overview did not preserve the ready server into the first-deploy link" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
+  if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Review server setup<' "$overview_html"; then
+    echo "[${smoke_name}] overview Step 1 still competes with first deploy instead of staying a review action" >&2
+    exit 1
+  fi
 
-    if grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Add first server target<' "$overview_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] overview regressed to server setup after a server was ready" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
+  if grep -Eq 'data-testid="workspace-scenario-action-step-2"[^>]*disabled' "$overview_html"; then
+    echo "[${smoke_name}] Step 2 stayed blocked after a server was ready" >&2
+    exit 1
+  fi
 
-    if ! grep -Eq 'data-testid="workspace-scenario-item-step-1".*Server ready.*already connected' "$overview_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] overview lost the explicit ready-server demotion copy on Step 1" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Review server setup<' "$overview_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] overview Step 1 still competes with first deploy instead of staying a review action" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
-
-    if grep -Eq 'data-testid="workspace-scenario-action-step-2"[^>]*disabled' "$overview_html"; then
-      echo "[frontend-beginner-admin-server-ready-smoke] Step 2 stayed blocked after a server was ready" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
-
-    workflow_html="$(mktemp)"
-    frontend_smoke_dump_dom "${BASE_URL}/app/deployment-workflow?server=smoke-server&source=overview-first-deploy" "$workflow_html"
-
-    if ! assert_first_deploy_handoff_workflow \
-      "frontend-beginner-admin-server-ready-smoke" \
-      "$workflow_html" \
-      'selected from Overview' \
-      "overview-first-deploy"; then
-      rm -f "$overview_html" "$workflow_html"
-      exit 1
-    fi
-
-    rm -f "$overview_html" "$workflow_html"
-  )
+  if ! assert_first_deploy_handoff_workflow \
+    "$smoke_name" \
+    "$workflow_html" \
+    'selected from Overview' \
+    "overview-first-deploy"; then
+    exit 1
+  fi
 }
 
 run_beginner_admin_live_review_smoke() {
-  (
-    set -euo pipefail
-    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+  local smoke_name="frontend-beginner-admin-live-review-smoke"
+  local dist_dir=".next-smoke-beginner-admin-live-review-static"
+  local overview_html=""
 
-    export PORT="${FRONTEND_SMOKE_BEGINNER_ADMIN_LIVE_REVIEW_PORT:-3017}"
-    export BASE_URL="http://127.0.0.1:${PORT}"
-    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_ADMIN_LIVE_REVIEW_LOG:-/tmp/deploymate-frontend-beginner-admin-live-review-smoke.log}"
-    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_ADMIN_LIVE_REVIEW_DIST_DIR:-.next-smoke-beginner-admin-live-review-${PORT}}"
-    export FRONTEND_SMOKE_PORT="$PORT"
-    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
-    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
-    export FRONTEND_SMOKE_REUSE_SERVER=0
-    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
-    export NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-live-review
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-live-review
 
-    cleanup_admin_live_review() {
-      stop_frontend_smoke_server
-    }
+  overview_html="$(beginner_static_html_file "$dist_dir" "/app")"
 
-    trap cleanup_admin_live_review EXIT
-
-    start_frontend_smoke_server
-    wait_for_frontend_smoke_url "/app"
-
-    overview_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app" > "$overview_html"
-
-    python3 - "$overview_html" <<'PY'
+  python3 - "$overview_html" <<'PY'
 import sys
 from pathlib import Path
 
@@ -390,309 +345,161 @@ if ">Review live apps<" not in step_three:
 if ">Review live apps<" not in primary_action:
     raise SystemExit("overview lost the top-level live-review action after deploy")
 PY
-
-    rm -f "$overview_html"
-  )
 }
 
 run_beginner_member_smoke() {
-  (
-    set -euo pipefail
-    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
-    source "${SCRIPT_DIR}/lib/frontend_smoke_checks.sh"
+  local smoke_name="frontend-beginner-member-smoke"
+  local dist_dir=".next-smoke-beginner-member-static"
+  local member_html=""
+  local workflow_html=""
 
-    export PORT="${FRONTEND_SMOKE_BEGINNER_MEMBER_PORT:-3006}"
-    export BASE_URL="http://127.0.0.1:${PORT}"
-    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_MEMBER_LOG:-/tmp/deploymate-frontend-beginner-member-smoke.log}"
-    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_MEMBER_DIST_DIR:-.next-smoke-beginner-member-${PORT}}"
-    export FRONTEND_SMOKE_PORT="$PORT"
-    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
-    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
-    export FRONTEND_SMOKE_REUSE_SERVER=0
-    export NEXT_PUBLIC_SMOKE_USER_ROLE=member
-    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_SMOKE_USER_ROLE=member \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
 
-    cleanup_member() {
-      stop_frontend_smoke_server
-    }
+  frontend_smoke_assert_static_checks \
+    "$smoke_name" \
+    "$REPO_ROOT" \
+    "$dist_dir" \
+    automation_smoke_beginner_member_checks
 
-    trap cleanup_member EXIT
+  member_html="$(beginner_static_html_file "$dist_dir" "/app/server-review")"
+  workflow_html="$(beginner_static_html_file "$dist_dir" "/app/deployment-workflow")"
 
-    start_frontend_smoke_server
-    wait_for_frontend_smoke_url "/app"
-    frontend_smoke_assert_checks "frontend-beginner-member-smoke" "$BASE_URL" automation_smoke_beginner_member_checks
+  if grep -Eq 'data-testid="server-review-create-card"|data-testid="server-review-create-server"|data-testid="server-review-blocked-workflow-link"' "$member_html"; then
+    echo "[${smoke_name}] member remote-only path leaked admin controls or a false workflow CTA" >&2
+    exit 1
+  fi
 
-    member_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app/server-review" > "$member_html"
-    if grep -Eq 'data-testid="server-review-create-card"|data-testid="server-review-create-server"|data-testid="server-review-blocked-workflow-link"' "$member_html"; then
-      echo "[frontend-beginner-member-smoke] member remote-only path leaked admin controls or a false workflow CTA" >&2
-      rm -f "$member_html"
-      exit 1
-    fi
+  if grep -Eq 'data-testid="create-deployment-card"|data-testid="create-deployment-submit-button"|data-testid="templates-card"|data-testid="template-delete-button-' "$workflow_html"; then
+    echo "[${smoke_name}] member remote-only workflow leaked blocked create/template controls" >&2
+    exit 1
+  fi
 
-    workflow_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app/deployment-workflow" > "$workflow_html"
-    if grep -Eq 'data-testid="create-deployment-card"|data-testid="create-deployment-submit-button"|data-testid="templates-card"|data-testid="template-delete-button-' "$workflow_html"; then
-      echo "[frontend-beginner-member-smoke] member remote-only workflow leaked blocked create/template controls" >&2
-      rm -f "$member_html" "$workflow_html"
-      exit 1
-    fi
+  if ! grep -Eq 'data-testid="deployment-workflow-member-live-card"' "$workflow_html"; then
+    echo "[${smoke_name}] member remote-only live path lost the live-review guidance card" >&2
+    exit 1
+  fi
 
-    if ! grep -Eq 'data-testid="deployment-workflow-member-live-card"' "$workflow_html"; then
-      echo "[frontend-beginner-member-smoke] member remote-only live path lost the live-review guidance card" >&2
-      rm -f "$member_html" "$workflow_html"
-      exit 1
-    fi
+  if grep -Eq 'data-testid="deployment-workflow-member-blocked-card"' "$workflow_html"; then
+    echo "[${smoke_name}] member remote-only live path still renders the waiting-for-admin card" >&2
+    exit 1
+  fi
 
-    if grep -Eq 'data-testid="deployment-workflow-member-blocked-card"' "$workflow_html"; then
-      echo "[frontend-beginner-member-smoke] member remote-only live path still renders the waiting-for-admin card" >&2
-      rm -f "$member_html" "$workflow_html"
-      exit 1
-    fi
-
-    if grep -Eq 'Ops Batch|ops-batch\.demo\.example\.com' "$workflow_html"; then
-      echo "[frontend-beginner-member-smoke] member remote-only workflow leaked admin-managed server identity" >&2
-      rm -f "$member_html" "$workflow_html"
-      exit 1
-    fi
-
-    detail_html="$(mktemp)"
-    failed_detail_html="$(mktemp)"
-    admin_managed_detail_html="$(mktemp)"
-    curl -sS "${BASE_URL}/deployments/smoke-deployment" > "$detail_html"
-    curl -sS "${BASE_URL}/deployments/review-worker" > "$failed_detail_html"
-    curl -sS "${BASE_URL}/deployments/admin-managed-runtime" > "$admin_managed_detail_html"
-    if grep -Eq 'data-testid="runtime-detail-tab-change"|data-testid="runtime-detail-redeploy-review-button"|data-testid="runtime-detail-delete-review-button"|data-testid="runtime-detail-delete-confirm-button"' "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"; then
-      echo "[frontend-beginner-member-smoke] member runtime detail leaked mutation or destructive controls" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    if grep -Eq 'Smoke VPS' "$detail_html"; then
-      echo "[frontend-beginner-member-smoke] member healthy runtime detail leaked admin-managed server label" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    if grep -Eq 'Ops Batch|ops-batch\.demo\.example\.com' "$failed_detail_html"; then
-      echo "[frontend-beginner-member-smoke] member failed runtime detail leaked admin-managed server identity" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="runtime-detail-admin-managed-live-checks-banner"' "$admin_managed_detail_html"; then
-      echo "[frontend-beginner-member-smoke] member admin-managed runtime detail lost the live-checks boundary notice" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="runtime-detail-template-admin-managed-banner"' "$admin_managed_detail_html"; then
-      echo "[frontend-beginner-member-smoke] member admin-managed runtime detail lost the template boundary notice" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    if grep -Eq 'data-testid="runtime-detail-save-template-button"' "$admin_managed_detail_html"; then
-      echo "[frontend-beginner-member-smoke] member admin-managed runtime detail exposed local template save" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    if grep -Eq 'Smoke VPS|smoke\.example\.com|deploy@|For local deploys' "$admin_managed_detail_html"; then
-      echo "[frontend-beginner-member-smoke] member admin-managed runtime detail leaked server identity or local-runtime copy" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Open running app<' "$detail_html"; then
-      echo "[frontend-beginner-member-smoke] member healthy runtime detail lost the safe open-app next step" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Review runtime issues<' "$failed_detail_html"; then
-      echo "[frontend-beginner-member-smoke] member failed runtime detail lost the review-first next step" >&2
-      rm -f "$member_html" "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-      exit 1
-    fi
-
-    rm -f "$member_html"
-    rm -f "$workflow_html" "$detail_html" "$failed_detail_html" "$admin_managed_detail_html"
-  )
+  if grep -Eq 'Ops Batch|ops-batch\.demo\.example\.com' "$workflow_html"; then
+    echo "[${smoke_name}] member remote-only workflow leaked admin-managed server identity" >&2
+    exit 1
+  fi
 }
 
 run_beginner_member_overview_live_smoke() {
-  (
-    set -euo pipefail
-    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+  local smoke_name="frontend-beginner-member-overview-live-smoke"
+  local dist_dir=".next-smoke-beginner-member-overview-live-static"
+  local overview_html=""
 
-    export PORT="${FRONTEND_SMOKE_BEGINNER_MEMBER_OVERVIEW_LIVE_PORT:-3009}"
-    export BASE_URL="http://127.0.0.1:${PORT}"
-    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_MEMBER_OVERVIEW_LIVE_LOG:-/tmp/deploymate-frontend-beginner-member-overview-live-smoke.log}"
-    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_MEMBER_OVERVIEW_LIVE_DIST_DIR:-.next-smoke-beginner-member-overview-live-${PORT}}"
-    export FRONTEND_SMOKE_PORT="$PORT"
-    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
-    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
-    export FRONTEND_SMOKE_REUSE_SERVER=0
-    export NEXT_PUBLIC_SMOKE_USER_ROLE=member
-    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
-    export NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=member-live-review
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_SMOKE_USER_ROLE=member \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=member-live-review
 
-    cleanup_member_overview_live() {
-      stop_frontend_smoke_server
-    }
+  overview_html="$(beginner_static_html_file "$dist_dir" "/app")"
 
-    trap cleanup_member_overview_live EXIT
+  if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Open live review<' "$overview_html"; then
+    echo "[${smoke_name}] member overview live path lost the review primary action" >&2
+    exit 1
+  fi
 
-    start_frontend_smoke_server
-    wait_for_frontend_smoke_url "/app"
+  if ! grep -Eq '(<button[^>]*data-testid="workspace-scenario-action-step-2"[^>]*disabled[^>]*>Ask admin for new deploy<)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-2"[^>]*>Ask admin for new deploy<)' "$overview_html"; then
+    echo "[${smoke_name}] member overview live path did not gate new deployments" >&2
+    exit 1
+  fi
 
-    overview_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app" > "$overview_html"
+  if ! grep -Eq 'data-testid="workspace-scenario-action-step-3"[^>]*>Review live apps<' "$overview_html"; then
+    echo "[${smoke_name}] member overview live path did not make live review the Step 3 action" >&2
+    exit 1
+  fi
 
-    if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Open live review<' "$overview_html"; then
-      echo "[frontend-beginner-member-overview-live-smoke] member overview live path lost the review primary action" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
-
-    if ! grep -Eq '(<button[^>]*data-testid="workspace-scenario-action-step-2"[^>]*disabled[^>]*>Ask admin for new deploy<)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-2"[^>]*>Ask admin for new deploy<)' "$overview_html"; then
-      echo "[frontend-beginner-member-overview-live-smoke] member overview live path did not gate new deployments" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="workspace-scenario-action-step-3"[^>]*>Review live apps<' "$overview_html"; then
-      echo "[frontend-beginner-member-overview-live-smoke] member overview live path did not make live review the Step 3 action" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
-
-    if grep -Eq 'Smoke VPS|Edge EU Central|Ops Batch|smoke\.example\.com|ops-batch\.demo\.example\.com|eu-central\.demo\.example\.com' "$overview_html"; then
-      echo "[frontend-beginner-member-overview-live-smoke] member overview live path leaked admin-managed server identity" >&2
-      rm -f "$overview_html"
-      exit 1
-    fi
-
-    rm -f "$overview_html"
-  )
+  if grep -Eq 'Smoke VPS|Edge EU Central|Ops Batch|smoke\.example\.com|ops-batch\.demo\.example\.com|eu-central\.demo\.example\.com' "$overview_html"; then
+    echo "[${smoke_name}] member overview live path leaked admin-managed server identity" >&2
+    exit 1
+  fi
 }
 
 run_beginner_member_waiting_smoke() {
-  (
-    set -euo pipefail
-    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+  local smoke_name="frontend-beginner-member-waiting-smoke"
+  local dist_dir=".next-smoke-beginner-member-waiting-static"
+  local overview_html=""
+  local waiting_html=""
 
-    export PORT="${FRONTEND_SMOKE_BEGINNER_MEMBER_WAITING_PORT:-3008}"
-    export BASE_URL="http://127.0.0.1:${PORT}"
-    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_MEMBER_WAITING_LOG:-/tmp/deploymate-frontend-beginner-member-waiting-smoke.log}"
-    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_MEMBER_WAITING_DIST_DIR:-.next-smoke-beginner-member-waiting-${PORT}}"
-    export FRONTEND_SMOKE_PORT="$PORT"
-    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
-    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
-    export FRONTEND_SMOKE_REUSE_SERVER=0
-    export NEXT_PUBLIC_SMOKE_USER_ROLE=member
-    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
-    export NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=member-waiting-for-admin-target
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_SMOKE_USER_ROLE=member \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=member-waiting-for-admin-target
 
-    cleanup_member_waiting() {
-      stop_frontend_smoke_server
-    }
+  overview_html="$(beginner_static_html_file "$dist_dir" "/app")"
+  waiting_html="$(beginner_static_html_file "$dist_dir" "/app/deployment-workflow")"
 
-    trap cleanup_member_waiting EXIT
+  if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Review rollout status<' "$overview_html"; then
+    echo "[${smoke_name}] member waiting overview lost the explicit rollout-status action" >&2
+    exit 1
+  fi
 
-    start_frontend_smoke_server
-    wait_for_frontend_smoke_url "/app"
+  if ! grep -Eq 'data-testid="deployment-workflow-member-blocked-card"' "$waiting_html"; then
+    echo "[${smoke_name}] member waiting path lost the blocked guidance card" >&2
+    exit 1
+  fi
 
-    overview_html="$(mktemp)"
-    waiting_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app" > "$overview_html"
-    curl -sS "${BASE_URL}/app/deployment-workflow" > "$waiting_html"
+  if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-button"[^>]*>Back to overview<' "$waiting_html"; then
+    echo "[${smoke_name}] member waiting path lost the overview primary action" >&2
+    exit 1
+  fi
 
-    if ! grep -Eq 'data-testid="workspace-scenario-action-step-1"[^>]*>Review rollout status<' "$overview_html"; then
-      echo "[frontend-beginner-member-waiting-smoke] member waiting overview lost the explicit rollout-status action" >&2
-      rm -f "$overview_html" "$waiting_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="deployment-workflow-member-blocked-card"' "$waiting_html"; then
-      echo "[frontend-beginner-member-waiting-smoke] member waiting path lost the blocked guidance card" >&2
-      rm -f "$overview_html" "$waiting_html"
-      exit 1
-    fi
-
-    if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-button"[^>]*>Back to overview<' "$waiting_html"; then
-      echo "[frontend-beginner-member-waiting-smoke] member waiting path lost the overview primary action" >&2
-      rm -f "$overview_html" "$waiting_html"
-      exit 1
-    fi
-
-    if grep -Eq 'data-testid="deployment-workflow-member-live-card"|data-testid="create-deployment-card"|data-testid="templates-card"|data-testid="runtime-deployment-card-' "$waiting_html"; then
-      echo "[frontend-beginner-member-waiting-smoke] member waiting path leaked live or create surfaces" >&2
-      rm -f "$overview_html" "$waiting_html"
-      exit 1
-    fi
-
-    rm -f "$overview_html" "$waiting_html"
-  )
+  if grep -Eq 'data-testid="deployment-workflow-member-live-card"|data-testid="create-deployment-card"|data-testid="templates-card"|data-testid="runtime-deployment-card-' "$waiting_html"; then
+    echo "[${smoke_name}] member waiting path leaked live or create surfaces" >&2
+    exit 1
+  fi
 }
 
 run_beginner_first_deploy_smoke() {
-  (
-    set -euo pipefail
-    source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
-    source "${SCRIPT_DIR}/lib/frontend_smoke_checks.sh"
+  local smoke_name="frontend-beginner-first-deploy-smoke"
+  local dist_dir=".next-smoke-beginner-first-deploy-static"
+  local server_review_html=""
+  local first_deploy_html=""
 
-    export PORT="${FRONTEND_SMOKE_BEGINNER_FIRST_DEPLOY_PORT:-3007}"
-    export BASE_URL="http://127.0.0.1:${PORT}"
-    export SERVER_LOG="${FRONTEND_SMOKE_BEGINNER_FIRST_DEPLOY_LOG:-/tmp/deploymate-frontend-beginner-first-deploy-smoke.log}"
-    export DIST_DIR="${FRONTEND_SMOKE_BEGINNER_FIRST_DEPLOY_DIST_DIR:-.next-smoke-beginner-first-deploy-${PORT}}"
-    export FRONTEND_SMOKE_PORT="$PORT"
-    export FRONTEND_SMOKE_LOG="$SERVER_LOG"
-    export FRONTEND_SMOKE_DIST_DIR="$DIST_DIR"
-    export FRONTEND_SMOKE_REUSE_SERVER=0
-    export NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0
-    export NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO=ready
-    export NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=first-deploy-after-server-review
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO=ready \
+    NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=first-deploy-after-server-review \
+    "NEXT_PUBLIC_SMOKE_WORKFLOW_QUERY=server=smoke-server&source=server-review"
 
-    cleanup_first_deploy() {
-      stop_frontend_smoke_server
-    }
+  server_review_html="$(beginner_static_html_file "$dist_dir" "/app/server-review")"
+  first_deploy_html="$(beginner_static_html_file "$dist_dir" "/app/deployment-workflow")"
 
-    trap cleanup_first_deploy EXIT
+  if ! grep -Eq 'href="/app/deployment-workflow\?server=smoke-server&amp;source=server-review"' "$server_review_html"; then
+    echo "[${smoke_name}] server review did not preserve the ready handoff into deployment workflow" >&2
+    exit 1
+  fi
 
-    start_frontend_smoke_server
-    wait_for_frontend_smoke_url "/app"
+  if ! grep -Eq 'Step 1 is done on' "$first_deploy_html"; then
+    echo "[${smoke_name}] server-ready lead is missing" >&2
+    exit 1
+  fi
 
-    server_review_html="$(mktemp)"
-    curl -sS "${BASE_URL}/app/server-review" > "$server_review_html"
-
-    if ! grep -Eq 'href="/app/deployment-workflow\?server=smoke-server&amp;source=server-review"' "$server_review_html"; then
-      echo "[frontend-beginner-first-deploy-smoke] server review did not preserve the ready handoff into deployment workflow" >&2
-      rm -f "$server_review_html"
-      exit 1
-    fi
-
-    first_deploy_html="$(mktemp)"
-    frontend_smoke_dump_dom "${BASE_URL}/app/deployment-workflow?server=smoke-server&source=server-review" "$first_deploy_html"
-
-    if ! grep -Eq 'Step 1 is done on' "$first_deploy_html"; then
-      echo "[frontend-beginner-first-deploy-smoke] server-ready lead is missing" >&2
-      rm -f "$server_review_html" "$first_deploy_html"
-      exit 1
-    fi
-
-    if ! assert_first_deploy_handoff_workflow \
-      "frontend-beginner-first-deploy-smoke" \
-      "$first_deploy_html" \
-      'selected from Server Review' \
-      "server-review"; then
-      rm -f "$server_review_html" "$first_deploy_html"
-      exit 1
-    fi
-
-    rm -f "$server_review_html" "$first_deploy_html"
-  )
+  if ! assert_first_deploy_handoff_workflow \
+    "$smoke_name" \
+    "$first_deploy_html" \
+    'selected from Server Review' \
+    "server-review"; then
+    exit 1
+  fi
 }
 
 run_beginner_admin_smoke

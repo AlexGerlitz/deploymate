@@ -21,6 +21,26 @@ def _normalize_context_label(value: str | None) -> str | None:
     return normalized or None
 
 
+def _template_has_foreign_owner(template: dict, user: dict) -> bool:
+    owner_user_id = str(template.get("owner_user_id") or "").strip()
+    current_user_id = str(user.get("id") or "").strip()
+    return bool(owner_user_id and current_user_id and owner_user_id != current_user_id)
+
+
+def _ensure_template_ready_for_direct_deploy(template: dict, user: dict) -> None:
+    if not _normalize_context_label(template.get("context_label")):
+        raise HTTPException(
+            status_code=400,
+            detail="Add a client or operating context label before deploying directly from this template.",
+        )
+
+    if _template_has_foreign_owner(template, user):
+        raise HTTPException(
+            status_code=400,
+            detail="Duplicate this template into your own handoff before deploying directly from another operator's baseline.",
+        )
+
+
 def build_template_record(
     template_id: str,
     payload: DeploymentTemplateCreateRequest,
@@ -227,6 +247,7 @@ def deploy_from_template(
     mark_deployment_template_used_fn,
 ) -> DeploymentResponse:
     template = get_deployment_template_or_404_fn(template_id)
+    _ensure_template_ready_for_direct_deploy(template, user)
     payload = DeploymentCreateRequest(
         image=template["image"],
         name=template.get("name"),

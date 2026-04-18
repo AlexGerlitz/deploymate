@@ -33,7 +33,138 @@ Updated: 2026-04-18
   4. deployment passport
   5. agency fit and packaging
 - Текущий active stop point now:
-  - no new product package started after `narrower workspace/client separation`; its local `smoke:templates` rerun now passes via static build, and deeper ownership model stays deferred until a concrete workflow ownership gap survives this narrower cue
+  - `Phase 4: Team and Agency Fit` now has an honest closure point: ownership boundary, workspace/client separation, reusable handoff assets, central `Deployment passport`, and clearer activity trail all survive outside the author's head and outside the live runtime page
+  - `Phase 5: Commercial Packaging` now has an honest closure point: the buyer path already shows a clear self-hosted commercial offer, explicit agency/multi-client packaging, Russian-language install/operator materials, and a concrete pilot onboarding/support motion instead of leaving that commercial story inside author narration
+  - `deployment passport` now has an honest closure point: steady-state review, fresh-rollout verification, single-runtime incident framing, single-runtime recovery choice, stable stack recovery posture, and stack-specific incident framing all live inside one operator artifact instead of being split across lower cards
+  - the first proactive ownership slice is now closed inside template review without widening into server sharing: admins can still review every handoff asset, but foreign-owned baselines are now duplicate-first for direct deploy and mutation
+  - latest dense-night-shift rerun on `2026-04-18 18:32 +07` closed `agency fit activity trail checkpoint v0` on the current dirty tree:
+    - handoff and export surfaces now keep one explicit `Activity trail` cue beside `Recent activity`, so the next operator can see the short event history, not only the single latest event, before opening the full timeline
+    - runtime detail quick reference and the activity card now summarize the current trail directly, while incident snapshot JSON, handoff markdown, and filtered activity CSV now carry structured activity-trail summary fields instead of leaving that story implicit in the raw event list
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: phase 4 is now honestly closed, so the next bounded gap moves into commercial packaging, starting with Russian-language operator materials
+  - latest dense-night-shift rerun on `2026-04-18 18:38 +07` closed `commercial packaging Russian operator materials checkpoint v0` on the current dirty tree:
+    - buyer-facing commercial surfaces now point to two real Russian-language proof docs instead of leaving the Russian/self-hosted wedge implicit: one quickstart for self-hosted install and one quickstart for the first operator deploy + handoff path
+    - `/upgrade` and `/commercial-license` now show those materials as part of the buyer path itself, so the commercial conversation is anchored to concrete install/operator evidence rather than only package wording
+    - `npm --prefix frontend run build`
+    - the stop point changes here: Russian operator/install proof is now visible on the buyer path, so the next bounded commercial gap moves to a pilot onboarding checklist instead of more generic package copy
+  - latest dense-night-shift rerun on `2026-04-18 18:47 +07` closed `commercial packaging pilot onboarding checklist v0` on the current dirty tree:
+    - the repo now has one explicit Russian-language pilot onboarding checklist that turns the first commercial week into a concrete path: scope review, self-hosted install, first deploy, passport-based handoff, and week-one support rhythm
+    - `/upgrade` and `/commercial-license` now surface that pilot/support proof beside the earlier Russian install/operator materials, so the buyer can see how onboarding actually works instead of being asked to trust vague support language
+    - `npm --prefix frontend run build`
+    - the stop point changes here: the fixed five-phase track is now honestly closed, so the next bounded gap moves beyond phase closure into design-partner demo proof rather than more packaging copy
+  - latest dense-night-shift rerun on `2026-04-18 18:59 +07` closed `design partner demo packet v0` on the current dirty tree:
+    - the repo now has one explicit Russian-language design-partner demo packet that turns the first serious buyer call into a concrete path: public story, live product entry, server-review and deploy flow, deployment passport proof, and the next pilot step
+    - landing, `/upgrade`, and `/commercial-license` now point to that packet beside the earlier install/operator/pilot materials, so buyer-facing demo proof no longer depends on README-only notes or live narration
+    - `npm --prefix frontend run build`
+    - the stop point changes here: the remaining work is now outside the repo-local build track and sits in external validation, not in another missing product/package slice
+  - latest dense-night-shift rerun on `2026-04-18 18:12 +07` closed `deployment passport stack incident cue v0` on the current dirty tree:
+    - stack incident detail now keeps stack-specific passport incident framing instead of generic single-runtime copy: degraded stack review calls out stack health failure, saved-health-target-first checks, review-first safe action, guarded whole-stack escalation, and `Diagnose, then replace stack` recovery posture inside the same passport block
+    - runtime smoke now requires healthy stack detail to stay out of incident mode and requires the dedicated stack-incident path to carry those stack-specific incident and recovery cues, so the last obvious passport gap no longer depends on visual review
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: `deployment passport` is now honestly closed, so the next bounded gap moves into `agency fit` activity-trail quality instead of more passport copy work
+  - latest dense-night-shift rerun on `2026-04-18 17:59 +07` closed `deployment passport stack recovery cue v0` on the current dirty tree:
+    - stack runtime `Deployment passport` now keeps a stack-specific `Recovery path` cue instead of the generic single-runtime wording: stable stack detail explicitly points to the saved health target and recent activity first, then to guarded whole-stack replacement, while reminding that guided redeploy and rollback stay paused for stack v0
+    - runtime smoke now requires that stack-specific passport recovery wording on the stack detail path, so the operator cannot fall back to single-container recovery language on a compose-backed runtime
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: passport now covers stable stack recovery posture too, so the next bounded gap moves to stack-specific incident framing instead of more steady-state stack summary work
+  - latest dense-night-shift rerun on `2026-04-18 17:53 +07` closed `deployment passport recovery path cue v0` on the current dirty tree:
+    - `Deployment passport` now carries one explicit `Recovery path` cue beside safe change path, so the operator can see from the passport itself whether the right recovery posture is `Review rollback`, `Diagnose, then review redeploy`, `No recovery decision yet`, `Guarded stack replacement`, or admin-managed recovery
+    - healthy, fresh-rollout, and failed runtime detail now keep that recovery cue in copied passport text and on-screen passport state, so the passport now answers not only what to review now but also how recovery would happen safely from the current state
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: passport now covers steady-state, incident framing, and single-runtime recovery choice strongly enough that the next bounded gap moves to stack-specific passport recovery language instead of more single-runtime summary work
+  - latest dense-night-shift rerun on `2026-04-18 17:38 +07` closed `deployment passport incident mode cue v0` on the current dirty tree:
+    - `Deployment passport` now switches into explicit incident mode for failed or degraded runtimes, keeping likely cause, first checks, safe action now, and escalation path inside the same passport block instead of forcing the operator to reconstruct the incident from lower cards
+    - healthy passport state now stays out of incident mode, while failed runtime detail keeps the incident brief cues on-screen and in copied passport text, so the passport now works as both steady-state operator artifact and first incident brief
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: passport now covers both steady-state and incident framing, so the next bounded gap moves to making recovery paths inside the passport more explicit rather than adding more summary cues
+  - latest dense-night-shift rerun on `2026-04-18 17:32 +07` closed `deployment passport phase-boundary checkpoint` on the current dirty tree:
+    - the on-screen `Deployment passport` now carries review target, release trace, current risk, and safe change path beside runtime identity, ownership, health proof, recent activity, and the next safe action, so the passport itself now reads like the central operator block instead of a partial summary next to richer side surfaces
+    - fresh-rollout passport state now keeps an explicit `Verify before change` path, while healthy steady-state passport keeps a visible rollback-ready path, so the operator can answer both current review and safe change posture from the same card
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: passport is now strong enough to count as the central steady-state operator artifact, so the next bounded gap moves to degraded runtime incident mode rather than more healthy-path summary work
+  - latest dense-night-shift rerun on `2026-04-18 17:23 +07` closed `runtime export next-step cue v0` on the current dirty tree:
+    - runtime handoff now keeps one explicit `Next safe action` line beside the plain-language summary, attention, recent activity, runtime identity, ownership boundary, review target, health proof, and release trace, so exported handoff no longer makes a teammate infer the recommended action from live-only copy
+    - incident snapshot JSON, incident markdown, filtered activity CSV, and copied passport summary now carry explicit next-step value/detail instead of leaving that cue only inside on-page decision text
+    - runtime detail keeps the legacy `runtime-detail-next-step` smoke hook as a compatibility alias while the handoff card uses the newer next-step cue id, so runtime smoke stays honest after the rename
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: the current runtime export cue set is now explicit enough that remaining work belongs to `deployment passport`, not to reopening phase 3 stack-ceiling work
+  - latest dense-night-shift rerun on `2026-04-18 17:14 +07` closed `runtime export attention cue v0` on the current dirty tree:
+    - runtime handoff now keeps one explicit `Attention` line beside the plain-language summary, next step, runtime identity, recent activity, ownership boundary, review target, health proof, and release trace, so exported handoff no longer makes a teammate infer the current risk from the raw attention list
+    - incident snapshot JSON, incident markdown, filtered activity CSV, and copied passport summary now carry explicit attention value/detail plus total/error/warn counts and primary attention label/message instead of leaving that context only inside the exported attention array
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: exported runtime handoff now states current risk explicitly beside the other passport cues, so the next bounded export gap moves to making the next safe action equally structured across export artifacts
+  - latest dense-night-shift rerun on `2026-04-18 17:09 +07` closed `runtime export recent activity cue v0` on the current dirty tree:
+    - runtime handoff now keeps one explicit `Recent activity` line beside the plain-language summary, next step, runtime identity, ownership boundary, review target, health proof, and release trace, so exported handoff no longer makes a teammate infer the latest operator-visible event from the raw activity list
+    - incident snapshot JSON, incident markdown, filtered activity CSV, and copied passport summary now carry explicit recent-activity value/detail plus logged-at/level/category/title/message metadata instead of leaving that context only inside the exported activity rows
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: exported runtime handoff now states recent activity explicitly beside the other passport cues, so the next bounded export gap moves to making current risk equally explicit outside the live runtime page
+  - latest dense-night-shift rerun on `2026-04-18 17:03 +07` closed `runtime export identity cue v0` on the current dirty tree:
+    - runtime handoff now keeps one explicit `Runtime identity` line beside the plain-language summary, next step, ownership boundary, review target, health proof, and release trace, so exported handoff no longer makes a teammate infer what is actually running from lower runtime facts
+    - incident snapshot JSON, incident markdown, filtered activity CSV, and copied passport summary now carry explicit runtime-identity value/detail plus shape/image/container/stack/service/location metadata instead of leaving that context scattered across nested deployment fields
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: exported runtime handoff now states identity, ownership, review target, health proof, and release trace explicitly, so the next bounded export gap moves to making recent activity equally explicit outside the live runtime page
+  - latest dense-night-shift rerun on `2026-04-18 16:56 +07` closed `runtime export health proof cue v0` on the current dirty tree:
+    - runtime handoff now keeps one explicit `Health proof` line beside the plain-language summary, next step, ownership boundary, review target, and release trace, so exported handoff no longer makes a teammate infer whether the runtime is healthy from raw health payloads
+    - incident snapshot JSON, incident markdown, filtered activity CSV, and copied passport summary now carry explicit health-proof status/detail plus checked-at/status-code/response-time/error metadata instead of leaving that evidence buried in the nested health object
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: exported runtime handoff now states ownership, review target, release trace, and health proof explicitly, so the next bounded export gap moves to making runtime identity equally explicit outside the live runtime page
+  - latest dense-night-shift rerun on `2026-04-18 16:49 +07` closed `runtime export release trace cue v0` on the current dirty tree:
+    - runtime handoff now keeps one explicit `Release trace` line beside the plain-language summary, next step, ownership boundary, and review target, so exported handoff no longer drops which release actually produced the live runtime
+    - incident snapshot JSON, incident markdown, filtered activity CSV, and copied passport summary now carry explicit release-trace summary/detail plus source/ref/commit/tag/trigger metadata instead of leaving that context buried in lower runtime fields
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: exported runtime handoff now states ownership, review target, and release trace explicitly, so the next bounded export gap moves to keeping health proof equally explicit outside the live runtime page
+  - latest dense-night-shift rerun on `2026-04-18 16:09 +07` closed `runtime export review target cue v0` on the current dirty tree:
+    - runtime handoff now keeps one explicit `Review target` line beside the plain-language summary, next step, and ownership boundary, so exported handoff work no longer depends on inferring the right URL or page from lower runtime facts
+    - incident snapshot JSON, incident markdown, filtered activity CSV, and copied passport summary now carry explicit review-target status/href/detail instead of leaving that cue implicit inside health or URL fields
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `node --input-type=module` runtime export handoff helper check passed
+    - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_FONT_GOOGLE_MOCKED_RESPONSES=/Users/alexgerlitz/deploymate/scripts/font_google_mock_responses.cjs npm --prefix frontend run build`
+    - `npm --prefix frontend run smoke:runtime` failed again immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+    - the stop point changes here: exported runtime handoff now states both ownership and review target explicitly, so the next bounded export gap moves to making release trace equally explicit in exported runtime context
+  - latest dense-night-shift rerun on `2026-04-18 15:39 +07` closed `runtime export ownership cue v0` on the current dirty tree:
+    - runtime handoff now keeps one explicit `Ownership boundary` line beside the plain-language summary and next step, so copy/download actions no longer make the operator infer who can actually act
+    - incident snapshot JSON, incident markdown, and filtered activity CSV now carry explicit ownership status/detail instead of keeping that cue only inside the live runtime page
+    - `bash -n scripts/frontend_runtime_smoke.sh`
+    - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_PUBLIC_SMOKE_USER_ROLE=member NEXT_FONT_GOOGLE_MOCKED_RESPONSES=/Users/alexgerlitz/deploymate/scripts/font_google_mock_responses.cjs npm --prefix frontend run build`
+    - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_PUBLIC_SMOKE_USER_ROLE=member node --input-type=module` runtime export ownership helper check passed
+    - `npm --prefix frontend run smoke:runtime` failed again immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+    - the stop point changes here: ownership is now explicit both on-screen and inside exported handoff artifacts, so the next bounded export gap moves to keeping the review target equally explicit in exported runtime context
+  - latest dense-night-shift rerun on `2026-04-18 15:17 +07` fully closed `runtime detail ownership cue v0` on this host:
+    - deployment detail now surfaces one explicit ownership summary inside `Deployment passport`, the plain-language handoff block, and copied passport text, so runtime review answers who can act before logs, delete, or template tools compete for attention
+    - runtime smoke fixtures now carry deployment `owner_user_id`, so member/admin-managed review states verify real ownership copy instead of collapsing into legacy runtime language
+    - `scripts/frontend_runtime_smoke.sh` now covers a member `admin-managed-runtime` scenario, and `scripts/frontend_smoke_shared.sh` now normalizes numeric port PIDs so macOS `fuser` usage output cannot wedge smoke cleanup/start loops
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+    - the stop point changes here: template ownership plus runtime detail ownership are now both explicit locally, so the next bounded ownership gap moves into runtime export/handoff surfaces instead of staying in detail review
+  - latest dense-night-shift rerun on `2026-04-18 14:49 +07` closed that first proactive ownership boundary on the current dirty tree:
+    - template API now exposes `owner_user_id`, so the workflow can distinguish `Your asset` from `Another operator's asset`
+    - direct deploy from a foreign-owned template now returns `400`, while update/delete return `403`, so another operator's baseline stays review-first and duplicate-first
+    - focused template review and the compact queue now show owner state explicitly and disable foreign edit/delete controls instead of pretending every baseline is equally mutable
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/frontend_templates_smoke.sh scripts/frontend_smoke_shared.sh scripts/lib/frontend_smoke_checks.sh scripts/project_automation_smoke_checks.sh`
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow backend.tests.test_member_ownership_isolation`
+    - `npm --prefix frontend run smoke:templates`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: proactive ownership work no longer waits on an external signal inside templates, but broader runtime/server sharing still stays deferred
+  - latest dense-night-shift rerun on `2026-04-18 15:10 +07` moved the next runtime checkpoint forward without widening scope:
+    - deployment detail now computes one explicit ownership summary and surfaces it inside `Deployment passport`, the plain-language handoff block, and the copied passport text instead of leaving ownership cues buried in lower admin-managed banners
+    - smoke-mode runtime fixtures now carry deployment `owner_user_id`, so member/admin-managed runtime review can distinguish direct ownership from legacy records during frontend verification
+    - `scripts/frontend_runtime_smoke.sh` now includes a dedicated member `admin-managed-runtime` scenario that requires the passport ownership cue and keeps the change tab hidden
+    - `bash -n scripts/frontend_runtime_smoke.sh`
+    - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_PUBLIC_SMOKE_USER_ROLE=member NEXT_FONT_GOOGLE_MOCKED_RESPONSES=/Users/alexgerlitz/deploymate/scripts/font_google_mock_responses.cjs npm --prefix frontend run build`
+    - `npm --prefix frontend run smoke:runtime` failed again immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+    - the runtime/detail ownership package is implemented, but honest closure still waits on one loopback-capable rerun of `smoke:runtime` on this host or another socket-capable machine
   - latest dense-night-shift rerun on `2026-04-18 13:35 +07` reconfirmed the same stop point from the current dirty tree:
     - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
     - `npm --prefix frontend run build`
@@ -53,6 +184,25 @@ Updated: 2026-04-18
     - the workflow copy now tells the operator to duplicate and relabel before reusing an outside-context asset
     - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
     - `npm --prefix frontend run smoke:templates`
+    - the same stop point still remains unchanged: deeper ownership work stays deferred until a real workflow-level gap survives the narrower template/context boundary
+  - latest dense-night-shift rerun on `2026-04-18 14:11 +07` closed another direct-reuse gap inside the same template/context boundary:
+    - direct template deploy now requires a `context_label`, so unlabeled duplicates cannot bypass the duplicate-and-relabel step through the deploy endpoint
+    - secondary template queue cards no longer expose one-click deploy; the operator must review/focus first, or duplicate and relabel when the asset sits outside the current context
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+    - `npm --prefix frontend run smoke:templates`
+    - `npm --prefix frontend run smoke:beginner` still stops at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`, so the first-pass browser smoke remains host-blocked rather than code-blocked here
+    - the same stop point still remains unchanged: deeper ownership work stays deferred until a real workflow-level gap survives the narrower template/context boundary
+  - latest dense-night-shift rerun on `2026-04-18 14:25 +07` closed the remaining local beginner-smoke blocker without widening the product package:
+    - `smoke:beginner` now verifies `/app`, `/app/server-review`, and `/app/deployment-workflow` through smoke-mode static build artifacts, so the first-pass verification no longer depends on a loopback-bound dev server in this sandbox
+    - deployment workflow smoke now bootstraps the handoff query from `NEXT_PUBLIC_SMOKE_WORKFLOW_QUERY`, so the server-review/overview first-deploy bridge still proves the selected-target copy and image-focus marker in static HTML
+    - `npm --prefix frontend run smoke:beginner`
+    - `npm --prefix frontend run smoke:templates`
+    - the same stop point still remains unchanged: deeper ownership work stays deferred until a real workflow-level gap survives the narrower template/context boundary
+  - latest dense-night-shift rerun on `2026-04-18 14:34 +07` reconfirmed the same narrow boundary on the current dirty tree:
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/frontend_templates_smoke.sh scripts/frontend_smoke_shared.sh scripts/lib/frontend_smoke_checks.sh`
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+    - `npm --prefix frontend run smoke:templates`
+    - `npm --prefix frontend run smoke:beginner`
     - the same stop point still remains unchanged: deeper ownership work stays deferred until a real workflow-level gap survives the narrower template/context boundary
   - `Agency fit v1` теперь закрыт:
     - deployment workflow templates now read as reusable handoff assets instead of a generic personal preset lane
@@ -165,6 +315,17 @@ Updated: 2026-04-18
       - deployment workflow no longer needs `useSearchParams` at prerender time, so the template smoke can verify the real focused-preview/context-boundary markup without a loopback-bound dev server
     - latest rerun on `2026-04-18 13:52 +07` passed again:
       - `npm --prefix frontend run smoke:templates`
+    - latest rerun on `2026-04-18 14:11 +07` closed the remaining direct template-reuse shortcut inside the same boundary:
+      - unlabeled templates now fail direct deploy until the operator adds a context label explicitly
+      - secondary queue cards now require review/focus before reuse, so outside-context assets cannot skip straight to deploy
+      - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+      - `npm --prefix frontend run smoke:templates`
+      - `npm --prefix frontend run smoke:beginner` still fails on this host at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+    - latest rerun on `2026-04-18 14:25 +07` closed the host-local beginner verification blocker:
+      - `smoke:beginner` now stays aligned to the real beginner surfaces (`/app`, `/app/server-review`, `/app/deployment-workflow`) and renders them through static build artifacts instead of a loopback-bound dev server
+      - the first-deploy handoff branch now stays verifiable in static HTML via `NEXT_PUBLIC_SMOKE_WORKFLOW_QUERY`, so the overview/server-review selected-target bridge still holds locally
+      - `npm --prefix frontend run smoke:beginner`
+      - `npm --prefix frontend run smoke:templates`
   - `Release review + rollback v1` is now closed:
     - deployment detail has a rollback review surface wired to the rollback endpoint
     - `npm --prefix frontend run smoke:runtime` passed
@@ -174,20 +335,19 @@ Updated: 2026-04-18
     - beginner overview/workflow gating mismatches were corrected while closing the same slice
     - `npm --prefix frontend run smoke:beginner` passed
 - Ближайшие пакеты тоже зафиксированы:
-  1. deeper ownership model stays deferred until one narrower client/workspace slice is truly needed
+  1. commercial packaging Russian operator materials checkpoint v0
 - `README.md` и broad repo-root packaging пока deliberately deferred до реального public funnel rewrite, чтобы не создавать doc/product drift.
 
 ## Autonomous Night Loop
 
 - Ночная работа теперь должна идти не как один изолированный проход, а как последовательный loop по текущему main track.
-- На этом хосте есть один локализованный automation blocker:
-  - текущий sandbox не даёт создать внешний single-writer lease по пути `/Users/alexgerlitz/.codex/automation-leases/deploymate.lock`
-  - попытка захвата lease на `2026-04-18 09:42 +07` завершилась `Operation not permitted`
-  - пока этот внешний lease path не станет доступен для записи, unattended проходы должны считать это stop condition и не продолжать product packages после reread/repo-status
+- На этом хосте прежний lease blocker больше не подтверждается:
+  - probe on `2026-04-18 14:49 +07` successfully created and removed `/Users/alexgerlitz/.codex/automation-leases/deploymate.lock`
+  - old `Operation not permitted` notes now belong to the earlier restricted sandbox, not to the current host state
 - Базовое правило:
   - если текущий пакет уже завершён и проверен, не ждать нового сообщения, а брать следующий пакет по фиксированному порядку
 - Порядок автономного продолжения сейчас такой:
-  1. deeper ownership model only after the narrower workflow separation slice proves insufficient
+  1. commercial packaging Russian operator materials checkpoint v0
 - Для каждого ночного прохода expected loop один и тот же:
   - reread `HANDOFF.md`
   - взять один bounded package
@@ -369,17 +529,217 @@ Updated: 2026-04-18
   - latest rerun on `2026-04-18 13:57 +07` passed the changed-scope package verification:
     - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
     - `npm --prefix frontend run smoke:templates`
+- `Template direct deploy guard v0` теперь считать закрытым:
+  - direct template deploy now requires a `context_label`, so unlabeled duplicates cannot bypass the duplicate-and-relabel boundary through the deploy endpoint
+  - secondary template queue cards no longer expose one-click deploy; the operator must review/focus first or duplicate and relabel for the current handoff
+  - local `smoke:beginner` now verifies the real `/app -> /app/server-review -> /app/deployment-workflow` handoff path through static build artifacts, so this boundary closes honestly on this host without a loopback-bound dev server
+  - latest rerun on `2026-04-18 14:34 +07` passed the changed-scope package verification:
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/frontend_templates_smoke.sh scripts/frontend_smoke_shared.sh scripts/lib/frontend_smoke_checks.sh`
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+    - `npm --prefix frontend run smoke:templates`
+    - `npm --prefix frontend run smoke:beginner`
+- `Template operator ownership boundary v0` теперь считать закрытым:
+  - template API now exposes `owner_user_id`, so the workflow review surface can tell whether the focused baseline is yours, foreign-owned, or legacy
+  - foreign-owned templates now stay review-first: direct deploy is blocked, update/delete are blocked, and the operator must duplicate into their own handoff before mutation
+  - focused review and the compact queue now show owner state explicitly and disable foreign edit/delete controls instead of implying every baseline is equally mutable
+  - latest rerun on `2026-04-18 14:49 +07` passed the changed-scope package verification:
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/frontend_templates_smoke.sh scripts/frontend_smoke_shared.sh scripts/lib/frontend_smoke_checks.sh scripts/project_automation_smoke_checks.sh`
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow backend.tests.test_member_ownership_isolation`
+    - `npm --prefix frontend run smoke:templates`
+    - `npm --prefix frontend run smoke:beginner`
+- `runtime detail ownership cue v0` теперь считать закрытым:
+  - deployment detail now answers runtime ownership directly inside `Deployment passport`, plain-language handoff, and copied passport text instead of hiding that boundary in lower admin-managed banners
+  - member/admin-managed runtime detail now has a dedicated runtime smoke scenario that requires the ownership cue and keeps change controls hidden
+  - the shared frontend smoke helper now normalizes numeric port PIDs, so macOS `fuser` usage output no longer wedges runtime smoke cleanup/start between scenario ports
+  - latest rerun on `2026-04-18 15:17 +07` passed the changed-scope package verification:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `runtime export ownership cue v0` теперь считать закрытым:
+  - handoff tools now show one explicit `Ownership boundary` line with copy support next to the plain-language summary and next step instead of leaving ownership implicit once the operator starts exporting runtime context
+  - incident snapshot JSON, incident handoff markdown, and filtered activity CSV now keep ownership status/detail as first-class export fields, so handoff artifacts survive outside the live runtime page
+  - latest rerun on `2026-04-18 15:39 +07` passed the changed-scope package verification available in this sandbox:
+    - `bash -n scripts/frontend_runtime_smoke.sh`
+    - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_PUBLIC_SMOKE_USER_ROLE=member NEXT_FONT_GOOGLE_MOCKED_RESPONSES=/Users/alexgerlitz/deploymate/scripts/font_google_mock_responses.cjs npm --prefix frontend run build`
+    - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_PUBLIC_SMOKE_USER_ROLE=member node --input-type=module` runtime export ownership helper check passed
+    - `npm --prefix frontend run smoke:runtime` is currently sandbox-blocked at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`, so this export slice closed here through build + pure-helper coverage instead of a socket-bound browser pass
+- `runtime export release trace cue v0` теперь считать закрытым:
+  - handoff tools now show one explicit `Release trace` line with copy support next to ownership and review target, so a teammate can see which release produced the live runtime before opening lower runtime facts
+  - incident snapshot JSON, incident handoff markdown, filtered activity CSV, and copied passport text now keep release-trace summary/detail plus source/ref/commit/tag/trigger metadata as first-class export fields
+  - latest rerun on `2026-04-18 16:49 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `runtime export health proof cue v0` теперь считать закрытым:
+  - handoff tools now show one explicit `Health proof` line with copy support next to ownership, review target, and release trace, so a teammate can see whether the runtime is healthy before opening lower health payloads or diagnostics
+  - incident snapshot JSON, incident handoff markdown, filtered activity CSV, and copied passport text now keep health-proof status/detail plus checked-at/status-code/response-time/error metadata as first-class export fields
+  - latest rerun on `2026-04-18 16:56 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `runtime export identity cue v0` теперь считать закрытым:
+  - handoff tools now show one explicit `Runtime identity` line with copy support next to ownership, review target, health proof, and release trace, so a teammate can see what is actually running before opening lower runtime facts
+  - incident snapshot JSON, incident handoff markdown, filtered activity CSV, and copied passport text now keep runtime-identity value/detail plus shape/image/container/stack/service/location metadata as first-class export fields
+  - latest rerun on `2026-04-18 17:03 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `runtime export recent activity cue v0` теперь считать закрытым:
+  - handoff tools now show one explicit `Recent activity` line with copy support next to runtime identity, ownership, review target, health proof, and release trace, so a teammate can see the latest recorded event before opening the full activity feed
+  - incident snapshot JSON, incident handoff markdown, filtered activity CSV, and copied passport text now keep recent-activity value/detail plus logged-at/level/category/title/message metadata as first-class export fields
+  - latest rerun on `2026-04-18 17:09 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `runtime export attention cue v0` теперь считать закрытым:
+  - handoff tools now show one explicit `Attention` line with copy support next to runtime identity, recent activity, ownership, review target, health proof, and release trace, so a teammate can see the current risk before opening the full attention list
+  - incident snapshot JSON, incident handoff markdown, filtered activity CSV, and copied passport text now keep attention value/detail plus total/error/warn counts and primary attention label/message as first-class export fields
+  - latest rerun on `2026-04-18 17:14 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `runtime export next-step cue v0` теперь считать закрытым:
+  - handoff tools now show one explicit `Next safe action` line with copy support next to attention, recent activity, runtime identity, ownership, review target, health proof, and release trace, so a teammate can see the recommended move before reopening the full runtime page
+  - incident snapshot JSON, incident handoff markdown, filtered activity CSV, and copied passport text now keep next-step value/detail as first-class export fields instead of leaving that cue only inside live runtime copy
+  - runtime detail keeps the legacy `runtime-detail-next-step` smoke hook as a compatibility alias while the handoff card uses the newer next-step cue id, so the current runtime smoke contract stays valid
+  - latest rerun on `2026-04-18 17:23 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `deployment passport phase-boundary checkpoint` теперь считать закрытым:
+  - the on-screen `Deployment passport` now keeps review target, release trace, current risk, and safe change path together with runtime identity, ownership, health proof, recent activity, and the next safe action, so the passport itself now carries the full steady-state operator story
+  - healthy runtime detail now exposes a visible rollback-ready path inside the passport, while fresh-rollout detail keeps a visible verify-before-change path there, so the card answers safe change posture instead of forcing the operator into lower tabs first
+  - latest rerun on `2026-04-18 17:32 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `deployment passport incident mode cue v0` теперь считать закрытым:
+  - `Deployment passport` now switches into explicit incident mode for failed or degraded runtimes, keeping likely cause, first checks, safe action now, and escalation path inside the passport itself instead of making the operator reconstruct the incident from lower review cards
+  - copied passport text now carries the same incident brief when the runtime is degraded, while healthy passport state stays out of incident mode
+  - latest rerun on `2026-04-18 17:38 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `deployment passport recovery path cue v0` теперь считать закрытым:
+  - `Deployment passport` now carries one explicit `Recovery path` cue beside the safe-change cue, so the card itself answers whether the safe recovery posture is rollback review, redeploy review after diagnosis, no recovery decision yet, guarded stack replacement, or admin-managed recovery
+  - copied passport text now keeps that same recovery path across healthy, fresh-rollout, and failed runtime states instead of leaving recovery only in lower rollback/redeploy cards
+  - latest rerun on `2026-04-18 17:53 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `deployment passport stack recovery cue v0` теперь считать закрытым:
+  - stack runtime `Deployment passport` now uses stack-specific recovery wording instead of generic single-runtime language, so the card itself tells the operator to review the saved health target and recent activity first, then treat recovery as guarded whole-stack replacement
+  - runtime smoke now requires that stack-specific recovery wording on the stack detail path, so stack passport copy cannot quietly drift back toward single-container rollback/redeploy language
+  - latest rerun on `2026-04-18 17:59 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `deployment passport stack incident cue v0` теперь считать закрытым:
+  - stack incident detail now uses stack-specific passport incident wording instead of the generic single-runtime brief, so the operator sees stack health failure, saved-health-target-first checks, review-first safe action, guarded whole-stack escalation, and `Diagnose, then replace stack` directly inside the passport
+  - runtime smoke now requires healthy stack detail to stay out of incident mode and requires the dedicated stack-incident path to carry those stack-specific incident and recovery cues, so the last obvious passport gap is now held as real behavior
+  - latest rerun on `2026-04-18 18:12 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `agency fit activity trail checkpoint v0` теперь считать закрытым:
+  - handoff and export surfaces now keep one explicit `Activity trail` cue beside `Recent activity`, so the next operator can see the short event history instead of reconstructing it from the raw timeline
+  - runtime detail quick reference and the activity card now summarize the current trail directly, while incident snapshot JSON, handoff markdown, and filtered activity CSV now carry structured activity-trail summary fields for handoff outside the live runtime page
+  - latest rerun on `2026-04-18 18:32 +07` passed the changed-scope package verification on this host:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+- `commercial packaging Russian operator materials checkpoint v0` теперь считать закрытым:
+  - the repo now has two real Russian-language materials for the first commercial wedge: one self-hosted install quickstart and one operator quickstart for first deploy plus handoff
+  - `/upgrade` and `/commercial-license` now surface those materials directly as buyer proof, so the public business path no longer asks a Russian/self-hosted buyer to infer whether install and operator guidance actually exists
+  - latest rerun on `2026-04-18 18:38 +07` passed the changed-scope package verification on this host:
+    - `npm --prefix frontend run build`
+- `commercial packaging pilot onboarding checklist v0` теперь считать закрытым:
+  - the repo now has one explicit Russian-language pilot onboarding checklist for the first commercial week: scope review, install, first deploy, handoff check, and minimal support rhythm
+  - `/upgrade` and `/commercial-license` now surface that checklist together with the earlier Russian install/operator materials, so onboarding and support motion are visible on the buyer path instead of living only in private explanation
+  - latest rerun on `2026-04-18 18:47 +07` passed the changed-scope package verification on this host:
+    - `npm --prefix frontend run build`
+- `design partner demo packet v0` теперь считать закрытым:
+  - the repo now has one explicit Russian-language demo packet for the first serious buyer/design-partner call: public story, live product, deployment passport proof, handoff fit, and the next pilot step
+  - landing, `/upgrade`, and `/commercial-license` now surface that packet directly, so buyer-facing demo proof no longer lives only in private walkthrough notes
+  - latest rerun on `2026-04-18 18:59 +07` passed the changed-scope package verification on this host:
+    - `npm --prefix frontend run build`
 - Текущий незавершённый checkpoint:
-  - no broader ownership-model implementation should start before a real workflow-level sharing problem survives the new context-boundary cue
-  - `narrower workspace/client separation` now has an honest local `smoke:templates` rerun, so deeper ownership model stays deferred until that narrower cue proves insufficient in a real workflow
+  - `Stack deploy v0`, `deployment passport`, `Phase 4: Team and Agency Fit`, and `Phase 5: Commercial Packaging` are now honestly closed on the current runtime/workflow/buyer surfaces
+  - the next unresolved gap now sits outside repo-local build work: first live-host demo recording, first real design-partner conversation, and first external validation loop for the same Russian/self-hosted wedge
+  - latest rerun on `2026-04-18 18:59 +07` moved that checkpoint forward on the current dirty tree:
+    - the buyer path now carries Russian install proof, Russian operator proof, a Russian pilot onboarding/support checklist, and a Russian design-partner demo packet directly on landing, `/upgrade`, and `/commercial-license`
+    - `npm --prefix frontend run build`
   - latest rerun on `2026-04-18 13:35 +07` kept that checkpoint unchanged after the current dirty tree passed the same backend + frontend verification path again
   - latest rerun on `2026-04-18 13:49 +07` kept that checkpoint unchanged after the same dirty tree passed `make frontend` plus the template API unittest
   - latest rerun on `2026-04-18 13:52 +07` kept that checkpoint unchanged after the same dirty tree passed `npm --prefix frontend run build` plus `npm --prefix frontend run smoke:templates`
   - latest rerun on `2026-04-18 13:57 +07` kept that checkpoint unchanged after closing the duplicate-relabel guard inside the same template/context workflow
+  - latest rerun on `2026-04-18 14:34 +07` kept that checkpoint unchanged after closing the direct-deploy guard and rerunning the backend + frontend smoke path on the same dirty tree
+  - latest rerun on `2026-04-18 14:49 +07` moved that checkpoint forward after closing the first proactive template ownership slice and reconfirming the backend + frontend smoke path
+  - latest rerun on `2026-04-18 15:17 +07` closed `runtime detail ownership cue v0` after fixing the frontend smoke lifecycle blocker on this host:
+    - the runtime passport now answers who controls the runtime before logs/templates/delete tools compete for attention
+    - plain-language summary plus copied passport text now carry the same ownership boundary, so handoff/export copy no longer drops who can actually perform live runtime actions
+    - `scripts/frontend_runtime_smoke.sh` now has a member `admin-managed-runtime` guardrail for the ownership cue and hidden change tab
+    - `scripts/frontend_smoke_shared.sh` now ignores non-numeric `fuser` output, so scenario cleanup no longer stalls on macOS while moving between runtime smoke ports
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 15:39 +07` closed `runtime export ownership cue v0` on the current dirty tree:
+    - handoff copy/download surfaces now keep an explicit `Ownership boundary` line and structured ownership status/detail instead of dropping that cue once context leaves the page
+    - filtered activity export now repeats ownership status/detail on every row, so CSV handoff still answers who controls the runtime without reopening deployment detail
+    - `bash -n scripts/frontend_runtime_smoke.sh`
+    - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_PUBLIC_SMOKE_USER_ROLE=member NEXT_FONT_GOOGLE_MOCKED_RESPONSES=/Users/alexgerlitz/deploymate/scripts/font_google_mock_responses.cjs npm --prefix frontend run build`
+    - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_PUBLIC_SMOKE_USER_ROLE=member node --input-type=module` runtime export ownership helper check passed
+    - `npm --prefix frontend run smoke:runtime` failed again immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+  - latest rerun on `2026-04-18 16:49 +07` closed `runtime export release trace cue v0` on the current dirty tree:
+    - handoff copy/download surfaces now keep an explicit `Release trace` line and structured release metadata instead of leaving the live rollout provenance inside lower runtime facts
+    - runtime export smoke now requires the new release-trace cue in both the handoff card and the JSON/markdown/CSV helper path, so exported context keeps source/ref/commit/tag/trigger details without reopening deployment detail
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 16:56 +07` closed `runtime export health proof cue v0` on the current dirty tree:
+    - handoff copy/download surfaces now keep an explicit `Health proof` line and structured health metadata instead of leaving runtime evidence inside the nested health payload
+    - runtime export smoke now requires the new health-proof cue in both the handoff card and the JSON/markdown/CSV helper path, so exported context keeps checked-at/status-code/response-time evidence without reopening deployment detail
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 17:03 +07` closed `runtime export identity cue v0` on the current dirty tree:
+    - handoff copy/download surfaces now keep an explicit `Runtime identity` line and structured identity metadata instead of leaving what-is-running context scattered across lower deployment fields
+    - runtime export smoke now requires the new identity cue in both the handoff card and the JSON/markdown/CSV helper path, so exported context keeps shape/image/container/location details without reopening deployment detail
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 17:09 +07` closed `runtime export recent activity cue v0` on the current dirty tree:
+    - handoff copy/download surfaces now keep an explicit `Recent activity` line and structured recent-event metadata instead of leaving that cue only inside the full activity list
+    - runtime export smoke now requires the new recent-activity cue in both the handoff card and the JSON/markdown/CSV helper path, so exported context keeps logged-at/level/category/title/message details without reopening deployment detail
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 17:14 +07` closed `runtime export attention cue v0` on the current dirty tree:
+    - handoff copy/download surfaces now keep an explicit `Attention` line and structured attention metadata instead of leaving current risk only inside the raw attention list
+    - runtime export smoke now requires the new attention cue in both the handoff card and the JSON/markdown/CSV helper path, so exported context keeps count/severity/primary-message details without reopening deployment detail
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 17:23 +07` closed `runtime export next-step cue v0` on the current dirty tree:
+    - handoff copy/download surfaces now keep an explicit `Next safe action` line and structured next-step value/detail instead of leaving the recommended action only inside live runtime copy
+    - runtime export smoke now requires the new next-step cue in both the handoff card and the JSON/markdown/CSV helper path, and the detail page keeps the legacy `runtime-detail-next-step` hook so the existing runtime smoke contract stays valid
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 17:32 +07` closed `deployment passport phase-boundary checkpoint` on the current dirty tree:
+    - the on-screen passport now carries review target, release trace, current risk, and safe change path together with the earlier runtime cues, so the steady-state operator story lives in one card instead of being split between passport, handoff, and lower action surfaces
+    - runtime smoke now requires those extra passport cues plus the fresh-rollout `Verify before change` path, so the checkpoint stays honest instead of depending on visual inspection
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 17:38 +07` closed `deployment passport incident mode cue v0` on the current dirty tree:
+    - failed or degraded runtime detail now turns the passport into an incident brief with likely cause, first checks, safe action now, and escalation path instead of leaving that framing scattered across lower cards
+    - runtime smoke now requires incident mode on failed runtime detail and requires it to stay absent on the healthy passport path, so the switch is held as real behavior rather than copy drift
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 17:53 +07` closed `deployment passport recovery path cue v0` on the current dirty tree:
+    - healthy, fresh-rollout, and failed passport states now keep an explicit `Recovery path` cue, so the operator can see the safe rollback/redeploy posture from the passport itself instead of opening lower recovery cards first
+    - runtime smoke now requires that recovery cue on those three single-runtime states, so recovery wording stays honest across stable, verify-first, and failed review paths
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 17:59 +07` closed `deployment passport stack recovery cue v0` on the current dirty tree:
+    - stack passport now keeps stack-specific recovery wording with the saved health target and whole-stack replacement boundary instead of falling back to single-runtime rollback/redeploy language
+    - runtime smoke now requires that wording on the stack detail path, so stable stack recovery posture stays explicit in the same passport artifact as the rest of the runtime story
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 18:12 +07` closed `deployment passport stack incident cue v0` on the current dirty tree:
+    - stack incident detail now keeps stack-specific passport incident wording with stack health failure, saved-health-target-first checks, review-first safe action, guarded whole-stack escalation, and `Diagnose, then replace stack` recovery posture instead of falling back to the generic single-runtime incident brief
+    - runtime smoke now requires healthy stack detail to stay out of incident mode and requires the dedicated stack-incident path to keep those stack-specific incident and recovery cues, so `deployment passport` no longer has an obvious stack-state hole
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
+  - latest rerun on `2026-04-18 18:32 +07` closed `agency fit activity trail checkpoint v0` on the current dirty tree:
+    - handoff and export surfaces now keep one explicit `Activity trail` cue beside `Recent activity`, and the detail page quick reference plus activity card now summarize the current trail directly instead of leaving that story only inside the raw event list
+    - runtime smoke now requires the new activity-trail helper/export contract and the on-screen handoff/detail summary, so phase-4 activity-trail quality no longer depends on visual review
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh`
+    - `npm --prefix frontend run smoke:runtime`
 - Следующий bounded runtime порядок:
-  1. deeper ownership model only after the workflow-level separation cue proves insufficient
+  1. external live-host demo recording and first design-partner run
 - Guardrails на следующий проход:
-  - не расширять client/workspace implementation beyond workflow/template separation cues без нового product signal
+  - не расширять packaging work в broad repo-root doc rewrite или generic marketing pages; следующий шаг держать внутри operator/install materials and buyer-proof surfaces
   - не считать single-container deployments допустимым долгоживущим ceiling
 
 ## Week 1 Result

@@ -51,6 +51,34 @@ const contactChannels = [
     href: "https://github.com/AlexGerlitz",
   },
 ];
+const russianMaterials = [
+  {
+    label: "Russian install quickstart",
+    detail: "Self-hosted setup on one VPS or dedicated host: env, known_hosts, compose up, and the first live checks.",
+    href: "https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-install-quickstart.md",
+  },
+  {
+    label: "Russian operator quickstart",
+    detail: "The first operator path from server review to deployment passport and handoff without SSH folklore.",
+    href: "https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-operator-quickstart.md",
+  },
+  {
+    label: "Russian pilot onboarding checklist",
+    detail: "The first-week commercial path: scope review, install, first deploy, handoff check, and support rhythm.",
+    href: "https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-pilot-onboarding-checklist.md",
+  },
+  {
+    label: "Russian design-partner demo packet",
+    detail: "The buyer demo path: public story, live product, deployment passport, handoff proof, and next pilot step.",
+    href: "https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-design-partner-demo-packet.md",
+  },
+];
+const pilotSupportMotion = [
+  "Short scope review before any agreement is treated as active delivery",
+  "One self-hosted install path instead of vague setup promises",
+  "One first deploy plus deployment-passport handoff check",
+  "One explicit week-one support rhythm for review, health, and ownership",
+];
 
 export default function CommercialLicensePage() {
   return (
@@ -133,6 +161,27 @@ export default function CommercialLicensePage() {
                 ))}
               </div>
             </article>
+            <article className="overviewCard">
+              <span className="overviewLabel">Russian operator materials</span>
+              <div className="overviewMeta">
+                {russianMaterials.map((item) => (
+                  <span key={item.label}>
+                    <strong>{item.label}</strong>:{" "}
+                    <a href={item.href} className="inlineLink" target="_blank" rel="noreferrer">
+                      {item.detail}
+                    </a>
+                  </span>
+                ))}
+              </div>
+            </article>
+            <article className="overviewCard">
+              <span className="overviewLabel">Pilot onboarding and support motion</span>
+              <div className="overviewMeta">
+                {pilotSupportMotion.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </article>
           </div>
 
           <div className="authDecisionRow">
@@ -154,6 +203,17 @@ export default function CommercialLicensePage() {
             <div className="authDecisionCard">
               <strong>What to prepare</strong>
               <p>Have your company/project name, infrastructure model, estimated footprint, runtime handoff needs, and any support or customization requirements ready before the conversation.</p>
+            </div>
+          </div>
+
+          <div className="authDecisionRow">
+            <div className="authDecisionCard">
+              <strong>Need Russian-first proof before the call?</strong>
+              <p>Start with the Russian install quickstart for the first self-hosted setup path, then use the operator quickstart, pilot onboarding checklist, and design-partner demo packet to review the first deploy, handoff, support rhythm, and live buyer conversation in plain language.</p>
+            </div>
+            <div className="authDecisionCard">
+              <strong>Why this matters for the buyer</strong>
+              <p>The commercial path is easier to justify when the team can already see real install, operator, pilot-support, and demo materials for the same client-infra workflow the product is selling.</p>
             </div>
           </div>
 

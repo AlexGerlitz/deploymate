@@ -77,6 +77,12 @@ const landingBuyerProofCards = [
     detail:
       "Evaluation, internal-team use, agency delivery, and custom commercial paths are already separated so packaging can match the real delivery model.",
   },
+  {
+    label: "Demo packet",
+    title: "A concrete design-partner conversation path already exists.",
+    detail:
+      "The project now has a buyer-facing demo packet that connects the public story, live product entry, deployment passport proof, and the next pilot step instead of relying on author narration alone.",
+  },
 ];
 
 export default function LandingPage() {
@@ -535,6 +541,16 @@ export default function LandingPage() {
             <div className="landingCommercialMeta">
               <span>Evaluation stays self-serve.</span>
               <span>Business use still goes through an explicit request path.</span>
+            </div>
+            <div className="buttonRow">
+              <a
+                href="https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-design-partner-demo-packet.md"
+                className="landingButton ghostButton"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open demo packet
+              </a>
             </div>
           </div>
 

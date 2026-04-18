@@ -98,6 +98,7 @@ export const smokeOverviewOpsOverview = {
 export const smokeDeployments = [
   {
     id: "smoke-deployment",
+    owner_user_id: smokeUser.id,
     status: "running",
     image: "nginx:alpine",
     container_name: "smoke-runtime",
@@ -111,12 +112,19 @@ export const smokeDeployments = [
     server_host: "smoke.example.com",
     rollback_available: true,
     rollback_summary: "nginx:1.26 via host port 38080 with 1 env var and 0 secrets",
+    release_source: "webhook",
+    release_ref: "refs/heads/main",
+    release_commit_sha: "7d9c4a2b1f0e6d5c4b3a29181716151413121110",
+    release_image_tag: "ghcr.io/deploymate/smoke-runtime:2026.04.02",
+    release_triggered_at: "2026-04-02T00:05:00Z",
+    release_triggered_by: "smoke-ci",
     env: {
       DEPLOYMATE_SMOKE: "1",
     },
   },
   {
     id: "smoke-stack-runtime",
+    owner_user_id: smokeUser.id,
     status: "running",
     image: "ghcr.io/deploymate/customer-portal-web:2026.04.17",
     container_name: "customer-portal-web-1",
@@ -137,6 +145,7 @@ export const smokeDeployments = [
   },
   {
     id: "billing-api",
+    owner_user_id: smokeUser.id,
     status: "running",
     image: "ghcr.io/deploymate/billing-api:2026.04.02",
     container_name: "billing-api",
@@ -155,6 +164,7 @@ export const smokeDeployments = [
   },
   {
     id: "review-worker",
+    owner_user_id: smokeUser.id,
     status: "failed",
     image: "ghcr.io/deploymate/review-worker:2026.04.02",
     container_name: "review-worker",
@@ -175,6 +185,7 @@ export const smokeDeployments = [
 
 export const smokeInternalRuntimeDeployment = {
   id: "internal-runtime",
+  owner_user_id: smokeUser.id,
   status: "running",
   image: "ghcr.io/deploymate/internal-api:2026.04.02",
   container_name: "internal-api",
@@ -313,6 +324,7 @@ export const smokeNotifications = [
 export const smokeTemplates = [
   {
     id: "smoke-template",
+    owner_user_id: "smoke-admin",
     template_name: "Smoke template",
     context_label: "Internal smoke / baseline",
     image: "nginx:alpine",
@@ -332,6 +344,7 @@ export const smokeTemplates = [
   },
   {
     id: "billing-api-template",
+    owner_user_id: "teammate-1",
     template_name: "Billing API rollout",
     context_label: "Billing client / production",
     image: "ghcr.io/deploymate/billing-api:stable",
@@ -352,6 +365,7 @@ export const smokeTemplates = [
   },
   {
     id: "review-worker-template",
+    owner_user_id: "smoke-admin",
     template_name: "Upgrade review worker",
     context_label: "Internal operations / review",
     image: "ghcr.io/deploymate/review-worker:stable",

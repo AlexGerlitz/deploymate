@@ -64,6 +64,13 @@ def _template_visible_to_user(template: dict, user: dict) -> bool:
     return user_is_admin(user) or template.get("owner_user_id") == user["id"]
 
 
+def _template_mutable_by_user(template: dict, user: dict) -> bool:
+    owner_user_id = str(template.get("owner_user_id") or "").strip()
+    if not owner_user_id:
+        return True
+    return owner_user_id == user["id"]
+
+
 def _list_user_templates(user: dict) -> list[dict]:
     templates = list_deployment_templates()
     if user_is_admin(user):
@@ -76,6 +83,16 @@ def _get_user_template_or_404(template_id: str, user: dict) -> dict:
     if _template_visible_to_user(template, user):
         return template
     raise HTTPException(status_code=404, detail="Deployment template not found.")
+
+
+def _get_mutable_user_template_or_403(template_id: str, user: dict, *, action: str) -> dict:
+    template = _get_user_template_or_404(template_id, user)
+    if _template_mutable_by_user(template, user):
+        return template
+    raise HTTPException(
+        status_code=403,
+        detail=f"Duplicate this template into your own handoff before {action} another operator's baseline.",
+    )
 
 
 def _validate_template_payload_for_user(payload: DeploymentTemplateCreateRequest, user: dict) -> None:
@@ -131,7 +148,7 @@ def update_template_endpoint(
         payload,
         user,
         get_deployment_template_or_404_fn=lambda current_id: sanitize_remote_target_fields(
-            _get_user_template_or_404(current_id, user),
+            _get_mutable_user_template_or_403(current_id, user, action="editing"),
             user,
         ),
         validate_template_payload_fn=_validate_template_payload_for_user,
@@ -193,7 +210,7 @@ def delete_template(template_id: str, user=Depends(require_auth)) -> DeploymentT
     return _service_delete_template(
         template_id,
         get_deployment_template_or_404_fn=lambda current_id: sanitize_remote_target_fields(
-            _get_user_template_or_404(current_id, user),
+            _get_mutable_user_template_or_403(current_id, user, action="deleting"),
             user,
         ),
         delete_deployment_template_record_fn=delete_deployment_template_record,

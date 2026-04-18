@@ -35,11 +35,23 @@ frontend_smoke_url_alive() {
   curl -sS -o /dev/null "$BASE_URL$FRONTEND_READY_PATH"
 }
 
+frontend_smoke_normalize_pids() {
+  awk '
+    {
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^[0-9]+$/) {
+          print $i
+        }
+      }
+    }
+  ' | tr '\n' ' ' | xargs || true
+}
+
 frontend_smoke_port_pids() {
   local pids=""
 
   if command -v lsof >/dev/null 2>&1; then
-    pids="$(lsof -ti "tcp:${PORT}" 2>/dev/null | tr '\n' ' ' | xargs || true)"
+    pids="$(lsof -ti "tcp:${PORT}" 2>/dev/null | frontend_smoke_normalize_pids)"
     if [ -n "$pids" ]; then
       printf '%s\n' "$pids"
       return 0
@@ -47,7 +59,7 @@ frontend_smoke_port_pids() {
   fi
 
   if command -v fuser >/dev/null 2>&1; then
-    pids="$(fuser -n tcp "$PORT" 2>/dev/null | tr '\n' ' ' | xargs || true)"
+    pids="$(fuser -n tcp "$PORT" 2>/dev/null | frontend_smoke_normalize_pids)"
     if [ -n "$pids" ]; then
       printf '%s\n' "$pids"
       return 0
@@ -57,8 +69,7 @@ frontend_smoke_port_pids() {
   if command -v ss >/dev/null 2>&1; then
     ss -ltnp "sport = :${PORT}" 2>/dev/null \
       | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' \
-      | tr '\n' ' ' \
-      | xargs || true
+      | frontend_smoke_normalize_pids
   fi
 }
 

@@ -76,6 +76,34 @@ const buyerProofItems = [
   "Templates now read as reusable handoff assets for repeat services, clients, or operator swaps",
   "The public business path already separates evaluation, internal-team use, agency delivery, and custom licensing",
 ];
+const russianMaterials = [
+  {
+    label: "Russian install quickstart",
+    detail: "Self-hosted setup on one VPS or dedicated host: env, known_hosts, compose up, and first live checks.",
+    href: "https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-install-quickstart.md",
+  },
+  {
+    label: "Russian operator quickstart",
+    detail: "First operator path from server review to deployment passport and handoff in plain Russian.",
+    href: "https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-operator-quickstart.md",
+  },
+  {
+    label: "Russian pilot onboarding checklist",
+    detail: "First-week commercial path: scope review, install, first deploy, handoff check, and support rhythm.",
+    href: "https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-pilot-onboarding-checklist.md",
+  },
+  {
+    label: "Russian design-partner demo packet",
+    detail: "The 10-15 minute buyer path: public story, live product, deployment passport, handoff proof, and next pilot step.",
+    href: "https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-design-partner-demo-packet.md",
+  },
+];
+const pilotSupportMotion = [
+  "Short scope review before the pilot becomes active delivery",
+  "One concrete self-hosted install path",
+  "One first deploy plus deployment-passport handoff check",
+  "One explicit week-one support rhythm around review, health, and ownership",
+];
 
 export default function UpgradePage() {
   const router = useRouter();
@@ -270,6 +298,27 @@ export default function UpgradePage() {
                 ))}
               </div>
             </article>
+            <article className="overviewCard">
+              <span className="overviewLabel">Russian operator materials</span>
+              <div className="overviewMeta">
+                {russianMaterials.map((item) => (
+                  <span key={item.label}>
+                    <strong>{item.label}</strong>:{" "}
+                    <a href={item.href} className="inlineLink" target="_blank" rel="noreferrer">
+                      {item.detail}
+                    </a>
+                  </span>
+                ))}
+              </div>
+            </article>
+            <article className="overviewCard">
+              <span className="overviewLabel">Pilot onboarding and support motion</span>
+              <div className="overviewMeta">
+                {pilotSupportMotion.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </article>
           </div>
         </article>
 
@@ -301,6 +350,45 @@ export default function UpgradePage() {
               {businessContactEmail}
             </a>
             . The first reply usually comes within 2 business days.
+          </div>
+          <div className="banner subtle">
+            Need a Russian-first proof pack before the conversation? Start with the{" "}
+            <a
+              href="https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-install-quickstart.md"
+              className="inlineLink"
+              target="_blank"
+              rel="noreferrer"
+            >
+              self-hosted install quickstart
+            </a>
+            {" "}and then open the{" "}
+            <a
+              href="https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-operator-quickstart.md"
+              className="inlineLink"
+              target="_blank"
+              rel="noreferrer"
+            >
+              operator handoff quickstart
+            </a>
+            {" "}and then use the{" "}
+            <a
+              href="https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-pilot-onboarding-checklist.md"
+              className="inlineLink"
+              target="_blank"
+              rel="noreferrer"
+            >
+              pilot onboarding checklist
+            </a>
+            {" "}and the{" "}
+            <a
+              href="https://github.com/AlexGerlitz/deploymate/blob/main/docs/ru-design-partner-demo-packet.md"
+              className="inlineLink"
+              target="_blank"
+              rel="noreferrer"
+            >
+              design-partner demo packet
+            </a>
+            .
           </div>
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">

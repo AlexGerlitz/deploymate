@@ -92,6 +92,7 @@ class DeploymentTemplateCreateRequest(BaseModel):
 
 class DeploymentTemplateResponse(BaseModel):
     id: str
+    owner_user_id: Optional[str] = None
     template_name: str
     context_label: Optional[str] = None
     image: str

@@ -57,6 +57,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         self._seed_template(
             {
                 "id": "template-popular",
+                "owner_user_id": "operator-2",
                 "template_name": "popular-web",
                 "context_label": "Shared smoke baseline",
                 "image": "nginx:1.27-alpine",
@@ -162,6 +163,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         self.assertEqual(create_response.status_code, 200)
         created = create_response.json()
         template_id = created["id"]
+        self.assertEqual(created["owner_user_id"], self.user["id"])
         self.assertEqual(created["template_name"], "web-template")
         self.assertEqual(created["context_label"], "Acme support / production")
         self.assertEqual(created["env"]["APP_ENV"], "smoke")
@@ -177,6 +179,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         popular_items = popular_response.json()
         self.assertGreaterEqual(len(popular_items), 1)
         self.assertEqual(popular_items[0]["id"], "template-popular")
+        self.assertEqual(popular_items[0]["owner_user_id"], "operator-2")
 
         recent_response = self.client.get("/deployment-templates?state=recent")
         self.assertEqual(recent_response.status_code, 200)
@@ -209,6 +212,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         duplicate = duplicate_response.json()
         duplicate_id = duplicate["id"]
         self.assertNotEqual(duplicate_id, template_id)
+        self.assertEqual(duplicate["owner_user_id"], self.user["id"])
         self.assertEqual(duplicate["template_name"], "web-template-copy")
         self.assertIsNone(duplicate["context_label"])
         self.assertEqual(duplicate["use_count"], 0)
@@ -225,6 +229,71 @@ class TemplateApiFlowTests(unittest.TestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(delete_response.json()["id"], duplicate_id)
         self.assertNotIn(duplicate_id, self.templates)
+
+    def test_duplicate_template_requires_context_label_before_direct_deploy(self):
+        duplicate_response = self.client.post(
+            "/deployment-templates/template-popular/duplicate",
+            json={"template_name": "popular-web-copy"},
+        )
+        self.assertEqual(duplicate_response.status_code, 200)
+        duplicate = duplicate_response.json()
+        duplicate_id = duplicate["id"]
+
+        blocked_deploy_response = self.client.post(f"/deployment-templates/{duplicate_id}/deploy")
+        self.assertEqual(blocked_deploy_response.status_code, 400)
+        self.assertIn("context label", blocked_deploy_response.json()["detail"])
+        self.assertEqual(self.templates[duplicate_id]["use_count"], 0)
+        self.assertEqual(len(self.deployments), 0)
+
+        relabel_response = self.client.put(
+            f"/deployment-templates/{duplicate_id}",
+            json={
+                "template_name": "popular-web-copy",
+                "context_label": "Acme support / staging",
+                "image": "nginx:1.27-alpine",
+                "name": "popular-web",
+                "internal_port": 80,
+                "external_port": 38081,
+                "env": {"MODE": "popular"},
+                "secrets": {},
+            },
+        )
+        self.assertEqual(relabel_response.status_code, 200)
+        self.assertEqual(relabel_response.json()["context_label"], "Acme support / staging")
+
+        deploy_response = self.client.post(f"/deployment-templates/{duplicate_id}/deploy")
+        self.assertEqual(deploy_response.status_code, 200)
+        self.assertEqual(self.templates[duplicate_id]["use_count"], 1)
+        self.assertEqual(len(self.deployments), 1)
+
+    def test_foreign_owned_template_requires_duplicate_before_direct_deploy(self):
+        blocked_deploy_response = self.client.post("/deployment-templates/template-popular/deploy")
+        self.assertEqual(blocked_deploy_response.status_code, 400)
+        self.assertIn("another operator", blocked_deploy_response.json()["detail"])
+        self.assertEqual(self.templates["template-popular"]["use_count"], 3)
+        self.assertEqual(len(self.deployments), 0)
+
+    def test_foreign_owned_template_requires_duplicate_before_mutation(self):
+        update_response = self.client.put(
+            "/deployment-templates/template-popular",
+            json={
+                "template_name": "popular-web",
+                "context_label": "Shared smoke baseline",
+                "image": "nginx:1.27-alpine",
+                "name": "popular-web",
+                "internal_port": 80,
+                "external_port": 38081,
+                "env": {"MODE": "popular"},
+                "secrets": {},
+            },
+        )
+        self.assertEqual(update_response.status_code, 403)
+        self.assertIn("editing another operator", update_response.json()["detail"])
+
+        delete_response = self.client.delete("/deployment-templates/template-popular")
+        self.assertEqual(delete_response.status_code, 403)
+        self.assertIn("deleting another operator", delete_response.json()["detail"])
+        self.assertIn("template-popular", self.templates)
 
 
 if __name__ == "__main__":
