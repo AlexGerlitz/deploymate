@@ -291,6 +291,35 @@ run_beginner_admin_server_ready_smoke() {
   fi
 }
 
+run_beginner_admin_server_ready_low_disk_smoke() {
+  local smoke_name="frontend-beginner-admin-server-ready-low-disk-smoke"
+  local dist_dir=".next-smoke-beginner-admin-server-ready-low-disk-static"
+  local overview_html=""
+
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-server-ready-low-disk
+
+  overview_html="$(beginner_static_html_file "$dist_dir" "/app")"
+
+  if ! grep -Eq 'data-testid="workspace-scenario-primary-action"[^>]*href="#ops-disk-recovery-card"[^>]*>Open cleanup runbook<' "$overview_html"; then
+    echo "[${smoke_name}] overview did not move the primary CTA into the cleanup path" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<button[^>]*data-testid="workspace-scenario-action-step-2"[^>]*disabled[^>]*>Clean up disk first<)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-2"[^>]*>Clean up disk first<)' "$overview_html"; then
+    echo "[${smoke_name}] Step 2 still looks available during host disk pressure" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="ops-disk-recovery-card"' "$overview_html"; then
+    echo "[${smoke_name}] overview lost the low-disk cleanup runbook card" >&2
+    exit 1
+  fi
+}
+
 run_beginner_admin_live_review_smoke() {
   local smoke_name="frontend-beginner-admin-live-review-smoke"
   local dist_dir=".next-smoke-beginner-admin-live-review-static"
@@ -504,6 +533,7 @@ run_beginner_first_deploy_smoke() {
 
 run_beginner_admin_smoke
 run_beginner_admin_server_ready_smoke
+run_beginner_admin_server_ready_low_disk_smoke
 run_beginner_admin_live_review_smoke
 run_beginner_member_smoke
 run_beginner_member_overview_live_smoke
@@ -513,6 +543,7 @@ run_beginner_export_payload_smoke
 
 echo "[frontend-beginner-smoke] first-time admin path rendered"
 echo "[frontend-beginner-smoke] admin server-ready first deploy path rendered"
+echo "[frontend-beginner-smoke] admin server-ready low-disk path rendered"
 echo "[frontend-beginner-smoke] admin live-review handoff rendered"
 echo "[frontend-beginner-smoke] member remote-only live review path rendered"
 echo "[frontend-beginner-smoke] member overview live review path rendered"

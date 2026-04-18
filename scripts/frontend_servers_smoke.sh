@@ -109,6 +109,24 @@ frontend_smoke_assert_checks "frontend-servers-smoke" "$BASE_URL" automation_smo
     exit 1
   fi
 
+  if ! grep -Eq 'data-testid="server-review-storage-pressure-plan-smoke-server"' "$pressure_html"; then
+    echo "[frontend-servers-pressure-smoke] storage pressure recovery path is missing" >&2
+    rm -f "$pressure_html"
+    exit 1
+  fi
+
+  if ! grep -Eq 'docker builder prune --all --force' "$pressure_html"; then
+    echo "[frontend-servers-pressure-smoke] storage pressure cleanup commands are missing" >&2
+    rm -f "$pressure_html"
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="smoke-server-storage-pressure-copy"[^>]*>Copy cleanup path<' "$pressure_html"; then
+    echo "[frontend-servers-pressure-smoke] storage pressure copy action is missing" >&2
+    rm -f "$pressure_html"
+    exit 1
+  fi
+
   if grep -Eq 'data-testid="smoke-server-continue-action"' "$pressure_html"; then
     echo "[frontend-servers-pressure-smoke] storage pressure path still unlocked the step-2 action" >&2
     rm -f "$pressure_html"

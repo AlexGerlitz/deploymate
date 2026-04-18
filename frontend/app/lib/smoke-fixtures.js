@@ -541,6 +541,53 @@ export const smokeWorkflowDiskPressureOpsOverview = {
   ],
 };
 
+export const smokeOverviewFirstDeployDiskPressureOpsOverview = {
+  ...smokeOpsOverview,
+  deployments: {
+    total: 0,
+    running: 0,
+    failed: 0,
+    pending: 0,
+    local: 0,
+    remote: 0,
+    exposed: 0,
+    public_urls: 0,
+  },
+  servers: {
+    total: 1,
+    password_auth: 0,
+    ssh_key_auth: 1,
+    unused: 1,
+  },
+  notifications: {
+    total: 0,
+    success: 0,
+    error: 0,
+    latest_error_title: null,
+    latest_error_at: null,
+  },
+  templates: {
+    total: 0,
+    unused: 0,
+    recently_used: 0,
+    top_template_name: null,
+    top_template_use_count: 0,
+  },
+  host_runtime: {
+    root_disk_status: "warn",
+    root_disk_usage_percent: 86,
+    root_disk_free: "7G",
+    root_disk_detail: "7G free on /. Clear old builder cache before the next release.",
+  },
+  attention_items: [
+    {
+      level: "warn",
+      title: "DeployMate host root disk is 86% full",
+      detail: "7G free on /. Clear old builder cache before the next release.",
+    },
+  ],
+};
+
 export const smokeHealth = {
   deployment_id: "smoke-deployment",
   container_name: "smoke-runtime",

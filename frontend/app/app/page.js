@@ -8,6 +8,7 @@ import {
   smokeDeployments,
   smokeMode,
   smokeOverviewDeployments,
+  smokeOverviewFirstDeployDiskPressureOpsOverview,
   smokeOverviewNotifications,
   smokeOverviewOpsOverview,
   smokeOverviewServers,
@@ -49,16 +50,19 @@ const smokeHomeDeployments =
 const smokeHomeServers =
   smokeMode &&
   (smokeOverviewScenario === "admin-server-ready-first-deploy" ||
+    smokeOverviewScenario === "admin-server-ready-low-disk" ||
     smokeOverviewScenario === "admin-live-review")
     ? smokeServers.slice(0, 1)
     : smokeOverviewServers;
 const smokeHomeOpsOverview =
-  smokeMode &&
-  (smokeOverviewScenario === "member-live-review" ||
-    smokeOverviewScenario === "admin-live-review" ||
-    smokeOverviewScenario === "admin-server-ready-first-deploy")
-    ? null
-    : smokeOverviewOpsOverview;
+  smokeMode && smokeOverviewScenario === "admin-server-ready-low-disk"
+    ? smokeOverviewFirstDeployDiskPressureOpsOverview
+    : smokeMode &&
+      (smokeOverviewScenario === "member-live-review" ||
+        smokeOverviewScenario === "admin-live-review" ||
+        smokeOverviewScenario === "admin-server-ready-first-deploy")
+      ? null
+      : smokeOverviewOpsOverview;
 
 export default function HomePage() {
   const router = useRouter();
@@ -151,13 +155,19 @@ export default function HomePage() {
             : "Deployment creation stays blocked until an admin confirms the saved server target for this workspace.",
           stepAction: memberHasLiveDeployments ? "Open live review" : "Review rollout status",
         };
+  const hasLiveDeployments = opsSnapshot.deployments.total > 0;
+  const hostDiskRolloutBlocked =
+    canAccessServers &&
+    Boolean(hostDiskRunbook) &&
+    (overviewPrimaryPath.reason === "first-deploy" || overviewPrimaryPath.reason === "steady-state");
+  const hostDiskFirstDeployBlocked = hostDiskRolloutBlocked && !hasLiveDeployments;
   const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
     ? "Next best step: connect and verify one server."
     : overviewPrimaryPath.reason === "incident"
       ? "Next best step: review live apps and inspect the problem first."
       : overviewPrimaryPath.reason === "admin-target-needed"
         ? "Next best step: ask an admin to confirm one server target, then return to the workflow."
-      : hostDiskRunbook && (overviewPrimaryPath.reason === "first-deploy" || overviewPrimaryPath.reason === "steady-state")
+      : hostDiskRolloutBlocked
         ? hostDiskRunbook.summary
       : memberServerCopy
         ? memberServerCopy.support
@@ -167,8 +177,7 @@ export default function HomePage() {
   const waitingForAdminTarget = overviewPrimaryPath.reason === "admin-target-needed";
   const waitingForServerSetup = overviewPrimaryPath.reason === "server-setup";
   const memberNewDeploymentBlocked = memberHasLiveDeployments;
-  const hasLiveDeployments = opsSnapshot.deployments.total > 0;
-  const stepTwoBlocked = waitingForServerSetup || waitingForAdminTarget;
+  const stepTwoBlocked = waitingForServerSetup || waitingForAdminTarget || hostDiskRolloutBlocked;
   const stepThreeBlocked =
     waitingForServerSetup || waitingForAdminTarget || opsSnapshot.deployments.total === 0;
   const stepThreeIsPrimary =
@@ -210,6 +219,10 @@ export default function HomePage() {
       detail: stepTwoBlocked
         ? waitingForAdminTarget
           ? "This step opens after an admin confirms one saved server target for the workspace."
+          : hostDiskRolloutBlocked
+            ? hasLiveDeployments
+              ? "New rollout stays blocked until the cleanup runbook clears low disk on the DeployMate host. Review live apps first."
+              : "This server is ready, but the first rollout stays blocked until the cleanup runbook clears low disk on the DeployMate host."
           : memberNewDeploymentBlocked
             ? "New remote deployments need an admin-managed target. Review the live apps that already exist instead."
             : "This step opens after Step 1 is done and one server is already connected."
@@ -218,15 +231,24 @@ export default function HomePage() {
         : hasLiveDeployments
           ? "Use this only when you are ready to start another app after reviewing what is already live."
         : "Paste the app image you want to run, or pick a saved setup if you already have one.",
-      href: singleServerFirstDeployTarget ? firstDeployWorkflowHref : "/app/deployment-workflow",
+      href: hostDiskRolloutBlocked
+        ? "#ops-disk-recovery-card"
+        : singleServerFirstDeployTarget
+          ? firstDeployWorkflowHref
+          : "/app/deployment-workflow",
       actionLabel: stepTwoBlocked
-        ? "Opens after Step 1"
+        ? waitingForAdminTarget
+          ? "Opens after admin target"
+          : hostDiskRolloutBlocked
+            ? "Clean up disk first"
+            : "Opens after Step 1"
         : memberNewDeploymentBlocked
           ? "Ask admin for new deploy"
         : hasLiveDeployments
           ? "Start another deploy"
         : "Choose app to run",
       primary: !stepOneIsPrimary && !stepThreeIsPrimary,
+      destination: hostDiskRolloutBlocked ? "Blocked until host cleanup" : "",
       disabled: stepTwoBlocked || memberNewDeploymentBlocked,
     },
     {
@@ -237,9 +259,11 @@ export default function HomePage() {
         ? "This step opens after the first deployment exists and DeployMate has live runtime state to review."
         : memberHasLiveDeployments
           ? "Open live status and runtime detail without exposing saved server inventory or target controls."
+          : hostDiskRolloutBlocked
+            ? "Review live status while low disk cleanup is still pending. Do not start another rollout until overview clears the warning."
           : hasLiveDeployments
             ? "Open live status and runtime detail before starting another rollout."
-        : "Start the app, then open live status to confirm it is running, healthy, and reachable.",
+            : "Start the app, then open live status to confirm it is running, healthy, and reachable.",
       href: "/app/deployment-workflow",
       actionLabel: stepThreeBlocked
         ? "Opens after deploy"
@@ -254,6 +278,12 @@ export default function HomePage() {
     beginnerSteps.find((card) => card.primary && !card.disabled) ||
     beginnerSteps.find((card) => !card.disabled) ||
     null;
+  const primaryWorkspaceAction = hostDiskFirstDeployBlocked
+    ? {
+        href: "#ops-disk-recovery-card",
+        actionLabel: "Open cleanup runbook",
+      }
+    : primaryBeginnerStep;
   const workspaceBoardSteps = beginnerSteps.map((card) => ({
     ...card,
     boardTitle:
@@ -268,12 +298,12 @@ export default function HomePage() {
           : memberHasLiveDeployments
             ? "Review live apps"
             : "Review health",
-    boardState: card.primary ? "Current" : card.disabled ? "Locked" : "Ready",
-    boardDestination: card.href.includes("/app/server-review")
+    boardState: card.disabled ? (card.primary ? "Blocked" : "Locked") : card.primary ? "Current" : "Ready",
+    boardDestination: card.destination || (card.href.includes("/app/server-review")
       ? "Opens Server review"
       : card.href.includes("/app/deployment-workflow")
         ? "Opens Deployment workflow"
-        : "Opens workspace",
+        : "Opens workspace"),
   }));
   const workspaceSignalsBadge = `${opsSnapshot.attention_items.length} attention item${
     opsSnapshot.attention_items.length === 1 ? "" : "s"
@@ -648,14 +678,14 @@ export default function HomePage() {
             <h1 data-testid="runtime-page-title">Choose the next step.</h1>
             <p>{beginnerNextStep}</p>
             <p data-testid="workspace-scenario-title">Step 1, Step 2, Step 3.</p>
-            {primaryBeginnerStep ? (
+            {primaryWorkspaceAction ? (
               <div className="formActions">
                 <Link
-                  href={primaryBeginnerStep.href}
+                  href={primaryWorkspaceAction.href}
                   className="landingButton primaryButton"
                   data-testid="workspace-scenario-primary-action"
                 >
-                  {primaryBeginnerStep.actionLabel}
+                  {primaryWorkspaceAction.actionLabel}
                 </Link>
               </div>
             ) : null}

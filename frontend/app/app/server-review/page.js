@@ -94,6 +94,48 @@ function getStoragePressureItem(diagnostics) {
   return diskItem.status === "warn" || diskItem.status === "error" ? diskItem : null;
 }
 
+function buildStoragePressureRecoveryPlan(server, diagnostics) {
+  const diskItem = getStoragePressureItem(diagnostics);
+  if (!diskItem) {
+    return null;
+  }
+
+  const target = diagnostics?.target || `${server.username}@${server.host}:${server.port}`;
+  const commands = [
+    "docker builder prune --all --force",
+    "journalctl --vacuum-size=100M",
+    "df -h /",
+  ];
+  const summary =
+    diskItem.summary ||
+    "Root disk is too full for the next rollout. Clear space before Step 2.";
+  const detail =
+    diskItem.details ||
+    "Run the safe cleanup set on this saved server target, then rerun server readiness before Step 2.";
+  const warningNote =
+    "Run these commands on the saved server target itself, not on the DeployMate host. If / still stays too full, inspect images and volumes manually before deleting anything broader.";
+
+  return {
+    target,
+    summary,
+    detail,
+    commands,
+    warningNote,
+    copyText: [
+      `Clear storage pressure on ${server.name || server.host}`,
+      `Target: ${target}`,
+      summary,
+      detail,
+      "",
+      "Run on the saved server target:",
+      ...commands,
+      "",
+      "Then rerun server readiness in DeployMate before Step 2.",
+      warningNote,
+    ].join("\n"),
+  };
+}
+
 function buildServerMeta(server, diagnostics, suggestedPorts) {
   const target = `${server.username}@${server.host}:${server.port}`;
   const authLabel = server.auth_type === "ssh_key" ? "SSH key auth" : "Auth review";
@@ -309,6 +351,9 @@ function ServerReviewPageContent() {
     selectedItem && selectedItem.segment !== "ready"
       ? selectedItem
       : items.find((item) => item.segment !== "ready") || null;
+  const selectedNeedsReviewStoragePressure = selectedNeedsReviewItem
+    ? getStoragePressureItem(selectedNeedsReviewItem.diagnostics)
+    : null;
   const heroSpotlight = noServers
     ? {
         badge: "Do this now",
@@ -327,6 +372,17 @@ function ServerReviewPageContent() {
           actionLabel: "Choose what to run",
           actionKind: "continue",
           actionHref: `/app/deployment-workflow?server=${selectedReadyItem.id}&source=server-review`,
+        }
+      : selectedNeedsReviewStoragePressure
+      ? {
+          badge: "Do this now",
+          title: `Clear storage pressure on ${selectedNeedsReviewItem?.label || "this server"}`,
+          detail: "This target stays out of Step 2 until the root disk warning clears and you rerun the readiness check.",
+          support: selectedNeedsReviewItem
+            ? `${selectedNeedsReviewItem.label} already has the right diagnostics signal. Use the cleanup path below on that same machine before another rollout decision.`
+            : "Use the cleanup path below on the saved server, then rerun readiness before Step 2.",
+          actionLabel: "Open cleanup path",
+          actionKind: "queue",
         }
       : {
           badge: "Do this now",
@@ -853,6 +909,22 @@ function ServerReviewPageContent() {
     }
   }
 
+  async function handleCopyStorageRecoveryPlan(item) {
+    const recoveryPlan = buildStoragePressureRecoveryPlan(item.server, item.diagnostics);
+    if (!recoveryPlan) {
+      return;
+    }
+
+    setError("");
+    try {
+      await navigator.clipboard.writeText(recoveryPlan.copyText);
+      setSuccess(`Storage cleanup path copied for "${item.label}".`);
+    } catch {
+      setError("Failed to copy the storage cleanup path.");
+      setSuccess("");
+    }
+  }
+
   useEffect(() => {
     if (smokeMode) {
       return;
@@ -1120,6 +1192,7 @@ function ServerReviewPageContent() {
         >
           {filteredItems.map((item) => {
             const storagePressure = getStoragePressureItem(item.diagnostics);
+            const storageRecoveryPlan = buildStoragePressureRecoveryPlan(item.server, item.diagnostics);
 
             return (
               <AdminSurfaceQueueCard
@@ -1161,87 +1234,161 @@ function ServerReviewPageContent() {
                         <strong>
                           {item.segment === "ready"
                             ? "This server is ready. Use it for Step 2."
+                            : storageRecoveryPlan
+                              ? "Clear storage pressure here, then rerun readiness."
                             : "Finish the check here, then move on."}
                         </strong>
                         <p>
                           {item.segment === "ready"
                             ? "You can still rerun a check if something changed, but the main path is choosing what to run next."
+                            : storageRecoveryPlan
+                              ? "This server already answered the main question: low disk is the blocker. Clear space on this machine first, then run a fresh readiness check."
                             : "Stay on this server, run the readiness check, and only then continue to the app step."}
                         </p>
                       </div>
 
                     <div className="workspaceReviewerGrid serverReviewTaskGrid">
-                      <article className="workspaceReviewerCard serverReviewTaskCard">
-                        <span>{item.segment === "ready" ? "Only if something changed" : "Do this now"}</span>
-                        <strong>
-                          {item.segment === "ready" ? "Recheck this server" : "Check whether this server is ready"}
-                        </strong>
-                        <p>
-                          {item.segment === "ready"
-                            ? "This is no longer the main path. Run the readiness check again only if the server details changed or you want a fresh answer."
-                            : item.diagnostics
-                            ? "Run the readiness check again if you changed the server details or want a fresh answer."
-                            : "This is the main action on this screen. It checks that the server is reachable and looks safe for Step 2."}
-                        </p>
-                        <button
-                          type="button"
-                          className={item.segment === "ready" ? "secondaryButton" : "landingButton primaryButton"}
-                          data-testid={`${item.id}-${item.segment === "ready" ? "recheck-action" : "primary-action"}`}
-                          onClick={() => handleRunStarterAction("primary", item.id)}
-                          disabled={actionLoadingId === item.id}
-                        >
-                          {actionLoadingId === item.id
-                            ? "Checking..."
-                            : item.segment === "ready"
-                              ? "Recheck server readiness"
-                              : "Check server readiness"}
-                        </button>
-                      </article>
-
-                      <article className="workspaceReviewerCard serverReviewTaskCard">
-                        <span>If you only need a quick test</span>
-                        <strong>Only test sign-in</strong>
-                        <p>
-                          Use this shorter check when you only want to confirm that DeployMate can log in before a fuller review.
-                        </p>
-                        <button
-                          type="button"
-                          className="secondaryButton"
-                          data-testid={`${item.id}-secondary-action`}
-                          onClick={() => handleRunStarterAction("secondary", item.id)}
-                          disabled={actionLoadingId === item.id}
-                        >
-                          {actionLoadingId === item.id ? "Checking..." : "Only test sign-in"}
-                        </button>
-                      </article>
-
-                      <article className="workspaceReviewerCard serverReviewTaskCard">
-                        <span>{item.segment === "ready" ? "Do this now" : "Then do this"}</span>
-                        <strong>
-                          {item.segment === "ready"
-                            ? "Choose what to run on this server"
-                            : "Move to Step 2 after this server looks ready"}
-                        </strong>
-                        <p>
-                          {item.segment === "ready"
-                            ? "Step 1 is done for this machine. Keep the momentum and pick one app or one saved setup next."
-                            : "Once the readiness result looks good, use the same server in Step 2 and keep the rollout path simple."}
-                        </p>
-                        {item.segment === "ready" ? (
-                          <Link
-                            href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
-                            data-testid={`${item.id}-continue-action`}
-                            className="landingButton primaryButton"
+                      {storageRecoveryPlan ? (
+                        <>
+                          <article
+                            className="workspaceReviewerCard serverReviewTaskCard"
+                            data-testid={`server-review-storage-pressure-plan-${item.id}`}
                           >
-                            Choose what to run
-                          </Link>
-                        ) : (
-                          <div className="banner subtle inlineBanner">
-                            Waiting for a ready result before Step 2 becomes the main path.
-                          </div>
-                        )}
-                      </article>
+                            <span>Do this now</span>
+                            <strong>Clear storage pressure on this server</strong>
+                            <p>{storageRecoveryPlan.summary}</p>
+                            <p className="formHint">{storageRecoveryPlan.detail}</p>
+                            <pre
+                              className="logs expandedBlock"
+                              data-testid={`server-review-storage-pressure-commands-${item.id}`}
+                            >
+                              {storageRecoveryPlan.commands.join("\n")}
+                            </pre>
+                            <button
+                              type="button"
+                              className="landingButton primaryButton"
+                              data-testid={`${item.id}-storage-pressure-copy`}
+                              onClick={() => handleCopyStorageRecoveryPlan(item)}
+                            >
+                              Copy cleanup path
+                            </button>
+                          </article>
+
+                          <article className="workspaceReviewerCard serverReviewTaskCard">
+                            <span>Then do this</span>
+                            <strong>Rerun server readiness</strong>
+                            <p>
+                              After cleanup on {storageRecoveryPlan.target}, run a fresh readiness check and confirm that the warning is gone.
+                            </p>
+                            <button
+                              type="button"
+                              className="secondaryButton"
+                              data-testid={`${item.id}-recheck-action`}
+                              onClick={() => handleRunStarterAction("primary", item.id)}
+                              disabled={actionLoadingId === item.id}
+                            >
+                              {actionLoadingId === item.id ? "Checking..." : "Recheck server readiness"}
+                            </button>
+                          </article>
+
+                          <article className="workspaceReviewerCard serverReviewTaskCard">
+                            <span>After cleanup</span>
+                            <strong>Move to Step 2 once the warning clears</strong>
+                            <p>
+                              Keep rollout work paused until this server comes back with a ready result and storage pressure no longer blocks the path.
+                            </p>
+                            <div
+                              className="banner subtle inlineBanner"
+                              data-testid={`server-review-storage-pressure-gate-${item.id}`}
+                            >
+                              Waiting for storage cleanup and a fresh ready result before Step 2.
+                            </div>
+                          </article>
+                        </>
+                      ) : (
+                        <>
+                          <article className="workspaceReviewerCard serverReviewTaskCard">
+                            <span>{item.segment === "ready" ? "Only if something changed" : "Do this now"}</span>
+                            <strong>
+                              {item.segment === "ready" ? "Recheck this server" : "Check whether this server is ready"}
+                            </strong>
+                            <p>
+                              {item.segment === "ready"
+                                ? "This is no longer the main path. Run the readiness check again only if the server details changed or you want a fresh answer."
+                                : item.diagnostics
+                                  ? "Run the readiness check again if you changed the server details or want a fresh answer."
+                                  : "This is the main action on this screen. It checks that the server is reachable and looks safe for Step 2."}
+                            </p>
+                            <button
+                              type="button"
+                              className={item.segment === "ready" ? "secondaryButton" : "landingButton primaryButton"}
+                              data-testid={`${item.id}-${item.segment === "ready" ? "recheck-action" : "primary-action"}`}
+                              onClick={() => handleRunStarterAction("primary", item.id)}
+                              disabled={actionLoadingId === item.id}
+                            >
+                              {actionLoadingId === item.id
+                                ? "Checking..."
+                                : item.segment === "ready"
+                                  ? "Recheck server readiness"
+                                  : "Check server readiness"}
+                            </button>
+                          </article>
+
+                          <article className="workspaceReviewerCard serverReviewTaskCard">
+                            <span>If you only need a quick test</span>
+                            <strong>Only test sign-in</strong>
+                            <p>
+                              Use this shorter check when you only want to confirm that DeployMate can log in before a fuller review.
+                            </p>
+                            <button
+                              type="button"
+                              className="secondaryButton"
+                              data-testid={`${item.id}-secondary-action`}
+                              onClick={() => handleRunStarterAction("secondary", item.id)}
+                              disabled={actionLoadingId === item.id}
+                            >
+                              {actionLoadingId === item.id ? "Checking..." : "Only test sign-in"}
+                            </button>
+                          </article>
+
+                          <article className="workspaceReviewerCard serverReviewTaskCard">
+                            <span>{item.segment === "ready" ? "Do this now" : "Then do this"}</span>
+                            <strong>
+                              {item.segment === "ready"
+                                ? "Choose what to run on this server"
+                                : "Move to Step 2 after this server looks ready"}
+                            </strong>
+                            <p>
+                              {item.segment === "ready"
+                                ? "Step 1 is done for this machine. Keep the momentum and pick one app or one saved setup next."
+                                : "Once the readiness result looks good, use the same server in Step 2 and keep the rollout path simple."}
+                            </p>
+                            {item.segment === "ready" ? (
+                              <Link
+                                href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
+                                data-testid={`${item.id}-continue-action`}
+                                className="landingButton primaryButton"
+                              >
+                                Choose what to run
+                              </Link>
+                            ) : (
+                              <div className="banner subtle inlineBanner">
+                                Waiting for a ready result before Step 2 becomes the main path.
+                              </div>
+                            )}
+                          </article>
+                        </>
+                      )}
                     </div>
+
+                    {storageRecoveryPlan ? (
+                      <div
+                        className="banner subtle"
+                        data-testid={`server-review-storage-pressure-warning-${item.id}`}
+                      >
+                        {storageRecoveryPlan.warningNote}
+                      </div>
+                    ) : null}
 
                     <div className="workspaceGlancePanel serverReviewTaskNotePanel">
                       <div className="workspaceGlanceHeader">
