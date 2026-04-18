@@ -94,6 +94,10 @@ class DeploymentApiFlowTests(unittest.TestCase):
         return serialized
 
     def _insert_deployment_record(self, record):
+        self.assertIn("stack_name", record)
+        self.assertIn("primary_service", record)
+        self.assertIn("health_target", record)
+        self.assertIn("compose_yaml", record)
         self.deployment = self._serialize_record(record)
 
     def _update_deployment_record(self, deployment_id, **updates):

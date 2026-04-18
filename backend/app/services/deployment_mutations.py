@@ -343,6 +343,10 @@ def create_deployment(
         "release_triggered_at": release_metadata["release_triggered_at"],
         "release_triggered_by": release_metadata["release_triggered_by"],
         "release_webhook_token": secrets.token_urlsafe(24),
+        "stack_name": None,
+        "primary_service": None,
+        "health_target": None,
+        "compose_yaml": None,
     }
 
     insert_deployment_record_fn(deployment_record)
@@ -690,11 +694,6 @@ def redeploy_deployment(
         **(existing_deployment.get("secrets") or {}),
         **payload.secrets,
     }
-    if capture_previous_release_snapshot and existing_deployment.get("status") == "running":
-        update_previous_release_snapshot_fn(
-            deployment_id,
-            build_previous_release_snapshot(existing_deployment),
-        )
     server = get_server_or_404_fn(existing_deployment["server_id"]) if existing_deployment.get("server_id") else None
     ensure_runtime_target_allowed_fn(server)
     ensure_docker_is_available_fn(server)
@@ -706,6 +705,11 @@ def redeploy_deployment(
     container_name = payload.name or existing_deployment["container_name"]
     if container_name != existing_deployment["container_name"]:
         ensure_container_name_is_available_fn(container_name, server)
+    if capture_previous_release_snapshot and existing_deployment.get("status") == "running":
+        update_previous_release_snapshot_fn(
+            deployment_id,
+            build_previous_release_snapshot(existing_deployment),
+        )
     create_activity_event_fn(
         deployment_id=deployment_id,
         level="success",
