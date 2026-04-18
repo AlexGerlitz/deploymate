@@ -135,6 +135,10 @@ Updated: 2026-04-18
 ## Autonomous Night Loop
 
 - Ночная работа теперь должна идти не как один изолированный проход, а как последовательный loop по текущему main track.
+- На этом хосте есть один локализованный automation blocker:
+  - текущий sandbox не даёт создать внешний single-writer lease по пути `/Users/alexgerlitz/.codex/automation-leases/deploymate.lock`
+  - попытка захвата lease на `2026-04-18 09:42 +07` завершилась `Operation not permitted`
+  - пока этот внешний lease path не станет доступен для записи, unattended проходы должны считать это stop condition и не продолжать product packages после reread/repo-status
 - Базовое правило:
   - если текущий пакет уже завершён и проверен, не ждать нового сообщения, а брать следующий пакет по фиксированному порядку
 - Порядок автономного продолжения сейчас такой:
