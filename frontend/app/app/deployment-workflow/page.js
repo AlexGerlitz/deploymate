@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import {
   smokeDeployments,
@@ -527,6 +527,118 @@ function buildTemplateAssetState(template) {
   };
 }
 
+function normalizeTemplateContextLabel(value) {
+  return String(value || "").trim();
+}
+
+function buildTemplateContextSummary(template) {
+  const contextLabel = normalizeTemplateContextLabel(template?.context_label);
+
+  if (contextLabel) {
+    return {
+      label: contextLabel,
+      detail: `This asset is labeled for ${contextLabel}.`,
+      missing: false,
+    };
+  }
+
+  return {
+    label: "Needs context label",
+    detail:
+      "Add the client, environment, or operator context before this asset is treated as a trusted reusable baseline.",
+    missing: true,
+  };
+}
+
+function buildTemplateContextQueue(primaryTemplate, secondaryTemplates) {
+  const focusContext = normalizeTemplateContextLabel(primaryTemplate?.context_label);
+
+  if (secondaryTemplates.length === 0) {
+    return {
+      detail: focusContext
+        ? `No additional saved assets currently sit outside ${focusContext}.`
+        : "No additional saved assets are waiting behind this unlabeled baseline.",
+      sections: [],
+    };
+  }
+
+  if (focusContext) {
+    const matchingTemplates = secondaryTemplates.filter(
+      (template) => normalizeTemplateContextLabel(template?.context_label) === focusContext,
+    );
+    const outsideTemplates = secondaryTemplates.filter(
+      (template) => normalizeTemplateContextLabel(template?.context_label) !== focusContext,
+    );
+    const sections = [];
+    const detailParts = [];
+
+    if (matchingTemplates.length > 0) {
+      detailParts.push(
+        `${matchingTemplates.length} more saved asset${matchingTemplates.length === 1 ? "" : "s"} match ${focusContext}.`,
+      );
+      sections.push({
+        id: "same-context",
+        title: "Same context",
+        detail: `These saved assets already belong to ${focusContext}.`,
+        templates: matchingTemplates,
+      });
+    } else {
+      detailParts.push(`No other saved assets currently match ${focusContext}.`);
+    }
+
+    if (outsideTemplates.length > 0) {
+      detailParts.push(
+        `${outsideTemplates.length} saved asset${outsideTemplates.length === 1 ? "" : "s"} stay outside this context and remain in a separate queue below.`,
+      );
+      sections.push({
+        id: "outside-context",
+        title: "Outside this context",
+        detail: `Keep these assets separate until you deliberately switch away from ${focusContext} or duplicate for a new handoff.`,
+        templates: outsideTemplates,
+      });
+    }
+
+    return {
+      detail: detailParts.join(" "),
+      sections,
+    };
+  }
+
+  const unlabeledTemplates = secondaryTemplates.filter(
+    (template) => !normalizeTemplateContextLabel(template?.context_label),
+  );
+  const labeledTemplates = secondaryTemplates.filter((template) =>
+    normalizeTemplateContextLabel(template?.context_label),
+  );
+  const sections = [];
+
+  if (unlabeledTemplates.length > 0) {
+    sections.push({
+      id: "missing-context",
+      title: "Also missing context",
+      detail: "These saved assets still need the same client or operating label before they become trusted baselines.",
+      templates: unlabeledTemplates,
+    });
+  }
+
+  if (labeledTemplates.length > 0) {
+    sections.push({
+      id: "labeled-contexts",
+      title: "Labeled contexts",
+      detail: "These assets already declare their client or operating context and stay separate from the unlabeled baseline.",
+      templates: labeledTemplates,
+    });
+  }
+
+  return {
+    detail:
+      labeledTemplates.length > 0
+        ? `This focused asset still needs a context label. ${labeledTemplates.length} saved asset${labeledTemplates.length === 1 ? "" : "s"} are already labeled and stay separate below.`
+        : "This focused asset still needs a context label before it becomes the trusted boundary for this queue.",
+    sections,
+  };
+}
+
 function extractComposeServiceNames(composeYaml) {
   if (!composeYaml) {
     return [];
@@ -703,9 +815,20 @@ function buildComposeIntakeSummary(draft, validation) {
   ].join("\n");
 }
 
+function buildRequestedWorkflowQuery(search = "") {
+  const params = new URLSearchParams(search);
+
+  return {
+    templateId: params.get("template") || "",
+    templateAction: params.get("template_action") || "preview",
+    templateSource: params.get("template_source") || "",
+    serverId: params.get("server") || "",
+    source: params.get("source") || "",
+  };
+}
+
 function DeploymentWorkflowPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [authChecked, setAuthChecked] = useState(smokeMode);
   const [authFallbackVisible, setAuthFallbackVisible] = useState(false);
@@ -781,8 +904,12 @@ function DeploymentWorkflowPageContent() {
     tls_enabled: smokeMode ? Boolean(smokeWorkflowFixture.form.tls_enabled) : false,
   });
   const [templateName, setTemplateName] = useState("");
+  const [templateContextLabel, setTemplateContextLabel] = useState("");
   const [envRows, setEnvRows] = useState([{ key: "", value: "" }]);
   const [secretRows, setSecretRows] = useState([{ key: "", value: "" }]);
+  const [requestedWorkflowQuery, setRequestedWorkflowQuery] = useState(() =>
+    buildRequestedWorkflowQuery(),
+  );
   const canAccessServers = Boolean(currentUser?.is_admin);
   const serverAccessBlocked = !canAccessServers && !localDeploymentsEnabled;
   const memberHasLiveDeployments = serverAccessBlocked && deployments.length > 0;
@@ -840,6 +967,7 @@ function DeploymentWorkflowPageContent() {
 
       return [
         template.template_name,
+        template.context_label,
         template.image,
         template.name,
         template.server_name,
@@ -877,6 +1005,8 @@ function DeploymentWorkflowPageContent() {
   const primaryTemplateAssetState = primaryTemplate
     ? buildTemplateAssetState(primaryTemplate)
     : null;
+  const primaryTemplateContext = buildTemplateContextSummary(primaryTemplate);
+  const templateContextQueue = buildTemplateContextQueue(primaryTemplate, secondaryTemplates);
   const templateLaneGuideItems = [
     {
       label: "1. Review asset",
@@ -935,11 +1065,11 @@ function DeploymentWorkflowPageContent() {
   const secondaryRuntimeDeployments = primaryRuntimeDeployment
     ? filteredDeployments.filter((deployment) => deployment.id !== primaryRuntimeDeployment.id)
     : [];
-  const requestedTemplateId = searchParams.get("template") || "";
-  const requestedTemplateAction = searchParams.get("template_action") || "preview";
-  const requestedTemplateSource = searchParams.get("template_source") || "";
-  const requestedServerId = searchParams.get("server") || "";
-  const requestedSource = searchParams.get("source") || "";
+  const requestedTemplateId = requestedWorkflowQuery.templateId;
+  const requestedTemplateAction = requestedWorkflowQuery.templateAction;
+  const requestedTemplateSource = requestedWorkflowQuery.templateSource;
+  const requestedServerId = requestedWorkflowQuery.serverId;
+  const requestedSource = requestedWorkflowQuery.source;
   const requestedFromOverview = requestedSource === "overview-first-deploy";
   const requestedFromServerReview = requestedSource === "server-review";
   const requestedWithServerContext = requestedFromServerReview || requestedFromOverview;
@@ -1132,6 +1262,14 @@ function DeploymentWorkflowPageContent() {
       loadTemplates(silent),
     ]);
   }
+
+  useEffect(() => {
+    if (smokeMode || typeof window === "undefined") {
+      return;
+    }
+
+    setRequestedWorkflowQuery(buildRequestedWorkflowQuery(window.location.search));
+  }, []);
 
   useEffect(() => {
     if (smokeMode) {
@@ -1344,6 +1482,7 @@ function DeploymentWorkflowPageContent() {
     } else {
       setEditingTemplateId("");
       setTemplateName(targetTemplate.template_name || "");
+      setTemplateContextLabel(targetTemplate.context_label || "");
     }
 
     if (requestedTemplateSource === "deployment-detail") {
@@ -1505,6 +1644,7 @@ function DeploymentWorkflowPageContent() {
     return {
       id: editingTemplateId || "",
       template_name: templateName.trim(),
+      context_label: templateContextLabel.trim(),
       image: form.image.trim(),
       name: form.name.trim(),
       internal_port: form.internal_port.trim(),
@@ -1523,6 +1663,7 @@ function DeploymentWorkflowPageContent() {
     return {
       id: template.id,
       template_name: template.template_name || "",
+      context_label: template.context_label || "",
       image: template.image || "",
       name: template.name || "",
       internal_port:
@@ -1647,6 +1788,7 @@ function DeploymentWorkflowPageContent() {
     setEnvRows(buildEnvRowsFromObject(template.env || {}));
     setSecretRows(buildSecretRowsFromObject(template.secrets || {}));
     setTemplateName(template.template_name || "");
+    setTemplateContextLabel(template.context_label || "");
     setTemplatePreviewId(template.id);
     setCreatedDeployment(null);
     setTemplateCreatedDeployment(null);
@@ -1670,14 +1812,88 @@ function DeploymentWorkflowPageContent() {
   function cancelTemplateEditing() {
     setEditingTemplateId("");
     setTemplateName("");
+    setTemplateContextLabel("");
     setTemplateSubmitError("");
     setTemplateSubmitSuccess("");
+  }
+
+  function renderTemplateQueueCard(template) {
+    return (
+      <div key={template.id} className="card compactCard" data-testid={`template-card-${template.id}`}>
+        <div className="row">
+          <span className="label">Template</span>
+          <span>{template.template_name}</span>
+        </div>
+        <div className="row">
+          <span className="label">Image</span>
+          <span>{template.image}</span>
+        </div>
+        <div className="row">
+          <span className="label">Context</span>
+          <span>{buildTemplateContextSummary(template).label}</span>
+        </div>
+        <div className="row">
+          <span className="label">Server</span>
+          <span>{formatServerLabel(template.server_name, template.server_host)}</span>
+        </div>
+        <div className="row">
+          <span className="label">Used</span>
+          <span>{template.use_count || 0}</span>
+        </div>
+        <div className="row">
+          <span className="label">Last used</span>
+          <span>{template.last_used_at ? formatDate(template.last_used_at) : "Not reused yet"}</span>
+        </div>
+        <div className="actions">
+          <button
+            type="button"
+            onClick={() => setTemplatePreviewId(template.id)}
+            data-testid={`template-preview-button-${template.id}`}
+          >
+            Review asset
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDeployTemplate(template.id)}
+            disabled={deployingTemplateId === template.id || deploymentLimitReached}
+            data-testid={`template-deploy-button-${template.id}`}
+          >
+            {deployingTemplateId === template.id ? "Deploying..." : "Deploy shared setup"}
+          </button>
+          <button
+            type="button"
+            onClick={() => applyTemplateToForm(template, { startEditing: true })}
+            data-testid={`template-edit-button-${template.id}`}
+          >
+            Edit baseline
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDuplicateTemplate(template)}
+            disabled={duplicatingTemplateId === template.id}
+            data-testid={`template-duplicate-button-${template.id}`}
+          >
+            {duplicatingTemplateId === template.id ? "Duplicating..." : "Duplicate for variant"}
+          </button>
+          <button
+            type="button"
+            className="dangerButton"
+            onClick={() => handleDeleteTemplate(template.id)}
+            disabled={deletingTemplateId === template.id}
+            data-testid={`template-delete-button-${template.id}`}
+          >
+            {deletingTemplateId === template.id ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   function buildTemplatePayload() {
     const draft = buildCurrentDraft();
     const payload = {
       template_name: draft.template_name,
+      context_label: draft.context_label,
       image: draft.image,
       env: draft.env,
       secrets: draft.secrets,
@@ -1816,11 +2032,18 @@ function DeploymentWorkflowPageContent() {
       ignoreTemplateId: editingTemplateId,
       canAccessServers,
     });
+    const saveWarnings = [...preflight.warnings];
 
     if (!draft.template_name) {
       setTemplateSubmitError("Template name is required.");
       setTemplateSubmitting(false);
       return;
+    }
+
+    if (!draft.context_label) {
+      saveWarnings.push(
+        "Context label is empty. The next operator will not see which client or environment this asset belongs to.",
+      );
     }
 
     if (preflight.errors.length > 0) {
@@ -1830,8 +2053,8 @@ function DeploymentWorkflowPageContent() {
     }
 
     if (
-      preflight.warnings.length > 0 &&
-      !window.confirm(`${preflight.warnings.join("\n")}\n\nSave template anyway?`)
+      saveWarnings.length > 0 &&
+      !window.confirm(`${saveWarnings.join("\n")}\n\nSave template anyway?`)
     ) {
       setTemplateSubmitting(false);
       return;
@@ -1859,6 +2082,7 @@ function DeploymentWorkflowPageContent() {
       );
 
       setTemplateName(savedTemplate.template_name || "");
+      setTemplateContextLabel(savedTemplate.context_label || "");
       setTemplatePreviewId(savedTemplate.id);
       setEditingTemplateId(savedTemplate.id);
       setTemplateSubmitSuccess(
@@ -3449,7 +3673,21 @@ function DeploymentWorkflowPageContent() {
                   data-testid="create-template-name-input"
                 />
                 <span className="fieldHint">
-                  Save the current image, name, ports, server, env vars, and secret keys as a reusable preset.
+                  Save the current image, name, ports, server, env vars, and secret keys as a reusable handoff asset.
+                </span>
+              </label>
+
+              <label className="field">
+                <span>Client or operating context</span>
+                <input
+                  value={templateContextLabel}
+                  onChange={(event) => setTemplateContextLabel(event.target.value)}
+                  placeholder="Acme support / production"
+                  disabled={submitting || templateSubmitting}
+                  data-testid="create-template-context-input"
+                />
+                <span className="fieldHint">
+                  Label who or what this asset is for so the next operator can tell whether it belongs to a client, environment, or internal workflow.
                 </span>
               </label>
             </section>
@@ -3604,7 +3842,7 @@ function DeploymentWorkflowPageContent() {
             <div>
               <h2 data-testid="templates-section-title">{templateLaneTitle}</h2>
               <p className="formHint">
-                Templates are reusable {templateAssetMode}s for this workflow. Review one, reuse it as-is, edit the baseline deliberately, or duplicate it before client-specific changes.
+                Templates are reusable {templateAssetMode}s for this workflow. Review one, confirm which client or operating context it belongs to, reuse it as-is, edit the baseline deliberately, or duplicate it before client-specific changes.
               </p>
             </div>
           </div>
@@ -3614,7 +3852,7 @@ function DeploymentWorkflowPageContent() {
               <div>
                 <h3 data-testid="templates-team-asset-title">Treat templates as reusable handoff assets</h3>
                 <p className="formHint">
-                  The goal here is not just faster form fill. The next operator should be able to see which setup is still trusted, how recently it was reused, and whether a change belongs in the baseline or in a duplicate.
+                  The goal here is not just faster form fill. The next operator should be able to see which setup is still trusted, which client or operating context it belongs to, how recently it was reused, and whether a change belongs in the baseline or in a duplicate.
                 </p>
               </div>
             </div>
@@ -3674,7 +3912,7 @@ function DeploymentWorkflowPageContent() {
             <input
               value={templateQuery}
               onChange={(event) => setTemplateQuery(event.target.value)}
-              placeholder="template name, image, server, env key"
+              placeholder="template name, context, image, server, env key"
               disabled={templatesLoading}
               data-testid="templates-search-input"
             />
@@ -3708,6 +3946,10 @@ function DeploymentWorkflowPageContent() {
                 <span>{primaryTemplate.image}</span>
               </div>
               <div className="row">
+                <span className="label">Context</span>
+                <span data-testid="template-preview-context">{primaryTemplateContext.label}</span>
+              </div>
+              <div className="row">
                 <span className="label">Server</span>
                 <span>{formatServerLabel(primaryTemplate.server_name, primaryTemplate.server_host)}</span>
               </div>
@@ -3733,6 +3975,14 @@ function DeploymentWorkflowPageContent() {
               </div>
               <div className="banner subtle" data-testid="template-preview-asset-banner">
                 {buildTemplateAssetState(primaryTemplate).detail}
+              </div>
+              {primaryTemplateContext.missing ? (
+                <div className="banner subtle" data-testid="template-preview-context-banner">
+                  {primaryTemplateContext.detail}
+                </div>
+              ) : null}
+              <div className="banner subtle" data-testid="template-context-boundary-banner">
+                {templateContextQueue.detail}
               </div>
               {previewDiffRows.length === 0 ? (
                 <div className="banner subtle" data-testid="template-preview-match-banner">
@@ -3823,71 +4073,19 @@ function DeploymentWorkflowPageContent() {
 
           {!templatesLoading ? (
             <div className="list compactList" data-testid="templates-list">
-              {secondaryTemplates.length > 0 ? secondaryTemplates.map((template) => (
-                <div key={template.id} className="card compactCard" data-testid={`template-card-${template.id}`}>
-                  <div className="row">
-                    <span className="label">Template</span>
-                    <span>{template.template_name}</span>
+              {templateContextQueue.sections.length > 0 ? (
+                templateContextQueue.sections.map((section) => (
+                  <div key={section.id}>
+                    <div className="sectionHeader" data-testid={`template-queue-section-${section.id}`}>
+                      <div>
+                        <h3 data-testid={`template-queue-title-${section.id}`}>{section.title}</h3>
+                        <p className="formHint">{section.detail}</p>
+                      </div>
+                    </div>
+                    {section.templates.map((template) => renderTemplateQueueCard(template))}
                   </div>
-                  <div className="row">
-                    <span className="label">Image</span>
-                    <span>{template.image}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Server</span>
-                    <span>{formatServerLabel(template.server_name, template.server_host)}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Used</span>
-                    <span>{template.use_count || 0}</span>
-                  </div>
-                  <div className="row">
-                    <span className="label">Last used</span>
-                    <span>{template.last_used_at ? formatDate(template.last_used_at) : "Not reused yet"}</span>
-                  </div>
-                  <div className="actions">
-                    <button
-                      type="button"
-                      onClick={() => setTemplatePreviewId(template.id)}
-                      data-testid={`template-preview-button-${template.id}`}
-                    >
-                      Review asset
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeployTemplate(template.id)}
-                      disabled={deployingTemplateId === template.id || deploymentLimitReached}
-                      data-testid={`template-deploy-button-${template.id}`}
-                    >
-                      {deployingTemplateId === template.id ? "Deploying..." : "Deploy shared setup"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => applyTemplateToForm(template, { startEditing: true })}
-                      data-testid={`template-edit-button-${template.id}`}
-                    >
-                      Edit baseline
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDuplicateTemplate(template)}
-                      disabled={duplicatingTemplateId === template.id}
-                      data-testid={`template-duplicate-button-${template.id}`}
-                    >
-                      {duplicatingTemplateId === template.id ? "Duplicating..." : "Duplicate for variant"}
-                    </button>
-                    <button
-                      type="button"
-                      className="dangerButton"
-                      onClick={() => handleDeleteTemplate(template.id)}
-                      disabled={deletingTemplateId === template.id}
-                      data-testid={`template-delete-button-${template.id}`}
-                    >
-                      {deletingTemplateId === template.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
-                </div>
-              )) : (
+                ))
+              ) : (
                 <div className="empty">No additional templates beyond the focused preset.</div>
               )}
             </div>

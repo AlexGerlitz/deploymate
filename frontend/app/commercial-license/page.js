@@ -21,7 +21,13 @@ const requestChecklist = [
   "Company or project name",
   "Whether the infrastructure is company-owned, client-owned, or mixed",
   "Expected number of services, servers, or environments",
+  "What runtime handoff or multi-operator workflow you need",
   "Whether you need support, customization, or redistribution rights",
+];
+const productProof = [
+  "Deployment passport already keeps runtime identity, health proof, recent activity, and the next safe action together",
+  "Templates already work as reusable handoff assets for repeat services or client environments",
+  "The business path already separates evaluation, internal-team use, agency delivery, and custom licensing",
 ];
 const contactChannels = [
   {
@@ -70,7 +76,7 @@ export default function CommercialLicensePage() {
             </div>
             <div className="authChecklistItem">
               <strong>The buyer path should feel clearer</strong>
-              <p>We frame the conversation around infrastructure type, support model, and rights needed instead of sending everyone through the same vague review wording.</p>
+              <p>We frame the conversation around infrastructure type, support model, runtime handoff needs, and rights needed instead of sending everyone through the same vague review wording.</p>
             </div>
           </div>
         </section>
@@ -107,6 +113,14 @@ export default function CommercialLicensePage() {
               </div>
             </article>
             <article className="overviewCard">
+              <span className="overviewLabel">What product proof already exists</span>
+              <div className="overviewMeta">
+                {productProof.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </article>
+            <article className="overviewCard">
               <span className="overviewLabel">Contact channels</span>
               <div className="overviewMeta">
                 {contactChannels.map((item) => (
@@ -128,7 +142,7 @@ export default function CommercialLicensePage() {
             </div>
             <div className="authDecisionCard">
               <strong>Supporting client infrastructure?</strong>
-              <p>The first wedge is the agency and integrator path: describe your delivery model, number of services, and what handoff/support shape you need.</p>
+              <p>The first wedge is the agency and integrator path: describe your delivery model, number of services, and what handoff or reusable-asset shape you need.</p>
             </div>
           </div>
 
@@ -139,7 +153,7 @@ export default function CommercialLicensePage() {
             </div>
             <div className="authDecisionCard">
               <strong>What to prepare</strong>
-              <p>Have your company/project name, infrastructure model, estimated footprint, and any support or customization requirements ready before the conversation.</p>
+              <p>Have your company/project name, infrastructure model, estimated footprint, runtime handoff needs, and any support or customization requirements ready before the conversation.</p>
             </div>
           </div>
 

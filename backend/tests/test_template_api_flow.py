@@ -58,6 +58,7 @@ class TemplateApiFlowTests(unittest.TestCase):
             {
                 "id": "template-popular",
                 "template_name": "popular-web",
+                "context_label": "Shared smoke baseline",
                 "image": "nginx:1.27-alpine",
                 "name": "popular-web",
                 "internal_port": 80,
@@ -149,6 +150,7 @@ class TemplateApiFlowTests(unittest.TestCase):
             "/deployment-templates",
             json={
                 "template_name": "web-template",
+                "context_label": "Acme support / production",
                 "image": "nginx:alpine",
                 "name": "web-runtime",
                 "internal_port": 80,
@@ -161,6 +163,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         created = create_response.json()
         template_id = created["id"]
         self.assertEqual(created["template_name"], "web-template")
+        self.assertEqual(created["context_label"], "Acme support / production")
         self.assertEqual(created["env"]["APP_ENV"], "smoke")
         self.assertEqual(created["secret_count"], 1)
         self.assertEqual(created["secrets"]["API_KEY"], "••••••")
@@ -183,6 +186,7 @@ class TemplateApiFlowTests(unittest.TestCase):
             f"/deployment-templates/{template_id}",
             json={
                 "template_name": "web-template-v2",
+                "context_label": "Acme support / staging",
                 "image": "nginx:1.27-alpine",
                 "name": "web-runtime-v2",
                 "internal_port": 8080,
@@ -194,6 +198,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         self.assertEqual(update_response.status_code, 200)
         updated = update_response.json()
         self.assertEqual(updated["template_name"], "web-template-v2")
+        self.assertEqual(updated["context_label"], "Acme support / staging")
         self.assertEqual(updated["external_port"], 39090)
 
         duplicate_response = self.client.post(
@@ -205,6 +210,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         duplicate_id = duplicate["id"]
         self.assertNotEqual(duplicate_id, template_id)
         self.assertEqual(duplicate["template_name"], "web-template-copy")
+        self.assertEqual(duplicate["context_label"], "Acme support / staging")
         self.assertEqual(duplicate["use_count"], 0)
 
         deploy_response = self.client.post(f"/deployment-templates/{template_id}/deploy")

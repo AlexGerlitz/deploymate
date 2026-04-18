@@ -785,6 +785,11 @@ export function buildTemplateDiff(template, currentDraft, servers) {
       currentValue: normalizeDraftValue(currentDraft.name || "Auto-generate"),
     },
     {
+      label: "Context",
+      templateValue: normalizeDraftValue(template.context_label || "Needs context label"),
+      currentValue: normalizeDraftValue(currentDraft.context_label || "Needs context label"),
+    },
+    {
       label: "Server",
       templateValue: formatServerLabel(template.server_name, template.server_host),
       currentValue: formatServerLabel(currentServer?.name, currentServer?.host),

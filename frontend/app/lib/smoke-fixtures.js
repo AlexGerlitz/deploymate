@@ -314,6 +314,7 @@ export const smokeTemplates = [
   {
     id: "smoke-template",
     template_name: "Smoke template",
+    context_label: "Internal smoke / baseline",
     image: "nginx:alpine",
     name: "smoke-runtime",
     internal_port: 80,
@@ -332,6 +333,7 @@ export const smokeTemplates = [
   {
     id: "billing-api-template",
     template_name: "Billing API rollout",
+    context_label: "Billing client / production",
     image: "ghcr.io/deploymate/billing-api:stable",
     name: "billing-api",
     internal_port: 8080,
@@ -351,6 +353,7 @@ export const smokeTemplates = [
   {
     id: "review-worker-template",
     template_name: "Upgrade review worker",
+    context_label: "Internal operations / review",
     image: "ghcr.io/deploymate/review-worker:stable",
     name: "review-worker",
     internal_port: 9090,

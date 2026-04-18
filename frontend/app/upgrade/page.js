@@ -36,6 +36,7 @@ const packageCards = [
     features: [
       "Path from evaluation to paid access",
       "Guided onboarding on self-owned infrastructure",
+      "Deployment passport for readable runtime review",
       "Commercial use covered explicitly",
     ],
   },
@@ -47,6 +48,7 @@ const packageCards = [
     features: [
       "Client infrastructure support path",
       "Packaging shaped around ongoing support and handoff",
+      "Reusable handoff assets for repeat client delivery",
       "Conversation starts from delivery model, not from generic seat count",
     ],
   },
@@ -58,6 +60,7 @@ const packageCards = [
     features: [
       "Redistribution and resale review",
       "Support and customization discussion",
+      "Rights review anchored to the live product path",
       "Explicit commercial licensing path",
     ],
   },
@@ -67,6 +70,11 @@ const commercialUseCases = [
   "Agency or client delivery on customer infrastructure",
   "Commercial SaaS or managed service",
   "Redistribution, white-label, or resale",
+];
+const buyerProofItems = [
+  "Deployment passport keeps runtime identity, health proof, recent activity, and the next safe action in one block",
+  "Templates now read as reusable handoff assets for repeat services, clients, or operator swaps",
+  "The public business path already separates evaluation, internal-team use, agency delivery, and custom licensing",
 ];
 
 export default function UpgradePage() {
@@ -254,6 +262,14 @@ export default function UpgradePage() {
                 ))}
               </div>
             </article>
+            <article className="overviewCard">
+              <span className="overviewLabel">What is already real in the product</span>
+              <div className="overviewMeta">
+                {buyerProofItems.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </article>
           </div>
         </article>
 
@@ -267,7 +283,7 @@ export default function UpgradePage() {
             </div>
           </div>
           <div className="banner subtle">
-            This is not instant checkout. We use the request to understand infrastructure type, number of services, support model, and whether this should become a paid workspace or a separate commercial license.
+            This is not instant checkout. We use the request to understand infrastructure type, number of services, support model, handoff expectations, and whether this should become a paid workspace or a separate commercial license.
           </div>
           <div className="banner subtle">
             Prefer the legal summary first? Start on{" "}
@@ -327,7 +343,7 @@ export default function UpgradePage() {
                 value={form.use_case}
                 onChange={updateFormField}
                 disabled={submitting}
-                placeholder="Describe your infrastructure, how many services or servers you support, whether this is internal team use or client delivery, and what kind of commercial path you need."
+                placeholder="Describe your infrastructure, how many services or servers you support, whether this is internal team use or client delivery, what runtime handoff shape you need, and what kind of commercial path you need."
               />
             </label>
 
@@ -342,7 +358,7 @@ export default function UpgradePage() {
           {success ? <div className="banner success">{success}</div> : null}
           {success ? (
             <div className="banner subtle">
-              Next step: we review infrastructure scope, support needs, and whether this should become an internal-team path, an agency package, or a separate commercial license. If needed, you can also follow up through{" "}
+              Next step: we review infrastructure scope, runtime handoff needs, support model, and whether this should become an internal-team path, an agency package, or a separate commercial license. If needed, you can also follow up through{" "}
               <a
                 href={buildBusinessMailto("DeployMate commercial license follow-up")}
                 className="inlineLink"

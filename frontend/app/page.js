@@ -20,8 +20,8 @@ const landingOperatingPrinciples = [
   },
 ];
 const landingProofPoints = [
-  "A live app already connects server review, guided deploy flow, and runtime detail",
-  "Deployment detail already leads with current state, health, diagnostics, and next-step review",
+  "A live app already connects server review, guided deploy flow, reusable handoff assets, and runtime detail",
+  "Deployment detail already leads with a deployment passport: runtime identity, health proof, recent activity, and the next safe action",
   "Commercial path and onboarding already exist without pretending the product is a generic cloud platform",
 ];
 const landingQuickWins = [
@@ -56,6 +56,26 @@ const landingAudienceCards = [
     title: "Readable enough for the next engineer, not only the one who shipped it.",
     detail:
       "The runtime story is being pushed toward state, health, and next-step clarity before deeper admin and recovery tooling takes over the screen.",
+  },
+];
+const landingBuyerProofCards = [
+  {
+    label: "Deployment passport",
+    title: "One readable runtime handoff block instead of scattered status hunting.",
+    detail:
+      "The product already groups runtime identity, health proof, recent activity, and the next safe action so a fresh rollout can be reviewed without reconstructing context from chat or shell history.",
+  },
+  {
+    label: "Reusable handoff assets",
+    title: "Templates are framed as reusable delivery assets, not loose presets.",
+    detail:
+      "A repeatable setup can be saved with image, ports, env vars, and server selection so client or team handoffs start from a known shape instead of tribal memory.",
+  },
+  {
+    label: "Business path",
+    title: "The buyer conversation already starts from infrastructure and support model.",
+    detail:
+      "Evaluation, internal-team use, agency delivery, and custom commercial paths are already separated so packaging can match the real delivery model.",
   },
 ];
 
@@ -117,8 +137,8 @@ export default function LandingPage() {
                 </article>
                 <article className="landingPathCard">
                   <span className="heroSummaryLabel">Then keep the runtime readable</span>
-                  <strong>Open runtime detail, review what is healthy, and understand the next safe action without reconstructing context from shell notes.</strong>
-                  <p>Templates, diagnostics, activity, and the commercial path stay inside the same product, but they stop competing with the main deploy story on first pass.</p>
+                  <strong>Open the deployment passport, review what is healthy, and understand the next safe action without reconstructing context from shell notes.</strong>
+                  <p>Reusable handoff assets, diagnostics, activity, and the commercial path stay inside the same product, but they stop competing with the main deploy story on first pass.</p>
                 </article>
               </div>
 
@@ -161,6 +181,7 @@ export default function LandingPage() {
                 <span className="landingMetaBadge">Client-owned infra</span>
                 <span className="landingMetaBadge">Provider-agnostic</span>
                 <span className="landingMetaBadge">Guided deploy path</span>
+                <span className="landingMetaBadge">Deployment passport</span>
                 <span className="landingMetaBadge">Runtime handoff</span>
                 <span className="landingMetaBadge">Public evaluation</span>
               </div>
@@ -315,6 +336,29 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="landingSection">
+        <div className="container">
+          <div className="sectionIntro sectionIntroWide">
+            <div className="eyebrow">Why the buyer story is credible</div>
+            <h2>The public story now points to handoff surfaces that already exist in the product.</h2>
+            <p className="sectionLead">
+              This is not only generic deploy language. The current product already exposes a
+              runtime passport, reusable handoff assets, and an explicit business path.
+            </p>
+          </div>
+
+          <div className="capabilityGrid">
+            {landingBuyerProofCards.map((item) => (
+              <article key={item.label} className="capabilityCard">
+                <span className="capabilityLabel">{item.label}</span>
+                <h3>{item.title}</h3>
+                <p>{item.detail}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="landingSection" id="product">
         <div className="container">
           <div className="sectionIntro sectionIntroWide">
@@ -338,7 +382,7 @@ export default function LandingPage() {
             </article>
             <article className="capabilityCard">
               <span className="capabilityLabel">Templates</span>
-              <h3>Turn repeated setup into reusable deploy presets instead of loose notes.</h3>
+              <h3>Turn repeated setup into reusable handoff assets instead of loose notes.</h3>
               <p>
                 Save common image, server, and port combinations once, then apply them
                 back into the deploy flow or launch straight from preview.
@@ -354,7 +398,7 @@ export default function LandingPage() {
             </article>
             <article className="capabilityCard">
               <span className="capabilityLabel">Runtime review</span>
-              <h3>Keep state, diagnostics, activity, and safer next actions close together.</h3>
+              <h3>Keep the deployment passport, diagnostics, activity, and safer next actions close together.</h3>
               <p>
                 The product is being pushed toward readable runtime handoff before it opens
                 into denser operational surfaces.

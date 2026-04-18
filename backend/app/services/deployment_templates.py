@@ -14,6 +14,13 @@ from app.schemas import (
 from app.services.secrets import apply_masked_secret_view
 
 
+def _normalize_context_label(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
 def build_template_record(
     template_id: str,
     payload: DeploymentTemplateCreateRequest,
@@ -28,6 +35,7 @@ def build_template_record(
     return {
         "id": template_id,
         "template_name": payload.template_name.strip(),
+        "context_label": _normalize_context_label(payload.context_label),
         "image": payload.image.strip(),
         "name": payload.name.strip() if payload.name else None,
         "internal_port": payload.internal_port,
@@ -98,6 +106,7 @@ def list_templates(
                     None,
                     [
                         template.get("template_name"),
+                        template.get("context_label"),
                         template.get("image"),
                         template.get("name"),
                         template.get("server_name"),
@@ -155,6 +164,7 @@ def update_template(
         template_id,
         {
             "template_name": payload.template_name.strip(),
+            "context_label": _normalize_context_label(payload.context_label),
             "image": payload.image.strip(),
             "name": payload.name.strip() if payload.name else None,
             "internal_port": payload.internal_port,
@@ -189,6 +199,7 @@ def duplicate_template(
     template_record = {
         "id": duplicate_id,
         "template_name": duplicate_name,
+        "context_label": template.get("context_label"),
         "image": template["image"],
         "name": template.get("name"),
         "internal_port": template.get("internal_port"),

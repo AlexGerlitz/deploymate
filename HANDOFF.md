@@ -32,8 +32,22 @@ Updated: 2026-04-18
   3. stack ceiling removal
   4. deployment passport
   5. agency fit and packaging
-- Текущий активный пакет now in progress:
-  - `Public packaging v2`
+- Текущий active stop point now:
+  - no new product package started after `narrower workspace/client separation`; its local `smoke:templates` rerun now passes via static build, and deeper ownership model stays deferred until a concrete workflow ownership gap survives this narrower cue
+  - latest dense-night-shift rerun on `2026-04-18 13:35 +07` reconfirmed the same stop point from the current dirty tree:
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+    - `npm --prefix frontend run build`
+    - `npm --prefix frontend run smoke:templates`
+    - no broader ownership-model package was started because the narrower template/context boundary still holds locally
+  - latest dense-night-shift rerun on `2026-04-18 13:49 +07` strengthened the same stop point with the fuller frontend fast path on this host:
+    - `make frontend` passed end-to-end, including `smoke:auth`, `smoke:ops`, and `smoke:runtime`
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow` passed again
+    - the earlier local bind blocker turned out to be restricted-sandbox history plus stale local port contention, not the current product code
+    - no broader ownership-model package was started because the narrower template/context boundary still holds locally
+  - latest dense-night-shift rerun on `2026-04-18 13:52 +07` closed the full local checkpoint verification for the same dirty tree:
+    - `npm --prefix frontend run build`
+    - `npm --prefix frontend run smoke:templates`
+    - the same stop point remains unchanged: deeper ownership work still stays deferred until a real workflow-level gap survives the narrower template/context boundary
   - `Agency fit v1` теперь закрыт:
     - deployment workflow templates now read as reusable handoff assets instead of a generic personal preset lane
     - the focused template review now shows reuse state, created/last-used context, and a deliberate review/deploy/edit/duplicate/delete order for the next operator
@@ -114,10 +128,37 @@ Updated: 2026-04-18
       - `npm --prefix frontend run smoke:runtime` passed end-to-end, including the stack runtime detail, internal-only review path, template success path, and create success path
       - honest closure changed here: `Stack deploy v0` is now verified locally and `Passport v1` becomes the active package
     - local system `python3` still lacks project deps, but repo-local `backend/venv` is enough for the backend changed-scope suite
-  - next stop point for `Public packaging v2`:
-    - begin from landing/commercial packaging surfaces only
-    - align public buyer copy with the now-real runtime passport plus reusable handoff asset story
-    - do not widen back into runtime/admin/workspace implementation in the same package
+  - `Public packaging v2` теперь закрыт:
+    - landing now explicitly sells the real `Deployment passport`, reusable handoff assets, and the buyer-facing business path instead of generic deploy/handoff language
+    - `/upgrade` now ties package cards and request copy to runtime handoff needs, reusable assets, and the already-live product proof
+    - `/commercial-license` now explains the same runtime passport + reusable asset proof before the business conversation starts
+    - latest rerun on `2026-04-18 09:51 +07` passed the honest changed-scope verification:
+      - `npm --prefix frontend run build`
+    - latest stronger rerun on `2026-04-18 13:49 +07` also passed:
+      - `make frontend`
+    - latest rerun on `2026-04-18 13:52 +07` also passed:
+      - `npm --prefix frontend run build`
+  - `Client-labeled handoff assets v0` теперь закрыт:
+    - deployment templates now carry one explicit `context_label` across save, update, duplicate, list, and focused review so the next operator can see which client or operating context the asset belongs to
+    - template review/list surfaces now show that context directly and mark unlabeled assets as needing context instead of silently looking globally reusable
+    - latest rerun on `2026-04-18 10:39 +07` passed the honest changed-scope verification available in this sandbox:
+      - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+      - `npm --prefix frontend run build`
+    - latest stronger rerun on `2026-04-18 13:49 +07` also passed:
+      - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+      - `make frontend`
+  - `narrower workspace/client separation` теперь закрыт:
+    - focused template review now states the current client/operating context boundary explicitly and splits the secondary queue into `same context` vs `outside this context`
+    - template workflow save/review surfaces and smoke expectations now keep the context field plus reusable-handoff-asset copy aligned instead of drifting between UI and verification
+    - latest rerun on `2026-04-18 11:38 +07` passed the honest changed-scope verification available in this sandbox:
+      - `npm --prefix frontend run build`
+      - `bash -n scripts/frontend_templates_smoke.sh scripts/frontend_smoke_shared.sh scripts/project_automation_smoke_checks.sh`
+    - latest rerun on `2026-04-18 12:37 +07` closed the local verification blocker on this machine:
+      - `bash -n scripts/frontend_templates_smoke.sh scripts/frontend_smoke_shared.sh scripts/project_automation_smoke_checks.sh` passed again
+      - `npm --prefix frontend run smoke:templates` passed end-to-end via smoke-mode static build against `frontend/.next-smoke-templates/server/app/app/deployment-workflow.html`
+      - deployment workflow no longer needs `useSearchParams` at prerender time, so the template smoke can verify the real focused-preview/context-boundary markup without a loopback-bound dev server
+    - latest rerun on `2026-04-18 13:52 +07` passed again:
+      - `npm --prefix frontend run smoke:templates`
   - `Release review + rollback v1` is now closed:
     - deployment detail has a rollback review surface wired to the rollback endpoint
     - `npm --prefix frontend run smoke:runtime` passed
@@ -126,10 +167,8 @@ Updated: 2026-04-18
     - deployment workflow now has a dedicated compose stack intake lane for the v0 subset
     - beginner overview/workflow gating mismatches were corrected while closing the same slice
     - `npm --prefix frontend run smoke:beginner` passed
-- Ближайшие три пакета тоже зафиксированы:
-  1. `Public packaging v2`
-  2. broad workspace/client separation still stays deferred until public packaging matches the agency/self-hosted story
-  3. deeper ownership model stays deferred until one narrower client/workspace slice is truly needed
+- Ближайшие пакеты тоже зафиксированы:
+  1. deeper ownership model stays deferred until one narrower client/workspace slice is truly needed
 - `README.md` и broad repo-root packaging пока deliberately deferred до реального public funnel rewrite, чтобы не создавать doc/product drift.
 
 ## Autonomous Night Loop
@@ -142,8 +181,7 @@ Updated: 2026-04-18
 - Базовое правило:
   - если текущий пакет уже завершён и проверен, не ждать нового сообщения, а брать следующий пакет по фиксированному порядку
 - Порядок автономного продолжения сейчас такой:
-  1. `Public packaging v2`
-  2. broad workspace/client separation only after the packaging story stays believable
+  1. deeper ownership model only after the narrower workflow separation slice proves insufficient
 - Для каждого ночного прохода expected loop один и тот же:
   - reread `HANDOFF.md`
   - взять один bounded package
@@ -182,8 +220,9 @@ Updated: 2026-04-18
 - `deployment detail` стал более decision-first, чем раньше.
 - public funnel now speaks more directly to the first wedge:
   - landing now centers client-owned/self-owned infrastructure, no-Kubernetes framing, and handoff value
-  - `/upgrade` now frames buyer paths as `Internal Team`, `Agency / Multi-client`, and `Custom / Redistribution`
-  - `/commercial-license` now reads as a buyer-facing business path instead of a purely legal review wall
+  - landing now also names the real `Deployment passport`, reusable handoff assets, and the explicit buyer path as proof points
+  - `/upgrade` now frames buyer paths as `Internal Team`, `Agency / Multi-client`, and `Custom / Redistribution`, with runtime handoff needs included in the business request
+  - `/commercial-license` now reads as a buyer-facing business path instead of a purely legal review wall and points to the same product proof
 - minimal funnel telemetry schema now exists in frontend:
   - `landing_cta`
   - `register_started`
@@ -291,15 +330,43 @@ Updated: 2026-04-18
     - `npm --prefix frontend run smoke:beginner`
     - `npm --prefix frontend run smoke:runtime`
     - `npm --prefix frontend run build`
+- `Public packaging v2` теперь считать закрытым:
+  - landing, `/upgrade`, and `/commercial-license` now point directly to the real `Deployment passport`, reusable handoff assets, and business-path proof instead of generic public copy
+  - latest rerun on `2026-04-18 09:51 +07` passed the changed-scope package verification:
+    - `npm --prefix frontend run build`
+  - latest stronger rerun on `2026-04-18 13:49 +07` also passed:
+    - `make frontend`
+  - latest rerun on `2026-04-18 13:52 +07` also passed:
+    - `npm --prefix frontend run build`
+- `Client-labeled handoff assets v0` теперь считать закрытым:
+  - deployment templates now persist one explicit client/operator context label through the template API and workflow review surface
+  - focused template review and the compact queue now show that context directly and call out unlabeled assets before they are treated as trusted handoff baselines
+  - latest rerun on `2026-04-18 10:39 +07` passed the changed-scope package verification available in this sandbox:
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+    - `npm --prefix frontend run build`
+  - latest stronger rerun on `2026-04-18 13:49 +07` also passed:
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+    - `make frontend`
+- `narrower workspace/client separation` теперь считать закрытым:
+  - focused template review now spells out the active client/operating context boundary and keeps non-matching assets in a separate queue below
+  - template smoke expectations now match the current handoff-asset wording and context field instead of still asserting the old preset copy
+  - latest rerun on `2026-04-18 11:38 +07` passed the changed-scope package verification available in this sandbox:
+    - `npm --prefix frontend run build`
+    - `bash -n scripts/frontend_templates_smoke.sh scripts/frontend_smoke_shared.sh scripts/project_automation_smoke_checks.sh`
+  - latest rerun on `2026-04-18 12:37 +07` closed the local smoke rerun:
+    - `npm --prefix frontend run smoke:templates` now passes via smoke-mode static build after prerendering `/app/deployment-workflow` with the real focused template/context-boundary markup
+  - latest rerun on `2026-04-18 13:52 +07` also passed:
+    - `npm --prefix frontend run smoke:templates`
 - Текущий незавершённый checkpoint:
-  - `Public packaging v2`
-  - next slice should start from landing/commercial packaging only
-  - align the public buyer story with runtime passport + reusable handoff assets before widening into client/workspace implementation
+  - no broader ownership-model implementation should start before a real workflow-level sharing problem survives the new context-boundary cue
+  - `narrower workspace/client separation` now has an honest local `smoke:templates` rerun, so deeper ownership model stays deferred until that narrower cue proves insufficient in a real workflow
+  - latest rerun on `2026-04-18 13:35 +07` kept that checkpoint unchanged after the current dirty tree passed the same backend + frontend verification path again
+  - latest rerun on `2026-04-18 13:49 +07` kept that checkpoint unchanged after the same dirty tree passed `make frontend` plus the template API unittest
+  - latest rerun on `2026-04-18 13:52 +07` kept that checkpoint unchanged after the same dirty tree passed `npm --prefix frontend run build` plus `npm --prefix frontend run smoke:templates`
 - Следующий bounded runtime порядок:
-  1. `Public packaging v2`
-  2. broad workspace/client separation still stays deferred until the public story is concrete
+  1. deeper ownership model only after the workflow-level separation cue proves insufficient
 - Guardrails на следующий проход:
-  - не расширять client/workspace implementation inside the packaging package
+  - не расширять client/workspace implementation beyond workflow/template separation cues без нового product signal
   - не считать single-container deployments допустимым долгоживущим ceiling
 
 ## Week 1 Result

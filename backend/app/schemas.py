@@ -80,6 +80,7 @@ class DeploymentResponse(BaseModel):
 
 class DeploymentTemplateCreateRequest(BaseModel):
     template_name: str = Field(..., min_length=1)
+    context_label: Optional[str] = Field(default=None, max_length=120)
     image: str = Field(..., min_length=1, description="Docker image, for example nginx:latest")
     name: Optional[str] = Field(default=None, description="Optional deployment name")
     internal_port: Optional[int] = Field(default=None, ge=1, le=65535)
@@ -92,6 +93,7 @@ class DeploymentTemplateCreateRequest(BaseModel):
 class DeploymentTemplateResponse(BaseModel):
     id: str
     template_name: str
+    context_label: Optional[str] = None
     image: str
     name: Optional[str] = None
     internal_port: Optional[int] = None

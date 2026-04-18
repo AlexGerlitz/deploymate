@@ -416,16 +416,21 @@ automation_smoke_templates_checks() {
 /app/deployment-workflow|smoke image copy|nginx:alpine
 /app/deployment-workflow|template preview card|data-testid="template-preview-card"
 /app/deployment-workflow|template preview title|data-testid="template-preview-title"
+/app/deployment-workflow|template preview context|data-testid="template-preview-context"
+/app/deployment-workflow|template context boundary banner|data-testid="template-context-boundary-banner"
 /app/deployment-workflow|template preview content|data-testid="template-preview-diff-list"|data-testid="template-preview-match-banner"
 /app/deployment-workflow|template preview actions|data-testid="template-preview-actions"
 /app/deployment-workflow|template preview apply button|data-testid="template-preview-apply-button"
 /app/deployment-workflow|template preview edit button|data-testid="template-preview-edit-button"
 /app/deployment-workflow|template preview deploy button|data-testid="template-preview-deploy-button"
+/app/deployment-workflow|outside context queue section|data-testid="template-queue-section-outside-context"
+/app/deployment-workflow|outside context queue title|Outside this context
 /app/deployment-workflow|create deployment card|data-testid="create-deployment-card"
 /app/deployment-workflow|create deployment title|data-testid="create-deployment-title"
 /app/deployment-workflow|template name input|data-testid="create-template-name-input"
+/app/deployment-workflow|template context input|data-testid="create-template-context-input"
 /app/deployment-workflow|save template button|data-testid="create-save-template-button"
 /app/deployment-workflow|create deployment button|data-testid="create-deployment-submit-button"
-/app/deployment-workflow|template helper copy|Save the current image, name, ports, server, and env vars as a reusable preset\.
+/app/deployment-workflow|template helper copy|Save the current image, name, ports, server, env vars, and secret keys as a reusable handoff asset\.
 EOF
 }

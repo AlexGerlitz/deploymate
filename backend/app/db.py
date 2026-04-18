@@ -336,6 +336,7 @@ def init_db() -> None:
     CREATE TABLE IF NOT EXISTS deployment_templates (
         id UUID PRIMARY KEY,
         template_name TEXT NOT NULL,
+        context_label TEXT NULL,
         image TEXT NOT NULL,
         name TEXT NULL,
         internal_port INTEGER NULL,
@@ -364,6 +365,11 @@ def init_db() -> None:
     alter_templates_add_use_count_sql = """
     ALTER TABLE deployment_templates
     ADD COLUMN IF NOT EXISTS use_count INTEGER NOT NULL DEFAULT 0;
+    """
+
+    alter_templates_add_context_label_sql = """
+    ALTER TABLE deployment_templates
+    ADD COLUMN IF NOT EXISTS context_label TEXT NULL;
     """
 
     alter_templates_add_owner_user_id_sql = """
@@ -422,6 +428,7 @@ def init_db() -> None:
             cur.execute(alter_templates_add_updated_at_sql)
             cur.execute(alter_templates_add_last_used_at_sql)
             cur.execute(alter_templates_add_use_count_sql)
+            cur.execute(alter_templates_add_context_label_sql)
             cur.execute(alter_templates_add_owner_user_id_sql)
             cur.execute(alter_templates_add_secrets_sql)
             _assert_server_credentials_policy(cur)
@@ -741,6 +748,7 @@ def insert_deployment_template(template_record: dict[str, Any]) -> None:
     INSERT INTO deployment_templates (
         id,
         template_name,
+        context_label,
         image,
         name,
         internal_port,
@@ -757,6 +765,7 @@ def insert_deployment_template(template_record: dict[str, Any]) -> None:
     VALUES (
         %(id)s,
         %(template_name)s,
+        %(context_label)s,
         %(image)s,
         %(name)s,
         %(internal_port)s,
@@ -783,6 +792,7 @@ def list_deployment_templates() -> list[dict[str, Any]]:
     SELECT
         t.id,
         t.template_name,
+        t.context_label,
         t.image,
         t.name,
         t.internal_port,
@@ -814,6 +824,7 @@ def get_deployment_template_or_404(template_id: str) -> dict[str, Any]:
     SELECT
         t.id,
         t.template_name,
+        t.context_label,
         t.image,
         t.name,
         t.internal_port,
@@ -860,6 +871,7 @@ def update_deployment_template(template_id: str, template_record: dict[str, Any]
     update_sql = """
     UPDATE deployment_templates
     SET template_name = %(template_name)s,
+        context_label = %(context_label)s,
         image = %(image)s,
         name = %(name)s,
         internal_port = %(internal_port)s,
