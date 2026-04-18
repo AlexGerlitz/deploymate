@@ -158,20 +158,30 @@ class OpsApiFlowTests(unittest.TestCase):
             },
             clear=False,
         ):
-            overview_response = self.client.get("/ops/overview?notifications_limit=100")
-            self.assertEqual(overview_response.status_code, 200)
-            overview = overview_response.json()
-            self.assertEqual(overview["user"]["username"], "smoke-admin")
-            self.assertEqual(overview["deployments"]["total"], 2)
-            self.assertEqual(overview["deployments"]["failed"], 1)
-            self.assertEqual(overview["servers"]["unused"], 1)
-            self.assertEqual(overview["notifications"]["error"], 1)
-            self.assertEqual(overview["templates"]["top_template_name"], "Smoke template")
-            self.assertFalse(overview["capabilities"]["local_docker_enabled"])
-            self.assertEqual(overview["capabilities"]["ssh_host_key_checking"], "yes")
-            self.assertTrue(overview["capabilities"]["strict_known_hosts_configured"])
-            self.assertTrue(overview["capabilities"]["server_credentials_key_configured"])
-            self.assertGreaterEqual(len(overview["attention_items"]), 3)
+            with patch(
+                "app.routes.ops._build_local_root_disk_attention_item",
+                return_value={
+                    "level": "warn",
+                    "title": "DeployMate host root disk is 86% full",
+                    "detail": "7G free on /. Clear old builder cache before the next release.",
+                },
+            ):
+                overview_response = self.client.get("/ops/overview?notifications_limit=100")
+                self.assertEqual(overview_response.status_code, 200)
+                overview = overview_response.json()
+                self.assertEqual(overview["user"]["username"], "smoke-admin")
+                self.assertEqual(overview["deployments"]["total"], 2)
+                self.assertEqual(overview["deployments"]["failed"], 1)
+                self.assertEqual(overview["servers"]["unused"], 1)
+                self.assertEqual(overview["notifications"]["error"], 1)
+                self.assertEqual(overview["templates"]["top_template_name"], "Smoke template")
+                self.assertFalse(overview["capabilities"]["local_docker_enabled"])
+                self.assertEqual(overview["capabilities"]["ssh_host_key_checking"], "yes")
+                self.assertTrue(overview["capabilities"]["strict_known_hosts_configured"])
+                self.assertTrue(overview["capabilities"]["server_credentials_key_configured"])
+                self.assertGreaterEqual(len(overview["attention_items"]), 4)
+                titles = [item["title"] for item in overview["attention_items"]]
+                self.assertIn("DeployMate host root disk is 86% full", titles)
 
         deployments_export_response = self.client.get("/ops/exports/deployments?format=json")
         self.assertEqual(deployments_export_response.status_code, 200)

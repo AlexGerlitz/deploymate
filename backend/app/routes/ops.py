@@ -1,6 +1,7 @@
 import csv
 import io
 import os
+import subprocess
 from datetime import datetime, timezone
 from typing import Callable, Iterable
 
@@ -26,6 +27,7 @@ from app.services.runtime_access import (
 )
 from app.services.secrets import apply_masked_secret_view
 from app.services.server_credentials import SERVER_CREDENTIALS_KEY_ENV
+from app.services.server_diagnostics import ROOT_DISK_ERROR_PERCENT, ROOT_DISK_WARN_PERCENT
 
 
 router = APIRouter(prefix="/ops", dependencies=[Depends(require_auth)])
@@ -102,6 +104,55 @@ def _build_runtime_capabilities_summary() -> OpsRuntimeCapabilitiesSummary:
         server_credentials_key_configured=bool(os.getenv(SERVER_CREDENTIALS_KEY_ENV, "").strip()),
         remote_only_recommended=True,
     )
+
+
+def _build_local_root_disk_attention_item() -> OpsAttentionItem | None:
+    try:
+        result = subprocess.run(
+            ["df", "-h", "/"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+
+    output = (result.stdout or result.stderr or "").strip()
+    if result.returncode != 0 or not output:
+        return None
+
+    lines = output.splitlines()
+    if len(lines) < 2:
+        return None
+
+    parts = lines[-1].split()
+    if len(parts) < 6 or not parts[4].endswith("%"):
+        return None
+
+    try:
+        usage_percent = int(parts[4][:-1])
+    except ValueError:
+        return None
+
+    avail = parts[3]
+
+    if usage_percent >= ROOT_DISK_ERROR_PERCENT:
+        return OpsAttentionItem(
+            level="error",
+            title=f"DeployMate host root disk is {usage_percent}% full",
+            detail=(
+                f"{avail} free on /. Clear Docker builder cache and old logs before the next release."
+            ),
+        )
+
+    if usage_percent >= ROOT_DISK_WARN_PERCENT:
+        return OpsAttentionItem(
+            level="warn",
+            title=f"DeployMate host root disk is {usage_percent}% full",
+            detail=f"{avail} free on /. Clear old builder cache before the next release.",
+        )
+
+    return None
 
 
 def _sanitize_server_export(item: dict) -> dict:
@@ -242,6 +293,10 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
                 detail=(recent_error or {}).get("title") or "Review recent activity history.",
             )
         )
+
+    local_root_disk_attention = _build_local_root_disk_attention_item()
+    if local_root_disk_attention is not None:
+        attention_items.append(local_root_disk_attention)
 
     if not servers:
         attention_items.append(

@@ -92,6 +92,11 @@ export const smokeOverviewOpsOverview = {
       title: "No server connected yet",
       detail: "Start with Step 1 and save one server target before the first deployment.",
     },
+    {
+      level: "warn",
+      title: "DeployMate host root disk is 86% full",
+      detail: "7G free on /. Clear old builder cache before the next release.",
+    },
   ],
 };
 

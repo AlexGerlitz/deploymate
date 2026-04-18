@@ -28,6 +28,18 @@ fi
 wait_for_frontend_smoke_url "$(automation_frontend_ready_path)"
 frontend_smoke_assert_checks "frontend-ops-smoke" "$BASE_URL" automation_smoke_ops_checks
 
+curl -sS "${BASE_URL}/app" > "$APP_HTML"
+
+if ! grep -Eq 'DeployMate host root disk is 86% full' "$APP_HTML"; then
+  echo "[frontend-ops-smoke] root disk pressure attention item is missing" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'Clear old builder cache before the next release\.' "$APP_HTML"; then
+  echo "[frontend-ops-smoke] root disk pressure guidance is missing" >&2
+  exit 1
+fi
+
 echo "[frontend-ops-smoke] ops overview rendered"
 echo "[frontend-ops-smoke] ops export actions rendered"
 echo "[frontend-ops-smoke] ops attention surface rendered"
