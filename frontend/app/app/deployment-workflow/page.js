@@ -593,7 +593,7 @@ function buildTemplateContextQueue(primaryTemplate, secondaryTemplates) {
       sections.push({
         id: "outside-context",
         title: "Outside this context",
-        detail: `Keep these assets separate until you deliberately switch away from ${focusContext} or duplicate for a new handoff.`,
+        detail: `Keep these assets separate until you deliberately switch away from ${focusContext} or duplicate and relabel for a new handoff.`,
         templates: outsideTemplates,
       });
     }
@@ -2138,7 +2138,9 @@ function DeploymentWorkflowPageContent() {
         "Failed to duplicate deployment template.",
       );
       setTemplatePreviewId(duplicatedTemplate.id);
-      setTemplateDuplicateSuccess(`Template duplicated as "${duplicatedTemplate.template_name}".`);
+      setTemplateDuplicateSuccess(
+        `Template duplicated as "${duplicatedTemplate.template_name}". Add the new client or operating context before reuse.`,
+      );
       await loadTemplates();
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {

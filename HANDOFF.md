@@ -48,6 +48,12 @@ Updated: 2026-04-18
     - `npm --prefix frontend run build`
     - `npm --prefix frontend run smoke:templates`
     - the same stop point remains unchanged: deeper ownership work still stays deferred until a real workflow-level gap survives the narrower template/context boundary
+  - latest dense-night-shift rerun on `2026-04-18 13:57 +07` closed one more narrow trust gap inside the same template/context boundary:
+    - duplicating a template now clears the inherited `context_label`, so a new handoff asset cannot silently keep the previous client or environment label
+    - the workflow copy now tells the operator to duplicate and relabel before reusing an outside-context asset
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+    - `npm --prefix frontend run smoke:templates`
+    - the same stop point still remains unchanged: deeper ownership work stays deferred until a real workflow-level gap survives the narrower template/context boundary
   - `Agency fit v1` теперь закрыт:
     - deployment workflow templates now read as reusable handoff assets instead of a generic personal preset lane
     - the focused template review now shows reuse state, created/last-used context, and a deliberate review/deploy/edit/duplicate/delete order for the next operator
@@ -357,12 +363,19 @@ Updated: 2026-04-18
     - `npm --prefix frontend run smoke:templates` now passes via smoke-mode static build after prerendering `/app/deployment-workflow` with the real focused template/context-boundary markup
   - latest rerun on `2026-04-18 13:52 +07` also passed:
     - `npm --prefix frontend run smoke:templates`
+- `Template duplicate relabel guard v0` теперь считать закрытым:
+  - duplicating a handoff asset now drops the inherited `context_label`, so the duplicate starts in a safe `Needs context label` state instead of silently pretending it still belongs to the previous client or environment
+  - outside-context template guidance now explicitly tells the operator to duplicate and relabel before reuse
+  - latest rerun on `2026-04-18 13:57 +07` passed the changed-scope package verification:
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_template_api_flow`
+    - `npm --prefix frontend run smoke:templates`
 - Текущий незавершённый checkpoint:
   - no broader ownership-model implementation should start before a real workflow-level sharing problem survives the new context-boundary cue
   - `narrower workspace/client separation` now has an honest local `smoke:templates` rerun, so deeper ownership model stays deferred until that narrower cue proves insufficient in a real workflow
   - latest rerun on `2026-04-18 13:35 +07` kept that checkpoint unchanged after the current dirty tree passed the same backend + frontend verification path again
   - latest rerun on `2026-04-18 13:49 +07` kept that checkpoint unchanged after the same dirty tree passed `make frontend` plus the template API unittest
   - latest rerun on `2026-04-18 13:52 +07` kept that checkpoint unchanged after the same dirty tree passed `npm --prefix frontend run build` plus `npm --prefix frontend run smoke:templates`
+  - latest rerun on `2026-04-18 13:57 +07` kept that checkpoint unchanged after closing the duplicate-relabel guard inside the same template/context workflow
 - Следующий bounded runtime порядок:
   1. deeper ownership model only after the workflow-level separation cue proves insufficient
 - Guardrails на следующий проход:

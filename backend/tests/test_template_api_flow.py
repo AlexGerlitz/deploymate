@@ -210,7 +210,7 @@ class TemplateApiFlowTests(unittest.TestCase):
         duplicate_id = duplicate["id"]
         self.assertNotEqual(duplicate_id, template_id)
         self.assertEqual(duplicate["template_name"], "web-template-copy")
-        self.assertEqual(duplicate["context_label"], "Acme support / staging")
+        self.assertIsNone(duplicate["context_label"])
         self.assertEqual(duplicate["use_count"], 0)
 
         deploy_response = self.client.post(f"/deployment-templates/{template_id}/deploy")

@@ -199,7 +199,7 @@ def duplicate_template(
     template_record = {
         "id": duplicate_id,
         "template_name": duplicate_name,
-        "context_label": template.get("context_label"),
+        "context_label": None,
         "image": template["image"],
         "name": template.get("name"),
         "internal_port": template.get("internal_port"),

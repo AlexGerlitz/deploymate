@@ -425,6 +425,7 @@ automation_smoke_templates_checks() {
 /app/deployment-workflow|template preview deploy button|data-testid="template-preview-deploy-button"
 /app/deployment-workflow|outside context queue section|data-testid="template-queue-section-outside-context"
 /app/deployment-workflow|outside context queue title|Outside this context
+/app/deployment-workflow|outside context queue detail|duplicate and relabel for a new handoff\.
 /app/deployment-workflow|create deployment card|data-testid="create-deployment-card"
 /app/deployment-workflow|create deployment title|data-testid="create-deployment-title"
 /app/deployment-workflow|template name input|data-testid="create-template-name-input"
