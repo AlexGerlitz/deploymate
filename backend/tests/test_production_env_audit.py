@@ -91,6 +91,101 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         thread.start()
         return server, thread
 
+    def _start_post_deploy_smoke_server(self):
+        session_cookie = "deploymate_session=test-session"
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, format: str, *args) -> None:
+                return
+
+            def _write_json(self, status: int, payload: dict, headers: dict[str, str] | None = None) -> None:
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                for name, value in (headers or {}).items():
+                    self.send_header(name, value)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def _write_html(self, status: int, html: str, headers: dict[str, str] | None = None) -> None:
+                body = html.encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                for name, value in (headers or {}).items():
+                    self.send_header(name, value)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self) -> None:
+                if self.path == "/login":
+                    self._write_html(200, "<html><body>login</body></html>")
+                    return
+
+                if self.path == "/app":
+                    self.send_response(307)
+                    self.send_header("Location", "/login")
+                    self.end_headers()
+                    return
+
+                if self.path == "/api/health":
+                    self._write_json(200, {"status": "healthy"})
+                    return
+
+                if self.path == "/api/auth/me":
+                    if session_cookie in (self.headers.get("Cookie") or ""):
+                        self._write_json(200, {"username": "admin"})
+                    else:
+                        self._write_json(401, {"detail": "Not authenticated"})
+                    return
+
+                if self.path == "/api/admin/backup-bundle":
+                    if session_cookie in (self.headers.get("Cookie") or ""):
+                        self._write_json(200, {"manifest": {"bundle_name": "smoke-backup"}})
+                    else:
+                        self._write_json(401, {"detail": "Not authenticated"})
+                    return
+
+                self._write_json(404, {"detail": "Not found"})
+
+            def do_POST(self) -> None:
+                if self.path == "/api/auth/login":
+                    length = int(self.headers.get("Content-Length", "0"))
+                    body = self.rfile.read(length).decode("utf-8")
+                    payload = json.loads(body or "{}")
+                    if payload == {"username": "admin", "password": "secret"}:
+                        self._write_json(
+                            200,
+                            {"username": "admin"},
+                            {"Set-Cookie": f"{session_cookie}; Path=/"},
+                        )
+                    else:
+                        self._write_json(401, {"detail": "Invalid username or password."})
+                    return
+
+                if self.path == "/api/admin/restore/dry-run":
+                    if session_cookie in (self.headers.get("Cookie") or ""):
+                        self._write_json(200, {"summary": {"total_sections": 1}})
+                    else:
+                        self._write_json(401, {"detail": "Not authenticated"})
+                    return
+
+                if self.path == "/api/auth/logout":
+                    self._write_json(
+                        200,
+                        {"status": "logged_out"},
+                        {"Set-Cookie": "deploymate_session=; Max-Age=0; Path=/"},
+                    )
+                    return
+
+                self._write_json(404, {"detail": "Not found"})
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return server, thread
+
     def _write_env_file(
         self,
         directory: Path,
@@ -308,6 +403,29 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
 
         self.assertIn("json_get()", script)
         self.assertIn("json_query()", script)
+
+    def test_post_deploy_smoke_accepts_standard_location_header_casing(self):
+        server, thread = self._start_post_deploy_smoke_server()
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join, 1)
+
+        env = os.environ.copy()
+        env["DEPLOYMATE_BASE_URL"] = f"http://127.0.0.1:{server.server_address[1]}"
+        env["DEPLOYMATE_ADMIN_USERNAME"] = "admin"
+        env["DEPLOYMATE_ADMIN_PASSWORD"] = "secret"
+
+        result = subprocess.run(
+            ["bash", "scripts/post_deploy_smoke.sh"],
+            cwd=self.repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("app shell redirect ok", result.stdout)
 
     def test_release_secret_contract_audit_accepts_matching_credentials(self):
         with tempfile.TemporaryDirectory() as temp_dir:

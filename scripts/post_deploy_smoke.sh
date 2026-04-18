@@ -114,7 +114,7 @@ check_http_redirect_to_login() {
   local status_code
   status_code="$(curl_smoke -sS -D "$headers_file" -o /dev/null -w "%{http_code}" "$url")"
   local location
-  location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/, "", $2); print $2}' "$headers_file" | tail -n 1)"
+  location="$(awk 'tolower($1) == "location:" {sub(/\r$/, "", $2); print $2}' "$headers_file" | tail -n 1)"
   rm -f "$headers_file"
 
   case "$status_code" in
