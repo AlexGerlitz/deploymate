@@ -16,6 +16,8 @@ import {
   smokeUser,
 } from "../lib/smoke-fixtures";
 import {
+  buildHostDiskPressureGuardrail,
+  buildHostDiskPressureRunbook,
   buildOverviewPrimaryPath,
   buildOpsSnapshot,
   buildOpsSummaryText,
@@ -103,6 +105,13 @@ export default function HomePage() {
     failedDeployments: opsSnapshot.deployments.failed,
     serversTotal: opsSnapshot.servers.total,
   });
+  const hostDiskGuardrail = buildHostDiskPressureGuardrail(opsOverview, {
+    deploymentsTotal: opsSnapshot.deployments.total,
+  });
+  const hostDiskRunbook = buildHostDiskPressureRunbook(hostDiskGuardrail, {
+    deploymentsTotal: opsSnapshot.deployments.total,
+    resumeReason: overviewPrimaryPath.reason,
+  });
   const singleServerFirstDeployTarget =
     canAccessServers &&
     !localDeploymentsEnabled &&
@@ -148,6 +157,8 @@ export default function HomePage() {
       ? "Next best step: review live apps and inspect the problem first."
       : overviewPrimaryPath.reason === "admin-target-needed"
         ? "Next best step: ask an admin to confirm one server target, then return to the workflow."
+      : hostDiskRunbook && (overviewPrimaryPath.reason === "first-deploy" || overviewPrimaryPath.reason === "steady-state")
+        ? hostDiskRunbook.summary
       : memberServerCopy
         ? memberServerCopy.support
         : deployments.length === 0
@@ -526,6 +537,21 @@ export default function HomePage() {
     }
   }
 
+  async function handleCopyDiskRecoveryPlan() {
+    clearOpsMessages();
+
+    if (!hostDiskRunbook) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(hostDiskRunbook.copyText);
+      setOpsActionMessage("Low-disk cleanup runbook copied to clipboard.");
+    } catch {
+      setOpsActionError("Failed to copy the low-disk cleanup runbook.");
+    }
+  }
+
   async function handleDownloadSnapshot() {
     clearOpsMessages();
 
@@ -718,6 +744,74 @@ export default function HomePage() {
           )}
 
         </div>
+
+        {hostDiskRunbook ? (
+          <article
+            className="card formCard workspaceGuidePanel"
+            data-testid="ops-disk-recovery-card"
+            id="ops-disk-recovery-card"
+          >
+            <div className="sectionHeader workspaceGuideHeader">
+              <div>
+                <span className={`status ${hostDiskGuardrail?.tone || "warn"}`}>
+                  {hostDiskGuardrail?.tone === "error" ? "error" : "warn"}
+                </span>
+                <h2 data-testid="ops-disk-recovery-title">{hostDiskRunbook.title}</h2>
+                <p className="formHint" data-testid="ops-disk-recovery-summary">
+                  {hostDiskRunbook.summary}
+                </p>
+              </div>
+              <div className="workspaceMetaLine">
+                <span>{hostDiskRunbook.focus}</span>
+              </div>
+            </div>
+            <div className="workspaceReviewerGrid">
+              {hostDiskRunbook.steps.map((step) => (
+                <article
+                  key={step.label}
+                  className="workspaceReviewerCard"
+                  data-testid={`ops-disk-recovery-step-${step.label.replace(/[^0-9]/g, "")}`}
+                >
+                  <span>{step.label}</span>
+                  <strong>{step.title}</strong>
+                  <p>{step.detail}</p>
+                </article>
+              ))}
+            </div>
+            <pre className="logs expandedBlock" data-testid="ops-disk-recovery-commands">
+              {hostDiskRunbook.commands.join("\n")}
+            </pre>
+            <div className="banner subtle" data-testid="ops-disk-recovery-warning-note">
+              {hostDiskRunbook.warningNote}
+            </div>
+            <div className="formActions">
+              {opsSnapshot.deployments.total > 0 ? (
+                <Link href="/app/deployment-workflow" className="landingButton primaryButton">
+                  Review live apps
+                </Link>
+              ) : null}
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={handleCopyDiskRecoveryPlan}
+                data-testid="ops-copy-disk-recovery-button"
+              >
+                Copy cleanup runbook
+              </button>
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => refreshPage()}
+                disabled={loading || serversLoading || notificationsLoading || templatesLoading || opsOverviewLoading}
+                data-testid="ops-refresh-after-disk-recovery-button"
+              >
+                {loading || serversLoading || notificationsLoading || templatesLoading || opsOverviewLoading
+                  ? "Refreshing..."
+                  : "Refresh overview"}
+              </button>
+            </div>
+          </article>
+        ) : null}
 
         {currentUser?.is_admin ? (
           <AdminDisclosureSection

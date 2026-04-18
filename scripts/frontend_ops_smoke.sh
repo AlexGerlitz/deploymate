@@ -40,6 +40,26 @@ if ! grep -Eq 'Clear old builder cache before the next release\.' "$APP_HTML"; t
   exit 1
 fi
 
+if ! grep -Eq 'data-testid="ops-disk-recovery-card"' "$APP_HTML"; then
+  echo "[frontend-ops-smoke] low-disk recovery runbook card is missing" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'docker builder prune --all --force' "$APP_HTML"; then
+  echo "[frontend-ops-smoke] low-disk recovery commands are missing the builder cleanup step" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'journalctl --vacuum-size=100M' "$APP_HTML"; then
+  echo "[frontend-ops-smoke] low-disk recovery commands are missing the journal cleanup step" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="ops-copy-disk-recovery-button"' "$APP_HTML"; then
+  echo "[frontend-ops-smoke] low-disk recovery card is missing the copy action" >&2
+  exit 1
+fi
+
 echo "[frontend-ops-smoke] ops overview rendered"
 echo "[frontend-ops-smoke] ops export actions rendered"
 echo "[frontend-ops-smoke] ops attention surface rendered"

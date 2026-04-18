@@ -1230,6 +1230,77 @@ export function buildHostDiskPressureGuardrail(opsOverview, options = {}) {
   };
 }
 
+export function buildHostDiskPressureRunbook(guardrail, options = {}) {
+  if (!guardrail?.blocker) {
+    return null;
+  }
+
+  const hasLiveDeployments = Number(options.deploymentsTotal || 0) > 0;
+  const resumeReason = String(options.resumeReason || "").trim();
+  const resumeStep =
+    resumeReason === "server-setup"
+      ? {
+          title: "Return to server review",
+          detail:
+            "After cleanup, keep Step 1 moving and verify one saved server target before rollout work becomes the main path again.",
+        }
+      : hasLiveDeployments
+        ? {
+            title: "Return to live review",
+            detail:
+              "After cleanup, review the current runtime again and only then decide whether another rollout is actually necessary.",
+          }
+        : {
+            title: "Return to deployment workflow",
+            detail:
+              "After cleanup, reopen the guided rollout path only when overview no longer warns about low disk on the DeployMate host.",
+          };
+  const commands = [
+    "docker builder prune --all --force",
+    "journalctl --vacuum-size=100M",
+    "df -h /",
+  ];
+  const warningNote =
+    "If / still stays above the warning threshold after these safe commands, inspect container/image usage manually before deleting anything broader.";
+
+  return {
+    title: "Low disk cleanup runbook",
+    focus: guardrail.title,
+    summary: guardrail.nextStep,
+    commands,
+    warningNote,
+    steps: [
+      {
+        label: "1. Stabilize the path",
+        title: hasLiveDeployments ? "Review live apps before another rollout" : "Pause rollout work",
+        detail: hasLiveDeployments
+          ? "Keep live review available while low disk is active, but treat new rollout work as blocked until cleanup is complete."
+          : "Do not start the first rollout while the DeployMate host is already low on free space.",
+      },
+      {
+        label: "2. Run the safe cleanup set",
+        title: "Clear builder cache and trim old logs",
+        detail:
+          "Start with safe cleanup on the DeployMate host itself: old Docker builder cache, old systemd journal data, then check root disk again.",
+      },
+      {
+        label: "3. Confirm headroom",
+        title: resumeStep.title,
+        detail: `${resumeStep.detail} ${warningNote}`,
+      },
+    ],
+    copyText: [
+      guardrail.title,
+      guardrail.nextStep,
+      "",
+      "Safe cleanup commands:",
+      ...commands,
+      "",
+      warningNote,
+    ].join("\n"),
+  };
+}
+
 export function buildDeploymentWorkflowState({
   isAdmin,
   localDeploymentsEnabled,
