@@ -35,6 +35,29 @@ export function buildDeploymentUrl(deployment) {
   return `http://${deployment.server_host}:${deployment.external_port}`;
 }
 
+export function buildDeploymentReviewTarget(deployment) {
+  const publicUrl = buildDeploymentUrl(deployment);
+
+  if (!publicUrl && deployment?.health_target) {
+    return {
+      href: deployment.health_target,
+      kind: "health",
+    };
+  }
+
+  if (publicUrl) {
+    return {
+      href: publicUrl,
+      kind: "app",
+    };
+  }
+
+  return {
+    href: "",
+    kind: "runtime",
+  };
+}
+
 export function normalizeCustomDomainValue(value) {
   return String(value || "").trim().toLowerCase().replace(/\.$/, "");
 }

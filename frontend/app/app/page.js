@@ -211,12 +211,12 @@ export default function HomePage() {
       actionLabel: stepTwoBlocked
         ? "Opens after Step 1"
         : memberNewDeploymentBlocked
-          ? "Review live apps instead"
+          ? "Ask admin for new deploy"
         : hasLiveDeployments
           ? "Start another deploy"
         : "Choose app to run",
       primary: !stepOneIsPrimary && !stepThreeIsPrimary,
-      disabled: stepTwoBlocked,
+      disabled: stepTwoBlocked || memberNewDeploymentBlocked,
     },
     {
       key: "step-3",

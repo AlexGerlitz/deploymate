@@ -7,6 +7,7 @@ import { AdminDisclosureSection } from "../../app/admin-ui";
 import { escapeCsvCell, triggerFileDownload } from "../../lib/admin-page-utils";
 import {
   buildCustomDomainIssues,
+  buildDeploymentReviewTarget,
   buildDeploymentUrl,
   buildEnvIssues,
   buildSecretRowsFromObject,
@@ -121,9 +122,12 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
 
   const lines = [
     `Deployment ${deployment.id}`,
+    `Runtime shape: ${deployment.runtime_shape || "single"}`,
     `Status: ${deployment.status || "unknown"}`,
+    deployment.stack_name ? `Stack: ${deployment.stack_name}` : null,
+    deployment.primary_service ? `Primary service: ${deployment.primary_service}` : null,
     `Image: ${deployment.image || "n/a"}`,
-    `Container: ${deployment.container_name || "n/a"}`,
+    `${deployment.runtime_shape === "stack" ? "Primary container" : "Container"}: ${deployment.container_name || "n/a"}`,
     `Server: ${
       canAccessServers && deployment.server_name && deployment.server_host
         ? `${deployment.server_name} (${deployment.server_host})`
@@ -137,6 +141,7 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
         ? `${deployment.custom_domain}${deployment.tls_enabled ? " (HTTPS)" : " (HTTP)"}`
         : "not set"
     }`,
+    deployment.health_target ? `Health target: ${deployment.health_target}` : null,
     `Ports: ${deployment.internal_port || "-"} -> ${deployment.external_port || "-"}`,
     buildReleaseTraceLine(deployment),
     `Health: ${health?.status || "unknown"}${
@@ -152,7 +157,7 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
           : "n/a"
     }`,
     `Activity events: ${Array.isArray(activity) ? activity.length : 0}`,
-  ];
+  ].filter(Boolean);
 
   if (diagnostics?.activity?.last_event_title) {
     lines.push(`Last event: ${diagnostics.activity.last_event_title}`);
@@ -162,23 +167,35 @@ function buildRuntimeSummaryText(deployment, health, diagnostics, activity, canA
 }
 
 function buildRecommendedNextStep(deployment, health, diagnostics, attentionItems) {
+  const isStackRuntime = deployment?.runtime_shape === "stack";
+
   if (deployment?.status === "failed") {
-    return "Review diagnostics and recent failures first, then redeploy only after the root cause is clear.";
+    return isStackRuntime
+      ? "Review diagnostics and recent failures first, then replace the whole stack only after the root cause is clear."
+      : "Review diagnostics and recent failures first, then redeploy only after the root cause is clear.";
   }
 
   if (health?.status && health.status !== "healthy") {
-    return "Check health, logs, and recent activity before making another rollout change.";
+    return isStackRuntime
+      ? "Check health, logs, and recent activity before deciding whether the whole stack needs replacement."
+      : "Check health, logs, and recent activity before making another rollout change.";
   }
 
   if (diagnostics?.activity?.recent_failure_count > 0) {
-    return "Review the recent failure history and confirm the runtime is stable before the next rollout.";
+    return isStackRuntime
+      ? "Review the recent failure history and confirm the stack is stable before planning any replacement."
+      : "Review the recent failure history and confirm the runtime is stable before the next rollout.";
   }
 
   if (attentionItems.length > 0) {
-    return "Work through the current attention items before changing this deployment.";
+    return isStackRuntime
+      ? "Work through the current attention items before replacing this stack."
+      : "Work through the current attention items before changing this deployment.";
   }
 
-  return "Keep the current rollout stable, and only redeploy when you are ready to change image, ports, or env vars deliberately.";
+  return isStackRuntime
+    ? "Keep the current stack stable, and only replace it deliberately after reviewing the health target and recent activity."
+    : "Keep the current rollout stable, and only redeploy when you are ready to change image, ports, or env vars deliberately.";
 }
 
 function buildPlainLanguageSummary(deployment, health, diagnostics, attentionItems, activity, canAccessServers) {
@@ -186,16 +203,20 @@ function buildPlainLanguageSummary(deployment, health, diagnostics, attentionIte
     return "";
   }
 
-  const deploymentName = deployment.container_name || deployment.image || deployment.id;
+  const deploymentName =
+    deployment.stack_name || deployment.container_name || deployment.image || deployment.id;
   const endpoint = buildDeploymentUrl(deployment);
   const latestEvent = Array.isArray(activity) && activity.length > 0 ? activity[0] : null;
   const nextStep = buildRecommendedNextStep(deployment, health, diagnostics, attentionItems);
 
   const lines = [
-    `What changed: the deployment "${deploymentName}" is currently ${deployment.status || "in an unknown state"}.`,
+    `What changed: the ${deployment.runtime_shape === "stack" ? "stack" : "deployment"} "${deploymentName}" is currently ${deployment.status || "in an unknown state"}.`,
     endpoint
       ? `People can currently reach it at ${endpoint}.`
       : "This deployment does not currently have a public URL.",
+    deployment.health_target
+      ? `DeployMate now treats ${deployment.health_target} as the health target for this runtime.`
+      : "No explicit health target is configured for this runtime yet.",
     deployment?.custom_domain
       ? `The configured primary domain is ${deployment.custom_domain}${deployment.tls_enabled ? " with HTTPS expected at the edge." : " and it is still marked as HTTP-only."}`
       : "No custom domain is configured for this deployment yet.",
@@ -472,7 +493,78 @@ function buildRedeployImpactSummary({
   return lines.join("\n");
 }
 
+function buildRollbackImpactSummary({
+  deployment,
+  diagnostics,
+  canAccessServers,
+}) {
+  if (!deployment) {
+    return "";
+  }
+
+  return [
+    `Deployment record: ${deployment.id}`,
+    `Current release: ${deployment.image || "n/a"}`,
+    `Current container: ${deployment.container_name || "N/A"}`,
+    `Target: ${
+      canAccessServers
+        ? diagnostics?.server_target ||
+          (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
+        : deployment.server_id || deployment.server_managed_by_admin
+          ? "Managed by an admin"
+          : "Local Docker target"
+    }`,
+    "",
+    `Saved rollback point: ${deployment.rollback_summary || "Previous running release snapshot is available."}`,
+    "",
+    "This action will ask DeployMate to redeploy this runtime from the latest saved running release snapshot.",
+  ].join("\n");
+}
+
+function buildDeleteImpactSummary({
+  deployment,
+  diagnostics,
+  deploymentUrl,
+  canAccessServers,
+}) {
+  if (!deployment) {
+    return "";
+  }
+
+  return [
+    `Deployment record: ${deployment.id}`,
+    deployment.runtime_shape === "stack"
+      ? `Stack: ${deployment.stack_name || deployment.id}`
+      : `Container: ${deployment.container_name || "N/A"}`,
+    deployment.runtime_shape === "stack" && deployment.primary_service
+      ? `Primary service: ${deployment.primary_service}`
+      : null,
+    `Target: ${
+      canAccessServers
+        ? diagnostics?.server_target ||
+          (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
+        : deployment.server_id || deployment.server_managed_by_admin
+          ? "Managed by an admin"
+          : "Local Docker target"
+    }`,
+    deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
+    deployment.health_target ? `Health target: ${deployment.health_target}` : null,
+    "",
+    buildActionReviewChecklist("delete"),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function buildActionReviewChecklist(action) {
+  if (action === "rollback") {
+    return [
+      "What happens now: DeployMate will redeploy this runtime from the latest saved running release snapshot.",
+      "What does not happen automatically: this review does not prove the restored release is healthy or preserve another rollback point after the restore.",
+      "Safe next step: confirm rollback only when the current rollout is clearly worse than the last known-good release, then verify app health and recent activity right away.",
+    ].join("\n");
+  }
+
   if (action === "delete") {
     return [
       "What happens now: DeployMate will try to stop and remove the running container, then delete the saved deployment record.",
@@ -497,10 +589,12 @@ function buildRuntimeDecisionState(
   options = {},
 ) {
   const { canMutateRuntime = true, freshRolloutReview = false } = options;
+  const isStackRuntime = deployment?.runtime_shape === "stack";
   const latestEvent = Array.isArray(activity) && activity.length > 0 ? activity[0] : null;
   const recentFailureCount = diagnostics?.activity?.recent_failure_count || 0;
   const errorCount = attentionItems.filter((item) => item.status === "error").length;
   const warnCount = attentionItems.filter((item) => item.status === "warn").length;
+  const reviewTarget = buildDeploymentReviewTarget(deployment);
 
   if (deployment?.status === "failed") {
     return {
@@ -510,7 +604,9 @@ function buildRuntimeDecisionState(
       why:
         "The runtime is already in a failed state, so the first job is understanding the failure before another rollout change competes for attention.",
       nextStep:
-        "Read the attention items, diagnostics, and recent activity first. Only redeploy after the root cause is concrete enough to explain.",
+        isStackRuntime
+          ? "Read the attention items, diagnostics, and recent activity first. Only replace the whole stack after the root cause is concrete enough to explain."
+          : "Read the attention items, diagnostics, and recent activity first. Only redeploy after the root cause is concrete enough to explain.",
       primaryHref: "#runtime-detail-attention-list",
       primaryAction: "Review runtime issues",
       secondaryHref: "#runtime-detail-activity-tools",
@@ -532,7 +628,9 @@ function buildRuntimeDecisionState(
         health?.error ||
         "Health is degraded, so this page should act as a runtime review surface before it becomes a rollout-change surface.",
       nextStep:
-        "Confirm whether the runtime is actually alive, read the health error or latency signal, and inspect activity before deciding on a redeploy.",
+        isStackRuntime
+          ? "Confirm whether the runtime is actually alive, read the health error or latency signal, and inspect activity before deciding whether the whole stack needs replacement."
+          : "Confirm whether the runtime is actually alive, read the health error or latency signal, and inspect activity before deciding on a redeploy.",
       primaryHref: "#runtime-detail-attention-list",
       primaryAction: "Review health and warnings",
       secondaryHref: "#runtime-detail-activity-tools",
@@ -555,7 +653,9 @@ function buildRuntimeDecisionState(
           ? `${recentFailureCount} recent failure event${recentFailureCount === 1 ? "" : "s"} still sit in diagnostics history.`
           : "The runtime is not clean yet, so the warnings should be understood before a new rollout becomes the main story.",
       nextStep:
-        "Work through the attention list and confirm the runtime is believable. Then decide whether the next safe move is stability, handoff, or a deliberate redeploy.",
+        isStackRuntime
+          ? "Work through the attention list and confirm the runtime is believable. Then decide whether the next safe move is stability, handoff, or a deliberate stack replacement."
+          : "Work through the attention list and confirm the runtime is believable. Then decide whether the next safe move is stability, handoff, or a deliberate redeploy.",
       primaryHref: "#runtime-detail-attention-list",
       primaryAction: "Review attention items",
       secondaryHref: "#runtime-detail-handoff-tools",
@@ -564,6 +664,44 @@ function buildRuntimeDecisionState(
         { label: "errors", value: `${errorCount}`, tone: errorCount > 0 ? "error" : "unknown" },
         { label: "warnings", value: `${warnCount}`, tone: warnCount > 0 ? "warn" : "unknown" },
         { label: "last event", value: latestEvent?.level || "none", tone: latestEvent?.level === "error" ? "error" : latestEvent?.level === "warn" ? "warn" : "healthy" },
+      ],
+    };
+  }
+
+  if (isStackRuntime) {
+    return {
+      tone: "healthy",
+      label: freshRolloutReview ? "Verify" : "Ready",
+      focus: reviewTarget.href
+        ? freshRolloutReview
+          ? "Fresh stack runtime is live. Check the saved health target before treating this deploy as done"
+          : "Stack runtime is healthy enough for deliberate review"
+        : freshRolloutReview
+          ? "Fresh stack runtime still needs review before it counts as done"
+          : "Stack runtime is stable enough for review before any replacement",
+      why: reviewTarget.href
+        ? freshRolloutReview
+          ? "This stack rollout was just created from Deployment Workflow. Verify the saved health target and runtime signals now, while the change context is still fresh."
+          : "No active runtime warnings are leading the page right now. The safest next step is checking the saved health target before planning any stack replacement."
+        : freshRolloutReview
+          ? "This stack rollout was just created without a saved health target. Review the runtime signals first so the next operator is not guessing."
+          : "No saved health target is available from this stack yet, so the safest next step is reviewing the runtime signals before planning any replacement.",
+      nextStep: reviewTarget.href
+        ? freshRolloutReview
+          ? "Open the saved health target, then return here and confirm health and recent activity before treating this rollout as complete."
+          : "Open the saved health target and confirm health and recent activity. Replace the whole stack only when that later becomes intentional."
+        : freshRolloutReview
+          ? "Review the current stack summary, health, and recent activity before deciding whether this rollout is believable enough to keep."
+          : "Review the current stack summary, health, and recent activity first. Replace the whole stack only after that review is intentional.",
+      primaryHref: reviewTarget.href || "#runtime-detail-overview",
+      primaryExternal: Boolean(reviewTarget.href),
+      primaryAction: reviewTarget.href ? "Open health target" : "Review stack runtime",
+      secondaryHref: reviewTarget.href ? "#runtime-detail-overview" : "#runtime-detail-handoff-tools",
+      secondaryAction: reviewTarget.href ? "Review runtime overview" : "Open handoff tools",
+      badges: [
+        { label: "health", value: health?.status || "unknown", tone: "healthy" },
+        { label: "attention", value: `${attentionItems.length}`, tone: "healthy" },
+        { label: "recent failures", value: `${recentFailureCount}`, tone: recentFailureCount > 0 ? "warn" : "healthy" },
       ],
     };
   }
@@ -692,6 +830,7 @@ export default function DeploymentDetailsPage({ params }) {
   const smokeDetailIsFailed = smokeDetailDeployment?.status === "failed";
   const smokeDetailIsAdminManaged = Boolean(smokeDetailDeployment?.server_managed_by_admin);
   const smokeDetailIsInternalOnly = smokeDetailDeployment?.id === smokeInternalRuntimeDeployment.id;
+  const smokeDetailIsStack = smokeDetailDeployment?.runtime_shape === "stack";
   const smokeDetailHealth =
     smokeMode && smokeDetailIsAdminManaged
       ? {
@@ -704,6 +843,17 @@ export default function DeploymentDetailsPage({ params }) {
             "Live health checks stay with admins for this admin-managed remote runtime.",
           checked_at: smokeDetailDeployment.created_at,
           response_time_ms: null,
+        }
+      : smokeMode && smokeDetailIsStack
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          url: smokeDetailDeployment.health_target,
+          status: "healthy",
+          status_code: 200,
+          error: null,
+          checked_at: smokeDetailDeployment.created_at,
+          response_time_ms: 84,
         }
       : smokeMode && smokeDetailIsInternalOnly
       ? {
@@ -731,6 +881,43 @@ export default function DeploymentDetailsPage({ params }) {
   const smokeDetailDiagnostics =
     smokeMode && smokeDetailIsAdminManaged
       ? null
+      : smokeMode && smokeDetailIsStack
+      ? {
+          deployment_id: smokeDetailDeployment.id,
+          container_name: smokeDetailDeployment.container_name,
+          current_status: smokeDetailDeployment.status,
+          server_target: `deploy@${smokeDetailDeployment.server_host}:22`,
+          checked_at: smokeDetailDeployment.created_at,
+          url: smokeDetailDeployment.health_target,
+          health: smokeDetailHealth,
+          activity: {
+            total_events: 2,
+            success_events: 2,
+            error_events: 0,
+            recent_failure_count: 0,
+            recent_failure_titles: [],
+            last_event_title: "Stack health check passed",
+            last_event_level: "success",
+            last_event_at: smokeDetailDeployment.created_at,
+          },
+          log_excerpt: "customer-portal-web-1 entered RUNNING state under compose project customer-portal.",
+          items: [
+            {
+              key: "deployment_status",
+              label: "Deployment status",
+              status: "ok",
+              summary: "Current status is running.",
+              details: null,
+            },
+            {
+              key: "health",
+              label: "Stack health",
+              status: "ok",
+              summary: "Health target responded with 200 in 84 ms.",
+              details: smokeDetailDeployment.health_target,
+            },
+          ],
+        }
       : smokeMode && smokeDetailIsFailed
       ? {
           deployment_id: smokeDetailDeployment.id,
@@ -809,7 +996,28 @@ export default function DeploymentDetailsPage({ params }) {
         }
       : smokeDiagnostics;
   const smokeDetailActivity =
-    smokeMode && smokeDetailIsFailed
+    smokeMode && smokeDetailIsStack
+      ? [
+          {
+            id: "stack-activity-2",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Stack health check passed",
+            message: "The primary service answered 200 on the saved health target.",
+            created_at: smokeDetailDeployment.created_at,
+            category: "health",
+          },
+          {
+            id: "stack-activity-1",
+            deployment_id: smokeDetailDeployment.id,
+            level: "success",
+            title: "Stack deployment succeeded",
+            message: "customer-portal is running with web as the primary service runtime.",
+            created_at: "2026-04-02T00:41:00Z",
+            category: "deploy",
+          },
+        ]
+      : smokeMode && smokeDetailIsFailed
       ? [
           {
             id: "review-worker-activity-2",
@@ -859,6 +1067,8 @@ export default function DeploymentDetailsPage({ params }) {
     smokeMode
       ? smokeDetailIsAdminManaged
         ? "Live logs stay with admins for this admin-managed remote runtime."
+        : smokeDetailIsStack
+        ? "customer-portal-web-1 entered RUNNING state under compose project customer-portal."
         : smokeDetailIsInternalOnly
         ? "internal-api entered RUNNING state without exposing a public URL."
         : smokeDetailIsFailed
@@ -877,6 +1087,11 @@ export default function DeploymentDetailsPage({ params }) {
   const [redeploySuccess, setRedeploySuccess] = useState("");
   const [redeployReviewOpen, setRedeployReviewOpen] = useState(false);
   const [redeployConfirmationText, setRedeployConfirmationText] = useState("");
+  const [rollingBack, setRollingBack] = useState(false);
+  const [rollbackError, setRollbackError] = useState("");
+  const [rollbackSuccess, setRollbackSuccess] = useState("");
+  const [rollbackReviewOpen, setRollbackReviewOpen] = useState(false);
+  const [rollbackConfirmationText, setRollbackConfirmationText] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateError, setTemplateError] = useState("");
@@ -912,6 +1127,19 @@ export default function DeploymentDetailsPage({ params }) {
   const canMutateRuntime =
     canAccessServers || (!deployment?.server_id && !runtimeServerAccessBlocked);
   const deploymentUrl = buildDeploymentUrl(deployment);
+  const reviewTarget = buildDeploymentReviewTarget(deployment);
+  const reviewTargetLabel = reviewTarget.kind === "health" ? "Health target" : "Endpoint";
+  const reviewTargetValue =
+    reviewTarget.kind === "health"
+      ? reviewTarget.href
+        ? "Saved"
+        : "Missing"
+      : deploymentUrl
+        ? "Live"
+        : "Private";
+  const reviewTargetDetail =
+    reviewTarget.href ||
+    (reviewTarget.kind === "health" ? "No health target assigned yet." : "No public URL assigned yet.");
   const runtimeServerLabel = formatAccessibleServerLabel({
     canAccessServers,
     serverName: deployment?.server_name,
@@ -926,6 +1154,13 @@ export default function DeploymentDetailsPage({ params }) {
     : runtimeServerAccessBlocked
       ? "Target admin-managed"
       : "Target local";
+  const runtimeLocationSummary = deployment?.server_id
+    ? canAccessServers
+      ? `Running on ${runtimeServerLabel}.`
+      : "Running on an admin-managed saved server."
+    : runtimeServerAccessBlocked
+      ? "Running on an admin-managed target."
+      : "Running locally in this workspace.";
   const adminManagedRuntimeMessage =
     "Live server checks for this runtime are admin-managed. You can review safe handoff context here, but diagnostics, logs, health checks, redeploy, and delete stay with admins.";
   const rawAttentionItems = buildAttentionItems(deployment, health, diagnostics);
@@ -971,6 +1206,35 @@ export default function DeploymentDetailsPage({ params }) {
     exportDiagnostics,
     attentionItems,
   );
+  const passportIdentityValue =
+    deployment?.runtime_shape === "stack"
+      ? deployment?.stack_name || deployment?.container_name || deployment?.id || "Stack pending"
+      : deployment?.container_name || deployment?.image || deployment?.id || "Deployment pending";
+  const passportIdentityDetail =
+    deployment?.runtime_shape === "stack"
+      ? `Primary service ${deployment?.primary_service || deployment?.container_name || "unknown"}. Compose-backed stack runtime. ${runtimeLocationSummary}`
+      : `${deployment?.image || "Image pending"} is the current runtime source. ${runtimeLocationSummary}`;
+  const passportHealthValue = health?.status || "unknown";
+  const passportHealthDetail = health?.checked_at
+    ? `Checked ${formatDate(health.checked_at)}${
+        health?.response_time_ms || health?.response_time_ms === 0
+          ? ` in ${health.response_time_ms} ms`
+          : ""
+      }.${reviewTarget.href ? ` Review target: ${reviewTarget.href}.` : ""}`
+    : reviewTarget.href
+      ? `Saved review target: ${reviewTarget.href}. No completed health check yet.`
+      : "No completed health check has been recorded yet.";
+  const passportRecentActivityValue = freshRolloutLatestEvent?.title || "No activity yet";
+  const passportRecentActivityDetail = freshRolloutLatestEvent
+    ? [
+        freshRolloutLatestEvent.message || "Most recent runtime event recorded.",
+        freshRolloutLatestEvent.created_at
+          ? `Logged ${formatDate(freshRolloutLatestEvent.created_at)}.`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "Wait for one meaningful runtime event before treating this deployment as settled.";
   const incidentSnapshot = buildIncidentSnapshotPayload(
     deployment,
     health,
@@ -1026,27 +1290,18 @@ export default function DeploymentDetailsPage({ params }) {
     "delete",
     deleteConfirmationTarget,
   );
-  const deleteImpactSummary = deployment
-    ? [
-        `Deployment record: ${deployment.id}`,
-        `Container: ${deployment.container_name || "N/A"}`,
-        `Target: ${
-          canAccessServers
-            ? diagnostics?.server_target ||
-              (deployment.server_name ? `${deployment.server_name} (${deployment.server_host})` : "Local Docker target")
-        : deployment.server_id || deployment.server_managed_by_admin
-          ? "Managed by an admin"
-          : "Local Docker target"
-        }`,
-        deploymentUrl ? `Public URL: ${deploymentUrl}` : "Public URL: none",
-        "",
-        buildActionReviewChecklist("delete"),
-      ].join("\n")
-    : "";
+  const deleteImpactSummary = buildDeleteImpactSummary({
+    deployment,
+    diagnostics,
+    deploymentUrl,
+    canAccessServers,
+  });
   const detailPriority =
     attentionItems[0]?.message ||
     (deployment?.status === "failed"
-      ? "Deployment is failed and needs a deliberate redeploy."
+      ? deployment?.runtime_shape === "stack"
+        ? "Deployment is failed and needs a deliberate stack replacement review."
+        : "Deployment is failed and needs a deliberate redeploy."
       : health?.status && health.status !== "healthy"
         ? `Health is currently ${health.status}.`
         : freshRolloutReview
@@ -1090,9 +1345,9 @@ export default function DeploymentDetailsPage({ params }) {
     : "No runtime activity has been recorded yet.";
   const detailGlanceItems = [
     {
-      label: "Endpoint",
-      value: deploymentUrl ? "Live" : "Private",
-      detail: deploymentUrl || "No public URL assigned yet.",
+      label: reviewTargetLabel,
+      value: reviewTargetValue,
+      detail: reviewTargetDetail,
     },
     {
       label: "Cadence",
@@ -1109,21 +1364,10 @@ export default function DeploymentDetailsPage({ params }) {
     },
     {
       label: "Next step",
-      value:
-        attentionItems.length > 0
-          ? "Review runtime issues"
-          : deployment?.status === "failed"
-            ? "Redeploy deliberately"
-            : freshRolloutReview
-              ? deploymentUrl
-                ? "Verify fresh rollout"
-                : "Review fresh runtime"
-            : deploymentUrl
-              ? "Open running app"
-              : "Review stable runtime",
+      value: runtimeDecisionState.primaryAction,
       detail: freshRolloutReview
-        ? deploymentUrl
-          ? "This rollout was just created. Verify the live app and runtime signals before queuing another change."
+        ? reviewTarget.href
+          ? "This rollout was just created. Verify the saved review target and runtime signals before queuing another change."
           : "This rollout was just created. Verify the stable runtime signals before queuing another change."
         : detailPriority,
     },
@@ -1134,14 +1378,18 @@ export default function DeploymentDetailsPage({ params }) {
       value:
         deployment?.status === "failed"
           ? "Failed"
-          : deploymentUrl
-            ? "Open app"
+          : reviewTarget.kind === "health" && reviewTarget.href
+            ? "Open health target"
+            : deploymentUrl
+              ? "Open app"
             : "Review here",
       detail:
         deployment?.status === "failed"
           ? "Start with the failure evidence instead of another rollout change."
-          : deploymentUrl
-            ? "Click the running app once, then come back to the runtime signals."
+          : reviewTarget.kind === "health" && reviewTarget.href
+            ? "Click the saved health target once, then come back to the runtime signals."
+            : deploymentUrl
+              ? "Click the running app once, then come back to the runtime signals."
             : "No public URL is available, so the first check stays on this page.",
     },
     {
@@ -1161,6 +1409,46 @@ export default function DeploymentDetailsPage({ params }) {
       detail: runtimeDecisionState.nextStep,
     },
   ];
+  const deploymentPassportItems = [
+    {
+      key: "identity",
+      label: "Runtime identity",
+      value: passportIdentityValue,
+      detail: passportIdentityDetail,
+    },
+    {
+      key: "health",
+      label: "Health proof",
+      value: passportHealthValue,
+      detail: passportHealthDetail,
+    },
+    {
+      key: "activity",
+      label: "Recent activity",
+      value: passportRecentActivityValue,
+      detail: passportRecentActivityDetail,
+    },
+    {
+      key: "next-step",
+      label: "Next safe action",
+      value: runtimeDecisionState.primaryAction,
+      detail: runtimeDecisionState.nextStep,
+    },
+  ];
+  const deploymentPassportSummary = [
+    "Deployment passport",
+    plainLanguageSummary ? `Summary: ${plainLanguageSummary}` : null,
+    `Runtime identity: ${passportIdentityValue}`,
+    `Identity detail: ${passportIdentityDetail}`,
+    `Health proof: ${passportHealthValue}`,
+    `Health detail: ${passportHealthDetail}`,
+    `Recent activity: ${passportRecentActivityValue}`,
+    `Activity detail: ${passportRecentActivityDetail}`,
+    `Next safe action: ${runtimeDecisionState.primaryAction}`,
+    `Next-step detail: ${runtimeDecisionState.nextStep}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
   const handoffGuideItems = [
     {
       label: "1. Explain state",
@@ -1267,6 +1555,19 @@ export default function DeploymentDetailsPage({ params }) {
     canAccessServers,
   });
   const redeployReviewChecklist = buildActionReviewChecklist("redeploy");
+  const isStackRuntime = deployment?.runtime_shape === "stack";
+  const rollbackAvailable = Boolean(deployment?.rollback_available);
+  const rollbackConfirmationTarget = deployment?.container_name || deployment?.id || "";
+  const rollbackConfirmationPhrase = buildReviewConfirmationPhrase(
+    "rollback",
+    rollbackConfirmationTarget,
+  );
+  const rollbackImpactSummary = buildRollbackImpactSummary({
+    deployment,
+    diagnostics,
+    canAccessServers,
+  });
+  const rollbackReviewChecklist = buildActionReviewChecklist("rollback");
   const deleteReviewChecklist = buildActionReviewChecklist("delete");
 
   async function loadDeploymentDiagnostics() {
@@ -1782,6 +2083,50 @@ export default function DeploymentDetailsPage({ params }) {
     }
   }
 
+  async function handleRollbackConfirm() {
+    if (
+      !rollbackConfirmationPhrase ||
+      rollbackConfirmationText.trim() !== rollbackConfirmationPhrase
+    ) {
+      return;
+    }
+
+    setRollingBack(true);
+    setRollbackError("");
+    setRollbackSuccess("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/deployments/${deploymentId}/rollback`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      await readJsonOrError(response, "Failed to roll back deployment.");
+      setRollbackSuccess("Deployment restored from the previous release.");
+      setRollbackReviewOpen(false);
+      setRollbackConfirmationText("");
+      await loadDeploymentDetails();
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setRollbackError(
+        requestError instanceof Error
+          ? normalizeDeploymentActionError(
+              requestError.message,
+              "Failed to roll back deployment.",
+            )
+          : "Failed to roll back deployment.",
+      );
+    } finally {
+      setRollingBack(false);
+    }
+  }
+
   async function handleDelete() {
     if (!deleteConfirmationPhrase || deleteConfirmationText.trim() !== deleteConfirmationPhrase) {
       return;
@@ -1931,9 +2276,9 @@ export default function DeploymentDetailsPage({ params }) {
               <p>{deployment?.container_name || "Container name pending"}</p>
             </div>
             <div className="workspaceHeroMetric">
-              <span>Endpoint</span>
-              <strong>{deploymentUrl ? "Live" : "Private"}</strong>
-              <p>{deploymentUrl || "No public URL assigned yet"}</p>
+              <span>{reviewTargetLabel}</span>
+              <strong>{reviewTargetValue}</strong>
+              <p>{reviewTargetDetail}</p>
             </div>
             <div className="workspaceHeroMetric">
               <span>Health</span>
@@ -1980,8 +2325,8 @@ export default function DeploymentDetailsPage({ params }) {
               data-testid="runtime-detail-fresh-rollout-banner"
             >
               {deploymentUrl
-                ? "Opened from deployment workflow: this rollout is still fresh. Open the app once, then confirm health and recent activity before preparing another change."
-                : "Opened from deployment workflow: this rollout is still fresh. Review overview, health, and recent activity before preparing another change."}
+                ? "Opened from deployment workflow: this rollout is still fresh. Start with the deployment passport below, open the app once, then confirm health and recent activity before preparing another change."
+                : "Opened from deployment workflow: this rollout is still fresh. Start with the deployment passport below, then confirm health and recent activity before preparing another change."}
             </div>
           ) : null}
           {diagnosticsError ? <div className="banner error">{diagnosticsError}</div> : null}
@@ -2114,6 +2459,52 @@ export default function DeploymentDetailsPage({ params }) {
             <section hidden={detailTab !== "overview"}>
             <article
               className="card compactCard runtimeReviewPanel runtimeDetailReviewPanel"
+              data-testid="runtime-detail-passport-card"
+              id="runtime-detail-passport"
+            >
+              <div className="sectionHeader">
+                <div>
+                  <span className={`status ${runtimeDecisionState.tone}`}>
+                    {runtimeDecisionState.label}
+                  </span>
+                  <h2 data-testid="runtime-detail-passport-title">Deployment passport</h2>
+                  <p className="formHint">
+                    Keep runtime identity, health proof, recent activity, and the next safe action in one handoff block.
+                  </p>
+                </div>
+                <div className="actionCluster">
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => copyText(deploymentPassportSummary, "Deployment passport")}
+                    data-testid="runtime-detail-passport-copy-button"
+                  >
+                    Copy passport summary
+                  </button>
+                </div>
+              </div>
+              {plainLanguageSummary ? (
+                <div className="banner subtle" data-testid="runtime-detail-passport-summary">
+                  {plainLanguageSummary}
+                </div>
+              ) : null}
+              <div className="workspaceReviewerGrid runtimeReviewGrid">
+                {deploymentPassportItems.map((item) => (
+                  <article
+                    className="workspaceReviewerCard"
+                    key={item.key}
+                    data-testid={`runtime-detail-passport-item-${item.key}`}
+                  >
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </article>
+
+            <article
+              className="card compactCard runtimeReviewPanel runtimeDetailReviewPanel"
               data-testid="runtime-detail-review-path-card"
             >
               <div className="sectionHeader">
@@ -2144,11 +2535,13 @@ export default function DeploymentDetailsPage({ params }) {
               id="runtime-detail-overview"
             >
               <div className="overviewCard" data-testid="runtime-detail-endpoint-card">
-                <span className="overviewLabel">Endpoint</span>
-                <strong className="overviewValue">{deploymentUrl || "No public URL"}</strong>
+                <span className="overviewLabel">{reviewTargetLabel}</span>
+                <strong className="overviewValue">{reviewTargetDetail}</strong>
                 <div className="overviewMeta">
                   <span>
-                    {deployment.custom_domain
+                    {reviewTarget.kind === "health"
+                      ? "Saved runtime probe"
+                      : deployment.custom_domain
                       ? `Domain ${deployment.custom_domain}`
                       : `Internal ${deployment.internal_port || "-"}`
                     }
@@ -2211,10 +2604,18 @@ export default function DeploymentDetailsPage({ params }) {
                     data-testid="runtime-detail-fresh-rollout-checklist-app"
                   >
                     <span>1. App</span>
-                    <strong>{deploymentUrl ? "Open the live app" : "Stay in runtime review"}</strong>
+                    <strong>
+                      {reviewTarget.kind === "health" && reviewTarget.href
+                        ? "Open the health target"
+                        : deploymentUrl
+                          ? "Open the live app"
+                          : "Stay in runtime review"}
+                    </strong>
                     <p>
-                      {deploymentUrl
-                        ? "Use the primary action once, then come back here before opening change tools."
+                      {reviewTarget.kind === "health" && reviewTarget.href
+                        ? "Use the saved health target once, then come back here before planning any stack replacement."
+                        : deploymentUrl
+                          ? "Use the primary action once, then come back here before opening change tools."
                         : "There is no public URL for this rollout, so the first verification stays on this page."}
                     </p>
                   </article>
@@ -2285,6 +2686,141 @@ export default function DeploymentDetailsPage({ params }) {
 
         {canMutateRuntime ? (
         <section hidden={detailTab !== "change"}>
+        {isStackRuntime ? (
+        <article className="card formCard adminToolCard" data-testid="runtime-detail-stack-change-note">
+          <div className="adminToolHeader">
+            <span className="adminToolEyebrow">Stack v0</span>
+            <h2>Review this stack as one runtime first</h2>
+            <p>
+              Stack deploy v0 is live for create, health, logs, diagnostics, and delete. Guided redeploy and rollback stay disabled until DeployMate can preserve the whole stack as one safe change unit.
+            </p>
+          </div>
+          <div className="row">
+            <span className="label">What is live</span>
+            <span data-testid="runtime-detail-stack-change-focus">
+              {deployment?.stack_name || deployment?.id || "This stack"} with primary service {deployment?.primary_service || deployment?.container_name || "unknown"}.
+            </span>
+          </div>
+          <div className="row">
+            <span className="label">Safe next step</span>
+            <span data-testid="runtime-detail-stack-change-next-step">
+              Open runtime review, confirm the health target and recent activity, then use guarded delete only if this stack must be replaced.
+            </span>
+          </div>
+          <div className="banner subtle" data-testid="runtime-detail-stack-change-banner">
+            Change actions for stack runtimes are intentionally paused here so DeployMate does not pretend a single-container redeploy form can safely mutate a compose stack.
+          </div>
+        </article>
+        ) : (
+        <>
+        <article className="card formCard adminToolCard" data-testid="runtime-detail-rollback-card">
+          <div className="adminToolHeader">
+            <span className="adminToolEyebrow">Rollback</span>
+            <h2>Restore the previous running release</h2>
+            <p>
+              Use this when the current rollout is worse than the last known-good running release and the safest move is restoring that earlier config quickly.
+            </p>
+          </div>
+          <div className="row">
+            <span className="label">State</span>
+            <span
+              className={`status ${rollbackAvailable ? "healthy" : "info"}`}
+              data-testid="runtime-detail-rollback-state"
+            >
+              {rollbackAvailable ? "Ready" : "Waiting"}
+            </span>
+          </div>
+          <div className="row">
+            <span className="label">Saved release</span>
+            <span data-testid="runtime-detail-rollback-summary">
+              {rollbackAvailable
+                ? deployment.rollback_summary || "Previous running release snapshot is available."
+                : "No previous running release snapshot is available yet."}
+            </span>
+          </div>
+          <div className="row">
+            <span className="label">When to use</span>
+            <span data-testid="runtime-detail-rollback-next-step">
+              {rollbackAvailable
+                ? "Use rollback when the current rollout is clearly worse than the previous running release and you need the fastest safe restore."
+                : "Rollback appears only after DeployMate has one older running release snapshot to restore."}
+            </span>
+          </div>
+          <div className="actionCluster">
+            {rollbackAvailable ? (
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => {
+                  setRollbackError("");
+                  setRollbackSuccess("");
+                  setRollbackReviewOpen(true);
+                }}
+                disabled={rollingBack || redeploying}
+                data-testid="runtime-detail-rollback-review-button"
+              >
+                {rollingBack ? "Rolling back..." : "Review rollback"}
+              </button>
+            ) : (
+              <span className="formHint">
+                DeployMate saves one previous running release after a later successful redeploy changes this runtime.
+              </span>
+            )}
+          </div>
+          {rollbackReviewOpen ? (
+            <div className="stackedValue" data-testid="runtime-detail-rollback-review-panel">
+              <div className="banner subtle">
+                {buildReviewIntroText("rollback", rollbackConfirmationPhrase).split(rollbackConfirmationPhrase)[0]}
+                <strong>{rollbackConfirmationPhrase}</strong>
+                {buildReviewIntroText("rollback", rollbackConfirmationPhrase).split(rollbackConfirmationPhrase)[1]}
+              </div>
+              <pre className="logs expandedBlock" data-testid="runtime-detail-rollback-review-checklist">
+                {rollbackReviewChecklist}
+              </pre>
+              <pre className="logs expandedBlock" data-testid="runtime-detail-rollback-impact-summary">
+                {rollbackImpactSummary}
+              </pre>
+              <label className="field">
+                <span>Type the confirmation phrase to continue</span>
+                <input
+                  value={rollbackConfirmationText}
+                  onChange={(event) => setRollbackConfirmationText(event.target.value)}
+                  placeholder={rollbackConfirmationPhrase}
+                  data-testid="runtime-detail-rollback-confirmation-input"
+                />
+              </label>
+              <div className="actionCluster">
+                <button
+                  type="button"
+                  className="landingButton primaryButton"
+                  onClick={handleRollbackConfirm}
+                  disabled={
+                    rollingBack ||
+                    rollbackConfirmationText.trim() !== rollbackConfirmationPhrase
+                  }
+                  data-testid="runtime-detail-rollback-confirm-button"
+                >
+                  {rollingBack ? "Rolling back..." : "Confirm rollback"}
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => {
+                    setRollbackReviewOpen(false);
+                    setRollbackConfirmationText("");
+                  }}
+                  disabled={rollingBack}
+                  data-testid="runtime-detail-rollback-cancel-button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {rollbackError ? <div className="banner error">{rollbackError}</div> : null}
+          {rollbackSuccess ? <div className="banner success">{rollbackSuccess}</div> : null}
+        </article>
+
         <article className="card formCard" data-testid="runtime-detail-change-readiness-card">
           <div className="sectionHeader">
             <div>
@@ -2604,6 +3140,8 @@ export default function DeploymentDetailsPage({ params }) {
           {redeployError ? <div className="banner error">{redeployError}</div> : null}
           {redeploySuccess ? <div className="banner success">{redeploySuccess}</div> : null}
         </article>
+        </>
+        )}
         </section>
         ) : null}
 
@@ -2797,14 +3335,32 @@ export default function DeploymentDetailsPage({ params }) {
                 </span>
               </div>
               <div className="row">
-                <span className="label">Image</span>
+                <span className="label">Runtime shape</span>
+                <span data-testid="runtime-detail-runtime-shape">
+                  {deployment.runtime_shape || "single"}
+                </span>
+              </div>
+              {deployment.stack_name ? (
+                <div className="row">
+                  <span className="label">Stack</span>
+                  <span data-testid="runtime-detail-stack-name">{deployment.stack_name}</span>
+                </div>
+              ) : null}
+              {deployment.primary_service ? (
+                <div className="row">
+                  <span className="label">Primary service</span>
+                  <span data-testid="runtime-detail-primary-service">{deployment.primary_service}</span>
+                </div>
+              ) : null}
+              <div className="row">
+                <span className="label">{isStackRuntime ? "Primary image" : "Image"}</span>
                 <span className="valueWithActions">
                   <span>{deployment.image || "N/A"}</span>
                   {deployment.image ? (
                     <button
                       type="button"
                       className="smallButton"
-                      onClick={() => copyText(deployment.image, "Image")}
+                      onClick={() => copyText(deployment.image, isStackRuntime ? "Primary image" : "Image")}
                     >
                       Copy
                     </button>
@@ -2812,7 +3368,7 @@ export default function DeploymentDetailsPage({ params }) {
                 </span>
               </div>
               <div className="row">
-                <span className="label">Container</span>
+                <span className="label">{isStackRuntime ? "Primary container" : "Container"}</span>
                 <span>{deployment.container_name || "N/A"}</span>
               </div>
               <div className="row">
@@ -2846,6 +3402,12 @@ export default function DeploymentDetailsPage({ params }) {
                 <span className="label">Ports</span>
                 <span>{deployment.internal_port || "-"} {"->"} {deployment.external_port || "-"}</span>
               </div>
+              {deployment.health_target ? (
+                <div className="row">
+                  <span className="label">Health target</span>
+                  <span data-testid="runtime-detail-health-target">{deployment.health_target}</span>
+                </div>
+              ) : null}
               <div className="row">
                 <span className="label">Release source</span>
                 <span>{formatReleaseSourceLabel(deployment.release_source)}</span>
@@ -2878,22 +3440,28 @@ export default function DeploymentDetailsPage({ params }) {
                 </span>
               </div>
               <div className="row">
-                <span className="label">URL</span>
+                <span className="label">{reviewTarget.kind === "health" ? "Review URL" : "URL"}</span>
                 <span className="valueWithActions">
-                  {deploymentUrl ? (
+                  {reviewTarget.href ? (
                     <>
                       <a
-                        href={deploymentUrl}
+                        href={reviewTarget.href}
                         target="_blank"
                         rel="noreferrer"
                         className="inlineLink"
+                        data-testid="runtime-detail-review-target-link"
                       >
-                        {deploymentUrl}
+                        {reviewTarget.href}
                       </a>
                       <button
                         type="button"
                         className="smallButton"
-                        onClick={() => copyText(deploymentUrl, "URL")}
+                        onClick={() =>
+                          copyText(
+                            reviewTarget.href,
+                            reviewTarget.kind === "health" ? "Health target URL" : "URL",
+                          )
+                        }
                       >
                         Copy
                       </button>
@@ -2903,35 +3471,44 @@ export default function DeploymentDetailsPage({ params }) {
                   )}
                 </span>
               </div>
-              <div className="row">
-                <span className="label">Webhook</span>
-                <span className="stackedValue">
-                  <span>{`${apiBaseUrl}/deployments/${deployment.id}/release-webhook`}</span>
-                  <div className="inlineActions">
-                    <button
-                      type="button"
-                      className="smallButton"
-                      onClick={() =>
-                        copyText(
-                          `${apiBaseUrl}/deployments/${deployment.id}/release-webhook`,
-                          "Webhook URL",
-                        )
-                      }
-                    >
-                      Copy URL
-                    </button>
-                    {deployment.release_webhook_token ? (
+              {isStackRuntime ? (
+                <div className="row">
+                  <span className="label">Release webhook</span>
+                  <span data-testid="runtime-detail-stack-webhook-note">
+                    Webhook-driven releases stay disabled for stack runtimes until DeployMate can replace the whole stack as one safe change unit.
+                  </span>
+                </div>
+              ) : (
+                <div className="row" data-testid="runtime-detail-webhook-row">
+                  <span className="label">Webhook</span>
+                  <span className="stackedValue">
+                    <span>{`${apiBaseUrl}/deployments/${deployment.id}/release-webhook`}</span>
+                    <div className="inlineActions">
                       <button
                         type="button"
                         className="smallButton"
-                        onClick={() => copyText(deployment.release_webhook_token, "Webhook token")}
+                        onClick={() =>
+                          copyText(
+                            `${apiBaseUrl}/deployments/${deployment.id}/release-webhook`,
+                            "Webhook URL",
+                          )
+                        }
                       >
-                        Copy token
+                        Copy URL
                       </button>
-                    ) : null}
-                  </div>
-                </span>
-              </div>
+                      {deployment.release_webhook_token ? (
+                        <button
+                          type="button"
+                          className="smallButton"
+                          onClick={() => copyText(deployment.release_webhook_token, "Webhook token")}
+                        >
+                          Copy token
+                        </button>
+                      ) : null}
+                    </div>
+                  </span>
+                </div>
+              )}
               <div className="row">
                 <span className="label">Env vars</span>
                 <span>
@@ -2992,18 +3569,29 @@ export default function DeploymentDetailsPage({ params }) {
               <div className="sectionHeader">
                 <div>
                   <h2>
-                    {runtimeServerAccessBlocked
-                      ? "Template handoff is admin-managed"
-                      : "Save as template"}
+                    {isStackRuntime
+                      ? "Stack templates are not available yet"
+                      : runtimeServerAccessBlocked
+                      ? "Template ownership is admin-managed"
+                      : "Save as reusable handoff asset"}
                   </h2>
                   <p className="formHint">
-                    {runtimeServerAccessBlocked
+                    {isStackRuntime
+                      ? "Single-app templates do not describe compose stacks safely yet. Keep this runtime in stack review mode until a dedicated stack template contract exists."
+                      : runtimeServerAccessBlocked
                       ? "This runtime belongs to an admin-managed remote target, so reusable rollout setup stays with admins until server sharing rules exist."
-                      : "Turn the current deployment settings into a reusable preset, then continue template review and reuse inside the deployment workflow."}
+                      : "Turn the current deployment settings into a reusable workflow asset for the next operator, then review, reuse, edit, or duplicate it inside deployment workflow."}
                   </p>
                 </div>
               </div>
-              {runtimeServerAccessBlocked ? (
+              {isStackRuntime ? (
+                <div
+                  className="banner subtle"
+                  data-testid="runtime-detail-stack-template-banner"
+                >
+                  Stack deploy v0 keeps compose YAML and primary-service ownership inside the runtime itself. Do not collapse it into the single-app template system yet.
+                </div>
+              ) : runtimeServerAccessBlocked ? (
                 <div
                   className="banner subtle"
                   data-testid="runtime-detail-template-admin-managed-banner"
@@ -3021,7 +3609,7 @@ export default function DeploymentDetailsPage({ params }) {
                     disabled={templateSaving}
                   />
                   <span className="fieldHint">
-                    Save image, ports, env vars, and server selection as a reusable handoff.
+                    Save image, ports, env vars, and server selection as a reusable workflow asset for this handoff path.
                   </span>
                 </label>
                 <div className="formActions">
@@ -3038,7 +3626,7 @@ export default function DeploymentDetailsPage({ params }) {
                       href={`/app/deployment-workflow?template=${savedTemplate.id}&template_action=preview&template_source=deployment-detail#templates`}
                       className="linkButton"
                     >
-                      Open in workflow
+                      Review in workflow
                     </Link>
                   ) : null}
 	                </div>
@@ -3046,7 +3634,7 @@ export default function DeploymentDetailsPage({ params }) {
               )}
 		              {savedTemplate?.id ? (
 	                <div className="banner subtle" data-testid="runtime-detail-template-bridge-banner">
-	                  Template "{savedTemplate.template_name}" is now part of the deployment workflow. Open it there to preview, reuse, or edit it in the main rollout screen.
+	                  Template "{savedTemplate.template_name}" is now a reusable workflow asset. Open it there to review the asset, reuse it as-is, edit the baseline deliberately, or duplicate it for a client-specific variant.
 	                </div>
 	              ) : null}
 	            </article>

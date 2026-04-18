@@ -1,7 +1,10 @@
 import json
+import re
+import shlex
 import subprocess
 import time
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 from fastapi import HTTPException
 
@@ -39,6 +42,22 @@ def ensure_docker_is_available(server: Optional[dict] = None) -> None:
                 or f'Docker is not available on server {server["name"]}.',
             )
         raise HTTPException(status_code=500, detail="Docker is not available.")
+
+
+def ensure_docker_compose_is_available(server: Optional[dict] = None) -> None:
+    result = _run_docker_command(["docker", "compose", "version"], server)
+
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or result.stdout.strip()
+        if server:
+            raise HTTPException(
+                status_code=500,
+                detail=error_message or f'Docker Compose is not available on server {server["name"]}.',
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=error_message or "Docker Compose is not available.",
+        )
 
 
 def ensure_external_port_is_available(external_port: Optional[int], server: Optional[dict] = None) -> None:
@@ -146,6 +165,176 @@ def run_container(
     command.append(image)
 
     return _run_docker_command(command, server)
+
+
+def normalize_stack_name(stack_name: str) -> str:
+    normalized = stack_name.strip().lower()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Stack name is required.")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{1,62}", normalized):
+        raise HTTPException(
+            status_code=400,
+            detail="Stack name must use only lowercase letters, numbers, dots, underscores, or hyphens.",
+        )
+    return normalized
+
+
+def normalize_stack_health_target(health_target: str) -> str:
+    normalized = health_target.strip()
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(
+            status_code=400,
+            detail="Stack health target must be a full http(s) URL for v0 stack deploys.",
+        )
+    return normalized
+
+
+def extract_compose_services(compose_yaml: str) -> dict[str, dict[str, str | None]]:
+    services: dict[str, dict[str, str | None]] = {}
+    in_services_block = False
+    service_indent: int | None = None
+    current_service: str | None = None
+
+    for raw_line in compose_yaml.splitlines():
+        line = raw_line.rstrip()
+        if not in_services_block:
+            if re.match(r"^\s*services:\s*$", line):
+                in_services_block = True
+            continue
+
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+
+        indent = len(line) - len(line.lstrip(" "))
+        if indent == 0:
+            break
+
+        service_match = re.match(r"^(\s+)([A-Za-z0-9._-]+):\s*$", line)
+        if service_match:
+            current_indent = len(service_match.group(1))
+            if service_indent is None:
+                service_indent = current_indent
+            if current_indent == service_indent:
+                current_service = service_match.group(2)
+                services.setdefault(current_service, {"image": None})
+                continue
+
+        if current_service and service_indent is not None and indent > service_indent:
+            image_match = re.match(r"^\s*image:\s*(\S+)\s*$", line)
+            if image_match and not services[current_service].get("image"):
+                services[current_service]["image"] = image_match.group(1)
+
+    return services
+
+
+def build_stack_project_name(deployment_id: str) -> str:
+    return f"deploymate-{deployment_id}"
+
+
+def build_stack_storage_dir(deployment_id: str) -> str:
+    return f"${{HOME}}/.deploymate/stacks/{deployment_id}"
+
+
+def build_stack_compose_path(deployment_id: str) -> str:
+    return f"{build_stack_storage_dir(deployment_id)}/compose.yaml"
+
+
+def _run_shell_script(script: str, server: Optional[dict] = None) -> subprocess.CompletedProcess:
+    return run_runtime_command(["sh", "-lc", script], server)
+
+
+def run_compose_stack_up(
+    deployment_id: str,
+    compose_yaml: str,
+    server: Optional[dict] = None,
+) -> subprocess.CompletedProcess:
+    storage_dir = build_stack_storage_dir(deployment_id)
+    compose_path = build_stack_compose_path(deployment_id)
+    project_name = build_stack_project_name(deployment_id)
+    delimiter = f"DEPLOYMATE_STACK_{deployment_id.replace('-', '_')}"
+    script = "\n".join(
+        [
+            "set -e",
+            f'storage_dir="{storage_dir}"',
+            'compose_path="${storage_dir}/compose.yaml"',
+            'mkdir -p "$storage_dir"',
+            f"cat > \"$compose_path\" <<'{delimiter}'",
+            compose_yaml.rstrip("\n"),
+            delimiter,
+            f"docker compose -f \"$compose_path\" -p {shlex.quote(project_name)} up -d",
+        ]
+    )
+    return _run_shell_script(script, server)
+
+
+def remove_stack_if_exists(
+    deployment_id: str,
+    server: Optional[dict] = None,
+) -> subprocess.CompletedProcess:
+    storage_dir = build_stack_storage_dir(deployment_id)
+    project_name = build_stack_project_name(deployment_id)
+    script = "\n".join(
+        [
+            "set -e",
+            f'storage_dir="{storage_dir}"',
+            'compose_path="${storage_dir}/compose.yaml"',
+            'if [ ! -f "$compose_path" ]; then',
+            f'  echo "Compose file is missing for stack deployment {deployment_id}." >&2',
+            "  exit 1",
+            "fi",
+            f"docker compose -f \"$compose_path\" -p {shlex.quote(project_name)} down --remove-orphans",
+            'rm -rf "$storage_dir"',
+        ]
+    )
+    return _run_shell_script(script, server)
+
+
+def get_stack_primary_container(
+    deployment_id: str,
+    primary_service: str,
+    server: Optional[dict] = None,
+) -> tuple[str, str]:
+    storage_dir = build_stack_storage_dir(deployment_id)
+    project_name = build_stack_project_name(deployment_id)
+    script = "\n".join(
+        [
+            "set -e",
+            f'storage_dir="{storage_dir}"',
+            'compose_path="${storage_dir}/compose.yaml"',
+            'if [ ! -f "$compose_path" ]; then',
+            f'  echo "Compose file is missing for stack deployment {deployment_id}." >&2',
+            "  exit 1",
+            "fi",
+            f"container_id=$(docker compose -f \"$compose_path\" -p {shlex.quote(project_name)} ps -q {shlex.quote(primary_service)} | head -n 1)",
+            'if [ -z "$container_id" ]; then',
+            f'  echo "Primary service {primary_service} did not produce a running container." >&2',
+            "  exit 1",
+            "fi",
+            'container_name=$(docker inspect --format "{{.Name}}" "$container_id" | sed \'s#^/##\')',
+            'if [ -z "$container_name" ]; then',
+            '  echo "Failed to inspect the primary service container name." >&2',
+            "  exit 1",
+            "fi",
+            'printf "%s\\n%s\\n" "$container_id" "$container_name"',
+        ]
+    )
+    result = _run_shell_script(script, server)
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or result.stdout.strip()
+        raise HTTPException(
+            status_code=500,
+            detail=error_message or "Failed to inspect the stack primary service container.",
+        )
+
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to resolve the stack primary service container.",
+        )
+
+    return lines[0], lines[1]
 
 
 def remove_container_if_exists(container_name: str, server: Optional[dict] = None) -> None:

@@ -77,8 +77,23 @@ assert_first_deploy_handoff_workflow() {
     return 1
   fi
 
+  if ! grep -Eq 'data-testid="deployment-workflow-tab-stack"[^>]*>Bring compose stack<' "$html_file"; then
+    echo "[${smoke_name}] workflow lost the compose stack intake tab" >&2
+    return 1
+  fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-stack-intake-note"' "$html_file"; then
+    echo "[${smoke_name}] workflow lost the compose stack intake guidance note" >&2
+    return 1
+  fi
+
   if ! grep -Eq 'data-testid="deployment-workflow-first-deploy-templates-note"' "$html_file"; then
     echo "[${smoke_name}] first deploy path lost the explicit template fallback note" >&2
+    return 1
+  fi
+
+  if ! grep -Eq 'data-testid="templates-team-asset-card"' "$html_file"; then
+    echo "[${smoke_name}] workflow lost the template handoff asset lane" >&2
     return 1
   fi
 
@@ -103,7 +118,7 @@ run_beginner_export_payload_smoke() {
     set -euo pipefail
     cd "$REPO_ROOT"
 
-    node --experimental-default-type=module --input-type=module <<'NODE'
+    node --input-type=module <<'NODE'
 import { buildAccessControlledRuntimeExportPayload } from "./frontend/app/lib/runtime-workspace-utils.js";
 import {
   smokeActivity,

@@ -27,6 +27,14 @@ class DeploymentCreateRequest(BaseModel):
     secrets: Dict[str, str] = Field(default_factory=dict)
 
 
+class StackDeploymentCreateRequest(BaseModel):
+    stack_name: str = Field(..., min_length=1, description="Human-readable stack label")
+    primary_service: str = Field(..., min_length=1, description="Compose service to represent the stack runtime")
+    health_target: str = Field(..., min_length=1, description="Full http(s) URL DeployMate should probe for stack health")
+    compose_yaml: str = Field(..., min_length=1, description="Compose YAML for the supported v0 stack subset")
+    server_id: Optional[str] = None
+
+
 class DeploymentReleaseWebhookRequest(BaseModel):
     image: Optional[str] = Field(default=None, min_length=1, description="Optional image override for this release")
     ref: Optional[str] = Field(default=None, min_length=1)
@@ -60,6 +68,9 @@ class DeploymentResponse(BaseModel):
     release_triggered_at: Optional[str] = None
     release_triggered_by: Optional[str] = None
     release_webhook_token: Optional[str] = None
+    stack_name: Optional[str] = None
+    primary_service: Optional[str] = None
+    health_target: Optional[str] = None
     rollback_available: bool = False
     rollback_summary: Optional[str] = None
     env: Dict[str, str] = Field(default_factory=dict)

@@ -16,6 +16,7 @@ import {
 } from "../../lib/admin-page-utils";
 import {
   buildCustomDomainIssues,
+  buildDeploymentReviewTarget,
   buildDeploymentUrl,
   buildDeploymentWorkflowNextStep,
   buildDeploymentWorkflowState,
@@ -180,7 +181,7 @@ const smokeWorkflowFixture =
           submitSuccess: "",
           createdDeployment: null,
           templateDeploySuccess:
-            "Deployment created from template. Open runtime detail next while this rollout is still fresh.",
+            "Deployment created from template. Open deployment passport next while this rollout is still fresh.",
           templateCreatedDeployment: smokeTemplateCreatedDeployment,
         }
     : smokeMode && smokeWorkflowScenario === "create-deploy-success"
@@ -198,7 +199,7 @@ const smokeWorkflowFixture =
           workflowMessage: "",
           workflowTab: "create",
           submitSuccess:
-            "Deployment created. Open runtime detail next while this rollout is still fresh.",
+            "Deployment created. Open deployment passport next while this rollout is still fresh.",
           createdDeployment: smokeCreatedDeployment,
           templateDeploySuccess: "",
           templateCreatedDeployment: null,
@@ -282,17 +283,23 @@ const smokeWorkflowFixture =
       };
 
 function buildRuntimeCardActionState(deployment) {
-  const runtimeUrl = buildDeploymentUrl(deployment);
+  const reviewTarget = buildDeploymentReviewTarget(deployment);
+  const runtimeUrl = reviewTarget.href;
   const failed = deployment?.status === "failed";
   const stableWithoutPublicUrl = deployment?.status === "running" && !runtimeUrl;
 
   return {
     runtimeUrl,
+    openActionLabel: reviewTarget.kind === "health" ? "Open health target" : "Open app",
+    endpointLabel: reviewTarget.kind === "health" ? "Health target" : "Endpoint",
+    emptyEndpointLabel: reviewTarget.kind === "health" ? "No health target" : "Internal only",
     detailsClassName: failed || !runtimeUrl ? "landingButton primaryButton" : "secondaryButton",
     detailsLabel: failed
       ? "Review runtime issues"
       : stableWithoutPublicUrl
-        ? "Review stable runtime"
+        ? deployment?.runtime_shape === "stack"
+          ? "Review stack runtime"
+          : "Review stable runtime"
         : "View details",
     openAppClassName: failed ? "linkButton" : "landingButton primaryButton",
     showOpenAppPrimary: Boolean(runtimeUrl) && !failed,
@@ -328,7 +335,8 @@ function buildRuntimeReviewState(deployment, visibleDeploymentsCount) {
     };
   }
 
-  const runtimeUrl = buildDeploymentUrl(deployment);
+  const reviewTarget = buildDeploymentReviewTarget(deployment);
+  const runtimeUrl = reviewTarget.href;
   const deploymentName = deployment.container_name || deployment.image || "This deployment";
 
   if (deployment.status === "failed") {
@@ -359,6 +367,36 @@ function buildRuntimeReviewState(deployment, visibleDeploymentsCount) {
   }
 
   if (deployment.status === "running" && runtimeUrl) {
+    if (reviewTarget.kind === "health") {
+      return {
+        label: "Ready to verify",
+        tone: "healthy",
+        focus: `${deploymentName} is running with a saved health target`,
+        nextStep: "Open the health target once, then return to runtime detail before deciding whether this runtime should stay or be replaced.",
+        summary: `${visibleDeploymentsCount} live deployment${visibleDeploymentsCount === 1 ? "" : "s"} are visible. Start with the focused one and keep the rest secondary.`,
+        checks: [
+          {
+            label: "First check",
+            value: "Open health target",
+            detail: "Confirm the saved health target responds before treating the runtime as settled.",
+          },
+          {
+            label: "Signal",
+            value: "Health target",
+            detail: runtimeUrl,
+          },
+          {
+            label: "Then",
+            value: "Review detail",
+            detail:
+              deployment.runtime_shape === "stack"
+                ? "Use runtime detail for health, activity, and guarded stack-change limits."
+                : "Use runtime detail for health, activity, and deliberate changes.",
+          },
+        ],
+      };
+    }
+
     return {
       label: "Ready to verify",
       tone: "healthy",
@@ -386,6 +424,33 @@ function buildRuntimeReviewState(deployment, visibleDeploymentsCount) {
   }
 
   if (deployment.status === "running") {
+    if (deployment.runtime_shape === "stack") {
+      return {
+        label: "Review stack",
+        tone: "warn",
+        focus: `${deploymentName} is running without a saved health target`,
+        nextStep: "Open runtime detail and confirm the stack summary, health, and activity before deciding whether a full replacement is necessary.",
+        summary: "Step 3 should stay in runtime review until one health target is recorded for the whole stack.",
+        checks: [
+          {
+            label: "First check",
+            value: "Review detail",
+            detail: "Confirm the stack summary, health signal, and recent activity from the runtime page.",
+          },
+          {
+            label: "Signal",
+            value: "Health target missing",
+            detail: "This stack still lacks the one URL DeployMate should probe for runtime health.",
+          },
+          {
+            label: "Then",
+            value: "Stabilize first",
+            detail: "Do not treat stack replacement as the default move until the runtime story is believable.",
+          },
+        ],
+      };
+    }
+
     return {
       label: "Stable private",
       tone: "healthy",
@@ -436,6 +501,206 @@ function buildRuntimeReviewState(deployment, visibleDeploymentsCount) {
       },
     ],
   };
+}
+
+function buildTemplateAssetState(template) {
+  const useCount = Number(template?.use_count || 0);
+  const lastUsedAt = template?.last_used_at || "";
+
+  if (useCount === 0) {
+    return {
+      label: "Draft asset",
+      detail: "Saved once, but not reused yet.",
+    };
+  }
+
+  if (lastUsedAt && isRecentDate(lastUsedAt, 7)) {
+    return {
+      label: "Active handoff",
+      detail: `Reused ${useCount} time${useCount === 1 ? "" : "s"} and still active in the last 7 days.`,
+    };
+  }
+
+  return {
+    label: "Stable baseline",
+    detail: `Reused ${useCount} time${useCount === 1 ? "" : "s"} as a deliberate rollout baseline.`,
+  };
+}
+
+function extractComposeServiceNames(composeYaml) {
+  if (!composeYaml) {
+    return [];
+  }
+
+  const lines = String(composeYaml).split(/\r?\n/);
+  const serviceNames = [];
+  let inServicesBlock = false;
+  let serviceIndent = null;
+
+  for (const line of lines) {
+    if (!inServicesBlock) {
+      if (/^\s*services:\s*$/.test(line)) {
+        inServicesBlock = true;
+      }
+      continue;
+    }
+
+    if (!line.trim()) {
+      continue;
+    }
+
+    const indentMatch = line.match(/^(\s*)/);
+    const indent = indentMatch ? indentMatch[1].length : 0;
+
+    if (indent === 0) {
+      break;
+    }
+
+    const serviceMatch = line.match(/^(\s+)([A-Za-z0-9._-]+):\s*$/);
+    if (!serviceMatch) {
+      continue;
+    }
+
+    const currentIndent = serviceMatch[1].length;
+    if (serviceIndent === null) {
+      serviceIndent = currentIndent;
+    }
+
+    if (currentIndent === serviceIndent) {
+      serviceNames.push(serviceMatch[2]);
+    }
+  }
+
+  return serviceNames;
+}
+
+function buildComposeIntakeValidation(draft, options = {}) {
+  const {
+    localDeploymentsEnabled = true,
+    canAccessServers = true,
+  } = options;
+  const errors = [];
+  const warnings = [];
+  const composeYaml = draft.compose_yaml.trim();
+  const stackName = draft.stack_name.trim();
+  const primaryService = draft.primary_service.trim();
+  const healthTarget = draft.health_target.trim();
+
+  if (!stackName) {
+    errors.push("Stack name is required.");
+  }
+
+  if (!primaryService) {
+    errors.push("Primary service is required.");
+  }
+
+  if (!healthTarget) {
+    errors.push("Health target is required.");
+  }
+
+  if (!composeYaml) {
+    errors.push("Compose file is required.");
+  }
+
+  if (!localDeploymentsEnabled && !draft.server_id) {
+    errors.push(
+      canAccessServers
+        ? "This environment is remote-only. Choose a saved server target."
+        : "Server targets are managed by an admin for this workspace.",
+    );
+  }
+
+  if (composeYaml && !/^\s*services:\s*$/m.test(composeYaml)) {
+    errors.push("Compose file must include a top-level services: block.");
+  }
+
+  const serviceNames = extractComposeServiceNames(composeYaml);
+
+  if (composeYaml && serviceNames.length === 0) {
+    errors.push("Compose file must declare at least one service under services:.");
+  }
+
+  if (primaryService && serviceNames.length > 0 && !serviceNames.includes(primaryService)) {
+    errors.push(`Primary service "${primaryService}" was not found in the compose services list.`);
+  }
+
+  if (healthTarget && !/^https?:\/\/\S+$/i.test(healthTarget)) {
+    errors.push("Health target must be a full http(s) URL for stack deploy v0.");
+  }
+
+  if (composeYaml && !/\bimage:\s*\S+/m.test(composeYaml)) {
+    warnings.push("This v0 intake is designed around image-based services first. Build-only stacks still need follow-up.");
+  }
+
+  if (/\$\{[^}]+\}/.test(composeYaml)) {
+    warnings.push("Compose env interpolation is noted, but this v0 intake does not review the external env contract yet.");
+  }
+
+  return { errors, warnings, serviceNames };
+}
+
+function buildComposeIntakeState(draft, validation) {
+  const draftStarted =
+    draft.stack_name.trim() ||
+    draft.primary_service.trim() ||
+    draft.health_target.trim() ||
+    draft.compose_yaml.trim();
+
+  if (!draftStarted) {
+    return {
+      tone: "info",
+      label: "Waiting",
+      focus: "Compose stack intake stays secondary until you really need a multi-service rollout",
+      why: "Single-app deploy is still the shortest path. Open this lane only when one workload needs to be owned as one stack runtime.",
+      nextStep: "Start with stack name, primary service, health target, and one compose file when the workload is truly multi-service.",
+    };
+  }
+
+  if (validation.errors.length > 0) {
+    return {
+      tone: "error",
+      label: "Blocked",
+      focus: "The compose intake draft is still incomplete",
+      why: validation.errors[0],
+      nextStep: "Fix the first blocking field, then confirm the primary service and health target for the whole stack.",
+    };
+  }
+
+  if (validation.warnings.length > 0) {
+    return {
+      tone: "warn",
+      label: "Review",
+      focus: `${validation.serviceNames.length} service${validation.serviceNames.length === 1 ? "" : "s"} are detected for stack intake`,
+      why: validation.warnings[0],
+      nextStep: "Keep the stack narrow: one compose file, one primary service, one health target, and one rollback unit.",
+    };
+  }
+
+  return {
+    tone: "healthy",
+      label: "Ready",
+      focus: `${draft.stack_name.trim()} is ready for compose intake review`,
+      why: `${draft.primary_service.trim()} can act as the primary service and ${draft.health_target.trim()} can act as the health target for one stack runtime.`,
+      nextStep: "Deploy the stack now, then open runtime detail to review the primary service as one runtime unit.",
+    };
+  }
+
+function buildComposeIntakeSummary(draft, validation) {
+  if (validation.errors.length > 0) {
+    return "";
+  }
+
+  return [
+    `Stack name: ${draft.stack_name.trim()}`,
+    "Runtime shape: stack",
+    "Release source: compose",
+    `Primary service: ${draft.primary_service.trim()}`,
+    `Health target: ${draft.health_target.trim()}`,
+    `Target: ${draft.server_id || "Local Docker target"}`,
+    `Detected services: ${validation.serviceNames.join(", ")}`,
+    "Rollback unit: whole stack",
+    "Supported v0 subset: one compose file, image-based services first, one primary service, one health target.",
+  ].join("\n");
 }
 
 function DeploymentWorkflowPageContent() {
@@ -493,6 +758,16 @@ function DeploymentWorkflowPageContent() {
     smokeMode ? smokeWorkflowFixture.workflowTab : "create",
   );
   const [createAdvancedOpen, setCreateAdvancedOpen] = useState(false);
+  const [stackDraft, setStackDraft] = useState({
+    stack_name: "",
+    primary_service: "",
+    health_target: "",
+    compose_yaml: "",
+    server_id: smokeMode ? smokeWorkflowFixture.form.server_id : "",
+  });
+  const [stackIntakeError, setStackIntakeError] = useState("");
+  const [stackIntakeSuccess, setStackIntakeSuccess] = useState("");
+  const [stackSubmitting, setStackSubmitting] = useState(false);
   const createSectionRef = useRef(null);
   const createImageInputRef = useRef(null);
   const handoffImageFocusAppliedRef = useRef(false);
@@ -594,6 +869,40 @@ function DeploymentWorkflowPageContent() {
   const secondaryTemplates = primaryTemplate
     ? filteredTemplates.filter((template) => template.id !== primaryTemplate.id)
     : [];
+  const templateAssetMode = currentUser?.plan === "team" ? "team asset" : "workspace asset";
+  const templateLaneTitle =
+    currentUser?.plan === "team"
+      ? "Step 2B: Review shared rollout assets"
+      : "Step 2B: Review reusable rollout setups";
+  const primaryTemplateAssetState = primaryTemplate
+    ? buildTemplateAssetState(primaryTemplate)
+    : null;
+  const templateLaneGuideItems = [
+    {
+      label: "1. Review asset",
+      value: primaryTemplate?.template_name || "Choose one template",
+      detail:
+        "Keep one saved setup in focus first so the next operator can verify server, ports, and reuse history before deploying it again.",
+    },
+    {
+      label: "2. Reuse stable setup",
+      value: primaryTemplateAssetState?.label || "No asset yet",
+      detail:
+        "Deploy directly from the focused template only when it still looks like the right baseline for this rollout.",
+    },
+    {
+      label: "3. Edit or duplicate",
+      value: currentUser?.plan === "team" ? "Protect the baseline" : "Keep changes deliberate",
+      detail:
+        "Edit when the shared setup should change for everyone. Duplicate first when one client or one handoff needs a variant.",
+    },
+    {
+      label: "4. Delete last",
+      value: templates.length > 0 ? `${templates.length} saved` : "None saved",
+      detail:
+        "Delete only after you are sure the setup is no longer part of the current handoff path.",
+    },
+  ];
   const workflowState = buildDeploymentWorkflowState({
     isAdmin: canAccessServers,
     localDeploymentsEnabled,
@@ -609,8 +918,8 @@ function DeploymentWorkflowPageContent() {
       : workflowState.mode === "live"
         ? "One rollout needs attention. Review what is already running before you start another one."
         : templates.length > 0
-          ? "You can start from a blank form or reuse one saved setup."
-          : "This page is where you choose one app image and start it.";
+          ? "You can start from one app image, one compose stack intake, or one saved setup."
+          : "This page is where you choose one app image or bring one compose stack.";
   const workflowPrimaryMode = workflowState.mode === "live" ? "live" : "create";
   const primaryRuntimeDeployment =
     filteredDeployments.find((deployment) => deployment.status === "failed") ||
@@ -638,6 +947,8 @@ function DeploymentWorkflowPageContent() {
   const rolloutDraftHasEnvRows = envRows.some((row) => row.key.trim() || row.value.trim());
   const selectedCreateServer =
     servers.find((server) => server.id === form.server_id) || null;
+  const selectedStackServer =
+    servers.find((server) => server.id === stackDraft.server_id) || null;
   const selectedServerLabel = selectedCreateServer
     ? formatServerLabel(selectedCreateServer.name, selectedCreateServer.host)
     : "";
@@ -647,14 +958,14 @@ function DeploymentWorkflowPageContent() {
       ? `Step 1 is done on ${selectedServerLabel}. Now choose one app to run on that server.`
       : workflowPriority;
   const stepTwoSupport = waitingForAdminTarget
-    ? "This page should not make you guess. Until the target is confirmed, the only real next step is asking an admin to finish Step 1."
+      ? "This page should not make you guess. Until the target is confirmed, the only real next step is asking an admin to finish Step 1."
     : serverAccessBlocked
       ? "Keep this page focused on the rollout itself. The saved server target stays with admins until they confirm it."
       : workflowState.mode === "prerequisite"
         ? "Do not overthink this page yet. Save one server in Step 1 first, then come back and keep Step 2 focused on the app you want to start."
       : workflowPrimaryMode === "live"
         ? "Because something already needs review, start by checking the live queue before you create another deployment."
-        : "Keep Step 2 simple: choose an app image or a saved setup first, then open advanced fields only if the rollout really needs them.";
+        : "Keep Step 2 simple: choose one app image, a compose stack intake, or a saved setup first, then open advanced fields only if the rollout really needs them.";
   const firstDeployHandoffSummary =
     selectedCreateServer && requestedWithServerContext
       ? requestedFromOverview
@@ -975,7 +1286,9 @@ function DeploymentWorkflowPageContent() {
       return;
     }
 
-    setWorkflowMessage("Template opened from deployment detail. Review, reuse, or edit it here in the main rollout workspace.");
+    setWorkflowMessage(
+      "Template opened from deployment detail as a reusable handoff asset. Review it here, reuse it as-is, or edit a deliberate variant in the main rollout workspace.",
+    );
   }, [requestedTemplateSource]);
 
   useEffect(() => {
@@ -1036,8 +1349,8 @@ function DeploymentWorkflowPageContent() {
     if (requestedTemplateSource === "deployment-detail") {
       setWorkflowMessage(
         requestedTemplateAction === "edit"
-          ? `Template "${targetTemplate.template_name}" opened from deployment detail and loaded into the form for editing.`
-          : `Template "${targetTemplate.template_name}" opened from deployment detail. Review, reuse, or edit it here.`,
+          ? `Template "${targetTemplate.template_name}" opened from deployment detail and loaded as a handoff asset for editing.`
+          : `Template "${targetTemplate.template_name}" opened from deployment detail as a handoff asset. Review it, reuse it, or edit a deliberate variant here.`,
       );
     }
   }, [requestedTemplateAction, requestedTemplateId, requestedTemplateSource, templates]);
@@ -1070,6 +1383,16 @@ function DeploymentWorkflowPageContent() {
 
       return nextForm;
     });
+  }
+
+  function updateStackDraftField(event) {
+    const { name, value } = event.target;
+    setStackDraft((currentDraft) => ({
+      ...currentDraft,
+      [name]: value,
+    }));
+    setStackIntakeError("");
+    setStackIntakeSuccess("");
   }
 
   function useSuggestedPort(port) {
@@ -1460,7 +1783,9 @@ function DeploymentWorkflowPageContent() {
       });
       setEnvRows([{ key: "", value: "" }]);
       setWorkflowTab("live");
-      setSubmitSuccess("Deployment created. Open runtime detail next while this rollout is still fresh.");
+      setSubmitSuccess(
+        "Deployment created. Open deployment passport next while this rollout is still fresh.",
+      );
       await refreshWorkspace();
     } catch (requestError) {
       if (requestError instanceof Error && requestError.status === 401) {
@@ -1731,7 +2056,7 @@ function DeploymentWorkflowPageContent() {
       const data = await readJsonOrError(response, "Failed to deploy from template.");
       setTemplateCreatedDeployment(data);
       setTemplateDeploySuccess(
-        "Deployment created from template. Open runtime detail next while this rollout is still fresh.",
+        "Deployment created from template. Open deployment passport next while this rollout is still fresh.",
       );
       await refreshWorkspace();
     } catch (requestError) {
@@ -1759,11 +2084,116 @@ function DeploymentWorkflowPageContent() {
     }
   }
 
+  async function handleCopyStackIntakeSummary() {
+    if (!composeIntakeSummary) {
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(composeIntakeSummary);
+      setStackIntakeSuccess("Compose stack intake summary copied.");
+      setStackIntakeError("");
+    } catch {
+      setStackIntakeError("Failed to copy compose stack intake summary.");
+      setStackIntakeSuccess("");
+    }
+  }
+
+  async function handleStackDeploy() {
+    setStackSubmitting(true);
+    setStackIntakeError("");
+    setStackIntakeSuccess("");
+    setSubmitError("");
+    setSubmitSuccess("");
+    setCreatedDeployment(null);
+
+    const validation = buildComposeIntakeValidation(stackDraft, {
+      localDeploymentsEnabled,
+      canAccessServers,
+    });
+
+    if (validation.errors.length > 0) {
+      setStackIntakeError(validation.errors[0]);
+      setStackSubmitting(false);
+      return;
+    }
+
+    if (
+      validation.warnings.length > 0 &&
+      !window.confirm(`${validation.warnings.join("\n")}\n\nDeploy stack anyway?`)
+    ) {
+      setStackSubmitting(false);
+      return;
+    }
+
+    const payload = {
+      stack_name: stackDraft.stack_name.trim(),
+      primary_service: stackDraft.primary_service.trim(),
+      health_target: stackDraft.health_target.trim(),
+      compose_yaml: stackDraft.compose_yaml,
+    };
+
+    if (stackDraft.server_id) {
+      payload.server_id = stackDraft.server_id;
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/deployments/stack`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      const data = await readJsonOrError(response, "Failed to deploy stack.");
+
+      setCreatedDeployment(data);
+      setSubmitSuccess(
+        "Stack deployment created. Open deployment passport next while the primary service is still fresh.",
+      );
+      setStackIntakeSuccess("Compose stack deployed as one runtime unit.");
+      setStackDraft({
+        stack_name: "",
+        primary_service: "",
+        health_target: "",
+        compose_yaml: "",
+        server_id: stackDraft.server_id,
+      });
+      await refreshWorkspace();
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      setStackIntakeError(
+        requestError instanceof Error
+          ? normalizeCreateDeploymentError(requestError.message)
+          : "Failed to deploy stack. Please try again.",
+      );
+    } finally {
+      setStackSubmitting(false);
+    }
+  }
+
   const currentDraft = buildCurrentDraft();
   const templateFormPreflight = validateTemplateDraft(currentDraft, {
     ignoreTemplateId: editingTemplateId,
     canAccessServers,
   });
+  const composeDraftStarted = Boolean(
+    stackDraft.stack_name.trim() ||
+      stackDraft.primary_service.trim() ||
+      stackDraft.health_target.trim() ||
+      stackDraft.compose_yaml.trim(),
+  );
+  const composeIntakeValidation = buildComposeIntakeValidation(stackDraft, {
+    localDeploymentsEnabled,
+    canAccessServers,
+  });
+  const composeIntakeState = buildComposeIntakeState(stackDraft, composeIntakeValidation);
+  const composeIntakeSummary = buildComposeIntakeSummary(stackDraft, composeIntakeValidation);
   const rolloutDraftStarted = Boolean(
     form.image.trim() ||
       form.name.trim() ||
@@ -1797,6 +2227,10 @@ function DeploymentWorkflowPageContent() {
     submitting ||
     deploymentLimitReached ||
     (!localDeploymentsEnabled && !form.server_id);
+  const stackDeploymentBlocked =
+    stackSubmitting ||
+    deploymentLimitReached ||
+    composeIntakeValidation.errors.length > 0;
   const workflowNextStep = buildDeploymentWorkflowNextStep({
     workflowState,
     localDeploymentsEnabled,
@@ -2006,7 +2440,7 @@ function DeploymentWorkflowPageContent() {
             <div className="sectionHeader workspaceGuideHeader">
               <div>
                 <h2 data-testid="deployment-workflow-member-live-title">
-                  Review live apps with admin-managed targets
+                  Review live deployments with admin-managed targets
                 </h2>
                 <p className="formHint">
                   Existing deployments can be reviewed here. Creating new remote deployments and choosing saved server targets stay with admins.
@@ -2137,6 +2571,14 @@ function DeploymentWorkflowPageContent() {
           ) : null}
           {!serverAccessBlocked ? (
             <div
+              className="banner subtle inlineBanner"
+              data-testid="deployment-workflow-stack-intake-note"
+            >
+              Need more than one container? Open the compose stack tab and define one primary service, one health target, and one rollback unit before stack deploy work begins.
+            </div>
+          ) : null}
+          {!serverAccessBlocked ? (
+            <div
               className="filterTabs"
               role="tablist"
               aria-label="Deployment workflow tabs"
@@ -2159,6 +2601,14 @@ function DeploymentWorkflowPageContent() {
                 data-testid="deployment-workflow-tab-create"
               >
                 Start with image
+              </button>
+              <button
+                type="button"
+                className={workflowTab === "stack" ? "active" : ""}
+                onClick={() => setWorkflowTab("stack")}
+                data-testid="deployment-workflow-tab-stack"
+              >
+                Bring compose stack
               </button>
               <button
                 type="button"
@@ -2325,8 +2775,8 @@ function DeploymentWorkflowPageContent() {
                   <strong>{primaryRuntimeDeployment.image || "N/A"}</strong>
                 </div>
                 <div className="deploymentMetric">
-                  <span>Endpoint</span>
-                  <strong>{buildDeploymentUrl(primaryRuntimeDeployment) || "Internal only"}</strong>
+                  <span>{primaryRuntimeActionState?.endpointLabel || "Endpoint"}</span>
+                  <strong>{primaryRuntimeActionState?.runtimeUrl || primaryRuntimeActionState?.emptyEndpointLabel || "Internal only"}</strong>
                 </div>
                 <div className="deploymentMetric">
                   <span>Ports</span>
@@ -2354,7 +2804,7 @@ function DeploymentWorkflowPageContent() {
                     className={primaryRuntimeActionState.openAppClassName}
                     data-testid={`runtime-deployment-open-app-link-${primaryRuntimeDeployment.id}`}
                   >
-                    Open app
+                    {primaryRuntimeActionState.openActionLabel}
                   </a>
                 ) : null}
                 <Link
@@ -2372,7 +2822,7 @@ function DeploymentWorkflowPageContent() {
                     className={primaryRuntimeActionState.openAppClassName}
                     data-testid={`runtime-deployment-open-app-link-${primaryRuntimeDeployment.id}`}
                   >
-                    Open app
+                    {primaryRuntimeActionState.openActionLabel}
                   </a>
                 ) : null}
                 {primaryRuntimeDeployment.status === "failed" ? (
@@ -2421,8 +2871,8 @@ function DeploymentWorkflowPageContent() {
                         </span>
                       </div>
                       <div className="row">
-                        <span className="label">Endpoint</span>
-                        <span>{runtimeActionState.runtimeUrl || "Internal only"}</span>
+                        <span className="label">{runtimeActionState.endpointLabel}</span>
+                        <span>{runtimeActionState.runtimeUrl || runtimeActionState.emptyEndpointLabel}</span>
                       </div>
                       <div className="row">
                         <span className="label">Created</span>
@@ -2437,7 +2887,7 @@ function DeploymentWorkflowPageContent() {
                             className={runtimeActionState.openAppClassName}
                             data-testid={`runtime-deployment-open-app-link-${deployment.id}`}
                           >
-                            Open app
+                            {runtimeActionState.openActionLabel}
                           </a>
                         ) : null}
                         <Link
@@ -2455,7 +2905,7 @@ function DeploymentWorkflowPageContent() {
                             className={runtimeActionState.openAppClassName}
                             data-testid={`runtime-deployment-open-app-link-${deployment.id}`}
                           >
-                            Open app
+                            {runtimeActionState.openActionLabel}
                           </a>
                         ) : null}
                       </div>
@@ -2467,6 +2917,241 @@ function DeploymentWorkflowPageContent() {
           ) : null}
         </div>
         </section>
+
+        {!serverAccessBlocked ? (
+        <section hidden={workflowTab !== "stack"}>
+        <article className="card formCard" data-testid="stack-intake-card" id="stack-intake">
+          <div className="sectionHeader">
+            <div>
+              <h2 data-testid="stack-intake-title">Step 2C: Bring a compose stack</h2>
+              <p className="formHint">
+                Use this lane when one workload is no longer a single container. This v0 path deploys one compose stack as one runtime with one primary service and one health target.
+              </p>
+            </div>
+          </div>
+          {workflowState.mode === "prerequisite" ? (
+            <div className="banner subtle" data-testid="stack-intake-prerequisite-banner">
+              Save one server target in Step 1 first if this stack needs a remote host. Then return here and keep the stack intake as one clear runtime shape.
+            </div>
+          ) : null}
+          <div className="workspaceReviewerGrid" data-testid="stack-intake-subset-grid">
+            <article className="workspaceReviewerCard">
+              <span>Supported v0 subset</span>
+              <strong>One compose file</strong>
+              <p>Start from one pasted compose YAML file instead of multiple overrides or generated fragments.</p>
+            </article>
+            <article className="workspaceReviewerCard">
+              <span>Primary service</span>
+              <strong>One user-facing owner</strong>
+              <p>Pick the service that should represent the stack in health, rollout review, and the future runtime detail.</p>
+            </article>
+            <article className="workspaceReviewerCard">
+              <span>Health + rollback</span>
+              <strong>One stack unit</strong>
+              <p>Choose one health target now so the whole stack can later behave like one runtime and one rollback decision.</p>
+            </article>
+          </div>
+
+          <form className="form" onSubmit={(event) => event.preventDefault()}>
+            {canAccessServers ? (
+              <label className="field">
+                <span>Server</span>
+                <select
+                  name="server_id"
+                  value={stackDraft.server_id}
+                  onChange={updateStackDraftField}
+                  disabled={stackSubmitting}
+                  data-testid="stack-intake-server-select"
+                >
+                  <option value="">
+                    {localDeploymentsEnabled ? "Local" : "Choose remote server"}
+                  </option>
+                  {servers.map((server) => (
+                    <option key={server.id} value={server.id}>
+                      {server.name} ({server.host})
+                    </option>
+                  ))}
+                </select>
+                <span className="fieldHint">
+                  {selectedStackServer
+                    ? `Stack deploy will target ${selectedStackServer.name} (${selectedStackServer.host}).`
+                    : localDeploymentsEnabled
+                      ? "Leave this empty only when the stack should run on the local Docker host."
+                      : "Choose the remote server that should own this stack runtime."}
+                </span>
+              </label>
+            ) : null}
+
+            <label className="field">
+              <span>Stack name</span>
+              <input
+                name="stack_name"
+                value={stackDraft.stack_name}
+                onChange={updateStackDraftField}
+                placeholder="customer-portal"
+                disabled={stackSubmitting}
+                data-testid="stack-intake-name-input"
+              />
+            </label>
+
+            <label className="field">
+              <span>Primary service</span>
+              <input
+                name="primary_service"
+                value={stackDraft.primary_service}
+                onChange={updateStackDraftField}
+                placeholder="web"
+                disabled={stackSubmitting}
+                data-testid="stack-intake-primary-service-input"
+              />
+              <span className="fieldHint">
+                This should be the service operators think about first when the stack needs review, health checks, or rollback.
+              </span>
+            </label>
+
+            <label className="field">
+              <span>Health target</span>
+              <input
+                name="health_target"
+                value={stackDraft.health_target}
+                onChange={updateStackDraftField}
+                placeholder="https://app.example.com/health"
+                disabled={stackSubmitting}
+                data-testid="stack-intake-health-target-input"
+              />
+              <span className="fieldHint">
+                Use one full http(s) URL that should answer whether the primary service is healthy enough for the whole stack.
+              </span>
+            </label>
+
+            <label className="field">
+              <span>Compose file</span>
+              <textarea
+                name="compose_yaml"
+                value={stackDraft.compose_yaml}
+                onChange={updateStackDraftField}
+                placeholder={"services:\n  web:\n    image: ghcr.io/acme/web:latest\n  worker:\n    image: ghcr.io/acme/worker:latest"}
+                rows={12}
+                disabled={stackSubmitting}
+                data-testid="stack-intake-compose-input"
+              />
+              <span className="fieldHint">
+                Paste one compose YAML file. This v0 intake is strongest with image-based services and one obvious primary service.
+              </span>
+            </label>
+          </form>
+
+          <article className="card compactCard" data-testid="stack-intake-readiness-card">
+            <div className="sectionHeader">
+              <div>
+                <h3 data-testid="stack-intake-readiness-title">Current stack intake review</h3>
+                <p className="formHint">
+                  Keep this review narrow: does DeployMate understand the stack as one runtime with one primary service and one health target?
+                </p>
+              </div>
+            </div>
+            <div className="row">
+              <span className="label">State</span>
+              <span className={`status ${composeIntakeState.tone}`} data-testid="stack-intake-readiness-state">
+                {composeIntakeState.label}
+              </span>
+            </div>
+            <div className="row">
+              <span className="label">Focus</span>
+              <span data-testid="stack-intake-readiness-focus">{composeIntakeState.focus}</span>
+            </div>
+            <div className="row">
+              <span className="label">Why</span>
+              <span data-testid="stack-intake-readiness-why">{composeIntakeState.why}</span>
+            </div>
+            <div className="row">
+              <span className="label">What to do</span>
+              <span data-testid="stack-intake-readiness-next-step">{composeIntakeState.nextStep}</span>
+            </div>
+            <div className="backupSummaryBadges">
+              <span className={`status ${composeIntakeState.tone}`}>services {composeIntakeValidation.serviceNames.length}</span>
+              <span className="status error">errors {composeDraftStarted ? composeIntakeValidation.errors.length : 0}</span>
+              <span className="status warn">warnings {composeIntakeValidation.warnings.length}</span>
+            </div>
+          </article>
+
+          {composeDraftStarted && composeIntakeValidation.errors.length > 0 ? (
+            <div className="banner error" data-testid="stack-intake-error-banner">
+              {composeIntakeValidation.errors[0]}
+            </div>
+          ) : null}
+          {composeIntakeValidation.warnings.length > 0 ? (
+            <div className="banner subtle" data-testid="stack-intake-warning-banner">
+              {composeIntakeValidation.warnings.join(" ")}
+            </div>
+          ) : null}
+          {composeIntakeSummary ? (
+            <pre className="logs expandedBlock" data-testid="stack-intake-summary">
+              {composeIntakeSummary}
+            </pre>
+          ) : null}
+          <div className="formActions">
+            <button
+              type="button"
+              className="landingButton primaryButton"
+              onClick={handleStackDeploy}
+              disabled={stackDeploymentBlocked}
+              data-testid="stack-intake-deploy-button"
+            >
+              {stackSubmitting ? "Deploying stack..." : "Deploy stack"}
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={handleCopyStackIntakeSummary}
+              disabled={!composeIntakeSummary || stackSubmitting}
+              data-testid="stack-intake-copy-button"
+            >
+              Copy stack intake summary
+            </button>
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={() => setWorkflowTab("create")}
+              disabled={stackSubmitting}
+              data-testid="stack-intake-switch-create-button"
+            >
+              Use single-app form instead
+            </button>
+          </div>
+          {stackIntakeError ? (
+            <div className="banner error" data-testid="stack-intake-submit-error-banner">
+              {stackIntakeError}
+            </div>
+          ) : null}
+          {stackIntakeSuccess ? (
+            <div className="banner success" data-testid="stack-intake-submit-success-banner">
+              <div>{stackIntakeSuccess}</div>
+              {submitSuccess ? <div className="formHint">{submitSuccess}</div> : null}
+              {createdDeployment?.id ? (
+                <div className="successActions">
+                  <Link
+                    href={`/deployments/${createdDeployment.id}?source=workflow-success#runtime-detail-passport`}
+                    className="landingButton primaryButton"
+                    data-testid="stack-intake-success-open-detail-link"
+                  >
+                    Open deployment passport
+                  </Link>
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => setWorkflowTab("live")}
+                    data-testid="stack-intake-success-open-live-button"
+                  >
+                    Review live queue
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </article>
+        </section>
+        ) : null}
 
         {!serverAccessBlocked ? (
         <section hidden={workflowTab !== "create"}>
@@ -2849,11 +3534,11 @@ function DeploymentWorkflowPageContent() {
                 <div className="successActions">
                   {createdDeployment?.id ? (
                     <Link
-                      href={`/deployments/${createdDeployment.id}?source=workflow-success`}
+                      href={`/deployments/${createdDeployment.id}?source=workflow-success#runtime-detail-passport`}
                       className="landingButton primaryButton"
                       data-testid="create-deployment-success-open-detail-link"
                     >
-                      Open runtime detail
+                      Open deployment passport
                     </Link>
                   ) : null}
                   {buildDeploymentUrl(createdDeployment) ? (
@@ -2917,12 +3602,32 @@ function DeploymentWorkflowPageContent() {
         <article className="card formCard" data-testid="templates-card" id="templates">
           <div className="sectionHeader" data-testid="templates-section-header">
             <div>
-              <h2 data-testid="templates-section-title">Step 2B: Reuse a saved setup</h2>
+              <h2 data-testid="templates-section-title">{templateLaneTitle}</h2>
               <p className="formHint">
-                A template is just a saved rollout setup. Reuse one when you do not want to fill the whole form again.
+                Templates are reusable {templateAssetMode}s for this workflow. Review one, reuse it as-is, edit the baseline deliberately, or duplicate it before client-specific changes.
               </p>
             </div>
           </div>
+
+          <article className="card compactCard runtimeReviewPanel" data-testid="templates-team-asset-card">
+            <div className="sectionHeader">
+              <div>
+                <h3 data-testid="templates-team-asset-title">Treat templates as reusable handoff assets</h3>
+                <p className="formHint">
+                  The goal here is not just faster form fill. The next operator should be able to see which setup is still trusted, how recently it was reused, and whether a change belongs in the baseline or in a duplicate.
+                </p>
+              </div>
+            </div>
+            <div className="workspaceReviewerGrid runtimeReviewGrid">
+              {templateLaneGuideItems.map((item) => (
+                <article key={item.label} className="workspaceReviewerCard">
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                  <p>{item.detail}</p>
+                </article>
+              ))}
+            </div>
+          </article>
 
           <div
             className="filterTabs historyFilters"
@@ -2990,7 +3695,7 @@ function DeploymentWorkflowPageContent() {
                 <div>
                   <h3 data-testid="template-preview-title">Focus template</h3>
                   <p className="formHint">
-                    Keep one template in focus while the rest stay in a compact queue below.
+                    Keep one {templateAssetMode} in focus while the rest stay in a compact queue below.
                   </p>
                 </div>
               </div>
@@ -3013,6 +3718,21 @@ function DeploymentWorkflowPageContent() {
               <div className="row">
                 <span className="label">Used</span>
                 <span>{primaryTemplate.use_count || 0}</span>
+              </div>
+              <div className="row">
+                <span className="label">State</span>
+                <span data-testid="template-preview-asset-state">{buildTemplateAssetState(primaryTemplate).label}</span>
+              </div>
+              <div className="row">
+                <span className="label">Last used</span>
+                <span>{primaryTemplate.last_used_at ? formatDate(primaryTemplate.last_used_at) : "Not reused yet"}</span>
+              </div>
+              <div className="row">
+                <span className="label">Created</span>
+                <span>{formatDate(primaryTemplate.created_at)}</span>
+              </div>
+              <div className="banner subtle" data-testid="template-preview-asset-banner">
+                {buildTemplateAssetState(primaryTemplate).detail}
               </div>
               {previewDiffRows.length === 0 ? (
                 <div className="banner subtle" data-testid="template-preview-match-banner">
@@ -3041,21 +3761,21 @@ function DeploymentWorkflowPageContent() {
                   }
                   data-testid={`template-preview-button-${primaryTemplate.id}`}
                 >
-                  {templatePreviewId === primaryTemplate.id ? "Hide preview" : "Focus"}
+                  {templatePreviewId === primaryTemplate.id ? "Hide review" : "Review asset"}
                 </button>
                 <button
                   type="button"
                   onClick={() => applyTemplateToForm(primaryTemplate)}
                   data-testid="template-preview-apply-button"
                 >
-                  Apply to form
+                  Load into create form
                 </button>
                 <button
                   type="button"
                   onClick={() => applyTemplateToForm(primaryTemplate, { startEditing: true })}
                   data-testid="template-preview-edit-button"
                 >
-                  Edit in form
+                  Edit baseline in form
                 </button>
                 <button
                   type="button"
@@ -3063,7 +3783,7 @@ function DeploymentWorkflowPageContent() {
                   disabled={deployingTemplateId === primaryTemplate.id || deploymentLimitReached}
                   data-testid="template-preview-deploy-button"
                 >
-                  {deployingTemplateId === primaryTemplate.id ? "Deploying..." : "Deploy from preview"}
+                  {deployingTemplateId === primaryTemplate.id ? "Deploying..." : "Deploy shared setup"}
                 </button>
                 <button
                   type="button"
@@ -3071,14 +3791,14 @@ function DeploymentWorkflowPageContent() {
                   disabled={deployingTemplateId === primaryTemplate.id || deploymentLimitReached}
                   data-testid={`template-deploy-button-${primaryTemplate.id}`}
                 >
-                  {deployingTemplateId === primaryTemplate.id ? "Deploying..." : "Deploy now"}
+                  {deployingTemplateId === primaryTemplate.id ? "Deploying..." : "Deploy shared setup"}
                 </button>
                 <button
                   type="button"
                   onClick={() => applyTemplateToForm(primaryTemplate, { startEditing: true })}
                   data-testid={`template-edit-button-${primaryTemplate.id}`}
                 >
-                  Edit in form
+                  Edit baseline
                 </button>
                 <button
                   type="button"
@@ -3086,7 +3806,7 @@ function DeploymentWorkflowPageContent() {
                   disabled={duplicatingTemplateId === primaryTemplate.id}
                   data-testid={`template-duplicate-button-${primaryTemplate.id}`}
                 >
-                  {duplicatingTemplateId === primaryTemplate.id ? "Duplicating..." : "Duplicate"}
+                  {duplicatingTemplateId === primaryTemplate.id ? "Duplicating..." : "Duplicate for variant"}
                 </button>
                 <button
                   type="button"
@@ -3121,13 +3841,17 @@ function DeploymentWorkflowPageContent() {
                     <span className="label">Used</span>
                     <span>{template.use_count || 0}</span>
                   </div>
+                  <div className="row">
+                    <span className="label">Last used</span>
+                    <span>{template.last_used_at ? formatDate(template.last_used_at) : "Not reused yet"}</span>
+                  </div>
                   <div className="actions">
                     <button
                       type="button"
                       onClick={() => setTemplatePreviewId(template.id)}
                       data-testid={`template-preview-button-${template.id}`}
                     >
-                      Focus
+                      Review asset
                     </button>
                     <button
                       type="button"
@@ -3135,14 +3859,14 @@ function DeploymentWorkflowPageContent() {
                       disabled={deployingTemplateId === template.id || deploymentLimitReached}
                       data-testid={`template-deploy-button-${template.id}`}
                     >
-                      {deployingTemplateId === template.id ? "Deploying..." : "Deploy now"}
+                      {deployingTemplateId === template.id ? "Deploying..." : "Deploy shared setup"}
                     </button>
                     <button
                       type="button"
                       onClick={() => applyTemplateToForm(template, { startEditing: true })}
                       data-testid={`template-edit-button-${template.id}`}
                     >
-                      Edit in form
+                      Edit baseline
                     </button>
                     <button
                       type="button"
@@ -3150,7 +3874,7 @@ function DeploymentWorkflowPageContent() {
                       disabled={duplicatingTemplateId === template.id}
                       data-testid={`template-duplicate-button-${template.id}`}
                     >
-                      {duplicatingTemplateId === template.id ? "Duplicating..." : "Duplicate"}
+                      {duplicatingTemplateId === template.id ? "Duplicating..." : "Duplicate for variant"}
                     </button>
                     <button
                       type="button"
@@ -3176,11 +3900,11 @@ function DeploymentWorkflowPageContent() {
                 <div className="successActions">
                   {templateCreatedDeployment?.id ? (
                     <Link
-                      href={`/deployments/${templateCreatedDeployment.id}?source=workflow-success`}
+                      href={`/deployments/${templateCreatedDeployment.id}?source=workflow-success#runtime-detail-passport`}
                       className="landingButton primaryButton"
                       data-testid="template-deploy-success-open-detail-link"
                     >
-                      Open runtime detail
+                      Open deployment passport
                     </Link>
                   ) : null}
                   {buildDeploymentUrl(templateCreatedDeployment) ? (

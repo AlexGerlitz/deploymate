@@ -15,6 +15,7 @@ KEEP_ALIVE_ON_EXIT="${FRONTEND_SMOKE_KEEP_ALIVE_ON_EXIT:-0}"
 SERVER_REGISTRY_DIR="${FRONTEND_SMOKE_REGISTRY_DIR:-$(automation_frontend_smoke_registry_dir)}"
 FRONTEND_DIR="$(automation_frontend_dir)"
 FRONTEND_READY_PATH="$(automation_frontend_ready_path)"
+GOOGLE_FONT_MOCK_RESPONSES="${NEXT_FONT_GOOGLE_MOCKED_RESPONSES:-$SCRIPT_DIR/font_google_mock_responses.cjs}"
 
 frontend_smoke_server_key() {
   printf '%s\n' "port-${PORT}_dist-${DIST_DIR}_restore-${NEXT_PUBLIC_SMOKE_RESTORE_REPORT:-0}_role-${NEXT_PUBLIC_SMOKE_USER_ROLE:-admin}" | tr '/ :' '___'
@@ -114,6 +115,40 @@ frontend_smoke_clear_state() {
   rm -f "$state_file"
 }
 
+frontend_smoke_assert_loopback_bind() {
+  local bind_port="${1:-$PORT}"
+  local preflight_output=""
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if preflight_output="$(
+    python3 - "$bind_port" <<'PY' 2>&1
+import socket
+import sys
+
+port = int(sys.argv[1])
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+try:
+    sock.bind(("127.0.0.1", port))
+except OSError as exc:
+    print(f"{exc.__class__.__name__}: {exc}")
+    raise SystemExit(exc.errno or 1)
+finally:
+    sock.close()
+PY
+  )"; then
+    return 0
+  fi
+
+  echo "[frontend-smoke] loopback bind preflight failed for 127.0.0.1:${bind_port}" >&2
+  echo "[frontend-smoke] local smoke cannot start until this machine allows listening sockets" >&2
+  printf '%s\n' "$preflight_output" >&2
+  return 1
+}
+
 start_frontend_smoke_server() {
   local state_file=""
 
@@ -133,6 +168,7 @@ start_frontend_smoke_server() {
       return 0
     fi
     frontend_smoke_clear_state
+    NEXT_FONT_GOOGLE_MOCKED_RESPONSES="$GOOGLE_FONT_MOCK_RESPONSES" \
     python3 "$SCRIPT_DIR/frontend_smoke_daemon.py" start \
       --state-file "$state_file" \
       --frontend-dir "$FRONTEND_DIR" \
@@ -143,8 +179,10 @@ start_frontend_smoke_server() {
     frontend_smoke_load_state
     FRONTEND_SMOKE_SERVER_PID="${FRONTEND_SMOKE_SERVER_PID:-}"
   else
+    frontend_smoke_assert_loopback_bind "$PORT"
     NEXT_PUBLIC_SMOKE_TEST_MODE=1 \
       NEXT_PUBLIC_SMOKE_RESTORE_REPORT="${NEXT_PUBLIC_SMOKE_RESTORE_REPORT:-}" \
+      NEXT_FONT_GOOGLE_MOCKED_RESPONSES="$GOOGLE_FONT_MOCK_RESPONSES" \
       NEXT_DIST_DIR="$DIST_DIR" \
       bash -lc "cd \"$FRONTEND_DIR\" && exec npm run dev -- --hostname 127.0.0.1 --port \"$PORT\"" >"$SERVER_LOG" 2>&1 &
     FRONTEND_SMOKE_SERVER_PID=$!

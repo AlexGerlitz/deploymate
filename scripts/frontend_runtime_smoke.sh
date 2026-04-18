@@ -8,6 +8,7 @@ SERVER_LOG="${FRONTEND_SMOKE_LOG:-/tmp/deploymate-frontend-runtime-smoke.log}"
 DIST_DIR="${FRONTEND_SMOKE_DIST_DIR:-.next-smoke-${PORT}}"
 APP_HTML="$(mktemp)"
 DETAIL_HTML="$(mktemp)"
+STACK_DETAIL_HTML="$(mktemp)"
 FRESH_DETAIL_HTML="$(mktemp)"
 FAILED_DETAIL_HTML="$(mktemp)"
 HEALTHY_WORKFLOW_HTML="$(mktemp)"
@@ -28,7 +29,7 @@ cleanup() {
   if [ "${FRONTEND_SMOKE_REUSE_SERVER:-0}" != "1" ]; then
     stop_frontend_smoke_server
   fi
-  rm -f "$APP_HTML" "$DETAIL_HTML" "$FRESH_DETAIL_HTML" "$FAILED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML" "$CREATE_SUCCESS_WORKFLOW_HTML"
+  rm -f "$APP_HTML" "$DETAIL_HTML" "$STACK_DETAIL_HTML" "$FRESH_DETAIL_HTML" "$FAILED_DETAIL_HTML" "$HEALTHY_WORKFLOW_HTML" "$FAILED_WORKFLOW_HTML" "$INTERNAL_DETAIL_HTML" "$INTERNAL_WORKFLOW_HTML" "$TEMPLATE_SUCCESS_WORKFLOW_HTML" "$CREATE_SUCCESS_WORKFLOW_HTML"
 }
 
 trap cleanup EXIT
@@ -51,6 +52,31 @@ if ! grep -Eq 'data-testid="runtime-detail-share-order-title"[^>]*>Share this ru
   exit 1
 fi
 
+if ! grep -Eq 'data-testid="runtime-detail-template-card"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail lost the template handoff card" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Save as reusable handoff asset<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail lost the reusable handoff template framing" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-rollback-card"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail lost the rollback review card" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-rollback-review-button"[^>]*>Review rollback<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail does not expose rollback review when a previous release snapshot exists" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-rollback-summary"[^>]*>nginx:1.26 via host port 38080 with 1 env var and 0 secrets<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail lost the saved rollback summary" >&2
+  exit 1
+fi
+
 if ! grep -Eq 'data-testid="runtime-detail-evidence-order-title"[^>]*>Read evidence in order<' "$DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] runtime detail lost the ordered evidence guidance" >&2
   exit 1
@@ -58,6 +84,62 @@ fi
 
 if grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Prepare rollout change<' "$DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] healthy runtime detail still makes rollout change the main next step" >&2
+  exit 1
+fi
+
+curl -sS "${BASE_URL}/deployments/smoke-stack-runtime" > "$STACK_DETAIL_HTML"
+if ! grep -Eq 'data-testid="runtime-detail-runtime-shape"[^>]*>stack<' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail lost the runtime shape summary" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-stack-name"[^>]*>customer-portal<' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail lost the stack identity" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-primary-service"[^>]*>web<' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail lost the primary service summary" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-health-target"[^>]*>https://customer-portal.example.com/health<' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail lost the saved health target" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-stack-change-note"' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail still lacks the guarded stack-change note" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-stack-template-banner"' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail still exposes the single-app template path" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-stack-webhook-note"' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail still lacks the guarded webhook note" >&2
+  exit 1
+fi
+
+if grep -Eq 'data-testid="runtime-detail-webhook-row"' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail still exposes the single-app release webhook controls" >&2
+  exit 1
+fi
+
+if ! grep -Eq '>Open health target<' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail no longer leads with the saved health target" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-review-target-link"[^>]*>https://customer-portal.example.com/health<' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail facts no longer expose the saved review endpoint link" >&2
+  exit 1
+fi
+
+if grep -Eq '>Prepare rollout change<' "$STACK_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] stack runtime detail still suggests the disabled single-app change flow as the next action" >&2
   exit 1
 fi
 
@@ -69,6 +151,16 @@ fi
 
 if ! grep -Eq 'Opened from deployment workflow: this rollout is still fresh\.' "$FRESH_DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] fresh rollout detail lost the explicit workflow-to-detail bridge copy" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-card"' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout detail lost the deployment passport card" >&2
+  exit 1
+fi
+
+if ! grep -Eq 'data-testid="runtime-detail-passport-title"[^>]*>Deployment passport<' "$FRESH_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] fresh rollout detail lost the deployment passport title" >&2
   exit 1
 fi
 
@@ -187,6 +279,11 @@ fi
 
   if ! grep -Eq '(<a[^>]*data-testid="runtime-deployment-details-link-smoke-deployment"[^>]*class="[^"]*secondaryButton[^"]*")|(<a[^>]*class="[^"]*secondaryButton[^"]*"[^>]*data-testid="runtime-deployment-details-link-smoke-deployment")' "$HEALTHY_WORKFLOW_HTML"; then
     echo "[frontend-runtime-smoke] healthy workflow does not keep detail review secondary after open app" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="runtime-deployment-open-app-link-smoke-stack-runtime"[^>]*>Open health target<' "$HEALTHY_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] healthy workflow no longer exposes the stack health target as the runtime review action" >&2
     exit 1
   fi
 )
@@ -313,18 +410,23 @@ fi
     exit 1
   fi
 
+  if ! grep -Eq 'data-testid="templates-team-asset-title"[^>]*>Treat templates as reusable handoff assets<' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] template workflow lost the reusable handoff asset framing" >&2
+    exit 1
+  fi
+
   if ! grep -Eq '(<a[^>]*data-testid="template-deploy-success-open-detail-link"[^>]*class="[^"]*landingButton primaryButton[^"]*")|(<a[^>]*class="[^"]*landingButton primaryButton[^"]*"[^>]*data-testid="template-deploy-success-open-detail-link")' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
     echo "[frontend-runtime-smoke] template deploy success does not make runtime detail the primary action" >&2
     exit 1
   fi
 
-  if ! grep -Eq 'data-testid="template-deploy-success-open-detail-link"[^>]*>Open runtime detail<' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
-    echo "[frontend-runtime-smoke] template deploy success lost the explicit runtime-detail action label" >&2
+  if ! grep -Eq 'data-testid="template-deploy-success-open-detail-link"[^>]*>Open deployment passport<' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] template deploy success lost the explicit deployment-passport action label" >&2
     exit 1
   fi
 
-  if ! grep -Eq '(<a[^>]*data-testid="template-deploy-success-open-detail-link"[^>]*href="/deployments/template-success-deployment\?source=workflow-success")|(<a[^>]*href="/deployments/template-success-deployment\?source=workflow-success"[^>]*data-testid="template-deploy-success-open-detail-link")' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
-    echo "[frontend-runtime-smoke] template deploy success detail link lost the workflow-success context" >&2
+  if ! grep -Eq '(<a[^>]*data-testid="template-deploy-success-open-detail-link"[^>]*href="/deployments/template-success-deployment\?source=workflow-success#runtime-detail-passport")|(<a[^>]*href="/deployments/template-success-deployment\?source=workflow-success#runtime-detail-passport"[^>]*data-testid="template-deploy-success-open-detail-link")' "$TEMPLATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] template deploy success passport link lost the workflow-success context" >&2
     exit 1
   fi
 
@@ -369,8 +471,13 @@ fi
     exit 1
   fi
 
-  if ! grep -Eq '(<a[^>]*data-testid="create-deployment-success-open-detail-link"[^>]*href="/deployments/fresh-success-deployment\?source=workflow-success")|(<a[^>]*href="/deployments/fresh-success-deployment\?source=workflow-success"[^>]*data-testid="create-deployment-success-open-detail-link")' "$CREATE_SUCCESS_WORKFLOW_HTML"; then
-    echo "[frontend-runtime-smoke] create success detail link lost the workflow-success context" >&2
+  if ! grep -Eq 'data-testid="create-deployment-success-open-detail-link"[^>]*>Open deployment passport<' "$CREATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] create success lost the explicit deployment-passport action label" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<a[^>]*data-testid="create-deployment-success-open-detail-link"[^>]*href="/deployments/fresh-success-deployment\?source=workflow-success#runtime-detail-passport")|(<a[^>]*href="/deployments/fresh-success-deployment\?source=workflow-success#runtime-detail-passport"[^>]*data-testid="create-deployment-success-open-detail-link")' "$CREATE_SUCCESS_WORKFLOW_HTML"; then
+    echo "[frontend-runtime-smoke] create success passport link lost the workflow-success context" >&2
     exit 1
   fi
 )

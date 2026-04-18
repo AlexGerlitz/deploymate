@@ -5,8 +5,18 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
-from app.schemas import DeploymentCreateRequest, DeploymentDeleteResponse, DeploymentResponse
-from app.services.deployments import build_container_name
+from app.schemas import (
+    DeploymentCreateRequest,
+    DeploymentDeleteResponse,
+    DeploymentResponse,
+    StackDeploymentCreateRequest,
+)
+from app.services.deployments import (
+    build_container_name,
+    extract_compose_services,
+    normalize_stack_health_target,
+    normalize_stack_name,
+)
 from app.services.secrets import apply_masked_secret_view
 
 
@@ -98,6 +108,25 @@ def describe_public_endpoint(custom_domain: str | None, tls_enabled: bool, exter
 
 
 def build_previous_release_snapshot(deployment: dict) -> dict[str, object]:
+    if deployment.get("runtime_shape") == "stack":
+        stack_name = deployment.get("stack_name") or deployment.get("id") or "unknown stack"
+        primary_service = deployment.get("primary_service") or deployment.get("container_name") or "unknown service"
+        health_target = deployment.get("health_target") or "no health target"
+        summary = (
+            f"{stack_name} via primary service {primary_service} "
+            f"with health target {health_target}"
+        )
+        return {
+            "image": deployment.get("image"),
+            "name": deployment.get("container_name"),
+            "stack_name": deployment.get("stack_name"),
+            "primary_service": deployment.get("primary_service"),
+            "health_target": deployment.get("health_target"),
+            "compose_yaml": deployment.get("compose_yaml"),
+            "runtime_shape": "stack",
+            "summary": summary,
+        }
+
     custom_domain = deployment.get("custom_domain")
     tls_enabled = bool(deployment.get("tls_enabled"))
     summary = (
@@ -214,9 +243,30 @@ def build_redeploy_start_message(
 
 
 def build_delete_start_message(deployment: dict, server: dict | None) -> str:
+    if deployment.get("runtime_shape") == "stack":
+        return (
+            f"Starting stack delete for {deployment['id']} "
+            f"({deployment.get('stack_name') or deployment.get('container_name') or 'unnamed stack'}) "
+            f"on {describe_runtime_target(server)}."
+        )
     return (
         f"Starting delete for {deployment['id']} on {describe_runtime_target(server)}. "
         f"Container {deployment.get('container_name') or deployment['id']} will be removed if it still exists."
+    )
+
+
+def build_stack_start_message(
+    payload: StackDeploymentCreateRequest,
+    server: dict | None,
+    primary_image: str,
+    release_metadata: dict | None,
+) -> str:
+    return (
+        f"Starting stack deployment for {payload.stack_name} on {describe_runtime_target(server)}. "
+        f"Primary service: {payload.primary_service}. "
+        f"Primary image: {primary_image}. "
+        f"Health target: {payload.health_target}. "
+        f"{summarize_release_trace(release_metadata)}"
     )
 
 
@@ -366,6 +416,233 @@ def create_deployment(
         level="success",
         title="Deployment succeeded",
         message=f"Deployment {deployment_id} is running in container {container_name}.",
+    )
+
+    saved_record = get_deployment_record_or_404_fn(deployment_id)
+    return DeploymentResponse(**apply_masked_secret_view(saved_record))
+
+
+def create_stack_deployment(
+    payload: StackDeploymentCreateRequest,
+    user,
+    *,
+    enforce_plan_limit_fn,
+    get_server_or_404_fn,
+    ensure_remote_server_access_allowed_fn,
+    ensure_runtime_target_allowed_fn,
+    ensure_docker_is_available_fn,
+    ensure_docker_compose_is_available_fn,
+    insert_deployment_record_fn,
+    update_deployment_record_fn,
+    update_deployment_configuration_fn,
+    create_notification_fn,
+    create_activity_event_fn,
+    get_deployment_record_or_404_fn,
+    run_compose_stack_up_fn,
+    get_stack_primary_container_fn,
+) -> DeploymentResponse:
+    enforce_plan_limit_fn(user, "deployments")
+    server = get_server_or_404_fn(payload.server_id) if payload.server_id else None
+    ensure_remote_server_access_allowed_fn(user, server)
+    ensure_runtime_target_allowed_fn(server)
+    ensure_docker_is_available_fn(server)
+    ensure_docker_compose_is_available_fn(server)
+
+    stack_name = normalize_stack_name(payload.stack_name)
+    health_target = normalize_stack_health_target(payload.health_target)
+    compose_services = extract_compose_services(payload.compose_yaml)
+    if not compose_services:
+        raise HTTPException(
+            status_code=400,
+            detail="Compose file must include a top-level services: block with at least one service.",
+        )
+    if payload.primary_service not in compose_services:
+        raise HTTPException(
+            status_code=400,
+            detail=f'Primary service "{payload.primary_service}" was not found in the compose services list.',
+        )
+
+    primary_image = compose_services[payload.primary_service].get("image") or f"compose:{stack_name}"
+    release_metadata = build_release_metadata(
+        image=primary_image,
+        source="compose",
+        triggered_by=user.get("username"),
+    )
+
+    deployment_id = str(uuid.uuid4())
+    deployment_record = {
+        "id": deployment_id,
+        "status": "pending",
+        "image": primary_image,
+        "container_name": f"{stack_name}-{payload.primary_service}",
+        "container_id": None,
+        "owner_user_id": user["id"],
+        "created_at": datetime.now(timezone.utc),
+        "error": None,
+        "internal_port": None,
+        "external_port": None,
+        "custom_domain": None,
+        "tls_enabled": health_target.startswith("https://"),
+        "previous_release_snapshot": None,
+        "server_id": payload.server_id,
+        "env": json.dumps({}),
+        "secrets": json.dumps({}),
+        "release_source": release_metadata["release_source"],
+        "runtime_shape": "stack",
+        "release_ref": release_metadata["release_ref"],
+        "release_commit_sha": release_metadata["release_commit_sha"],
+        "release_image_tag": release_metadata["release_image_tag"],
+        "release_image_digest": release_metadata["release_image_digest"],
+        "release_triggered_at": release_metadata["release_triggered_at"],
+        "release_triggered_by": release_metadata["release_triggered_by"],
+        "release_webhook_token": None,
+        "stack_name": stack_name,
+        "primary_service": payload.primary_service,
+        "health_target": health_target,
+        "compose_yaml": payload.compose_yaml,
+    }
+
+    insert_deployment_record_fn(deployment_record)
+    create_activity_event_fn(
+        deployment_id=deployment_id,
+        level="success",
+        title="Stack deployment started",
+        message=build_stack_start_message(
+            payload,
+            server,
+            primary_image,
+            release_metadata,
+        ),
+    )
+
+    result = run_compose_stack_up_fn(deployment_id, payload.compose_yaml, server)
+    if result.returncode != 0:
+        error_message = normalize_runtime_error(
+            result.stderr.strip() or result.stdout.strip(),
+            "Docker Compose deploy failed.",
+        )
+        update_deployment_record_fn(
+            deployment_id=deployment_id,
+            status="failed",
+            container_id=None,
+            error=error_message,
+        )
+        create_notification_fn(
+            deployment_id=deployment_id,
+            level="error",
+            title="Stack deployment failed",
+            message=f"Stack deployment {deployment_id} failed: {error_message}",
+        )
+        create_activity_event_fn(
+            deployment_id=deployment_id,
+            level="error",
+            title="Stack deployment failed",
+            message=(
+                f"Stack deployment {deployment_id} failed on {describe_runtime_target(server)}: "
+                f"{error_message}"
+            ),
+        )
+        saved_record = get_deployment_record_or_404_fn(deployment_id)
+        return DeploymentResponse(**apply_masked_secret_view(saved_record))
+
+    try:
+        container_id, container_name = get_stack_primary_container_fn(
+            deployment_id,
+            payload.primary_service,
+            server,
+        )
+    except HTTPException as exc:
+        error_message = normalize_runtime_error(exc.detail, "Failed to inspect the stack primary service.")
+        update_deployment_record_fn(
+            deployment_id=deployment_id,
+            status="failed",
+            container_id=None,
+            error=error_message,
+        )
+        create_notification_fn(
+            deployment_id=deployment_id,
+            level="error",
+            title="Stack deployment failed",
+            message=f"Stack deployment {deployment_id} failed: {error_message}",
+        )
+        create_activity_event_fn(
+            deployment_id=deployment_id,
+            level="error",
+            title="Stack deployment failed",
+            message=(
+                f"Stack deployment {deployment_id} started but the primary service could not be inspected "
+                f"on {describe_runtime_target(server)}: {error_message}"
+            ),
+        )
+        saved_record = get_deployment_record_or_404_fn(deployment_id)
+        return DeploymentResponse(**apply_masked_secret_view(saved_record))
+
+    update_deployment_configuration_fn(
+        deployment_id=deployment_id,
+        image=primary_image,
+        container_name=container_name,
+        internal_port=None,
+        external_port=None,
+        custom_domain=None,
+        tls_enabled=health_target.startswith("https://"),
+        env={},
+        secrets={},
+        release_source=str(release_metadata["release_source"]),
+        release_ref=(
+            str(release_metadata["release_ref"])
+            if release_metadata.get("release_ref")
+            else None
+        ),
+        release_commit_sha=(
+            str(release_metadata["release_commit_sha"])
+            if release_metadata.get("release_commit_sha")
+            else None
+        ),
+        release_image_tag=(
+            str(release_metadata["release_image_tag"])
+            if release_metadata.get("release_image_tag")
+            else None
+        ),
+        release_image_digest=(
+            str(release_metadata["release_image_digest"])
+            if release_metadata.get("release_image_digest")
+            else None
+        ),
+        release_triggered_at=release_metadata.get("release_triggered_at"),
+        release_triggered_by=(
+            str(release_metadata["release_triggered_by"])
+            if release_metadata.get("release_triggered_by")
+            else None
+        ),
+        stack_name=stack_name,
+        primary_service=payload.primary_service,
+        health_target=health_target,
+        compose_yaml=payload.compose_yaml,
+    )
+    update_deployment_record_fn(
+        deployment_id=deployment_id,
+        status="running",
+        container_id=container_id,
+        error=None,
+    )
+    create_notification_fn(
+        deployment_id=deployment_id,
+        level="success",
+        title="Stack deployment succeeded",
+        message=(
+            f"Stack deployment {deployment_id} is running with primary service "
+            f"{payload.primary_service} in container {container_name}."
+        ),
+    )
+    create_activity_event_fn(
+        deployment_id=deployment_id,
+        level="success",
+        title="Stack deployment succeeded",
+        message=(
+            f"Stack deployment {deployment_id} is running with primary service "
+            f"{payload.primary_service} in container {container_name}. "
+            f"{summarize_release_trace(release_metadata)}"
+        ),
     )
 
     saved_record = get_deployment_record_or_404_fn(deployment_id)
@@ -589,7 +866,9 @@ def delete_deployment(
     get_deployment_record_or_404_fn,
     get_server_or_404_fn,
     ensure_docker_is_available_fn,
+    ensure_docker_compose_is_available_fn,
     remove_container_if_exists_fn,
+    remove_stack_if_exists_fn,
     create_notification_fn,
     create_activity_event_fn,
     delete_deployment_record_fn,
@@ -597,6 +876,8 @@ def delete_deployment(
     deployment = get_deployment_record_or_404_fn(deployment_id)
     server = get_server_or_404_fn(deployment["server_id"]) if deployment.get("server_id") else None
     ensure_docker_is_available_fn(server)
+    if deployment.get("runtime_shape") == "stack":
+        ensure_docker_compose_is_available_fn(server)
     create_activity_event_fn(
         deployment_id=deployment_id,
         level="success",
@@ -604,7 +885,16 @@ def delete_deployment(
         message=build_delete_start_message(deployment, server),
     )
     try:
-        remove_container_if_exists_fn(deployment["container_name"], server)
+        if deployment.get("runtime_shape") == "stack":
+            result = remove_stack_if_exists_fn(deployment_id, server)
+            if result.returncode != 0:
+                error_message = normalize_runtime_error(
+                    result.stderr.strip() or result.stdout.strip(),
+                    "Failed to delete stack deployment.",
+                )
+                raise HTTPException(status_code=500, detail=error_message)
+        else:
+            remove_container_if_exists_fn(deployment["container_name"], server)
     except HTTPException as exc:
         error_message = normalize_runtime_error(exc.detail, "Failed to delete deployment.")
         create_notification_fn(

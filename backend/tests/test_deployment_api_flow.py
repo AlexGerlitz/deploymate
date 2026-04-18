@@ -30,10 +30,17 @@ class DeploymentApiFlowTests(unittest.TestCase):
             patch("app.main.init_db", return_value=None),
             patch("app.routes.deployments.enforce_plan_limit", return_value=None),
             patch("app.routes.deployments.ensure_docker_is_available", return_value=None),
+            patch("app.routes.deployments.ensure_docker_compose_is_available", return_value=None),
             patch("app.routes.deployments.ensure_external_port_is_available", return_value=None),
             patch("app.routes.deployments.ensure_container_name_is_available", return_value=None),
             patch("app.routes.deployments.run_container", side_effect=self._run_container),
+            patch("app.routes.deployments.run_compose_stack_up", side_effect=self._run_compose_stack_up),
+            patch(
+                "app.routes.deployments.get_stack_primary_container",
+                side_effect=self._get_stack_primary_container,
+            ),
             patch("app.routes.deployments.remove_container_if_exists", return_value=None),
+            patch("app.routes.deployments.remove_stack_if_exists", side_effect=self._remove_stack_if_exists),
             patch("app.routes.deployments.insert_deployment_record", side_effect=self._insert_deployment_record),
             patch("app.routes.deployments.update_deployment_record", side_effect=self._update_deployment_record),
             patch("app.routes.deployments.update_deployment_configuration", side_effect=self._update_deployment_configuration),
@@ -144,6 +151,34 @@ class DeploymentApiFlowTests(unittest.TestCase):
             stderr="",
         )
 
+    def _run_compose_stack_up(self, deployment_id, compose_yaml, server=None):
+        self.assertIsNone(server)
+        self.assertEqual(deployment_id, self.deployment["id"])
+        self.assertIn("services:", compose_yaml)
+        self.assertIn("web:", compose_yaml)
+        return CompletedProcess(
+            args=["docker", "compose", "up"],
+            returncode=0,
+            stdout="stack-up\n",
+            stderr="",
+        )
+
+    def _get_stack_primary_container(self, deployment_id, primary_service, server=None):
+        self.assertIsNone(server)
+        self.assertEqual(deployment_id, self.deployment["id"])
+        self.assertEqual(primary_service, self.deployment["primary_service"])
+        return ("container-stack-1", "customer-portal-web-1")
+
+    def _remove_stack_if_exists(self, deployment_id, server=None):
+        self.assertIsNone(server)
+        self.assertEqual(deployment_id, self.deployment["id"])
+        return CompletedProcess(
+            args=["docker", "compose", "down"],
+            returncode=0,
+            stdout="stack-down\n",
+            stderr="",
+        )
+
     def _get_container_logs(self, container_name, server=None, tail=None):
         self.assertIsNone(server)
         self.assertEqual(container_name, self.deployment["container_name"])
@@ -167,7 +202,9 @@ class DeploymentApiFlowTests(unittest.TestCase):
         }
 
     def _probe_http_endpoint(self, url, timeout=5.0):
-        if self.deployment.get("custom_domain"):
+        if self.deployment.get("health_target"):
+            expected_url = self.deployment["health_target"]
+        elif self.deployment.get("custom_domain"):
             expected_url = (
                 f"{'https' if self.deployment.get('tls_enabled') else 'http'}://"
                 f"{self.deployment['custom_domain']}"
@@ -247,6 +284,158 @@ class DeploymentApiFlowTests(unittest.TestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(delete_response.json()["status"], "deleted")
         self.assertIsNone(self.deployment)
+
+    def test_stack_deployment_flow_uses_compose_runtime(self):
+        create_response = self.client.post(
+            "/deployments/stack",
+            json={
+                "stack_name": "customer-portal",
+                "primary_service": "web",
+                "health_target": "https://customer-portal.example.com/health",
+                "compose_yaml": (
+                    "services:\n"
+                    "  web:\n"
+                    "    image: ghcr.io/deploymate/customer-portal-web:2026.04.17\n"
+                    "  worker:\n"
+                    "    image: ghcr.io/deploymate/customer-portal-worker:2026.04.17\n"
+                ),
+            },
+        )
+        self.assertEqual(create_response.status_code, 200)
+        created = create_response.json()
+        deployment_id = created["id"]
+        self.assertEqual(created["status"], "running")
+        self.assertEqual(created["container_id"], "container-stack-1")
+        self.assertEqual(created["container_name"], "customer-portal-web-1")
+        self.assertEqual(created["runtime_shape"], "stack")
+        self.assertEqual(created["release_source"], "compose")
+        self.assertEqual(created["stack_name"], "customer-portal")
+        self.assertEqual(created["primary_service"], "web")
+        self.assertEqual(
+            created["health_target"],
+            "https://customer-portal.example.com/health",
+        )
+
+        health_response = self.client.get(f"/deployments/{deployment_id}/health")
+        self.assertEqual(health_response.status_code, 200)
+        health = health_response.json()
+        self.assertEqual(health["status"], "healthy")
+        self.assertEqual(
+            health["url"],
+            "https://customer-portal.example.com/health",
+        )
+
+        logs_response = self.client.get(f"/deployments/{deployment_id}/logs")
+        self.assertEqual(logs_response.status_code, 200)
+        self.assertIn("RUNNING", logs_response.json()["logs"])
+
+        activity_response = self.client.get(f"/deployments/{deployment_id}/activity")
+        self.assertEqual(activity_response.status_code, 200)
+        activity = activity_response.json()
+        titles = [item["title"] for item in activity]
+        self.assertIn("Stack deployment started", titles)
+        self.assertIn("Stack deployment succeeded", titles)
+
+        delete_response = self.client.delete(f"/deployments/{deployment_id}")
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(delete_response.json()["status"], "deleted")
+        self.assertIsNone(self.deployment)
+
+    def test_stack_deployment_redeploy_endpoint_is_blocked(self):
+        create_response = self.client.post(
+            "/deployments/stack",
+            json={
+                "stack_name": "customer-portal",
+                "primary_service": "web",
+                "health_target": "https://customer-portal.example.com/health",
+                "compose_yaml": (
+                    "services:\n"
+                    "  web:\n"
+                    "    image: ghcr.io/deploymate/customer-portal-web:2026.04.17\n"
+                    "  worker:\n"
+                    "    image: ghcr.io/deploymate/customer-portal-worker:2026.04.17\n"
+                ),
+            },
+        )
+        deployment_id = create_response.json()["id"]
+
+        redeploy_response = self.client.post(
+            f"/deployments/{deployment_id}/redeploy",
+            json={
+                "image": "ghcr.io/deploymate/customer-portal-web:2026.04.18",
+                "name": "customer-portal-web-v2",
+                "internal_port": 80,
+                "external_port": 38080,
+                "env": {},
+                "secrets": {},
+            },
+        )
+
+        self.assertEqual(redeploy_response.status_code, 400)
+        self.assertEqual(
+            redeploy_response.json()["detail"],
+            "Stack redeploy is not available yet. Review the running stack and delete it deliberately if you need a replacement.",
+        )
+
+    def test_stack_deployment_release_webhook_endpoint_is_blocked(self):
+        create_response = self.client.post(
+            "/deployments/stack",
+            json={
+                "stack_name": "customer-portal",
+                "primary_service": "web",
+                "health_target": "https://customer-portal.example.com/health",
+                "compose_yaml": (
+                    "services:\n"
+                    "  web:\n"
+                    "    image: ghcr.io/deploymate/customer-portal-web:2026.04.17\n"
+                    "  worker:\n"
+                    "    image: ghcr.io/deploymate/customer-portal-worker:2026.04.17\n"
+                ),
+            },
+        )
+        deployment_id = create_response.json()["id"]
+
+        webhook_response = self.client.post(
+            f"/deployments/{deployment_id}/release-webhook",
+            headers={"x-deploymate-webhook-token": "unused-token"},
+            json={
+                "image": "ghcr.io/deploymate/customer-portal-web:2026.04.18",
+                "ref": "refs/heads/main",
+                "commit_sha": "abcdef1234567890",
+            },
+        )
+
+        self.assertEqual(webhook_response.status_code, 400)
+        self.assertEqual(
+            webhook_response.json()["detail"],
+            "Webhook-driven releases are not available for stack deployments yet.",
+        )
+
+    def test_stack_deployment_rollback_endpoint_is_blocked(self):
+        create_response = self.client.post(
+            "/deployments/stack",
+            json={
+                "stack_name": "customer-portal",
+                "primary_service": "web",
+                "health_target": "https://customer-portal.example.com/health",
+                "compose_yaml": (
+                    "services:\n"
+                    "  web:\n"
+                    "    image: ghcr.io/deploymate/customer-portal-web:2026.04.17\n"
+                    "  worker:\n"
+                    "    image: ghcr.io/deploymate/customer-portal-worker:2026.04.17\n"
+                ),
+            },
+        )
+        deployment_id = create_response.json()["id"]
+
+        rollback_response = self.client.post(f"/deployments/{deployment_id}/rollback")
+
+        self.assertEqual(rollback_response.status_code, 400)
+        self.assertEqual(
+            rollback_response.json()["detail"],
+            "Stack rollback is not available yet. Review the running stack and replace it deliberately if needed.",
+        )
 
     def test_logs_stay_readable_when_saved_server_target_is_missing(self):
         self.deployment = {

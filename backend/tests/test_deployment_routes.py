@@ -91,7 +91,10 @@ class DeploymentRouteTests(unittest.TestCase):
             secrets={"API_KEY": "rotated"},
         )
 
-        with patch("app.routes.deployments.get_deployment_record_or_404", side_effect=[existing, saved]):
+        with patch(
+            "app.routes.deployments.get_deployment_record_or_404",
+            side_effect=[existing, existing, saved],
+        ):
             with patch("app.routes.deployments.get_server_or_404", return_value=_server_record()):
                 with patch("app.routes.deployments.ensure_docker_is_available") as ensure_docker:
                     with patch("app.routes.deployments.ensure_external_port_is_available") as ensure_port:
@@ -100,17 +103,20 @@ class DeploymentRouteTests(unittest.TestCase):
                                 with patch("app.routes.deployments.update_deployment_configuration") as update_config:
                                     with patch("app.routes.deployments.update_deployment_record") as update_record:
                                         with patch(
-                                            "app.routes.deployments.run_container",
-                                            return_value=CompletedProcess(
-                                                args=["docker", "run"],
-                                                returncode=0,
-                                                stdout="container-2\n",
-                                                stderr="",
-                                            ),
-                                        ) as run_container:
-                                            with patch("app.routes.deployments.create_notification") as notify:
-                                                with patch("app.routes.deployments.create_activity_event") as activity:
-                                                    response = redeploy_deployment("dep-1", payload, user=_admin_user())
+                                            "app.routes.deployments.update_deployment_previous_release_snapshot"
+                                        ) as update_snapshot:
+                                            with patch(
+                                                "app.routes.deployments.run_container",
+                                                return_value=CompletedProcess(
+                                                    args=["docker", "run"],
+                                                    returncode=0,
+                                                    stdout="container-2\n",
+                                                    stderr="",
+                                                ),
+                                            ) as run_container:
+                                                with patch("app.routes.deployments.create_notification") as notify:
+                                                    with patch("app.routes.deployments.create_activity_event") as activity:
+                                                        response = redeploy_deployment("dep-1", payload, user=_admin_user())
 
         self.assertEqual(response.container_name, "demo-v2")
         self.assertEqual(response.container_id, "container-2")
@@ -118,6 +124,8 @@ class DeploymentRouteTests(unittest.TestCase):
         ensure_port.assert_called_once_with(8081, _server_record())
         ensure_name.assert_called_once_with("demo-v2", _server_record())
         remove_container.assert_called_once_with("demo-app", _server_record())
+        update_snapshot.assert_called_once()
+        self.assertEqual(update_snapshot.call_args.args[0], "dep-1")
         update_config.assert_called_once_with(
             deployment_id="dep-1",
             image="nginx:1.27",
@@ -181,27 +189,35 @@ class DeploymentRouteTests(unittest.TestCase):
         existing = _deployment_record()
         failed = _deployment_record(status="failed", container_id=None, error="port 8080 is already allocated")
 
-        with patch("app.routes.deployments.get_deployment_record_or_404", side_effect=[existing, failed]):
+        with patch(
+            "app.routes.deployments.get_deployment_record_or_404",
+            side_effect=[existing, existing, failed],
+        ):
             with patch("app.routes.deployments.get_server_or_404", return_value=_server_record()):
                 with patch("app.routes.deployments.ensure_docker_is_available"):
                     with patch("app.routes.deployments.remove_container_if_exists"):
                         with patch("app.routes.deployments.update_deployment_configuration") as update_config:
                             with patch("app.routes.deployments.update_deployment_record") as update_record:
                                 with patch(
-                                    "app.routes.deployments.run_container",
-                                    return_value=CompletedProcess(
-                                        args=["docker", "run"],
-                                        returncode=1,
-                                        stdout="docker: Error response from daemon: port 8080 is already allocated\n",
-                                        stderr="",
-                                    ),
-                                ):
-                                    with patch("app.routes.deployments.create_notification") as notify:
-                                        with patch("app.routes.deployments.create_activity_event") as activity:
-                                            response = redeploy_deployment("dep-1", payload, user=_admin_user())
+                                    "app.routes.deployments.update_deployment_previous_release_snapshot"
+                                ) as update_snapshot:
+                                    with patch(
+                                        "app.routes.deployments.run_container",
+                                        return_value=CompletedProcess(
+                                            args=["docker", "run"],
+                                            returncode=1,
+                                            stdout="docker: Error response from daemon: port 8080 is already allocated\n",
+                                            stderr="",
+                                        ),
+                                    ):
+                                        with patch("app.routes.deployments.create_notification") as notify:
+                                            with patch("app.routes.deployments.create_activity_event") as activity:
+                                                response = redeploy_deployment("dep-1", payload, user=_admin_user())
 
         self.assertEqual(response.status, "failed")
         self.assertEqual(response.error, "port 8080 is already allocated")
+        update_snapshot.assert_called_once()
+        self.assertEqual(update_snapshot.call_args.args[0], "dep-1")
         update_config.assert_called_once()
         self.assertEqual(
             update_record.call_args_list[0].kwargs,

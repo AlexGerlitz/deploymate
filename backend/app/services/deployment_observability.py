@@ -61,11 +61,14 @@ def build_deployment_health_response(
     container_name = deployment["container_name"]
     external_port = deployment.get("external_port")
     custom_domain = deployment.get("custom_domain")
+    health_target = deployment.get("health_target")
     tls_enabled = bool(deployment.get("tls_enabled"))
     checked_at = _now_iso()
 
     url = None
-    if custom_domain:
+    if health_target:
+        url = health_target
+    elif custom_domain:
         url = f"{'https' if tls_enabled else 'http'}://{custom_domain}"
     elif external_port:
         host = deployment.get("server_host") or "127.0.0.1"

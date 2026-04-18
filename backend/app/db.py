@@ -136,7 +136,11 @@ def init_db() -> None:
         release_image_digest TEXT NULL,
         release_triggered_at TIMESTAMPTZ NULL,
         release_triggered_by TEXT NULL,
-        release_webhook_token TEXT NULL
+        release_webhook_token TEXT NULL,
+        stack_name TEXT NULL,
+        primary_service TEXT NULL,
+        health_target TEXT NULL,
+        compose_yaml TEXT NULL
     );
     """
 
@@ -218,6 +222,26 @@ def init_db() -> None:
     alter_deployments_add_release_webhook_token_sql = """
     ALTER TABLE deployments
     ADD COLUMN IF NOT EXISTS release_webhook_token TEXT NULL;
+    """
+
+    alter_deployments_add_stack_name_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS stack_name TEXT NULL;
+    """
+
+    alter_deployments_add_primary_service_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS primary_service TEXT NULL;
+    """
+
+    alter_deployments_add_health_target_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS health_target TEXT NULL;
+    """
+
+    alter_deployments_add_compose_yaml_sql = """
+    ALTER TABLE deployments
+    ADD COLUMN IF NOT EXISTS compose_yaml TEXT NULL;
     """
 
     create_notifications_table_sql = """
@@ -379,6 +403,10 @@ def init_db() -> None:
             cur.execute(alter_deployments_add_release_triggered_at_sql)
             cur.execute(alter_deployments_add_release_triggered_by_sql)
             cur.execute(alter_deployments_add_release_webhook_token_sql)
+            cur.execute(alter_deployments_add_stack_name_sql)
+            cur.execute(alter_deployments_add_primary_service_sql)
+            cur.execute(alter_deployments_add_health_target_sql)
+            cur.execute(alter_deployments_add_compose_yaml_sql)
             cur.execute(create_notifications_table_sql)
             cur.execute(drop_notifications_fk_sql)
             cur.execute(create_deployment_activity_table_sql)
@@ -451,12 +479,17 @@ def insert_deployment_record(deployment_record: dict[str, Any]) -> None:
         release_image_digest,
         release_triggered_at,
         release_triggered_by,
-        release_webhook_token
+        release_webhook_token,
+        stack_name,
+        primary_service,
+        health_target,
+        compose_yaml
     )
     VALUES (%(id)s, %(status)s, %(image)s, %(container_name)s, %(container_id)s,
             %(owner_user_id)s, %(created_at)s, %(error)s, %(internal_port)s, %(external_port)s, %(custom_domain)s, %(tls_enabled)s, %(previous_release_snapshot)s, %(server_id)s, %(env)s, %(secrets)s,
             %(release_source)s, %(runtime_shape)s, %(release_ref)s, %(release_commit_sha)s, %(release_image_tag)s,
-            %(release_image_digest)s, %(release_triggered_at)s, %(release_triggered_by)s, %(release_webhook_token)s);
+            %(release_image_digest)s, %(release_triggered_at)s, %(release_triggered_by)s, %(release_webhook_token)s,
+            %(stack_name)s, %(primary_service)s, %(health_target)s, %(compose_yaml)s);
     """
 
     with get_db_connection() as conn:
@@ -502,6 +535,10 @@ def update_deployment_configuration(
     release_image_digest: str | None,
     release_triggered_at: datetime | None,
     release_triggered_by: str | None,
+    stack_name: str | None = None,
+    primary_service: str | None = None,
+    health_target: str | None = None,
+    compose_yaml: str | None = None,
 ) -> None:
     update_sql = """
     UPDATE deployments
@@ -519,7 +556,11 @@ def update_deployment_configuration(
         release_image_tag = %s,
         release_image_digest = %s,
         release_triggered_at = %s,
-        release_triggered_by = %s
+        release_triggered_by = %s,
+        stack_name = %s,
+        primary_service = %s,
+        health_target = %s,
+        compose_yaml = %s
     WHERE id = %s;
     """
 
@@ -543,6 +584,10 @@ def update_deployment_configuration(
                     release_image_digest,
                     release_triggered_at,
                     release_triggered_by,
+                    stack_name,
+                    primary_service,
+                    health_target,
+                    compose_yaml,
                     deployment_id,
                 ),
             )
@@ -584,6 +629,9 @@ def get_deployment_record_or_404(deployment_id: str) -> dict[str, Any]:
         d.error,
         d.internal_port,
         d.external_port,
+        d.custom_domain,
+        d.tls_enabled,
+        d.previous_release_snapshot,
         d.server_id,
         d.env,
         d.secrets,
@@ -596,6 +644,10 @@ def get_deployment_record_or_404(deployment_id: str) -> dict[str, Any]:
         d.release_triggered_at,
         d.release_triggered_by,
         d.release_webhook_token,
+        d.stack_name,
+        d.primary_service,
+        d.health_target,
+        d.compose_yaml,
         s.name AS server_name,
         s.host AS server_host
     FROM deployments d
@@ -627,6 +679,9 @@ def list_deployment_records() -> list[dict[str, Any]]:
         d.error,
         d.internal_port,
         d.external_port,
+        d.custom_domain,
+        d.tls_enabled,
+        d.previous_release_snapshot,
         d.server_id,
         d.env,
         d.secrets,
@@ -639,6 +694,10 @@ def list_deployment_records() -> list[dict[str, Any]]:
         d.release_triggered_at,
         d.release_triggered_by,
         d.release_webhook_token,
+        d.stack_name,
+        d.primary_service,
+        d.health_target,
+        d.compose_yaml,
         s.name AS server_name,
         s.host AS server_host
     FROM deployments d

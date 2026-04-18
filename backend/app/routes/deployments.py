@@ -21,18 +21,24 @@ from app.schemas import (
     DeploymentDeleteResponse,
     DeploymentReleaseWebhookRequest,
     DeploymentResponse,
+    StackDeploymentCreateRequest,
 )
 from app.services.deployments import (
     ensure_container_name_is_available,
     ensure_docker_is_available,
+    ensure_docker_compose_is_available,
     ensure_external_port_is_available,
+    get_stack_primary_container,
     ensure_runtime_target_allowed,
     remove_container_if_exists,
+    remove_stack_if_exists,
     run_container,
+    run_compose_stack_up,
 )
 from app.services.deployment_mutations import (
     build_release_metadata as _service_build_release_metadata,
     create_deployment as _service_create_deployment,
+    create_stack_deployment as _service_create_stack_deployment,
     delete_deployment as _service_delete_deployment,
     normalize_runtime_error as _service_normalize_runtime_error,
     redeploy_deployment as _service_redeploy_deployment,
@@ -87,6 +93,30 @@ def _create_deployment(
         create_notification_fn=create_notification,
         create_activity_event_fn=create_activity_event,
         get_deployment_record_or_404_fn=get_deployment_record_or_404,
+    )
+
+
+def _create_stack_deployment(
+    payload: StackDeploymentCreateRequest,
+    user,
+) -> DeploymentResponse:
+    return _service_create_stack_deployment(
+        payload,
+        user,
+        enforce_plan_limit_fn=enforce_plan_limit,
+        get_server_or_404_fn=get_server_or_404,
+        ensure_remote_server_access_allowed_fn=ensure_remote_server_access_allowed,
+        ensure_runtime_target_allowed_fn=ensure_runtime_target_allowed,
+        ensure_docker_is_available_fn=ensure_docker_is_available,
+        ensure_docker_compose_is_available_fn=ensure_docker_compose_is_available,
+        insert_deployment_record_fn=insert_deployment_record,
+        update_deployment_record_fn=update_deployment_record,
+        update_deployment_configuration_fn=update_deployment_configuration,
+        create_notification_fn=create_notification,
+        create_activity_event_fn=create_activity_event,
+        get_deployment_record_or_404_fn=get_deployment_record_or_404,
+        run_compose_stack_up_fn=run_compose_stack_up,
+        get_stack_primary_container_fn=get_stack_primary_container,
     )
 
 
@@ -227,12 +257,30 @@ def create_deployment_endpoint(
     return _create_deployment(payload, user)
 
 
+@router.post("/deployments/stack", response_model=DeploymentResponse)
+def create_stack_deployment_endpoint(
+    payload: StackDeploymentCreateRequest,
+    user=Depends(require_auth),
+) -> DeploymentResponse:
+    return _create_stack_deployment(payload, user)
+
+
 @router.post("/deployments/{deployment_id}/redeploy", response_model=DeploymentResponse)
 def redeploy_deployment(
     deployment_id: str,
     payload: DeploymentCreateRequest,
     user=Depends(require_auth),
 ) -> DeploymentResponse:
+    deployment = _get_mutable_user_deployment_or_404(
+        deployment_id,
+        user,
+        action="Remote runtime changes",
+    )
+    if deployment.get("runtime_shape") == "stack":
+        raise HTTPException(
+            status_code=400,
+            detail="Stack redeploy is not available yet. Review the running stack and delete it deliberately if you need a replacement.",
+        )
     return _service_redeploy_deployment(
         deployment_id,
         payload,
@@ -268,6 +316,11 @@ def trigger_release_webhook(
     x_deploymate_webhook_token: str | None = Header(default=None),
 ) -> DeploymentResponse:
     deployment = get_deployment_record_or_404(deployment_id)
+    if deployment.get("runtime_shape") == "stack":
+        raise HTTPException(
+            status_code=400,
+            detail="Webhook-driven releases are not available for stack deployments yet.",
+        )
     _validate_release_webhook_token(deployment, x_deploymate_webhook_token)
 
     release_image = payload.image or deployment["image"]
@@ -328,6 +381,11 @@ def rollback_deployment(
         user,
         action="Remote runtime changes",
     )
+    if deployment.get("runtime_shape") == "stack":
+        raise HTTPException(
+            status_code=400,
+            detail="Stack rollback is not available yet. Review the running stack and replace it deliberately if needed.",
+        )
     previous_release_snapshot = deployment.get("previous_release_snapshot") or {}
     if not previous_release_snapshot:
         raise HTTPException(status_code=400, detail="No previous release snapshot is available yet.")
@@ -394,7 +452,9 @@ def delete_deployment(deployment_id: str, user=Depends(require_auth)) -> Deploym
         ),
         get_server_or_404_fn=get_server_or_404,
         ensure_docker_is_available_fn=ensure_docker_is_available,
+        ensure_docker_compose_is_available_fn=ensure_docker_compose_is_available,
         remove_container_if_exists_fn=remove_container_if_exists,
+        remove_stack_if_exists_fn=remove_stack_if_exists,
         create_notification_fn=create_notification,
         create_activity_event_fn=create_activity_event,
         delete_deployment_record_fn=delete_deployment_record,

@@ -1,6 +1,6 @@
 # DeployMate Handoff
 
-Updated: 2026-04-17
+Updated: 2026-04-18
 
 ## Web Terminal Pointer
 
@@ -33,13 +33,103 @@ Updated: 2026-04-17
   4. deployment passport
   5. agency fit and packaging
 - Текущий активный пакет now in progress:
-  - `Release review + rollback v1`
-  - backend-first checkpoint started: previous release snapshot + rollback endpoint draft
-  - frontend rollback surface and end-to-end verification are still pending
+  - `Public packaging v2`
+  - `Agency fit v1` теперь закрыт:
+    - deployment workflow templates now read as reusable handoff assets instead of a generic personal preset lane
+    - the focused template review now shows reuse state, created/last-used context, and a deliberate review/deploy/edit/duplicate/delete order for the next operator
+    - deployment detail template save now frames the saved setup as a reusable workflow asset and bridges directly back into focused template review
+    - beginner + runtime smoke now hold that agency-fit handoff contract explicitly
+    - latest rerun on `2026-04-18 09:17 +07` passed the changed-scope verification:
+      - `npm --prefix frontend run smoke:beginner`
+      - `npm --prefix frontend run smoke:runtime`
+      - `npm --prefix frontend run build`
+  - `Passport v1` теперь закрыт:
+    - deployment detail overview now starts with one explicit `Deployment passport` block for both single runtimes and stacks
+    - that passport keeps runtime identity, health proof, recent activity, and the next safe action in one handoff summary instead of scattering them across cards
+    - deployment workflow success states now point straight to the passport anchor, so a fresh rollout lands on the exact handoff block instead of a generic detail page start
+    - runtime smoke now explicitly holds the workflow-to-passport bridge and the fresh-rollout passport card
+    - latest rerun on `2026-04-18 08:49 +07` passed the changed-scope verification:
+      - `npm --prefix frontend run build`
+      - `npm --prefix frontend run smoke:runtime`
+  - `Stack deploy v0` теперь закрыт:
+    - code path now exists across frontend + backend:
+    - `POST /deployments/stack` now creates one compose-backed runtime with one primary service and one saved health target
+    - backend now persists stack deploy metadata needed for compose up/down and primary-service runtime review
+    - deployment workflow stack lane now deploys the compose subset instead of stopping at intake-only copy
+    - runtime detail now identifies stack shape directly and hides false single-container change/template CTAs for stack runtimes
+    - verification reality on this machine:
+    - `npm --prefix frontend run build` passed again on `2026-04-18`
+    - `python3 -m py_compile backend/app/... backend/tests/test_deployment_api_flow.py` had already passed in the previous stack pass
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_deployment_api_flow backend.tests.test_deployment_routes` passed again on `2026-04-18`
+    - backend route tests were updated to match the current redeploy preflight + previous-release-snapshot callback flow, so local changed-scope verification no longer depends on a missing DB stub
+    - backend API coverage now also locks the current stack safety boundary explicitly:
+      - `redeploy`, `release-webhook`, and `rollback` each return the intended `400` for stack runtimes instead of falling through to single-container mutation paths
+      - the same repo-local unittest command above passed again after adding those stack guardrail checks on `2026-04-18`
+    - latest dense-night-shift rerun on `2026-04-18 03:04 +07` reconfirmed the same stop point with a tighter verification path:
+      - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh` passed after adding a loopback bind preflight to the shared smoke launcher
+      - `npm --prefix frontend run smoke:runtime` now fails immediately with an explicit `PermissionError: [Errno 1] Operation not permitted` bind preflight instead of waiting for `next dev` to die later
+      - honest stack closure still needs a socket-capable machine because the runtime smoke assertions themselves still cannot start in this sandbox
+    - latest dense-night-shift rerun on `2026-04-18 04:05 +07` kept the same honest stop point:
+      - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_deployment_api_flow backend.tests.test_deployment_routes` passed after adding stack guardrail tests for blocked `redeploy`, `release-webhook`, and `rollback`
+      - `npm --prefix frontend run smoke:runtime` failed again immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+      - `Stack deploy v0` still needs one socket-capable machine for the final runtime smoke before `Passport v1` can become the active package
+    - latest dense-night-shift rerun on `2026-04-18 05:05 +07` closed one more false-action gap inside stack runtime detail:
+      - `npm --prefix frontend run build` passed after replacing the stack runtime release-webhook controls with an explicit unsupported note
+      - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh` passed after adding runtime smoke coverage for the hidden stack webhook path
+      - `npm --prefix frontend run smoke:runtime` still failed immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+      - honest closure is unchanged: `Stack deploy v0` still needs one socket-capable machine before `Passport v1` can become the active package
+    - latest dense-night-shift rerun on `2026-04-18 06:03 +07` reconfirmed the same stop point after the full changed-scope verification pass:
+      - `npm --prefix frontend run build` passed again with the current stack workflow + runtime detail surfaces
+      - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_deployment_api_flow backend.tests.test_deployment_routes` passed again
+      - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh scripts/frontend_beginner_smoke.sh` passed
+      - `npm --prefix frontend run smoke:runtime` failed again immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+      - honest closure is still unchanged: `Stack deploy v0` cannot be marked done here until one socket-capable machine runs the frontend runtime smoke
+    - latest dense-night-shift rerun on `2026-04-18 07:14 +07` closed another false-next-action gap for stack runtimes:
+      - deployment workflow live cards and deployment detail now treat the saved stack `health_target` as the review endpoint when no public URL exists, so stack runtime review no longer falls back to a false `private` story
+      - stable stack runtime detail now leads with `Open health target` / runtime overview instead of suggesting the disabled single-app `Prepare rollout change` path
+      - future runtime smoke coverage now also asserts that stack runtime detail keeps the health-target CTA and does not reintroduce the false stack redeploy CTA
+      - `npm --prefix frontend run build` passed again
+      - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_deployment_api_flow backend.tests.test_deployment_routes` passed again
+      - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh scripts/frontend_beginner_smoke.sh` passed again
+      - `npm --prefix frontend run smoke:runtime` still failed immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+      - honest closure is still unchanged: `Stack deploy v0` still needs one socket-capable machine before `Passport v1` can become the active package
+    - latest dense-night-shift rerun on `2026-04-18 08:08 +07` closed one more stack handoff mismatch inside runtime detail:
+      - deployment detail facts now expose the same saved stack review endpoint link that the overview cards and primary CTA already use, so stack operators no longer see `Open health target` above and `URL -` below for the same runtime
+      - runtime smoke coverage now also asserts that the stack runtime facts section keeps that review-target link visible
+      - `npm --prefix frontend run build` passed again
+      - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_deployment_api_flow backend.tests.test_deployment_routes` remained green from the same dirty tree earlier in this pass
+      - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh` passed again
+      - `npm --prefix frontend run smoke:runtime` still failed immediately at the shared loopback bind preflight with `PermissionError: [Errno 1] Operation not permitted`
+      - honest closure is still unchanged: `Stack deploy v0` still needs one socket-capable machine before `Passport v1` can become the active package
+    - latest dense-night-shift rerun on `2026-04-18 08:18 +07` closed one more verification-path blocker around smoke-mode builds:
+      - smoke launcher scripts now inject a repo-local `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` file, so smoke/dev startup no longer depends on live access to `fonts.googleapis.com`
+      - `bash -n scripts/frontend_smoke_shared.sh` passed
+      - `NEXT_PUBLIC_SMOKE_TEST_MODE=1 NEXT_FONT_GOOGLE_MOCKED_RESPONSES=/Users/alexgerlitz/deploymate/scripts/font_google_mock_responses.cjs npm --prefix frontend run build` passed, so the smoke-mode frontend build is now honest even in this offline sandbox
+      - the final socketless runtime-smoke experiment is still not closed here: probing the compiled Next app-page handler for `/deployments/[deploymentId]` now gets past fonts and manifest loading, but still dies inside Next runtime internals with `TypeError: Cannot read properties of undefined (reading 'startsWith')`
+      - honest closure is still unchanged: `Stack deploy v0` still needs either one socket-capable machine for the existing runtime smoke or a deeper Next-specific static render harness before `Passport v1` can become the active package
+    - latest rerun on `2026-04-18 08:31 +07` finally closed the package on this machine:
+      - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh scripts/frontend_beginner_smoke.sh` passed
+      - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_deployment_api_flow backend.tests.test_deployment_routes` passed again
+      - `npm --prefix frontend run build` passed again
+      - `npm --prefix frontend run smoke:runtime` passed end-to-end, including the stack runtime detail, internal-only review path, template success path, and create success path
+      - honest closure changed here: `Stack deploy v0` is now verified locally and `Passport v1` becomes the active package
+    - local system `python3` still lacks project deps, but repo-local `backend/venv` is enough for the backend changed-scope suite
+  - next stop point for `Public packaging v2`:
+    - begin from landing/commercial packaging surfaces only
+    - align public buyer copy with the now-real runtime passport plus reusable handoff asset story
+    - do not widen back into runtime/admin/workspace implementation in the same package
+  - `Release review + rollback v1` is now closed:
+    - deployment detail has a rollback review surface wired to the rollback endpoint
+    - `npm --prefix frontend run smoke:runtime` passed
+    - targeted backend rollback route test passed in an isolated venv
+  - `Stack/Compose intake v0` is now closed:
+    - deployment workflow now has a dedicated compose stack intake lane for the v0 subset
+    - beginner overview/workflow gating mismatches were corrected while closing the same slice
+    - `npm --prefix frontend run smoke:beginner` passed
 - Ближайшие три пакета тоже зафиксированы:
-  1. `Release review + rollback v1`
-  2. `Stack/Compose intake v0`
-  3. `Stack deploy v0`
+  1. `Public packaging v2`
+  2. broad workspace/client separation still stays deferred until public packaging matches the agency/self-hosted story
+  3. deeper ownership model stays deferred until one narrower client/workspace slice is truly needed
 - `README.md` и broad repo-root packaging пока deliberately deferred до реального public funnel rewrite, чтобы не создавать doc/product drift.
 
 ## Autonomous Night Loop
@@ -48,11 +138,8 @@ Updated: 2026-04-17
 - Базовое правило:
   - если текущий пакет уже завершён и проверен, не ждать нового сообщения, а брать следующий пакет по фиксированному порядку
 - Порядок автономного продолжения сейчас такой:
-  1. `Release review + rollback v1`
-  2. `Stack/Compose intake v0`
-  3. `Stack deploy v0`
-  4. `Passport v1`
-  5. `Agency fit v1`
+  1. `Public packaging v2`
+  2. broad workspace/client separation only after the packaging story stays believable
 - Для каждого ночного прохода expected loop один и тот же:
   - reread `HANDOFF.md`
   - взять один bounded package
@@ -176,17 +263,39 @@ Updated: 2026-04-17
   - `Webhook/release source v0`
   - `Secrets v1`
   - `Domains/SSL v1`
-- Текущий незавершённый checkpoint:
   - `Release review + rollback v1`
-  - backend snapshot/rollback contract is partially implemented
-  - route tests and frontend rollback surface still need finishing before this package can be considered done
+  - `Stack/Compose intake v0`
+  - `Passport v1`
+  - `Agency fit v1`
+- `Stack deploy v0` теперь считать закрытым:
+  - the supported compose/stack subset is now verified locally as one runtime unit with one compose file, one primary service, one health target, and one stack delete unit
+  - latest rerun on `2026-04-18 08:31 +07` passed the full changed-scope package verification:
+    - `bash -n scripts/frontend_smoke_shared.sh scripts/frontend_runtime_smoke.sh scripts/frontend_beginner_smoke.sh`
+    - `PYTHONPATH=backend ./backend/venv/bin/python -m unittest backend.tests.test_deployment_api_flow backend.tests.test_deployment_routes`
+    - `npm --prefix frontend run build`
+    - `npm --prefix frontend run smoke:runtime`
+- `Passport v1` теперь считать закрытым:
+  - deployment detail now exposes one `Deployment passport` handoff block for both single runtimes and stacks
+  - deployment workflow success paths now open that passport directly with the fresh-rollout context preserved in the URL
+  - latest rerun on `2026-04-18 08:49 +07` passed the changed-scope package verification:
+    - `npm --prefix frontend run build`
+    - `npm --prefix frontend run smoke:runtime`
+- `Agency fit v1` теперь считать закрытым:
+  - deployment workflow templates now behave like reusable handoff assets with explicit reuse state, recency, and safe review order
+  - deployment detail now saves and bridges templates as reusable workflow assets for the next operator instead of a generic preset
+  - latest rerun on `2026-04-18 09:17 +07` passed the changed-scope package verification:
+    - `npm --prefix frontend run smoke:beginner`
+    - `npm --prefix frontend run smoke:runtime`
+    - `npm --prefix frontend run build`
+- Текущий незавершённый checkpoint:
+  - `Public packaging v2`
+  - next slice should start from landing/commercial packaging only
+  - align the public buyer story with runtime passport + reusable handoff assets before widening into client/workspace implementation
 - Следующий bounded runtime порядок:
-  1. `Release review + rollback v1`
-  2. `Stack/Compose intake v0`
-  3. `Stack deploy v0`
+  1. `Public packaging v2`
+  2. broad workspace/client separation still stays deferred until the public story is concrete
 - Guardrails на следующий проход:
-  - не центрировать Passport до release/domain/stack context
-  - не расширять agency/client surfaces до того, как baseline runtime станет product-believable
+  - не расширять client/workspace implementation inside the packaging package
   - не считать single-container deployments допустимым долгоживущим ceiling
 
 ## Week 1 Result
