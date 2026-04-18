@@ -276,11 +276,57 @@ export const smokeServerDiagnostics = {
         details: "The daemon responded and compose support is installed.",
       },
       {
+        key: "disk_usage",
+        label: "Disk usage",
+        status: "ok",
+        summary: "Root disk has headroom: 18% used, 42G free.",
+        details: "8G used of 50G on /; 42G free. Raw: /dev/sda1 50G 8G 42G 18% /",
+      },
+      {
         key: "ports",
         label: "Ports",
         status: "success",
         summary: "Expected service ports are reachable.",
         details: "Port 38080 is free for the smoke deployment.",
+      },
+    ],
+  },
+};
+
+export const smokeServerDiagnosticsPressure = {
+  "smoke-server": {
+    checked_at: "2026-04-02T00:03:00Z",
+    overall_status: "warn",
+    target: "deploy@203.0.113.10:22",
+    deployment_count: 1,
+    hostname: "smoke-vps",
+    operating_system: "Ubuntu 24.04",
+    uptime: "2 days",
+    disk_usage: "/dev/sda1 50G 43G 7G 86% /",
+    memory: "42%",
+    docker_compose_version: "v2.29.2",
+    listening_ports: [22, 80, 443, 38080],
+    items: [
+      {
+        key: "ssh",
+        label: "SSH",
+        status: "ok",
+        summary: "SSH access is healthy.",
+        details: "Accepted a key-based connection and resolved the remote hostname.",
+      },
+      {
+        key: "docker",
+        label: "Docker",
+        status: "ok",
+        summary: "Docker engine is available.",
+        details: "The daemon responded and compose support is installed.",
+      },
+      {
+        key: "disk_usage",
+        label: "Disk usage",
+        status: "warn",
+        summary: "Root disk is 86% full. Clear old build cache before the next rollout.",
+        details: "43G used of 50G on /; 7G free. Raw: /dev/sda1 50G 43G 7G 86% /",
       },
     ],
   },

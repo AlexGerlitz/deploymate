@@ -12,6 +12,9 @@ MEMBER_DIST_DIR="${FRONTEND_SMOKE_MEMBER_DIST_DIR:-.next-smoke-member-${MEMBER_P
 READY_PORT="${FRONTEND_SMOKE_READY_PORT:-3004}"
 READY_LOG="${FRONTEND_SMOKE_READY_LOG:-/tmp/deploymate-frontend-servers-ready-smoke.log}"
 READY_DIST_DIR="${FRONTEND_SMOKE_READY_DIST_DIR:-.next-smoke-ready-${READY_PORT}}"
+PRESSURE_PORT="${FRONTEND_SMOKE_PRESSURE_PORT:-3005}"
+PRESSURE_LOG="${FRONTEND_SMOKE_PRESSURE_LOG:-/tmp/deploymate-frontend-servers-pressure-smoke.log}"
+PRESSURE_DIST_DIR="${FRONTEND_SMOKE_PRESSURE_DIST_DIR:-.next-smoke-pressure-${PRESSURE_PORT}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
@@ -65,6 +68,54 @@ frontend_smoke_assert_checks "frontend-servers-smoke" "$BASE_URL" automation_smo
     exit 1
   fi
   rm -f "$member_html"
+)
+
+(
+  set -euo pipefail
+  source "${SCRIPT_DIR}/frontend_smoke_shared.sh"
+  source "${SCRIPT_DIR}/lib/frontend_smoke_checks.sh"
+
+  export PORT="$PRESSURE_PORT"
+  export BASE_URL="http://127.0.0.1:${PORT}"
+  export SERVER_LOG="$PRESSURE_LOG"
+  export DIST_DIR="$PRESSURE_DIST_DIR"
+  export FRONTEND_SMOKE_PORT="$PRESSURE_PORT"
+  export FRONTEND_SMOKE_LOG="$PRESSURE_LOG"
+  export FRONTEND_SMOKE_DIST_DIR="$PRESSURE_DIST_DIR"
+  export FRONTEND_SMOKE_REUSE_SERVER=0
+  export NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO=storage-pressure
+
+  cleanup_pressure() {
+    stop_frontend_smoke_server
+  }
+
+  trap cleanup_pressure EXIT
+
+  start_frontend_smoke_server
+  wait_for_frontend_smoke_url "/app"
+
+  pressure_html="$(mktemp)"
+  curl -sS "${BASE_URL}/app/server-review" > "$pressure_html"
+
+  if ! grep -Eq 'data-testid="server-review-storage-pressure-smoke-server"' "$pressure_html"; then
+    echo "[frontend-servers-pressure-smoke] storage pressure cue is missing" >&2
+    rm -f "$pressure_html"
+    exit 1
+  fi
+
+  if ! grep -Eq 'Clear old build cache before the next rollout' "$pressure_html"; then
+    echo "[frontend-servers-pressure-smoke] storage pressure summary is missing" >&2
+    rm -f "$pressure_html"
+    exit 1
+  fi
+
+  if grep -Eq 'data-testid="smoke-server-continue-action"' "$pressure_html"; then
+    echo "[frontend-servers-pressure-smoke] storage pressure path still unlocked the step-2 action" >&2
+    rm -f "$pressure_html"
+    exit 1
+  fi
+
+  rm -f "$pressure_html"
 )
 
 (
@@ -163,5 +214,6 @@ echo "[frontend-servers-smoke] server management surface rendered"
 echo "[frontend-servers-smoke] diagnostics surface rendered"
 echo "[frontend-servers-smoke] member blocked surface rendered"
 echo "[frontend-servers-smoke] pending server review path rendered"
+echo "[frontend-servers-smoke] storage pressure server review path rendered"
 echo "[frontend-servers-smoke] ready server review path rendered"
 echo "[frontend-servers-smoke] complete"

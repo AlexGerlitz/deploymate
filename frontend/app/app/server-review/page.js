@@ -7,6 +7,7 @@ import { readJsonOrError } from "../../lib/admin-page-utils";
 import {
   smokeMode,
   smokeServerDiagnostics,
+  smokeServerDiagnosticsPressure,
   smokeServerTestResults,
   smokeServers,
   smokeUser,
@@ -48,6 +49,17 @@ const smokeServerReviewFixture =
           "smoke-server": [38080, 38081],
         },
       }
+    : smokeMode && smokeServerReviewScenario === "storage-pressure"
+    ? {
+        servers: [smokeServers[0]],
+        successMessage:
+          'Loaded 1 saved server target. Clear storage pressure before Step 2.',
+        testResults: {},
+        diagnostics: smokeServerDiagnosticsPressure,
+        suggestedPorts: {
+          "smoke-server": [38080, 38081],
+        },
+      }
     : smokeMode && smokeServerReviewScenario === "pending"
     ? {
         servers: [smokeServers[0]],
@@ -64,6 +76,23 @@ const smokeServerReviewFixture =
         diagnostics: {},
         suggestedPorts: {},
       };
+
+function getDiagnosticItem(diagnostics, key) {
+  if (!diagnostics || !Array.isArray(diagnostics.items)) {
+    return null;
+  }
+
+  return diagnostics.items.find((item) => item?.key === key) || null;
+}
+
+function getStoragePressureItem(diagnostics) {
+  const diskItem = getDiagnosticItem(diagnostics, "disk_usage");
+  if (!diskItem) {
+    return null;
+  }
+
+  return diskItem.status === "warn" || diskItem.status === "error" ? diskItem : null;
+}
 
 function buildServerMeta(server, diagnostics, suggestedPorts) {
   const target = `${server.username}@${server.host}:${server.port}`;
@@ -82,7 +111,9 @@ function buildServerMeta(server, diagnostics, suggestedPorts) {
 
 function buildServerNote(server, testResult, diagnostics) {
   if (diagnostics) {
+    const diskItem = getDiagnosticItem(diagnostics, "disk_usage");
     const details = [
+      diskItem?.summary || (diagnostics.disk_usage ? `Disk usage ${diagnostics.disk_usage}` : "disk usage pending"),
       diagnostics.hostname || diagnostics.target,
       diagnostics.operating_system || "OS pending",
       diagnostics.docker_version || "Docker version pending",
@@ -1087,45 +1118,57 @@ function ServerReviewPageContent() {
           emptyText={emptyQueueText}
           items={filteredItems}
         >
-          {filteredItems.map((item) => (
-            <AdminSurfaceQueueCard
-              className={`serverReviewServerCard serverReviewReveal ${item.id === selectedItemId ? "isSelected" : ""}`.trim()}
-              key={item.id}
-              title={item.label}
-              body={item.note}
-              status={item.id === selectedItemId ? `${item.status} · open` : item.status}
-            >
-              {item.segment === "ready" ? (
-                <div className="banner success">
-                  Step 1 is complete for this server. Next: go to Step 2 and choose what to run.
+          {filteredItems.map((item) => {
+            const storagePressure = getStoragePressureItem(item.diagnostics);
+
+            return (
+              <AdminSurfaceQueueCard
+                className={`serverReviewServerCard serverReviewReveal ${item.id === selectedItemId ? "isSelected" : ""}`.trim()}
+                key={item.id}
+                title={item.label}
+                body={item.note}
+                status={item.id === selectedItemId ? `${item.status} · open` : item.status}
+              >
+                {storagePressure ? (
+                  <div
+                    className={storagePressure.status === "error" ? "banner error" : "banner subtle"}
+                    data-testid={`server-review-storage-pressure-${item.id}`}
+                  >
+                    {storagePressure.summary}
+                  </div>
+                ) : null}
+
+                {item.segment === "ready" ? (
+                  <div className="banner success">
+                    Step 1 is complete for this server. Next: go to Step 2 and choose what to run.
+                  </div>
+                ) : null}
+
+                <div className="serverReviewMetaStack">
+                  <p className="formHint">
+                    <strong>{starterStrings.cardMetaLabel}:</strong> {item.meta}
+                  </p>
+                  <p className="formHint">
+                    <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
+                  </p>
                 </div>
-              ) : null}
 
-              <div className="serverReviewMetaStack">
-                <p className="formHint">
-                  <strong>{starterStrings.cardMetaLabel}:</strong> {item.meta}
-                </p>
-                <p className="formHint">
-                  <strong>{starterStrings.segmentFilterLabel}:</strong> {item.segment}
-                </p>
-              </div>
-
-              {item.id === selectedItemId ? (
-                <>
-                  <section className="serverReviewTaskPanel" data-testid={`server-review-tasks-${item.id}`}>
-                    <div className="serverReviewTaskHeader">
-                      <span className="serverReviewPanelLabel">Tasks for this server</span>
-                      <strong>
-                        {item.segment === "ready"
-                          ? "This server is ready. Use it for Step 2."
-                          : "Finish the check here, then move on."}
-                      </strong>
-                      <p>
-                        {item.segment === "ready"
-                          ? "You can still rerun a check if something changed, but the main path is choosing what to run next."
-                          : "Stay on this server, run the readiness check, and only then continue to the app step."}
-                      </p>
-                    </div>
+                {item.id === selectedItemId ? (
+                  <>
+                    <section className="serverReviewTaskPanel" data-testid={`server-review-tasks-${item.id}`}>
+                      <div className="serverReviewTaskHeader">
+                        <span className="serverReviewPanelLabel">Tasks for this server</span>
+                        <strong>
+                          {item.segment === "ready"
+                            ? "This server is ready. Use it for Step 2."
+                            : "Finish the check here, then move on."}
+                        </strong>
+                        <p>
+                          {item.segment === "ready"
+                            ? "You can still rerun a check if something changed, but the main path is choosing what to run next."
+                            : "Stay on this server, run the readiness check, and only then continue to the app step."}
+                        </p>
+                      </div>
 
                     <div className="workspaceReviewerGrid serverReviewTaskGrid">
                       <article className="workspaceReviewerCard serverReviewTaskCard">
@@ -1324,19 +1367,20 @@ function ServerReviewPageContent() {
                     </div>
                   </details>
                 </>
-              ) : (
-                <div className="formActions">
-                  <button
-                    type="button"
-                    className="secondaryButton"
-                    onClick={() => handleSelectItem(item.id)}
-                  >
-                    Open tasks
-                  </button>
-                </div>
-              )}
-            </AdminSurfaceQueueCard>
-          ))}
+                ) : (
+                  <div className="formActions">
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={() => handleSelectItem(item.id)}
+                    >
+                      Open tasks
+                    </button>
+                  </div>
+                )}
+              </AdminSurfaceQueueCard>
+            );
+          })}
         </AdminSurfaceQueue>
       </div>
 

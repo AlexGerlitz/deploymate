@@ -2,6 +2,69 @@ import time
 
 from app.services.runtime_executors import _run_remote_command
 
+ROOT_DISK_WARN_PERCENT = 80
+ROOT_DISK_ERROR_PERCENT = 90
+
+
+def _parse_root_disk_usage(output: str) -> dict[str, object] | None:
+    parts = output.split()
+    if len(parts) < 6:
+        return None
+
+    usage_text = parts[4]
+    if not usage_text.endswith("%"):
+        return None
+
+    try:
+        usage_percent = int(usage_text[:-1])
+    except ValueError:
+        return None
+
+    return {
+        "filesystem": parts[0],
+        "size": parts[1],
+        "used": parts[2],
+        "avail": parts[3],
+        "usage_percent": usage_percent,
+        "mount": parts[-1],
+    }
+
+
+def _build_disk_usage_item(output: str) -> dict[str, object]:
+    parsed = _parse_root_disk_usage(output)
+    if not parsed:
+        return {
+            "key": "disk_usage",
+            "label": "Disk usage",
+            "status": "warn",
+            "summary": "Root disk usage was collected, but the result could not be parsed.",
+            "details": output,
+        }
+
+    usage_percent = int(parsed["usage_percent"])
+    avail = str(parsed["avail"])
+    size = str(parsed["size"])
+    used = str(parsed["used"])
+    mount = str(parsed["mount"])
+
+    if usage_percent >= ROOT_DISK_ERROR_PERCENT:
+        summary = f"Root disk is {usage_percent}% full. Clear space before the next rollout."
+        status = "error"
+    elif usage_percent >= ROOT_DISK_WARN_PERCENT:
+        summary = f"Root disk is {usage_percent}% full. Clear old build cache before the next rollout."
+        status = "warn"
+    else:
+        summary = f"Root disk has headroom: {usage_percent}% used, {avail} free."
+        status = "ok"
+
+    return {
+        "key": "disk_usage",
+        "label": "Disk usage",
+        "status": status,
+        "summary": summary,
+        "details": f"{used} used of {size} on {mount}; {avail} free. Raw: {output}",
+    }
+
 
 def collect_server_diagnostics(server: dict) -> dict[str, object]:
     target = f'{server["username"]}@{server["host"]}:{server["port"]}'
@@ -126,6 +189,10 @@ def collect_server_diagnostics(server: dict) -> dict[str, object]:
             continue
 
         diagnostics[key] = output
+        if key == "disk_usage":
+            items.append(_build_disk_usage_item(output))
+            continue
+
         if key in {"disk_usage", "memory", "docker_compose_version"}:
             items.append(
                 {

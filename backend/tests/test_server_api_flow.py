@@ -117,6 +117,13 @@ class ServerApiFlowTests(unittest.TestCase):
                     "summary": "Docker is available.",
                     "details": "Docker version 29.3.1, build c2be9cc",
                 },
+                {
+                    "key": "disk_usage",
+                    "label": "Disk usage",
+                    "status": "ok",
+                    "summary": "Root disk has headroom: 24% used, 36G free.",
+                    "details": "12G used of 48G on /; 36G free. Raw: /dev/sda1 48G 12G 36G 24% /",
+                },
             ],
         }
 
@@ -196,6 +203,7 @@ class ServerApiFlowTests(unittest.TestCase):
         self.assertEqual(diagnostics["overall_status"], "ok")
         self.assertEqual(diagnostics["deployment_count"], 0)
         self.assertEqual(diagnostics["listening_ports"], [22, 80, 443])
+        self.assertTrue(any(item["key"] == "disk_usage" for item in diagnostics["items"]))
 
         ports_response = self.client.get(
             f"/servers/{server_id}/suggested-ports?limit=2&start_port=38080"
