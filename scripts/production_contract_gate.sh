@@ -13,6 +13,7 @@ echo "[production-contract] shell syntax"
 bash -n \
   scripts/preflight.sh \
   scripts/remote_release.sh \
+  scripts/release_disk_guard.sh \
   scripts/release_secret_contract_audit.sh \
   scripts/release_smoke_precheck.sh \
   scripts/security_audit.sh \

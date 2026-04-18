@@ -15,6 +15,9 @@ ADMIN_USERNAME="${DEPLOYMATE_ADMIN_USERNAME:-}"
 ADMIN_PASSWORD="${DEPLOYMATE_ADMIN_PASSWORD:-}"
 SKIP_SMOKE="${DEPLOYMATE_SKIP_SMOKE:-0}"
 SMOKE_RUNNER="${DEPLOYMATE_SMOKE_RUNNER:-local}"
+DISK_GUARD_THRESHOLD="${DEPLOYMATE_RELEASE_DISK_GUARD_THRESHOLD:-80}"
+BUILDER_CACHE_MAX_AGE="${DEPLOYMATE_RELEASE_BUILDER_CACHE_MAX_AGE:-24h}"
+BUILDER_CACHE_PRUNE_ALWAYS="${DEPLOYMATE_RELEASE_BUILDER_CACHE_PRUNE_ALWAYS:-1}"
 DRY_RUN=0
 
 usage() {
@@ -40,6 +43,10 @@ Options:
 Environment passthrough:
   Any DEPLOYMATE_SMOKE_* variables already set in the shell are forwarded to
   scripts/post_deploy_smoke.sh. Use that for optional runtime smoke inputs.
+  DEPLOYMATE_RELEASE_DISK_GUARD_THRESHOLD, DEPLOYMATE_RELEASE_BUILDER_CACHE_MAX_AGE,
+  and DEPLOYMATE_RELEASE_BUILDER_CACHE_PRUNE_ALWAYS are forwarded to the remote
+  post-release disk guard. Default behavior prunes only old builder cache (`24h`)
+  after every deploy and warns if `/` still stays above the threshold (`80%`).
   Set DEPLOYMATE_SMOKE_CURL_RESOLVE=host:443:ip when the smoke runner cannot
   resolve the public hostname directly.
   Before any remote build, the helper verifies that the provided admin smoke
@@ -88,6 +95,10 @@ run_cmd() {
   fi
 
   "$@"
+}
+
+shell_quote() {
+  printf '%q' "$1"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -187,6 +198,9 @@ fi
 echo "[remote-release] remote repo: $DEPLOY_REPO_DIR"
 echo "[remote-release] remote env file: $DEPLOY_ENV_FILE"
 echo "[remote-release] smoke runner: $SMOKE_RUNNER"
+echo "[remote-release] disk guard threshold: ${DISK_GUARD_THRESHOLD}%"
+echo "[remote-release] builder cache max age: $BUILDER_CACHE_MAX_AGE"
+echo "[remote-release] builder cache prune always: $BUILDER_CACHE_PRUNE_ALWAYS"
 
 if [ "$SKIP_SMOKE" != "1" ]; then
   echo "[remote-release] release secret contract"
@@ -221,6 +235,11 @@ case "$DEPLOY_SURFACE" in
 esac
 
 REMOTE_AUDIT_CMD="bash scripts/runtime_capability_audit.sh --env-file $quoted_env_file && bash scripts/production_env_audit.sh --env-file $quoted_env_file --require-runtime-files"
+REMOTE_DISK_GUARD_CMD="env \
+DEPLOYMATE_RELEASE_DISK_GUARD_THRESHOLD=$(shell_quote "$DISK_GUARD_THRESHOLD") \
+DEPLOYMATE_RELEASE_BUILDER_CACHE_MAX_AGE=$(shell_quote "$BUILDER_CACHE_MAX_AGE") \
+DEPLOYMATE_RELEASE_BUILDER_CACHE_PRUNE_ALWAYS=$(shell_quote "$BUILDER_CACHE_PRUNE_ALWAYS") \
+bash scripts/release_disk_guard.sh"
 REMOTE_SWITCH_CMD="git switch $DEPLOY_BRANCH || { echo [remote-release]\ regular\ branch\ switch\ failed,\ retrying\ with\ local\ changes\ preserved; git status --short; git switch --merge $DEPLOY_BRANCH; }"
 REMOTE_RECOVER_CMD="git merge --abort >/dev/null 2>&1 || git reset --merge >/dev/null 2>&1 || true"
 
@@ -230,11 +249,11 @@ if [ "$DEPLOY_SURFACE" = "frontend" ]; then
   else
     REMOTE_TARGET_CMD="git fetch origin $DEPLOY_BRANCH && TARGET_SHA=\$(git rev-parse origin/$DEPLOY_BRANCH)"
   fi
-  REMOTE_CMD="cd $DEPLOY_REPO_DIR && $REMOTE_RECOVER_CMD && $REMOTE_TARGET_CMD && RELEASE_WORKTREE=.release-worktrees/\$TARGET_SHA-\$\$ && mkdir -p .release-worktrees && git worktree add --detach \$RELEASE_WORKTREE \$TARGET_SHA && REMOTE_ENV_FILE=$DEPLOY_ENV_FILE && case \"\$REMOTE_ENV_FILE\" in /*) ;; *) REMOTE_ENV_FILE=$DEPLOY_REPO_DIR/\$REMOTE_ENV_FILE ;; esac && cd \$RELEASE_WORKTREE && bash scripts/runtime_capability_audit.sh --env-file \$REMOTE_ENV_FILE && bash scripts/production_env_audit.sh --env-file \$REMOTE_ENV_FILE --require-runtime-files && COMPOSE_PROJECT_NAME=deploymate docker compose -f docker-compose.prod.yml --env-file \$REMOTE_ENV_FILE up -d --build --no-deps frontend && COMPOSE_PROJECT_NAME=deploymate docker compose -f docker-compose.prod.yml --env-file \$REMOTE_ENV_FILE ps frontend && DEPLOYED_SHA=\$TARGET_SHA && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && cd $DEPLOY_REPO_DIR && (git worktree remove --force \$RELEASE_WORKTREE >/dev/null 2>&1 || true)"
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && $REMOTE_RECOVER_CMD && $REMOTE_TARGET_CMD && RELEASE_WORKTREE=.release-worktrees/\$TARGET_SHA-\$\$ && mkdir -p .release-worktrees && git worktree add --detach \$RELEASE_WORKTREE \$TARGET_SHA && REMOTE_ENV_FILE=$DEPLOY_ENV_FILE && case \"\$REMOTE_ENV_FILE\" in /*) ;; *) REMOTE_ENV_FILE=$DEPLOY_REPO_DIR/\$REMOTE_ENV_FILE ;; esac && cd \$RELEASE_WORKTREE && bash scripts/runtime_capability_audit.sh --env-file \$REMOTE_ENV_FILE && bash scripts/production_env_audit.sh --env-file \$REMOTE_ENV_FILE --require-runtime-files && COMPOSE_PROJECT_NAME=deploymate docker compose -f docker-compose.prod.yml --env-file \$REMOTE_ENV_FILE up -d --build --no-deps frontend && COMPOSE_PROJECT_NAME=deploymate docker compose -f docker-compose.prod.yml --env-file \$REMOTE_ENV_FILE ps frontend && DEPLOYED_SHA=\$TARGET_SHA && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_DISK_GUARD_CMD && cd $DEPLOY_REPO_DIR && (git worktree remove --force \$RELEASE_WORKTREE >/dev/null 2>&1 || true)"
 elif [ -n "$DEPLOY_REF" ]; then
-  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD && $REMOTE_DISK_GUARD_CMD"
 else
-  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD && $REMOTE_DISK_GUARD_CMD"
 fi
 
 echo "[remote-release] remote deploy"
@@ -244,10 +263,6 @@ if [ "$SKIP_SMOKE" = "1" ]; then
   echo "[remote-release] smoke skipped by request"
   exit 0
 fi
-
-shell_quote() {
-  printf '%q' "$1"
-}
 
 echo "[remote-release] post-deploy smoke"
 if [ "$SMOKE_RUNNER" = "remote" ]; then

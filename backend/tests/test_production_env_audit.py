@@ -509,6 +509,95 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
             result.stdout.index("bash scripts/release_smoke_precheck.sh"),
             result.stdout.index("ssh deploymate"),
         )
+        self.assertIn("scripts/release_disk_guard.sh", result.stdout)
+        self.assertLess(
+            result.stdout.index("ssh deploymate"),
+            result.stdout.index("bash scripts/post_deploy_smoke.sh"),
+        )
+
+    def test_release_disk_guard_prunes_old_builder_cache_by_default(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            bin_dir = temp_path / "bin"
+            bin_dir.mkdir()
+            prune_log = temp_path / "builder-prune.log"
+
+            (bin_dir / "df").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\\n'\n"
+                "printf '/dev/sda1 100 85 15 85%% /\\n'\n",
+                encoding="utf-8",
+            )
+            (bin_dir / "docker").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >> \"$DOCKER_PRUNE_LOG\"\n"
+                "if [ \"$1\" = \"builder\" ] && [ \"$2\" = \"prune\" ]; then\n"
+                "  printf 'Total:\\t2.0GB\\n'\n"
+                "  exit 0\n"
+                "fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            os.chmod(bin_dir / "df", 0o755)
+            os.chmod(bin_dir / "docker", 0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["DOCKER_PRUNE_LOG"] = str(prune_log)
+
+            result = subprocess.run(
+                ["bash", "scripts/release_disk_guard.sh"],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("pruning builder cache older than 24h", result.stdout)
+            self.assertIn("--force --filter until=24h", prune_log.read_text(encoding="utf-8"))
+
+    def test_release_disk_guard_can_skip_prune_below_threshold(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            bin_dir = temp_path / "bin"
+            bin_dir.mkdir()
+            prune_log = temp_path / "builder-prune.log"
+
+            (bin_dir / "df").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\\n'\n"
+                "printf '/dev/sda1 100 42 58 42%% /\\n'\n",
+                encoding="utf-8",
+            )
+            (bin_dir / "docker").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >> \"$DOCKER_PRUNE_LOG\"\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            os.chmod(bin_dir / "df", 0o755)
+            os.chmod(bin_dir / "docker", 0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["DOCKER_PRUNE_LOG"] = str(prune_log)
+            env["DEPLOYMATE_RELEASE_BUILDER_CACHE_PRUNE_ALWAYS"] = "0"
+            env["DEPLOYMATE_RELEASE_DISK_GUARD_THRESHOLD"] = "80"
+
+            result = subprocess.run(
+                ["bash", "scripts/release_disk_guard.sh"],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("root usage below 80%; skipping builder prune", result.stdout)
+            self.assertFalse(prune_log.exists())
 
 
 if __name__ == "__main__":
