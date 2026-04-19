@@ -9,6 +9,7 @@ export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
   const error = typeof params?.error === "string" ? params.error : "";
   const username = typeof params?.username === "string" ? params.username : "";
+  const hasTrialEntry = liveDemoEnabled || publicSignupEnabled;
   const loginLead = liveDemoEnabled
     ? publicSignupEnabled
       ? "Sign in, open the shared trial account, or create your own trial account."
@@ -16,11 +17,10 @@ export default async function LoginPage({ searchParams }) {
     : publicSignupEnabled
       ? "Sign in if you already have access, or start with a trial account."
       : "Sign in to open the workspace.";
-  const loginHint = liveDemoEnabled
-    ? "Already have your own access? Sign in below. If you only want to look around, open the shared trial account first."
-    : publicSignupEnabled
-      ? "Enter your username and password. Trial access starts on the separate signup path."
-      : "Enter your username and password to open the workspace.";
+  const loginHint = hasTrialEntry
+    ? "Already have your own access? Sign in below. If you only want to look around, start with the trial path first."
+    : "Enter your username and password to open the workspace.";
+  const showSignupHelperBanner = liveDemoEnabled && publicSignupEnabled;
 
   return (
     <main className="page authPage authLoginScene">
@@ -50,26 +50,47 @@ export default async function LoginPage({ searchParams }) {
                 <div className="authCardBadge">Live app</div>
               </div>
 
-              {liveDemoEnabled ? (
+              {hasTrialEntry ? (
                 <div className="authDemoGuide" data-testid="auth-login-trial-card">
-                  <strong>Just want to look around first?</strong>
-                  <p className="formHint">
-                    Open the shared trial account and go straight into the product
-                    without creating your own credentials.
-                  </p>
-                  <form method="post" action="/login/demo" className="authDemoForm authLoginDemoForm">
-                    <button
-                      type="submit"
-                      className="landingButton secondaryButton authDemoAction authLoginDemoAction"
-                      data-testid="auth-demo-submit-button"
-                    >
-                      Open trial account
-                    </button>
-                  </form>
+                  {liveDemoEnabled ? (
+                    <>
+                      <strong>Just want to look around first?</strong>
+                      <p className="formHint">
+                        Open the shared trial account and go straight into the product
+                        without creating your own credentials.
+                      </p>
+                      <form method="post" action="/login/demo" className="authDemoForm authLoginDemoForm">
+                        <button
+                          type="submit"
+                          className="landingButton secondaryButton authDemoAction authLoginDemoAction"
+                          data-testid="auth-demo-submit-button"
+                        >
+                          Open trial account
+                        </button>
+                      </form>
+                    </>
+                  ) : (
+                    <>
+                      <strong>New here?</strong>
+                      <p className="formHint">
+                        Create a trial account and go straight into the product
+                        without starting any business or commercial setup first.
+                      </p>
+                      <div className="authDemoForm authLoginDemoForm">
+                        <Link
+                          href="/register"
+                          className="landingButton secondaryButton authDemoAction authLoginDemoAction"
+                          data-testid="auth-login-trial-link"
+                        >
+                          Create trial account
+                        </Link>
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : null}
 
-              {liveDemoEnabled ? (
+              {hasTrialEntry ? (
                 <div className="authLoginDivider" aria-hidden="true">
                   <span />
                   <small>or sign in with your own access</small>
@@ -114,7 +135,7 @@ export default async function LoginPage({ searchParams }) {
 
             {error ? <div className="banner error" data-testid="auth-login-error-banner">{error}</div> : null}
 
-            {publicSignupEnabled ? (
+            {showSignupHelperBanner ? (
               <div className="banner subtle authBanner" data-testid="auth-login-signup-banner">
                 New here?{" "}
                 <Link href="/register" className="inlineLink" data-testid="auth-login-register-link">

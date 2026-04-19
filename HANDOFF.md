@@ -38,7 +38,7 @@ Updated: 2026-04-18
   - `deployment passport` now has an honest closure point: steady-state review, fresh-rollout verification, single-runtime incident framing, single-runtime recovery choice, stable stack recovery posture, and stack-specific incident framing all live inside one operator artifact instead of being split across lower cards
   - the first proactive ownership slice is now closed inside template review without widening into server sharing: admins can still review every handoff asset, but foreign-owned baselines are now duplicate-first for direct deploy and mutation
   - latest dense-night-shift rerun on `2026-04-19 21:10 +07` closed `login trial account entry clarity v0` on the current dirty tree:
-    - `/login` now treats the shared trial account as a first-class public entry instead of a buried “live demo” fallback: the intro copy explains it, the card exposes one explicit `Open trial account` path, and the regular username/password form stays clearly framed as the path for people who already have their own access
+    - `/login` now treats trial access as a first-class public entry instead of leaving it as a buried helper link: when shared demo access is enabled the page exposes one explicit `Open trial account` action, and when only public signup is enabled the same card becomes a direct `Create trial account` entry instead of hiding trial behind a subtle footer banner
     - the auth smoke contract now pins that trial-entry surface too, so future auth copy cleanup cannot silently remove the quickest “just let me look around” route from the public entry page
     - `bash -n scripts/project_automation_smoke_checks.sh`
     - `npm --prefix frontend run build`
