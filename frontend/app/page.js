@@ -104,14 +104,6 @@ export default function LandingPage() {
             <a href="#pricing" className="landingButton ghostButton">
               Pricing
             </a>
-            <TrackedLink
-              href="/habr"
-              className="landingButton ghostButton"
-              eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
-              eventProps={{ surface: "topbar", cta: "habr_reader_path" }}
-            >
-              Habr path
-            </TrackedLink>
             <Link href="/login" className="landingButton secondaryButton">
               Login
             </Link>
@@ -559,14 +551,6 @@ export default function LandingPage() {
               >
                 Open demo packet
               </a>
-              <TrackedLink
-                href="/habr"
-                className="landingButton ghostButton"
-                eventName={FUNNEL_EVENT_NAMES.LANDING_CTA}
-                eventProps={{ surface: "packaging_strip", cta: "habr_reader_path" }}
-              >
-                Habr reader path
-              </TrackedLink>
             </div>
           </div>
 

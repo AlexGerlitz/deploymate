@@ -268,9 +268,6 @@ export default function UpgradePage() {
             >
               Read policy
             </a>
-            <Link href="/habr" className="linkButton">
-              Habr reader path
-            </Link>
             <Link href="/commercial-license" className="linkButton">
               Commercial license page
             </Link>
@@ -391,11 +388,7 @@ export default function UpgradePage() {
             >
               design-partner demo packet
             </a>
-            . If this request came from a Russian Habr article, keep the dedicated{" "}
-            <Link href="/habr" className="inlineLink">
-              Habr reader path
-            </Link>
-            {" "}as the main public entry instead of dropping people straight into the form.
+            .
           </div>
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
