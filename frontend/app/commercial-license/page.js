@@ -50,6 +50,11 @@ const contactChannels = [
     value: "https://github.com/AlexGerlitz",
     href: "https://github.com/AlexGerlitz",
   },
+  {
+    label: "Habr reader path",
+    value: "/habr",
+    href: "/habr",
+  },
 ];
 const russianMaterials = [
   {
@@ -220,6 +225,9 @@ export default function CommercialLicensePage() {
           <div className="formActions authActions">
             <Link href="/upgrade" className="landingButton primaryButton authPrimaryAction">
               Start business path conversation
+            </Link>
+            <Link href="/habr" className="linkButton">
+              Open Habr reader path
             </Link>
             <a
               href={buildBusinessMailto("DeployMate commercial license")}
