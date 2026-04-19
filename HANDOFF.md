@@ -37,6 +37,24 @@ Updated: 2026-04-18
   - `Phase 5: Commercial Packaging` now has an honest closure point: the buyer path already shows a clear self-hosted commercial offer, explicit agency/multi-client packaging, Russian-language install/operator materials, and a concrete pilot onboarding/support motion instead of leaving that commercial story inside author narration
   - `deployment passport` now has an honest closure point: steady-state review, fresh-rollout verification, single-runtime incident framing, single-runtime recovery choice, stable stack recovery posture, and stack-specific incident framing all live inside one operator artifact instead of being split across lower cards
   - the first proactive ownership slice is now closed inside template review without widening into server sharing: admins can still review every handoff asset, but foreign-owned baselines are now duplicate-first for direct deploy and mutation
+  - latest dense-night-shift rerun on `2026-04-19 20:03 +07` closed `server review storage-pressure step-strip truthfulness v0` on the current dirty tree:
+    - `Server Review` no longer keeps the Step 1 strip stuck on generic `Run one check` wording after storage pressure is already known: that current step now reads as clearing the blocker and rerunning readiness, which matches the rest of the page instead of contradicting it
+    - beginner smoke now checks the storage-pressure strip copy directly, so the saved-server blocker path keeps one truthful current job across the hero, queue card, and progress strip
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: Step 1 storage-pressure state now reads consistently from headline to strip to task cards, so the next bounded gap should be a broader cross-screen hesitation review rather than more local step-strip polish
+  - latest dense-night-shift rerun on `2026-04-19 19:58 +07` closed `deployment workflow guardrail live-lane truthfulness v0` on the current dirty tree:
+    - Step 2 no longer opens on the create lane when host disk pressure already blocks another rollout and live deployments exist: the guardrail path now lands directly on the live-review tab, matching the hero’s `Review live apps instead` instruction instead of asking the operator to mentally override the screen
+    - beginner smoke now checks that host-disk guardrail mode activates the live tab and leaves the create tab inactive, so the blocked rollout path points at runtime review on first render instead of hiding it behind a manual tab switch
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: Step 2 guardrail mode now points to the same visible lane, hero action, and panel copy, so the next bounded gap should be a broader cross-screen hesitation review rather than more local tab/CTA cleanup
+  - latest dense-night-shift rerun on `2026-04-19 19:52 +07` closed `server review queue-action truthfulness v0` on the current dirty tree:
+    - `Server Review` hero no longer pretends that an in-page scroll/focus action is the real Step 1 primary: when the current job is “open this server check” or “open cleanup path,” the hero button now stays secondary and the selected server card keeps the actual primary check/cleanup action
+    - beginner smoke now covers both pending-check and storage-pressure Step 1 states, so queue-navigation hero actions stay visibly different from the real selected-card action that changes server readiness
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the remaining obvious false-primary pattern on `Server Review` is gone, so the next bounded gap should be a true cross-screen hesitation pass rather than more local hero/button truthfulness cleanup
   - latest dense-night-shift rerun on `2026-04-19 19:43 +07` closed `overview live-review low-disk blocked-state truthfulness v0` on the current dirty tree:
     - `/app` no longer calls Step 2 merely `Locked` when live deployments exist but host disk pressure blocks the next rollout: that card now stays explicitly `Blocked`, matching its cleanup-first copy and destination instead of reading like a generic permission gate
     - beginner smoke now checks the steady-state low-disk overview path for that explicit blocked state, so the live-review workspace tells the operator that rollout is paused by cleanup, not by some vague unavailable step

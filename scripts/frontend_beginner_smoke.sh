@@ -410,6 +410,45 @@ run_beginner_server_review_storage_pressure_smoke() {
     echo "[${smoke_name}] server review lost the storage cleanup primary action" >&2
     exit 1
   fi
+
+  if ! grep -Eq 'class="secondaryButton serverReviewHeroPrimaryAction"[^>]*>Open cleanup path<' "$server_review_html"; then
+    echo "[${smoke_name}] server review storage-pressure hero still competes with the real cleanup action instead of acting like a guide into the task card" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'serverReviewStepCard isCurrent[^>]*><span>2\. Check</span><strong>Clear the blocker</strong><p>Free space on the saved server, then rerun readiness\.' "$server_review_html"; then
+    echo "[${smoke_name}] server review step strip still talks like readiness is the current job after storage pressure is already known" >&2
+    exit 1
+  fi
+}
+
+run_beginner_server_review_pending_smoke() {
+  local smoke_name="frontend-beginner-server-review-pending-smoke"
+  local dist_dir=".next-smoke-beginner-server-review-pending-static"
+  local server_review_html=""
+
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO=pending
+
+  server_review_html="$(beginner_static_html_file "$dist_dir" "/app/server-review")"
+
+  if ! grep -Eq 'data-testid="server-review-page-title">Run one readiness check\.' "$server_review_html"; then
+    echo "[${smoke_name}] server review hero did not switch to the pending-check title" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'class="secondaryButton serverReviewHeroPrimaryAction"[^>]*>Open this server check<' "$server_review_html"; then
+    echo "[${smoke_name}] server review pending hero still competes with the real readiness action instead of guiding into the selected card" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<button[^>]*data-testid="smoke-server-primary-action"[^>]*class="landingButton primaryButton")|(<button[^>]*class="landingButton primaryButton"[^>]*data-testid="smoke-server-primary-action")' "$server_review_html"; then
+    echo "[${smoke_name}] server review pending state lost the actual primary readiness action inside the selected card" >&2
+    exit 1
+  fi
 }
 
 run_beginner_workflow_disk_guardrail_smoke() {
@@ -432,6 +471,16 @@ run_beginner_workflow_disk_guardrail_smoke() {
 
   if ! grep -Eq 'data-testid="deployment-workflow-hero-primary-action"[^>]*>Review live apps instead<' "$workflow_html"; then
     echo "[${smoke_name}] workflow hero lost the live-review primary action during host disk pressure" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<button[^>]*data-testid="deployment-workflow-tab-live"[^>]*class="active")|(<button[^>]*class="active"[^>]*data-testid="deployment-workflow-tab-live")' "$workflow_html"; then
+    echo "[${smoke_name}] workflow guardrail path did not switch the visible lane into live review" >&2
+    exit 1
+  fi
+
+  if grep -Eq '(<button[^>]*data-testid="deployment-workflow-tab-create"[^>]*class="active")|(<button[^>]*class="active"[^>]*data-testid="deployment-workflow-tab-create")' "$workflow_html"; then
+    echo "[${smoke_name}] workflow guardrail path still opens on the create tab while rollout is blocked" >&2
     exit 1
   fi
 
@@ -777,6 +826,7 @@ run_beginner_admin_server_ready_smoke
 run_beginner_admin_prerequisite_smoke
 run_beginner_admin_server_ready_low_disk_smoke
 run_beginner_server_review_storage_pressure_smoke
+run_beginner_server_review_pending_smoke
 run_beginner_workflow_disk_guardrail_smoke
 run_beginner_admin_live_review_smoke
 run_beginner_admin_live_review_low_disk_smoke
@@ -789,6 +839,7 @@ run_beginner_export_payload_smoke
 echo "[frontend-beginner-smoke] first-time admin path rendered"
 echo "[frontend-beginner-smoke] admin server-ready first deploy path rendered"
 echo "[frontend-beginner-smoke] admin server-ready low-disk path rendered"
+echo "[frontend-beginner-smoke] server review pending path rendered"
 echo "[frontend-beginner-smoke] workflow disk-guardrail path rendered"
 echo "[frontend-beginner-smoke] admin live-review handoff rendered"
 echo "[frontend-beginner-smoke] admin live-review low-disk path rendered"

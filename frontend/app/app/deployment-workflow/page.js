@@ -183,7 +183,7 @@ const smokeWorkflowFixture =
             server_id: "",
           },
           workflowMessage: "",
-          workflowTab: "create",
+          workflowTab: "live",
           submitSuccess: "",
           createdDeployment: null,
           templateDeploySuccess: "",
@@ -1583,6 +1583,13 @@ function DeploymentWorkflowPageContent() {
 
     if (workflowState.mode === "live") {
       setWorkflowTab("live");
+      return;
+    }
+
+    if (workflowState.mode === "guardrail" && deployments.length > 0) {
+      if (workflowTab !== "live") {
+        setWorkflowTab("live");
+      }
       return;
     }
 

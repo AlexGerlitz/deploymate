@@ -431,8 +431,10 @@ function ServerReviewPageContent() {
     {
       id: "check",
       label: "2. Check",
-      title: "Run one check",
-      detail: "Confirm the server is reachable and ready.",
+      title: selectedNeedsReviewStoragePressure ? "Clear the blocker" : "Run one check",
+      detail: selectedNeedsReviewStoragePressure
+        ? "Free space on the saved server, then rerun readiness."
+        : "Confirm the server is reachable and ready.",
       state: noServers ? "upcoming" : selectedReadyItem ? "complete" : "current",
     },
     {
@@ -1137,7 +1139,7 @@ function ServerReviewPageContent() {
               <p className="serverReviewHeroSpotlightNote">{heroSpotlight.support}</p>
               <button
                 type="button"
-                className={`${heroSpotlight.actionKind === "create" ? "secondaryButton" : "landingButton primaryButton"} serverReviewHeroPrimaryAction`}
+                className={`${heroSpotlight.actionKind === "continue" ? "landingButton primaryButton" : "secondaryButton"} serverReviewHeroPrimaryAction`}
                 onClick={handleHeroPrimaryAction}
               >
                 {heroSpotlight.actionLabel}
