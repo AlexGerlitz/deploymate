@@ -9,6 +9,18 @@ export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
   const error = typeof params?.error === "string" ? params.error : "";
   const username = typeof params?.username === "string" ? params.username : "";
+  const loginLead = liveDemoEnabled
+    ? publicSignupEnabled
+      ? "Sign in, open the shared trial account, or create your own trial account."
+      : "Sign in or open the shared trial account to look around quickly."
+    : publicSignupEnabled
+      ? "Sign in if you already have access, or start with a trial account."
+      : "Sign in to open the workspace.";
+  const loginHint = liveDemoEnabled
+    ? "Already have your own access? Sign in below. If you only want to look around, open the shared trial account first."
+    : publicSignupEnabled
+      ? "Enter your username and password. Trial access starts on the separate signup path."
+      : "Enter your username and password to open the workspace.";
 
   return (
     <main className="page authPage authLoginScene">
@@ -24,11 +36,7 @@ export default async function LoginPage({ searchParams }) {
           <div className="authLoginIntro">
             <span className="eyebrow">Live product access</span>
             <h1>DeployMate</h1>
-            <p className="authLoginLead">
-              {publicSignupEnabled
-                ? "Sign in if you already have access, or start with a trial account."
-                : "Sign in to open the workspace."}
-            </p>
+            <p className="authLoginLead">{loginLead}</p>
           </div>
 
           <article className="card formCard authCard authLoginCard" data-testid="auth-login-card">
@@ -37,12 +45,37 @@ export default async function LoginPage({ searchParams }) {
                 <div>
                   <div className="eyebrow">Secure access</div>
                   <h2 data-testid="auth-login-title">Login</h2>
-                  <p className="formHint">
-                    Enter your username and password. Trial access starts on the separate signup path.
-                  </p>
+                  <p className="formHint">{loginHint}</p>
                 </div>
                 <div className="authCardBadge">Live app</div>
               </div>
+
+              {liveDemoEnabled ? (
+                <div className="authDemoGuide" data-testid="auth-login-trial-card">
+                  <strong>Just want to look around first?</strong>
+                  <p className="formHint">
+                    Open the shared trial account and go straight into the product
+                    without creating your own credentials.
+                  </p>
+                  <form method="post" action="/login/demo" className="authDemoForm authLoginDemoForm">
+                    <button
+                      type="submit"
+                      className="landingButton secondaryButton authDemoAction authLoginDemoAction"
+                      data-testid="auth-demo-submit-button"
+                    >
+                      Open trial account
+                    </button>
+                  </form>
+                </div>
+              ) : null}
+
+              {liveDemoEnabled ? (
+                <div className="authLoginDivider" aria-hidden="true">
+                  <span />
+                  <small>or sign in with your own access</small>
+                  <span />
+                </div>
+              ) : null}
 
               <form className="form" method="post" action="/login/submit" data-testid="auth-login-form">
                 <label className="field">
@@ -78,29 +111,6 @@ export default async function LoginPage({ searchParams }) {
                 </div>
               </form>
             </div>
-
-            {liveDemoEnabled ? (
-              <>
-                <div className="authLoginDivider" aria-hidden="true">
-                  <span />
-                  <small>or</small>
-                  <span />
-                </div>
-
-                <form method="post" action="/login/demo" className="authDemoForm authLoginDemoForm">
-                  <button
-                    type="submit"
-                    className="linkButton authDemoAction authLoginDemoAction"
-                    data-testid="auth-demo-submit-button"
-                  >
-                    Open live demo
-                  </button>
-                  <p className="formHint">
-                    Fastest way to look around before creating an account.
-                  </p>
-                </form>
-              </>
-            ) : null}
 
             {error ? <div className="banner error" data-testid="auth-login-error-banner">{error}</div> : null}
 

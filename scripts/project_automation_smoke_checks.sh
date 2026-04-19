@@ -10,7 +10,7 @@ automation_smoke_auth_checks() {
 /login|login username input|data-testid="auth-login-username-input"
 /login|login password input|data-testid="auth-login-password-input"
 /login|login submit button|data-testid="auth-login-submit-button"
-/login|login signup or helper path|data-testid="auth-login-signup-banner"|data-testid="auth-demo-submit-button"|Quiet login, then straight into the product\.
+/login|login trial or helper path|data-testid="auth-login-trial-card"|data-testid="auth-login-signup-banner"|data-testid="auth-demo-submit-button"|Quiet login, then straight into the product\.
 /register|register card|data-testid="auth-register-card"
 /register|register title|data-testid="auth-register-title"
 /register|register username input or disabled banner|data-testid="auth-register-username-input"|data-testid="auth-register-disabled-banner"

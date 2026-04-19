@@ -37,6 +37,12 @@ Updated: 2026-04-18
   - `Phase 5: Commercial Packaging` now has an honest closure point: the buyer path already shows a clear self-hosted commercial offer, explicit agency/multi-client packaging, Russian-language install/operator materials, and a concrete pilot onboarding/support motion instead of leaving that commercial story inside author narration
   - `deployment passport` now has an honest closure point: steady-state review, fresh-rollout verification, single-runtime incident framing, single-runtime recovery choice, stable stack recovery posture, and stack-specific incident framing all live inside one operator artifact instead of being split across lower cards
   - the first proactive ownership slice is now closed inside template review without widening into server sharing: admins can still review every handoff asset, but foreign-owned baselines are now duplicate-first for direct deploy and mutation
+  - latest dense-night-shift rerun on `2026-04-19 21:10 +07` closed `login trial account entry clarity v0` on the current dirty tree:
+    - `/login` now treats the shared trial account as a first-class public entry instead of a buried “live demo” fallback: the intro copy explains it, the card exposes one explicit `Open trial account` path, and the regular username/password form stays clearly framed as the path for people who already have their own access
+    - the auth smoke contract now pins that trial-entry surface too, so future auth copy cleanup cannot silently remove the quickest “just let me look around” route from the public entry page
+    - `bash -n scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run build`
+    - the stop point changes here: public visitors now have one clearer way to enter the product without creating credentials, so the next bounded gap should be live validation of that public entry on prod, not more generic auth-page wording churn
   - latest dense-night-shift rerun on `2026-04-19 20:48 +07` closed `public entry de-habrification v0` on the current dirty tree:
     - the public site no longer carries a dedicated `/habr` route or Habr-labeled navigation on landing, `/upgrade`, or `/commercial-license`; the generic homepage is again the only public entry and article traffic should land there without channel-specific branding inside the product
     - Russian install/operator/pilot proof remains visible through the existing buyer-facing surfaces, but the product no longer advertises a special article funnel inside its own navigation
