@@ -1226,6 +1226,19 @@ function DeploymentWorkflowPageContent() {
       : workflowPrimaryMode === "live"
         ? "Because something already needs review, start by checking the live queue before you create another deployment."
         : "Keep Step 2 simple: choose one app image, a compose stack intake, or a saved setup first, then open advanced fields only if the rollout really needs them.";
+  const deploymentWorkflowHeroTitle = waitingForAdminTarget
+    ? "Wait for one admin-managed target."
+    : workflowState.mode === "prerequisite"
+      ? "Finish Step 1 before rollout setup."
+      : workflowState.mode === "guardrail"
+        ? "Clear host disk pressure before another rollout."
+        : workflowPrimaryMode === "live"
+          ? "Review live apps before another rollout."
+          : selectedCreateServer
+            ? `Choose what to run on ${selectedCreateServer.name || selectedServerLabel}.`
+            : templates.length > 0
+              ? "Choose one app or one saved setup."
+              : "Choose one app to run first.";
   const firstDeployHandoffSummary =
     selectedCreateServer && requestedWithServerContext
       ? requestedFromOverview
@@ -2706,7 +2719,13 @@ function DeploymentWorkflowPageContent() {
               : memberWorkflowNextStep.primaryAction === "Fix the create form"
                 ? { kind: "button", tab: "create", label: "Fix the create form" }
                 : { kind: "button", tab: "create", label: "Create deployment" };
-  const showMainNextStepPrimaryAction = !firstDeployHandoffFocusMode || Boolean(deployBlocker?.blocker);
+  const workflowHeroOwnsPrimaryAction =
+    serverAccessBlocked ||
+    workflowState.mode === "prerequisite" ||
+    workflowState.mode === "guardrail" ||
+    workflowPrimaryMode === "live";
+  const showMainNextStepPrimaryAction =
+    !firstDeployHandoffFocusMode && !workflowHeroOwnsPrimaryAction;
   const primaryTemplateDeployLabel = deployBlocker?.blocker
     ? "Blocked by low disk"
     : deployingTemplateId === primaryTemplate?.id
@@ -2757,7 +2776,7 @@ function DeploymentWorkflowPageContent() {
           <div className="header">
             <div>
               <div className="eyebrow">Step 2</div>
-              <h1 data-testid="deployment-workflow-title">Step 2: Choose what to run and deploy it</h1>
+              <h1 data-testid="deployment-workflow-title">{deploymentWorkflowHeroTitle}</h1>
               <p className="formHint">{stepTwoLead}</p>
               {!imageFirstCompactMode ? <p className="formHint">{stepTwoSupport}</p> : null}
               <p className="formHint">
@@ -2865,7 +2884,11 @@ function DeploymentWorkflowPageContent() {
               </article>
             </div>
             <div className="formActions">
-              <Link href="/app/server-review" className="landingButton primaryButton">
+              <Link
+                href="/app/server-review"
+                className="landingButton secondaryButton"
+                data-testid="deployment-workflow-prerequisite-panel-action"
+              >
                 Open server review
               </Link>
               <Link href="/app" className="landingButton secondaryButton">
@@ -2947,7 +2970,8 @@ function DeploymentWorkflowPageContent() {
             <div className="formActions">
               <button
                 type="button"
-                className="landingButton primaryButton"
+                className="landingButton secondaryButton"
+                data-testid="deployment-workflow-member-live-panel-action"
                 onClick={() => setWorkflowTab("live")}
               >
                 Review live apps instead
@@ -2985,7 +3009,11 @@ function DeploymentWorkflowPageContent() {
               </article>
             </div>
             <div className="formActions">
-              <Link href="/app" className="landingButton primaryButton">
+              <Link
+                href="/app"
+                className="landingButton secondaryButton"
+                data-testid="deployment-workflow-member-blocked-panel-action"
+              >
                 Back to overview
               </Link>
               {filteredDeployments.length > 0 ? (

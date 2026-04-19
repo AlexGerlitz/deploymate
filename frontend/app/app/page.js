@@ -161,6 +161,63 @@ export default function HomePage() {
     Boolean(hostDiskRunbook) &&
     (overviewPrimaryPath.reason === "first-deploy" || overviewPrimaryPath.reason === "steady-state");
   const hostDiskFirstDeployBlocked = hostDiskRolloutBlocked && !hasLiveDeployments;
+  const overviewHeroState = hostDiskFirstDeployBlocked
+    ? {
+        eyebrow: "DeployMate workspace",
+        title: "Clear host disk pressure before the first rollout.",
+        guide:
+          "Free space on the DeployMate host first. After that, refresh overview and return to the first deploy path.",
+      }
+    : overviewPrimaryPath.reason === "server-setup"
+      ? {
+          eyebrow: "DeployMate workspace",
+          title: "Connect one server first.",
+          guide:
+            "Save one target, run one check, and come back here only after Step 1 is truly done.",
+        }
+      : overviewPrimaryPath.reason === "admin-target-needed"
+        ? {
+            eyebrow: "DeployMate workspace",
+            title: "Wait for one admin-managed server target.",
+            guide:
+              "This workspace stays blocked until an admin confirms the saved remote target for Step 1.",
+          }
+        : overviewPrimaryPath.reason === "incident"
+          ? {
+              eyebrow: "DeployMate workspace",
+              title: "Review what is already live.",
+              guide:
+                "Check the current runtime first, then decide whether another rollout is actually safe.",
+            }
+          : overviewPrimaryPath.reason === "first-deploy"
+            ? {
+                eyebrow: "DeployMate workspace",
+                title: "Choose what to run on the ready server.",
+                guide:
+                  "Step 1 is done. The shortest path now is the first deploy, not more server setup.",
+              }
+            : {
+                eyebrow: "DeployMate workspace",
+                title: "Review live apps before the next rollout.",
+                guide:
+                  "Use this page to verify what is already running before you start another deliberate change.",
+              };
+  const workspaceStatusLineItems = [
+    degradedOpsAttentionItems.length > 0
+      ? {
+          key: "degraded",
+          testId: "ops-degraded-banner",
+          text: `Degraded signals: ${degradedOpsAttentionItems.map((item) => item.title).join(" · ")}.`,
+        }
+      : null,
+    {
+      key: "refresh",
+      testId: "runtime-smoke-banner",
+      text: smokeMode
+        ? "Smoke mode uses fixture data for overview and deployment entry surfaces."
+        : "Auto-refresh: overview signals and reports update every 8 seconds.",
+    },
+  ].filter(Boolean);
   const beginnerNextStep = overviewPrimaryPath.reason === "server-setup"
     ? "Next best step: connect and verify one server."
     : overviewPrimaryPath.reason === "incident"
@@ -189,6 +246,10 @@ export default function HomePage() {
   const stepOneIsPrimary =
     overviewPrimaryPath.reason === "server-setup" ||
     overviewPrimaryPath.reason === "admin-target-needed";
+  const stepTwoIsPrimary =
+    !stepOneIsPrimary &&
+    !stepThreeIsPrimary &&
+    !hostDiskFirstDeployBlocked;
   const beginnerSteps = [
     {
       key: "step-1",
@@ -247,7 +308,8 @@ export default function HomePage() {
         : hasLiveDeployments
           ? "Start another deploy"
         : "Choose app to run",
-      primary: !stepOneIsPrimary && !stepThreeIsPrimary,
+      primary: stepTwoIsPrimary,
+      blocked: hostDiskFirstDeployBlocked,
       destination: hostDiskRolloutBlocked ? "Blocked until host cleanup" : "",
       disabled: stepTwoBlocked || memberNewDeploymentBlocked,
     },
@@ -298,7 +360,13 @@ export default function HomePage() {
           : memberHasLiveDeployments
             ? "Review live apps"
             : "Review health",
-    boardState: card.disabled ? (card.primary ? "Blocked" : "Locked") : card.primary ? "Current" : "Ready",
+    boardState: card.blocked
+      ? "Blocked"
+      : card.disabled
+        ? (card.primary ? "Blocked" : "Locked")
+        : card.primary
+          ? "Current"
+          : "Ready",
     boardDestination: card.destination || (card.href.includes("/app/server-review")
       ? "Opens Server review"
       : card.href.includes("/app/deployment-workflow")
@@ -674,10 +742,10 @@ export default function HomePage() {
       <div className="container workspaceActionContainer">
         <section className="workspaceActionSurface" data-testid="workspace-action-surface">
           <div className="workspaceActionSurfaceHeader" data-testid="workspace-scenario-card">
-            <span className="workspaceActionSurfaceEyebrow">Main workspace</span>
-            <h1 data-testid="runtime-page-title">Choose the next step.</h1>
-            <p>{beginnerNextStep}</p>
-            <p data-testid="workspace-scenario-title">Step 1, Step 2, Step 3.</p>
+            <span className="workspaceActionSurfaceEyebrow">{overviewHeroState.eyebrow}</span>
+            <h1 data-testid="runtime-page-title">{overviewHeroState.title}</h1>
+            <p>{overviewHeroState.guide}</p>
+            <p data-testid="workspace-scenario-title">{beginnerNextStep}</p>
             {primaryWorkspaceAction ? (
               <div className="formActions">
                 <Link
@@ -689,6 +757,13 @@ export default function HomePage() {
                 </Link>
               </div>
             ) : null}
+            <div className="workspaceMetaLine" data-testid="workspace-status-line">
+              {workspaceStatusLineItems.map((item) => (
+                <span key={item.key} data-testid={item.testId}>
+                  {item.text}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="workspaceActionGrid" data-testid="workspace-quick-actions">
@@ -748,12 +823,6 @@ export default function HomePage() {
           {templatesError ? <div className="banner error">{templatesError}</div> : null}
           {opsActionError ? <div className="banner error">{opsActionError}</div> : null}
           {opsActionMessage ? <div className="banner success">{opsActionMessage}</div> : null}
-          {degradedOpsAttentionItems.length > 0 ? (
-            <div className="banner subtle" data-testid="ops-degraded-banner">
-              Some workspace signals are in degraded mode right now:{" "}
-              {degradedOpsAttentionItems.map((item) => item.title).join(" · ")}.
-            </div>
-          ) : null}
           {currentUser?.must_change_password ? (
             <div className="banner error">
               You are still using the default admin password.{" "}
@@ -763,16 +832,6 @@ export default function HomePage() {
               .
             </div>
           ) : null}
-          {smokeMode ? (
-            <div className="banner subtle" data-testid="runtime-smoke-banner">
-              Smoke mode uses fixture data for overview and deployment entry surfaces.
-            </div>
-          ) : (
-            <div className="banner subtle" data-testid="runtime-smoke-banner">
-              Overview signals and reports refresh automatically every 8 seconds.
-            </div>
-          )}
-
         </div>
 
         {hostDiskRunbook ? (

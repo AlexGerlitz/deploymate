@@ -37,6 +37,72 @@ Updated: 2026-04-18
   - `Phase 5: Commercial Packaging` now has an honest closure point: the buyer path already shows a clear self-hosted commercial offer, explicit agency/multi-client packaging, Russian-language install/operator materials, and a concrete pilot onboarding/support motion instead of leaving that commercial story inside author narration
   - `deployment passport` now has an honest closure point: steady-state review, fresh-rollout verification, single-runtime incident framing, single-runtime recovery choice, stable stack recovery posture, and stack-specific incident framing all live inside one operator artifact instead of being split across lower cards
   - the first proactive ownership slice is now closed inside template review without widening into server sharing: admins can still review every handoff asset, but foreign-owned baselines are now duplicate-first for direct deploy and mutation
+  - latest dense-night-shift rerun on `2026-04-18 23:16 +07` closed `server review empty-state dual-primary cleanup v0` on the current dirty tree:
+    - empty `Server Review` no longer shows two competing primary actions on the same Step 1 screen: the hero button now acts as a secondary guide into the add-server form, while the actual form submit remains the only primary save action
+    - beginner smoke now checks that split directly, so Step 1 starts with one clear submit action instead of a hero button that visually competes with it
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the biggest surviving empty-state CTA conflict on `Server Review` is gone, so the next bounded gap should be a true end-to-end hesitation pass rather than more local Step 1 CTA cleanup
+  - latest dense-night-shift rerun on `2026-04-18 23:09 +07` closed `server review empty-state hero CTA truthfulness v0` on the current dirty tree:
+    - empty `Server Review` no longer labels the hero button as if it already saves a server: the hero now truthfully says it opens the add-server form, while the form submit keeps the actual `Save first server` action label
+    - beginner smoke now checks that split explicitly, so Step 1 starts with one guidance CTA and one real submit action instead of two different buttons claiming to do the same save
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the empty-state Step 1 hero no longer fakes the save action, so the next bounded gap should be a true end-to-end hesitation pass rather than more local label cleanup
+  - latest dense-night-shift rerun on `2026-04-18 23:01 +07` closed `server review ready-state banner cleanup v0` on the current dirty tree:
+    - `Server Review` ready-state no longer repeats a green `Step 1 is complete` banner inside the selected server card when the hero already owns that same conclusion and next-step handoff
+    - beginner smoke now checks the ready handoff path for absence of that duplicate banner, so the selected ready server card stays focused on optional recheck vs next-step detail instead of echoing the hero
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the loudest remaining ready-state repetition on `Server Review` is gone, so the next bounded gap should be a true cross-screen hesitation review rather than more local duplicate-callout cleanup
+  - latest dense-night-shift rerun on `2026-04-18 22:55 +07` closed `deployment workflow panel duplicate CTA cleanup v0` on the current dirty tree:
+    - Step 2 blocked/support panels no longer re-promote the same action that the hero already owns: prerequisite `Open server review`, member-live `Review live apps instead`, and member-waiting `Back to overview` now stay as secondary follow-up buttons inside their panels instead of competing primary CTAs
+    - beginner smoke now checks those three panel actions directly, including a dedicated admin prerequisite scenario, so blocked/live-review Step 2 states keep one truthful primary action at the top of the screen
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the remaining obvious duplicate CTA layer on Step 2 blocked states is gone, so the next bounded gap should be a true full-path beginner hesitation pass rather than another local button-demotion sweep
+  - latest dense-night-shift rerun on `2026-04-18 22:46 +07` closed `server review ready-state duplicate CTA cleanup v0` on the current dirty tree:
+    - `Server Review` no longer shouts the same Step 2 action twice when one server is already ready: the hero keeps the primary handoff into rollout setup, while the selected ready card now keeps that same path as a secondary follow-up instead of competing for the same click
+    - beginner smoke now checks the ready server card for a demoted Step 2 action, so Step 1 keeps one clear primary next step when readiness is already known
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the biggest surviving duplicate CTA on `Server Review` is gone, so the next bounded gap should be a real full-path hesitation pass or one remaining cross-screen action conflict, not more local CTA demotion on this screen
+  - latest dense-night-shift rerun on `2026-04-18 22:39 +07` closed `deployment workflow duplicate primary CTA cleanup v0` on the current dirty tree:
+    - `Deployment Workflow` no longer renders the same primary action twice on review-first and blocked states: when the hero already owns the truthful next click, the lower `Do this now` card now keeps explanation and copy tools only instead of repeating the same button again
+    - beginner smoke now checks the default review-first workflow and the member waiting workflow for absence of that lower duplicate CTA, so Step 2 keeps one clear primary action instead of competing hero and mid-page buttons
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the biggest surviving duplicate CTA on Step 2 is gone, so the next bounded gap should be a real full-path hesitation review or one remaining Step 1/Step 2 action conflict, not another generic copy pass
+  - latest dense-night-shift rerun on `2026-04-18 22:28 +07` closed `server review hero state copy simplification v0` on the current dirty tree:
+    - `Server Review` no longer opens empty, ready, and storage-pressure states with one generic Step 1 headline: the left hero now says whether the real job is saving the first target, moving on because one server is already ready, clearing low disk on the saved server, or finishing one readiness check
+    - beginner smoke now pins the default empty-state title plus the ready-server and storage-pressure Step 1 titles, so the first screen in the path keeps describing the actual state instead of making the user infer it from the right-side spotlight only
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the three beginner top-level screens now all open with state-driven framing, so the next bounded gap should be a cross-screen live-user hesitation check or one concrete CTA conflict that still survives in the flow
+  - latest dense-night-shift rerun on `2026-04-18 22:18 +07` closed `deployment workflow hero state copy simplification v0` on the current dirty tree:
+    - `/app/deployment-workflow` no longer opens blocked, review-first, and ready-for-first-deploy states with one generic `Step 2` headline: the hero title now says the real situation first, whether that means finishing Step 1, waiting for an admin-managed target, clearing host disk pressure, reviewing live apps, or choosing what to run on the already-selected server
+    - beginner smoke now pins those hero titles on the default prerequisite path, the ready-server handoff path, and the member waiting path, so Step 2 keeps reading like one truthful next-step screen instead of a generic shell over several different states
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the top of the beginner path now reads more truthfully on both overview and deployment workflow, so the next bounded gap should be Step 1 drift on `Server Review` or a real live-user hesitation capture, not another generic headline cleanup
+  - latest dense-night-shift rerun on `2026-04-18 22:07 +07` closed `overview non-blocking banner demotion v0` on the current dirty tree:
+    - `/app` no longer stacks degraded-mode and auto-refresh notes as a second wall of subtle banners under the hero: those passive signals now live in one compact status line inside the main workspace block, while real blockers and action feedback still stay visible below
+    - beginner smoke now pins the runtime status note above the step grid, so the overview keeps the product story and the next click ahead of passive system noise
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: `/app` now has a cleaner main block, so the next bounded gap should be a cross-screen beginner drift check or a real live-user hesitation, not more local banner churn on this page
+  - latest dense-night-shift rerun on `2026-04-18 21:50 +07` closed `overview hero state copy simplification v0` on the current dirty tree:
+    - `/app` hero no longer opens with scaffold language like `Choose the next step` and `Step 1, Step 2, Step 3`: the top block now speaks in state-driven plain language about the real situation on this workspace, whether that is first server setup, first deploy, live review, admin wait-state, or cleanup-before-rollout
+    - beginner smoke now checks the default admin overview against the simpler first-step wording, so the screen keeps explaining the product and the current next click instead of reading like a generic shell over the real workflow
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the main hero on `/app` now reads more like a real product surface, so the next bounded gap should be compressing or demoting non-blocking banner noise under that hero rather than more hero wording churn
+  - latest dense-night-shift rerun on `2026-04-18 21:46 +07` closed `overview blocked-step primary marker cleanup v0` on the current dirty tree:
+    - `/app` no longer marks blocked `Step 2` as the current step during the ready-server + low-disk first-deploy state: the top CTA still points into the cleanup runbook, but the step grid now stops pretending that the disabled rollout card is the active next click
+    - beginner smoke now asserts that the low-disk first-deploy overview keeps `Step 2` in an explicit blocked state without the `Current step` marker, so the screen no longer sends two competing “main action” signals at once
+    - `bash -n scripts/frontend_beginner_smoke.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the largest CTA conflict on `/app` is gone, so the next bounded gap should be simplifying the hero/state copy on that page rather than more blocker-state polish
   - latest dense-night-shift rerun on `2026-04-18 21:31 +07` closed `live release validation for Step 1 storage-pressure slice v0` on the current dirty tree:
     - the overview and `Server Review` storage-pressure recovery path is now released on the live frontend host at commit `65f19eb`, after a frontend-only preflight, commit/push on `deploymate/release-preserve-local-overrides`, and a frontend-only remote release to `https://deploymatecloud.ru`
     - release secret contract, smoke credential precheck, remote frontend rebuild, post-release disk guard, and local post-deploy smoke all passed; the deployed frontend container restarted cleanly on the live host and reported the expected deployed sha `65f19eb0652c77c3d8067405565906551e56fb23`

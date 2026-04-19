@@ -131,16 +131,15 @@ automation_smoke_beginner_admin_checks() {
 /app|beginner overview step 1 action|data-testid="workspace-scenario-action-step-1"
 /app|beginner overview step 2 blocked|(<button[^>]*data-testid="workspace-scenario-action-step-2"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-2")
 /app|beginner overview step 3 blocked|(<button[^>]*data-testid="workspace-scenario-action-step-3"[^>]*disabled)|(<button[^>]*disabled[^>]*data-testid="workspace-scenario-action-step-3")
-/app|beginner overview board copy|Choose the next step\.
+/app|beginner overview board copy|Connect one server first\.
 /app/server-review|beginner server review title|data-testid="server-review-page-title"
-/app/server-review|beginner server review step framing|Step 1: Connect and verify one server
+/app/server-review|beginner server review step framing|Save one server first\.
 /app/server-review|beginner server review create card|data-testid="server-review-create-card"
 /app/server-review|beginner server review create form|data-testid="server-review-create-server"
 /app/deployment-workflow|beginner workflow title|data-testid="deployment-workflow-title"
-/app/deployment-workflow|beginner workflow step framing|Step 2: Choose what to run and deploy it
+/app/deployment-workflow|beginner workflow step framing|Finish Step 1 before rollout setup\.|Review live apps before another rollout\.
 /app/deployment-workflow|beginner workflow hero action|data-testid="deployment-workflow-hero-primary-action"
 /app/deployment-workflow|beginner workflow main next step card|data-testid="deployment-workflow-main-next-step-card"
-/app/deployment-workflow|beginner workflow main next step button|data-testid="deployment-workflow-main-next-step-button"
 EOF
 }
 

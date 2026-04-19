@@ -195,6 +195,8 @@ run_beginner_admin_smoke() {
   local smoke_name="frontend-beginner-admin-smoke"
   local dist_dir=".next-smoke-beginner-admin-static"
   local overview_html=""
+  local server_review_html=""
+  local workflow_html=""
 
   build_beginner_static_dist \
     "$smoke_name" \
@@ -208,6 +210,8 @@ run_beginner_admin_smoke() {
     automation_smoke_beginner_admin_checks
 
   overview_html="$(beginner_static_html_file "$dist_dir" "/app")"
+  server_review_html="$(beginner_static_html_file "$dist_dir" "/app/server-review")"
+  workflow_html="$(beginner_static_html_file "$dist_dir" "/app/deployment-workflow")"
   python3 - "$overview_html" <<'PY'
 import sys
 from pathlib import Path
@@ -215,6 +219,7 @@ from pathlib import Path
 html = Path(sys.argv[1]).read_text(encoding="utf-8")
 required_order = [
     'data-testid="workspace-action-surface"',
+    'data-testid="runtime-smoke-banner"',
     'data-testid="workspace-quick-actions"',
     'data-testid="ops-overview-disclosure"',
 ]
@@ -228,6 +233,21 @@ for marker in required_order:
 if positions != sorted(positions):
     raise SystemExit("overview primary product blocks no longer render before operations depth")
 PY
+
+  if grep -Eq 'data-testid="deployment-workflow-main-next-step-button"' "$workflow_html"; then
+    echo "[${smoke_name}] workflow still renders a duplicate primary CTA under the hero on the default review-first state" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'class="secondaryButton serverReviewHeroPrimaryAction"[^>]*>Open add server form<' "$server_review_html"; then
+    echo "[${smoke_name}] server review empty-state hero still competes with the real save action instead of acting like a guide into the form" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="server-review-create-submit"[^>]*>Save first server<' "$server_review_html"; then
+    echo "[${smoke_name}] server review create form lost the real save action label" >&2
+    exit 1
+  fi
 }
 
 run_beginner_admin_server_ready_smoke() {
@@ -289,6 +309,35 @@ run_beginner_admin_server_ready_smoke() {
     "overview-first-deploy"; then
     exit 1
   fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-title">Choose what to run on Smoke VPS\.' "$workflow_html"; then
+    echo "[${smoke_name}] workflow hero did not switch to the ready-server title after overview handoff" >&2
+    exit 1
+  fi
+}
+
+run_beginner_admin_prerequisite_smoke() {
+  local smoke_name="frontend-beginner-admin-prerequisite-smoke"
+  local dist_dir=".next-smoke-beginner-admin-prerequisite-static"
+  local workflow_html=""
+
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=member-waiting-for-admin-target
+
+  workflow_html="$(beginner_static_html_file "$dist_dir" "/app/deployment-workflow")"
+
+  if ! grep -Eq 'data-testid="deployment-workflow-title">Finish Step 1 before rollout setup\.' "$workflow_html"; then
+    echo "[${smoke_name}] admin prerequisite path lost the Step 2 blocked hero title" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<a[^>]*data-testid="deployment-workflow-prerequisite-panel-action"[^>]*class="landingButton secondaryButton")|(<a[^>]*class="landingButton secondaryButton"[^>]*data-testid="deployment-workflow-prerequisite-panel-action")' "$workflow_html"; then
+    echo "[${smoke_name}] prerequisite panel still renders a competing primary CTA under the hero" >&2
+    exit 1
+  fi
 }
 
 run_beginner_admin_server_ready_low_disk_smoke() {
@@ -316,6 +365,49 @@ run_beginner_admin_server_ready_low_disk_smoke() {
 
   if ! grep -Eq 'data-testid="ops-disk-recovery-card"' "$overview_html"; then
     echo "[${smoke_name}] overview lost the low-disk cleanup runbook card" >&2
+    exit 1
+  fi
+
+  python3 - "$overview_html" <<'PY'
+import sys
+from pathlib import Path
+
+html = Path(sys.argv[1]).read_text(encoding="utf-8")
+marker = 'data-testid="workspace-scenario-item-step-2"'
+start = html.find(marker)
+if start == -1:
+    raise SystemExit("missing Step 2 card")
+next_start = html.find('data-testid="workspace-scenario-item-step-', start + len(marker))
+card = html[start: next_start if next_start != -1 else len(html)]
+
+if 'data-testid="workspace-primary-task-card"' in card:
+    raise SystemExit("Step 2 still renders as the current step during low-disk cleanup")
+
+if ">Blocked<" not in card:
+    raise SystemExit("Step 2 lost the explicit blocked state during low-disk cleanup")
+PY
+}
+
+run_beginner_server_review_storage_pressure_smoke() {
+  local smoke_name="frontend-beginner-server-review-storage-pressure-smoke"
+  local dist_dir=".next-smoke-beginner-server-review-storage-pressure-static"
+  local server_review_html=""
+
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_SERVER_REVIEW_SCENARIO=storage-pressure
+
+  server_review_html="$(beginner_static_html_file "$dist_dir" "/app/server-review")"
+
+  if ! grep -Eq 'data-testid="server-review-page-title">Clear storage pressure before Step 2\.' "$server_review_html"; then
+    echo "[${smoke_name}] server review hero did not switch to the storage-pressure title" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="smoke-server-storage-pressure-copy"' "$server_review_html"; then
+    echo "[${smoke_name}] server review lost the storage cleanup primary action" >&2
     exit 1
   fi
 }
@@ -412,6 +504,11 @@ run_beginner_member_smoke() {
     exit 1
   fi
 
+  if ! grep -Eq '(<button[^>]*data-testid="deployment-workflow-member-live-panel-action"[^>]*class="landingButton secondaryButton")|(<button[^>]*class="landingButton secondaryButton"[^>]*data-testid="deployment-workflow-member-live-panel-action")' "$workflow_html"; then
+    echo "[${smoke_name}] member remote-only live path still renders a competing primary CTA under the hero" >&2
+    exit 1
+  fi
+
   if grep -Eq 'data-testid="deployment-workflow-member-blocked-card"' "$workflow_html"; then
     echo "[${smoke_name}] member remote-only live path still renders the waiting-for-admin card" >&2
     exit 1
@@ -484,8 +581,18 @@ run_beginner_member_waiting_smoke() {
     exit 1
   fi
 
-  if ! grep -Eq 'data-testid="deployment-workflow-main-next-step-button"[^>]*>Back to overview<' "$waiting_html"; then
-    echo "[${smoke_name}] member waiting path lost the overview primary action" >&2
+  if ! grep -Eq 'data-testid="deployment-workflow-title">Wait for one admin-managed target\.' "$waiting_html"; then
+    echo "[${smoke_name}] member waiting path lost the state-driven Step 2 hero title" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<a[^>]*data-testid="deployment-workflow-member-blocked-panel-action"[^>]*class="landingButton secondaryButton")|(<a[^>]*class="landingButton secondaryButton"[^>]*data-testid="deployment-workflow-member-blocked-panel-action")' "$waiting_html"; then
+    echo "[${smoke_name}] member waiting path still renders a competing primary CTA inside the blocked panel" >&2
+    exit 1
+  fi
+
+  if grep -Eq 'data-testid="deployment-workflow-main-next-step-button"' "$waiting_html"; then
+    echo "[${smoke_name}] member waiting path still renders a duplicate primary CTA below the hero" >&2
     exit 1
   fi
 
@@ -517,8 +624,28 @@ run_beginner_first_deploy_smoke() {
     exit 1
   fi
 
+  if ! grep -Eq 'data-testid="server-review-page-title">One server is already ready for Step 2\.' "$server_review_html"; then
+    echo "[${smoke_name}] server review hero did not switch to the ready-server title" >&2
+    exit 1
+  fi
+
+  if grep -Eq 'Step 1 is complete for this server\. Next: go to Step 2 and choose what to run\.' "$server_review_html"; then
+    echo "[${smoke_name}] server review still repeats the ready-state success banner under the hero" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<a[^>]*data-testid="smoke-server-continue-action"[^>]*class="landingButton secondaryButton")|(<a[^>]*class="landingButton secondaryButton"[^>]*data-testid="smoke-server-continue-action")' "$server_review_html"; then
+    echo "[${smoke_name}] server review ready card still renders the Step 2 CTA as a competing primary action" >&2
+    exit 1
+  fi
+
   if ! grep -Eq 'Step 1 is done on' "$first_deploy_html"; then
     echo "[${smoke_name}] server-ready lead is missing" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-title">Choose what to run on Smoke VPS\.' "$first_deploy_html"; then
+    echo "[${smoke_name}] workflow hero did not switch to the ready-server title after Step 1 handoff" >&2
     exit 1
   fi
 
@@ -533,7 +660,9 @@ run_beginner_first_deploy_smoke() {
 
 run_beginner_admin_smoke
 run_beginner_admin_server_ready_smoke
+run_beginner_admin_prerequisite_smoke
 run_beginner_admin_server_ready_low_disk_smoke
+run_beginner_server_review_storage_pressure_smoke
 run_beginner_admin_live_review_smoke
 run_beginner_member_smoke
 run_beginner_member_overview_live_smoke

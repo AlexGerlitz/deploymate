@@ -360,7 +360,7 @@ function ServerReviewPageContent() {
         title: "Save one server for Step 1",
         detail: "Start narrow: save one SSH target first, then run one check on that same machine.",
         support: "You do not need a server list yet. One good target is enough to move the main path forward.",
-        actionLabel: "Save first server",
+        actionLabel: "Open add server form",
         actionKind: "create",
       }
     : selectedReadyItem
@@ -397,6 +397,29 @@ function ServerReviewPageContent() {
               : "Open next server check",
           actionKind: "queue",
         };
+  const serverReviewHeroState = noServers
+    ? {
+        title: "Save one server first.",
+        lead: "This page has one job: save one SSH target and run one check on that same machine.",
+        support: "Stop here as soon as one server is ready. Do not branch into rollout settings, templates, or runtime review yet.",
+      }
+    : selectedReadyItem
+      ? {
+          title: "One server is already ready for Step 2.",
+          lead: `${selectedReadyItem.label} is already confirmed. The main path has moved on to choosing what to run.`,
+          support: "Stay on this page only if you need to review or replace the saved target.",
+        }
+      : selectedNeedsReviewStoragePressure
+        ? {
+            title: "Clear storage pressure before Step 2.",
+            lead: `${selectedNeedsReviewItem?.label || "This saved server"} already answered the main question: low disk is the blocker right now.`,
+            support: "Use the cleanup path below on that same machine, rerun readiness, and only then continue to app setup.",
+          }
+        : {
+            title: "Run one readiness check.",
+            lead: `${selectedNeedsReviewItem?.label || "The saved server"} still needs one clear answer before Step 2 can open.`,
+            support: "Stay focused on one saved target, finish the check, and only then think about rollout setup.",
+          };
   const stepCards = [
     {
       id: "save",
@@ -1073,16 +1096,12 @@ function ServerReviewPageContent() {
   return (
     <main className="workspaceShell serverReviewPage">
       <article className="card formCard serverReviewHero serverReviewReveal">
-        <div className="serverReviewHeroLayout">
+          <div className="serverReviewHeroLayout">
           <div className="serverReviewHeroCopy">
             <div className="eyebrow">Step 1</div>
-            <h1 data-testid="server-review-page-title">Step 1: Connect and verify one server</h1>
-            <p className="serverReviewLead">
-              This page has one job: save one machine, run one check, and only then move to Step 2.
-            </p>
-            <p className="formHint serverReviewSubtleCopy">
-              Keep this step simple. Do not branch into rollout settings, templates, or runtime review yet.
-            </p>
+            <h1 data-testid="server-review-page-title">{serverReviewHeroState.title}</h1>
+            <p className="serverReviewLead">{serverReviewHeroState.lead}</p>
+            <p className="formHint serverReviewSubtleCopy">{serverReviewHeroState.support}</p>
             <div className="serverReviewStepStrip" aria-label="Server review path">
               {stepCards.map((step) => (
                 <article
@@ -1118,7 +1137,7 @@ function ServerReviewPageContent() {
               <p className="serverReviewHeroSpotlightNote">{heroSpotlight.support}</p>
               <button
                 type="button"
-                className="landingButton primaryButton serverReviewHeroPrimaryAction"
+                className={`${heroSpotlight.actionKind === "create" ? "secondaryButton" : "landingButton primaryButton"} serverReviewHeroPrimaryAction`}
                 onClick={handleHeroPrimaryAction}
               >
                 {heroSpotlight.actionLabel}
@@ -1208,12 +1227,6 @@ function ServerReviewPageContent() {
                     data-testid={`server-review-storage-pressure-${item.id}`}
                   >
                     {storagePressure.summary}
-                  </div>
-                ) : null}
-
-                {item.segment === "ready" ? (
-                  <div className="banner success">
-                    Step 1 is complete for this server. Next: go to Step 2 and choose what to run.
                   </div>
                 ) : null}
 
@@ -1352,7 +1365,7 @@ function ServerReviewPageContent() {
                           </article>
 
                           <article className="workspaceReviewerCard serverReviewTaskCard">
-                            <span>{item.segment === "ready" ? "Do this now" : "Then do this"}</span>
+                            <span>{item.segment === "ready" ? "Available next" : "Then do this"}</span>
                             <strong>
                               {item.segment === "ready"
                                 ? "Choose what to run on this server"
@@ -1367,7 +1380,7 @@ function ServerReviewPageContent() {
                               <Link
                                 href={`/app/deployment-workflow?server=${item.id}&source=server-review`}
                                 data-testid={`${item.id}-continue-action`}
-                                className="landingButton primaryButton"
+                                className="landingButton secondaryButton"
                               >
                                 Choose what to run
                               </Link>
