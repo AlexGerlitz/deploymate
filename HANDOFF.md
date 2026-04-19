@@ -37,6 +37,30 @@ Updated: 2026-04-18
   - `Phase 5: Commercial Packaging` now has an honest closure point: the buyer path already shows a clear self-hosted commercial offer, explicit agency/multi-client packaging, Russian-language install/operator materials, and a concrete pilot onboarding/support motion instead of leaving that commercial story inside author narration
   - `deployment passport` now has an honest closure point: steady-state review, fresh-rollout verification, single-runtime incident framing, single-runtime recovery choice, stable stack recovery posture, and stack-specific incident framing all live inside one operator artifact instead of being split across lower cards
   - the first proactive ownership slice is now closed inside template review without widening into server sharing: admins can still review every handoff asset, but foreign-owned baselines are now duplicate-first for direct deploy and mutation
+  - latest dense-night-shift rerun on `2026-04-19 19:43 +07` closed `overview live-review low-disk blocked-state truthfulness v0` on the current dirty tree:
+    - `/app` no longer calls Step 2 merely `Locked` when live deployments exist but host disk pressure blocks the next rollout: that card now stays explicitly `Blocked`, matching its cleanup-first copy and destination instead of reading like a generic permission gate
+    - beginner smoke now checks the steady-state low-disk overview path for that explicit blocked state, so the live-review workspace tells the operator that rollout is paused by cleanup, not by some vague unavailable step
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the low-disk overview path now reads truthfully in both first-deploy and steady-state modes, so the next bounded gap should be a real cross-screen hesitation pass rather than more local blocker-state wording
+  - latest dense-night-shift rerun on `2026-04-19 19:40 +07` closed `deployment workflow guardrail panel duplicate CTA cleanup v0` on the current dirty tree:
+    - Step 2 no longer shows two competing primary CTA layers during host-disk guardrail mode: the hero keeps the single primary `Review live apps instead` action, while the guardrail panel follow-up buttons now stay secondary beneath it
+    - beginner smoke now covers the dedicated `disk-pressure-blocked` workflow path, so host cleanup mode keeps one top-level action instead of splitting the operator between hero and panel primaries
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the loudest duplicate CTA on Step 2 guardrail mode is gone, so the next bounded gap should be a true cross-screen beginner hesitation pass rather than more local guardrail button cleanup
+  - latest dense-night-shift rerun on `2026-04-19 19:34 +07` closed `overview live-review wording alignment v0` on the current dirty tree:
+    - `/app` no longer mixes `Review live apps` and `Review health` for the same steady-state Step 3 path: once live deployments exist, the primary overview card title now uses the same live-review wording as the hero and the action labels
+    - beginner smoke now checks both steady-state and low-disk live-review overview scenarios for that aligned Step 3 title, so the main review path reads like one job instead of three slightly different labels
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the main Step 3 wording on overview now lines up with the live-review action, so the next bounded gap should be a true end-to-end beginner hesitation pass rather than more local `/app` naming cleanup
+  - latest dense-night-shift rerun on `2026-04-19 19:27 +07` closed `overview live-review low-disk duplicate CTA cleanup v0` on the current dirty tree:
+    - `/app` no longer repeats the same live-review primary action inside the low-disk cleanup runbook when live deployments already exist: the hero keeps the only primary `Review live apps` CTA, while the runbook follow-up link now stays secondary inside the cleanup panel
+    - beginner smoke now covers the steady-state low-disk overview path directly, so the page keeps one top-level live-review action even when Step 2 is blocked and the runbook stays visible under it
+    - `bash -n scripts/frontend_beginner_smoke.sh scripts/project_automation_smoke_checks.sh`
+    - `npm --prefix frontend run smoke:beginner`
+    - the stop point changes here: the loudest remaining duplicate CTA on overview low-disk states is gone, so the next bounded gap should be a true end-to-end beginner hesitation pass rather than more local `/app` CTA cleanup
   - latest dense-night-shift rerun on `2026-04-18 23:16 +07` closed `server review empty-state dual-primary cleanup v0` on the current dirty tree:
     - empty `Server Review` no longer shows two competing primary actions on the same Step 1 screen: the hero button now acts as a secondary guide into the add-server form, while the actual form submit remains the only primary save action
     - beginner smoke now checks that split directly, so Step 1 starts with one clear submit action instead of a hero button that visually competes with it

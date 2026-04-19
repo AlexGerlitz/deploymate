@@ -412,6 +412,45 @@ run_beginner_server_review_storage_pressure_smoke() {
   fi
 }
 
+run_beginner_workflow_disk_guardrail_smoke() {
+  local smoke_name="frontend-beginner-workflow-disk-guardrail-smoke"
+  local dist_dir=".next-smoke-beginner-workflow-disk-guardrail-static"
+  local workflow_html=""
+
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_DEPLOYMENT_WORKFLOW_SCENARIO=disk-pressure-blocked
+
+  workflow_html="$(beginner_static_html_file "$dist_dir" "/app/deployment-workflow")"
+
+  if ! grep -Eq 'data-testid="deployment-workflow-title">Clear host disk pressure before another rollout\.' "$workflow_html"; then
+    echo "[${smoke_name}] workflow hero did not switch to the guardrail title" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="deployment-workflow-hero-primary-action"[^>]*>Review live apps instead<' "$workflow_html"; then
+    echo "[${smoke_name}] workflow hero lost the live-review primary action during host disk pressure" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<a[^>]*data-testid="deployment-workflow-guardrail-panel-overview-action"[^>]*class="landingButton secondaryButton")|(<a[^>]*class="landingButton secondaryButton"[^>]*data-testid="deployment-workflow-guardrail-panel-overview-action")' "$workflow_html"; then
+    echo "[${smoke_name}] guardrail panel still promotes Back to overview as a competing primary CTA" >&2
+    exit 1
+  fi
+
+  if ! grep -Eq '(<button[^>]*data-testid="deployment-workflow-guardrail-panel-live-action"[^>]*class="landingButton secondaryButton")|(<button[^>]*class="landingButton secondaryButton"[^>]*data-testid="deployment-workflow-guardrail-panel-live-action")' "$workflow_html"; then
+    echo "[${smoke_name}] guardrail panel lost the secondary live-review follow-up action" >&2
+    exit 1
+  fi
+
+  if grep -Eq 'data-testid="deployment-workflow-main-next-step-button"' "$workflow_html"; then
+    echo "[${smoke_name}] guardrail path still renders a duplicate main-next-step primary CTA below the hero" >&2
+    exit 1
+  fi
+}
+
 run_beginner_admin_live_review_smoke() {
   local smoke_name="frontend-beginner-admin-live-review-smoke"
   local dist_dir=".next-smoke-beginner-admin-live-review-static"
@@ -463,8 +502,83 @@ if ">Start another deploy<" not in step_two:
 if ">Review live apps<" not in step_three:
     raise SystemExit("Step 3 did not expose live review as the current action")
 
+if ">Review live apps</h2>" not in step_three:
+    raise SystemExit("Step 3 card title did not stay aligned with the live-review path")
+
 if ">Review live apps<" not in primary_action:
     raise SystemExit("overview lost the top-level live-review action after deploy")
+PY
+}
+
+run_beginner_admin_live_review_low_disk_smoke() {
+  local smoke_name="frontend-beginner-admin-live-review-low-disk-smoke"
+  local dist_dir=".next-smoke-beginner-admin-live-review-low-disk-static"
+  local overview_html=""
+
+  build_beginner_static_dist \
+    "$smoke_name" \
+    "$dist_dir" \
+    NEXT_PUBLIC_LOCAL_DEPLOYMENTS_ENABLED=0 \
+    NEXT_PUBLIC_SMOKE_OVERVIEW_SCENARIO=admin-live-review-low-disk
+
+  overview_html="$(beginner_static_html_file "$dist_dir" "/app")"
+
+  python3 - "$overview_html" <<'PY'
+import sys
+from pathlib import Path
+
+html = Path(sys.argv[1]).read_text(encoding="utf-8")
+
+def card(step):
+    marker = f'data-testid="workspace-scenario-item-step-{step}"'
+    start = html.find(marker)
+    if start == -1:
+        raise SystemExit(f"missing overview step {step}")
+    next_start = html.find('data-testid="workspace-scenario-item-step-', start + len(marker))
+    return html[start: next_start if next_start != -1 else len(html)]
+
+def anchor(testid):
+    marker = f'data-testid="{testid}"'
+    marker_start = html.find(marker)
+    if marker_start == -1:
+        raise SystemExit(f"missing {testid}")
+    start = html.rfind("<a", 0, marker_start)
+    if start == -1:
+        raise SystemExit(f"missing opening anchor for {testid}")
+    end = html.find("</a>", marker_start)
+    return html[start: end + len("</a>") if end != -1 else len(html)]
+
+step_two = card(2)
+step_three = card(3)
+primary_action = anchor("workspace-scenario-primary-action")
+runbook_action = anchor("ops-disk-recovery-review-live-apps")
+
+if 'data-testid="ops-disk-recovery-card"' not in html:
+    raise SystemExit("overview lost the low-disk cleanup runbook card on the live-review path")
+
+if 'data-testid="workspace-primary-task-card"' in step_two:
+    raise SystemExit("Step 2 stayed primary while low disk blocked the next rollout")
+
+if ">Clean up disk first<" not in step_two:
+    raise SystemExit("Step 2 did not keep the cleanup-first action label on the live-review low-disk path")
+
+if 'data-testid="workspace-primary-task-card"' not in step_three:
+    raise SystemExit("Step 3 did not stay primary on the live-review low-disk path")
+
+if ">Review live apps</h2>" not in step_three:
+    raise SystemExit("Step 3 card title did not stay aligned with the live-review low-disk path")
+
+if ">Blocked<" not in step_two:
+    raise SystemExit("Step 2 did not stay explicitly blocked on the live-review low-disk path")
+
+if ">Review live apps<" not in primary_action or 'class="landingButton primaryButton"' not in primary_action:
+    raise SystemExit("overview lost the top-level primary live-review CTA during low disk pressure")
+
+if ">Review live apps<" not in runbook_action:
+    raise SystemExit("runbook lost the live-review follow-up action during low disk pressure")
+
+if 'class="landingButton secondaryButton"' not in runbook_action:
+    raise SystemExit("runbook still renders the live-review follow-up as a competing primary CTA")
 PY
 }
 
@@ -663,7 +777,9 @@ run_beginner_admin_server_ready_smoke
 run_beginner_admin_prerequisite_smoke
 run_beginner_admin_server_ready_low_disk_smoke
 run_beginner_server_review_storage_pressure_smoke
+run_beginner_workflow_disk_guardrail_smoke
 run_beginner_admin_live_review_smoke
+run_beginner_admin_live_review_low_disk_smoke
 run_beginner_member_smoke
 run_beginner_member_overview_live_smoke
 run_beginner_member_waiting_smoke
@@ -673,7 +789,9 @@ run_beginner_export_payload_smoke
 echo "[frontend-beginner-smoke] first-time admin path rendered"
 echo "[frontend-beginner-smoke] admin server-ready first deploy path rendered"
 echo "[frontend-beginner-smoke] admin server-ready low-disk path rendered"
+echo "[frontend-beginner-smoke] workflow disk-guardrail path rendered"
 echo "[frontend-beginner-smoke] admin live-review handoff rendered"
+echo "[frontend-beginner-smoke] admin live-review low-disk path rendered"
 echo "[frontend-beginner-smoke] member remote-only live review path rendered"
 echo "[frontend-beginner-smoke] member overview live review path rendered"
 echo "[frontend-beginner-smoke] member remote-only waiting path rendered"

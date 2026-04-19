@@ -2924,13 +2924,18 @@ function DeploymentWorkflowPageContent() {
               </article>
             </div>
             <div className="formActions">
-              <Link href="/app" className="landingButton primaryButton">
+              <Link
+                href="/app"
+                className="landingButton secondaryButton"
+                data-testid="deployment-workflow-guardrail-panel-overview-action"
+              >
                 Back to overview
               </Link>
               {filteredDeployments.length > 0 ? (
                 <button
                   type="button"
                   className="landingButton secondaryButton"
+                  data-testid="deployment-workflow-guardrail-panel-live-action"
                   onClick={() => setWorkflowTab("live")}
                 >
                   Review live apps instead

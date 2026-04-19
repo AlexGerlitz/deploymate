@@ -15,6 +15,7 @@ import {
   smokeOverviewTemplates,
   smokeServers,
   smokeUser,
+  smokeWorkflowDiskPressureOpsOverview,
 } from "../lib/smoke-fixtures";
 import {
   buildHostDiskPressureGuardrail,
@@ -42,7 +43,9 @@ const smokeMemberOverviewDeployments = smokeDeployments.map(
   }),
 );
 const smokeHomeDeployments =
-  smokeMode && smokeOverviewScenario === "admin-live-review"
+  smokeMode &&
+  (smokeOverviewScenario === "admin-live-review" ||
+    smokeOverviewScenario === "admin-live-review-low-disk")
     ? smokeDeployments.slice(0, 1)
     : smokeMode && smokeOverviewScenario === "member-live-review"
     ? smokeMemberOverviewDeployments
@@ -51,12 +54,15 @@ const smokeHomeServers =
   smokeMode &&
   (smokeOverviewScenario === "admin-server-ready-first-deploy" ||
     smokeOverviewScenario === "admin-server-ready-low-disk" ||
-    smokeOverviewScenario === "admin-live-review")
+    smokeOverviewScenario === "admin-live-review" ||
+    smokeOverviewScenario === "admin-live-review-low-disk")
     ? smokeServers.slice(0, 1)
     : smokeOverviewServers;
 const smokeHomeOpsOverview =
   smokeMode && smokeOverviewScenario === "admin-server-ready-low-disk"
     ? smokeOverviewFirstDeployDiskPressureOpsOverview
+    : smokeMode && smokeOverviewScenario === "admin-live-review-low-disk"
+    ? smokeWorkflowDiskPressureOpsOverview
     : smokeMode &&
       (smokeOverviewScenario === "member-live-review" ||
         smokeOverviewScenario === "admin-live-review" ||
@@ -309,7 +315,7 @@ export default function HomePage() {
           ? "Start another deploy"
         : "Choose app to run",
       primary: stepTwoIsPrimary,
-      blocked: hostDiskFirstDeployBlocked,
+      blocked: hostDiskRolloutBlocked,
       destination: hostDiskRolloutBlocked ? "Blocked until host cleanup" : "",
       disabled: stepTwoBlocked || memberNewDeploymentBlocked,
     },
@@ -346,6 +352,10 @@ export default function HomePage() {
         actionLabel: "Open cleanup runbook",
       }
     : primaryBeginnerStep;
+  const runbookLiveReviewOwnsHeroPrimary =
+    Boolean(hostDiskRunbook) &&
+    opsSnapshot.deployments.total > 0 &&
+    primaryWorkspaceAction?.href === "/app/deployment-workflow";
   const workspaceBoardSteps = beginnerSteps.map((card) => ({
     ...card,
     boardTitle:
@@ -357,7 +367,7 @@ export default function HomePage() {
           : card.title
         : card.key === "step-2"
           ? "Deploy app"
-          : memberHasLiveDeployments
+          : hasLiveDeployments
             ? "Review live apps"
             : "Review health",
     boardState: card.blocked
@@ -875,7 +885,11 @@ export default function HomePage() {
             </div>
             <div className="formActions">
               {opsSnapshot.deployments.total > 0 ? (
-                <Link href="/app/deployment-workflow" className="landingButton primaryButton">
+                <Link
+                  href="/app/deployment-workflow"
+                  className={`landingButton ${runbookLiveReviewOwnsHeroPrimary ? "secondaryButton" : "primaryButton"}`}
+                  data-testid="ops-disk-recovery-review-live-apps"
+                >
                   Review live apps
                 </Link>
               ) : null}
