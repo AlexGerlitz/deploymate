@@ -970,7 +970,9 @@ summary:focus-visible {
   border-color: rgba(209, 221, 233, 0.9);
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 253, 0.97) 56%, rgba(241, 247, 252, 0.98) 100%);
-  box-shadow: 0 28px 70px rgba(148, 163, 184, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 30px 74px rgba(148, 163, 184, 0.14);
 }
 
 .serverReviewHeroLayout {
@@ -1076,7 +1078,7 @@ summary:focus-visible {
   background: rgba(255, 255, 255, 0.74);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.86),
-    0 22px 40px rgba(148, 163, 184, 0.08);
+    0 24px 46px rgba(148, 163, 184, 0.1);
   backdrop-filter: blur(16px);
 }
 
@@ -2025,10 +2027,12 @@ code {
 
 .compactCard {
   border: 1px solid rgba(19, 34, 56, 0.08);
-  border-radius: 20px;
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 251, 253, 0.98) 100%);
-  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.05);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(247, 250, 253, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 18px 36px rgba(17, 24, 39, 0.07);
 }
 
 .deploymentCard {
@@ -2044,10 +2048,15 @@ code {
   display: grid;
   gap: 16px;
   margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
   border-color: rgba(190, 202, 215, 0.82);
   background:
     radial-gradient(circle at 0% 0%, rgba(240, 181, 90, 0.12), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 253, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 24px 52px rgba(125, 144, 170, 0.12);
 }
 
 .runtimeReviewPanel .sectionHeader {
@@ -2183,8 +2192,10 @@ code {
 .deploymentMetric {
   padding: 14px 16px;
   border: 1px solid rgba(19, 34, 56, 0.08);
-  border-radius: 16px;
-  background: rgba(247, 250, 252, 0.92);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(249, 252, 254, 0.98) 0%, rgba(242, 247, 251, 0.96) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
 }
 
 .deploymentMetric span {
@@ -2210,9 +2221,12 @@ code {
   gap: 8px;
   padding: 16px 18px;
   border: 1px solid rgba(19, 34, 56, 0.08);
-  border-radius: 18px;
+  border-radius: 20px;
   background:
-    linear-gradient(180deg, rgba(255, 252, 246, 0.96) 0%, rgba(248, 251, 253, 0.96) 100%);
+    linear-gradient(180deg, rgba(255, 252, 246, 0.97) 0%, rgba(247, 251, 253, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 12px 26px rgba(148, 163, 184, 0.08);
 }
 
 .runtimeDecisionNote strong {
@@ -2845,24 +2859,31 @@ code {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 12px 18px;
-  font-weight: 600;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   transition:
     transform 160ms ease,
     box-shadow 160ms ease,
-    background 160ms ease;
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    filter 160ms ease;
 }
 
 .landingButton:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  filter: saturate(1.03);
 }
 
 .primaryButton {
-  background: #132238;
+  background: linear-gradient(135deg, #18314a 0%, #102033 100%);
   color: #fff;
-  border: 1px solid transparent;
-  box-shadow: 0 14px 28px rgba(19, 34, 56, 0.18);
+  border: 1px solid rgba(11, 24, 39, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 18px 34px rgba(19, 34, 56, 0.2);
 }
 
 .landingHeroCopy .primaryButton {
@@ -2871,13 +2892,13 @@ code {
 }
 
 button.landingButton.primaryButton {
-  background: #132238;
+  background: linear-gradient(135deg, #18314a 0%, #102033 100%);
   color: #fff;
-  border: 1px solid transparent;
+  border: 1px solid rgba(11, 24, 39, 0.16);
 }
 
 button.landingButton.primaryButton:hover {
-  background: #1b2f4c;
+  background: linear-gradient(135deg, #1d3854 0%, #13263c 100%);
 }
 
 button.landingButton.primaryButton:disabled {
@@ -2887,9 +2908,19 @@ button.landingButton.primaryButton:disabled {
 }
 
 .secondaryButton {
-  border: 1px solid #d0d5dd;
-  background: #fff;
-  color: #111;
+  border: 1px solid rgba(198, 209, 223, 0.96);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 249, 252, 0.94) 100%);
+  color: #223247;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 12px 24px rgba(148, 163, 184, 0.08);
+}
+
+.secondaryButton:hover {
+  border-color: rgba(167, 182, 200, 0.96);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 246, 251, 0.98) 100%);
 }
 
 .landingSecondaryCta {
@@ -3635,8 +3666,28 @@ button.landingButton.primaryButton:disabled {
 .workspaceGuidePanel {
   overflow: hidden;
   border-radius: 28px;
+  position: relative;
+  border: 1px solid rgba(205, 217, 230, 0.96);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(246, 249, 252, 0.97) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 26px 58px rgba(148, 163, 184, 0.12);
+}
+
+.workspaceGuidePanel::before {
+  content: "";
+  position: absolute;
+  inset: -22% auto auto -10%;
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(236, 193, 109, 0.18) 0%, rgba(236, 193, 109, 0) 72%);
+  pointer-events: none;
+}
+
+.workspaceGuidePanel > * {
+  position: relative;
+  z-index: 1;
 }
 
 .workspaceGuidePanel .adminDisclosure {
@@ -3803,9 +3854,25 @@ button.landingButton.primaryButton:disabled {
   display: grid;
   gap: 12px;
   padding: 16px 18px;
-  border: 1px solid rgba(19, 34, 56, 0.08);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(205, 216, 228, 0.96);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(247, 250, 253, 0.96) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 14px 28px rgba(148, 163, 184, 0.08);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.workspaceReviewerCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(184, 198, 214, 0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 18px 34px rgba(125, 144, 170, 0.12);
 }
 
 .workspaceReviewerCard span {
@@ -3885,6 +3952,21 @@ button.landingButton.primaryButton:disabled {
 .workspaceActionPage {
   min-height: calc(100vh - 64px);
   padding-top: 24px;
+  position: relative;
+  isolation: isolate;
+}
+
+.workspaceActionPage::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 560px;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 8% 2%, rgba(237, 194, 114, 0.2), transparent 26%),
+    radial-gradient(circle at 92% 10%, rgba(164, 192, 218, 0.2), transparent 28%),
+    linear-gradient(180deg, rgba(244, 248, 252, 0.96) 0%, rgba(248, 250, 253, 0.18) 100%);
+  pointer-events: none;
 }
 
 .workspaceActionContainer {
@@ -3893,7 +3975,7 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceActionSurface {
   display: grid;
-  gap: 22px;
+  gap: 24px;
   min-height: calc(100vh - 156px);
   align-content: start;
   margin-bottom: 24px;
@@ -3901,34 +3983,64 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceActionSurfaceHeader {
   display: grid;
-  gap: 8px;
-  max-width: 820px;
+  gap: 10px;
+  max-width: 860px;
+  position: relative;
+  overflow: hidden;
+  padding: 28px 30px;
+  border: 1px solid rgba(208, 219, 231, 0.98);
+  border-radius: 32px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 253, 0.97) 54%, rgba(241, 247, 252, 0.96) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 28px 64px rgba(148, 163, 184, 0.12);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+.workspaceActionSurfaceHeader::before {
+  content: "";
+  position: absolute;
+  inset: -20% auto auto -10%;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(240, 181, 90, 0.18) 0%, rgba(240, 181, 90, 0) 74%);
+  pointer-events: none;
+}
+
+.workspaceActionSurfaceHeader > * {
+  position: relative;
+  z-index: 1;
 }
 
 .workspaceActionSurfaceEyebrow {
   display: inline-flex;
-  color: #6e6e73;
+  color: #72839a;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
+  font-weight: 800;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
 .workspaceActionSurfaceHeader h1 {
   margin: 0;
-  color: #1d1d1f;
+  color: #162438;
   font-family: var(--font-display), sans-serif;
   font-size: 44px;
-  line-height: 1.02;
-  letter-spacing: 0;
+  line-height: 1;
+  letter-spacing: -0.045em;
 }
 
 .workspaceActionSurfaceHeader p {
   max-width: 760px;
   margin: 0;
-  color: #6e6e73;
+  color: #5c6c80;
   font-size: 18px;
-  line-height: 1.5;
+  line-height: 1.6;
+}
+
+.workspaceActionSurfaceHeader .formActions {
+  margin-top: 8px;
 }
 
 .workspaceActionGrid {
@@ -3943,22 +4055,41 @@ button.landingButton.primaryButton:disabled {
   grid-template-rows: auto auto minmax(124px, 1fr) auto auto;
   gap: 16px;
   min-height: 280px;
-  padding: 18px;
-  border: 1px solid rgba(18, 34, 56, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.86);
+  padding: 20px;
+  border: 1px solid rgba(205, 216, 228, 0.96);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 250, 253, 0.94) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.42),
-    0 16px 36px rgba(18, 34, 56, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 18px 38px rgba(18, 34, 56, 0.08);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.workspaceActionCard:hover {
+  transform: translateY(-3px);
+  border-color: rgba(184, 198, 214, 0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    0 22px 44px rgba(125, 144, 170, 0.14);
 }
 
 .workspaceActionCard.isPrimary {
-  border-color: rgba(18, 34, 56, 0.16);
-  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(197, 166, 111, 0.68);
+  background:
+    linear-gradient(180deg, rgba(255, 251, 244, 0.99) 0%, rgba(247, 248, 243, 0.97) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 22px 48px rgba(201, 147, 56, 0.12);
 }
 
 .workspaceActionCard.isLocked {
-  background: rgba(248, 249, 252, 0.92);
+  background:
+    linear-gradient(180deg, rgba(250, 251, 253, 0.96) 0%, rgba(243, 246, 249, 0.95) 100%);
 }
 
 .workspaceActionCardHeader {
@@ -3983,13 +4114,13 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceActionCardIcon {
   min-width: 30px;
-  background: #1d1d1f;
+  background: linear-gradient(135deg, #132238 0%, #223f5f 100%);
   color: #fff;
 }
 
 .workspaceActionCardState {
-  background: #f5f5f7;
-  color: #6e6e73;
+  background: rgba(245, 248, 251, 0.94);
+  color: #6d7d90;
 }
 
 .workspaceActionCard.isPrimary .workspaceActionCardState {
@@ -4012,12 +4143,16 @@ button.landingButton.primaryButton:disabled {
   display: inline-flex;
   width: fit-content;
   min-height: 30px;
-  border-radius: 8px;
-  background: rgba(18, 34, 56, 0.06);
-  color: #16324d;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 243, 0.96) 0%, rgba(248, 243, 235, 0.94) 100%);
+  color: #8f5e0d;
+  border: 1px solid rgba(213, 187, 138, 0.76);
   padding: 6px 10px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .workspaceActionPrimaryMarker.isPlaceholder {
@@ -4026,11 +4161,11 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceActionCardCopy h2 {
   margin: 0;
-  color: #1d1d1f;
+  color: #162438;
   font-family: var(--font-display), sans-serif;
   font-size: 28px;
   line-height: 1.12;
-  letter-spacing: 0;
+  letter-spacing: -0.035em;
 }
 
 .workspaceActionCardCopy p {
@@ -4041,9 +4176,9 @@ button.landingButton.primaryButton:disabled {
 
 .workspaceActionCardMeta {
   align-self: end;
-  color: #6e6e73;
+  color: #6f7f93;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .workspaceActionButton {
@@ -4051,14 +4186,18 @@ button.landingButton.primaryButton:disabled {
   min-height: 46px;
   justify-content: center;
   margin-top: auto;
-  border-color: rgba(18, 34, 56, 0.08);
-  background: rgba(255, 255, 255, 0.78);
-  color: #1d1d1f;
-  box-shadow: none;
+  border-color: rgba(198, 209, 223, 0.94);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 249, 252, 0.94) 100%);
+  color: #1d2735;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 12px 22px rgba(148, 163, 184, 0.08);
 }
 
 .workspaceActionButton:hover {
-  background: rgba(255, 255, 255, 0.95);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(242, 247, 251, 0.98) 100%);
 }
 
 .workspaceActionButton:disabled {
