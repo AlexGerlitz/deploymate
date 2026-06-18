@@ -9,6 +9,7 @@ cd "$ROOT_DIR"
 RELEASE_WORKFLOW=".github/workflows/release.yml"
 STAGING_WORKFLOW=".github/workflows/staging.yml"
 SECRETS_AUDIT_WORKFLOW=".github/workflows/release-secrets-audit.yml"
+SECRETS_AUDIT_ACTION=".github/actions/release-secrets-audit/action.yml"
 RUNBOOK_FILE="RUNBOOK.md"
 
 extract_workflow_secrets() {
@@ -143,6 +144,25 @@ if text.count("uses: ./.github/actions/release-audit-incident") != 3:
 PY
 }
 
+audit_release_secrets_action_shape() {
+  python3 - "$SECRETS_AUDIT_ACTION" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+if "id: audit" not in text:
+    raise SystemExit(f"[release-audit] {path} must give the secret-contract step id: audit")
+
+if "${{ job.status }}" in text:
+    raise SystemExit(f"[release-audit] {path} must not report composite action status from job.status")
+
+if text.count("${{ steps.audit.outcome == 'success' && 'success' || 'failure' }}") != 2:
+    raise SystemExit(f"[release-audit] {path} should report summary and notification status from steps.audit.outcome")
+PY
+}
+
 TMP_DIR="$(mktemp -d)"
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -151,12 +171,14 @@ trap cleanup EXIT
 
 audit_cache_prepare
 audit_release_secrets_workflow_shape
+audit_release_secrets_action_shape
 
 release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "release-workflow-audit" \
   "$RELEASE_WORKFLOW" \
   "$STAGING_WORKFLOW" \
   "$SECRETS_AUDIT_WORKFLOW" \
+  "$SECRETS_AUDIT_ACTION" \
   "$RUNBOOK_FILE")"
 
 if audit_cache_persistent_has "release_workflow_audit" "$release_audit_fingerprint"; then

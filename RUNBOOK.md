@@ -604,6 +604,24 @@ Optional GitHub Actions release secrets audit workflow secrets:
 
 The audit workflow also needs GitHub Actions issue-write permission so scheduled failures can open or update an incident issue in the repository.
 
+If the audit fails with `REMOTE HOST IDENTIFICATION HAS CHANGED`, treat it as a trust-anchor
+incident, not a normal CI flake:
+
+1. Confirm out of band that the target host was intentionally rebuilt, reinstalled, or rotated.
+2. Capture the current host key fingerprints from a trusted workstation:
+
+```bash
+bash scripts/prepare_known_hosts.sh --host <target-host> --port 22 --output /tmp/deploymate_known_hosts
+cat /tmp/deploymate_known_hosts
+```
+
+3. Compare the printed fingerprints with the provider console, host console, or another trusted
+   owner-controlled path.
+4. Only after the new fingerprint is confirmed, update the GitHub environment secret
+   `DEPLOY_SSH_KNOWN_HOSTS` with the full known_hosts contents for the same environment.
+5. Re-run `Release Secrets Audit` manually for that environment and close the incident issue only
+   after the manual run succeeds.
+
 Runtime smoke notes:
 
 - if `DEPLOYMATE_SMOKE_SERVER_ID` is set, the script asks `/servers/{server_id}/suggested-ports` for a free external port
