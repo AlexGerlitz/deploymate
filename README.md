@@ -15,11 +15,13 @@
 </p>
 
 <p align="center">
-  <a href="https://deploymatecloud.ru">Live App</a>
-  ·
-  <a href="https://deploymatecloud.ru/register">Create Trial Account</a>
-  ·
-  <a href="https://deploymatecloud.ru/login">Login</a>
+  <a href="#reviewer-package">Reviewer Package</a>
+  |
+  <a href="ARCHITECTURE.md">Architecture</a>
+  |
+  <a href="RUNBOOK.md">Runbook</a>
+  |
+  <a href="PRODUCT-STRATEGY.md">Product Strategy</a>
 </p>
 
 DeployMate is a self-hosted deployment control panel for small teams that need a fast way to ship Docker containers, manage reusable templates, track operational state, and handle lightweight admin workflows from one UI.
@@ -38,8 +40,7 @@ See [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for the business-use policy a
 
 Commercial licensing entry points:
 
-- public explanation: `https://deploymatecloud.ru/commercial-license`
-- request flow: `https://deploymatecloud.ru/upgrade`
+- public explanation: [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)
 - owner contact: `mailto:alexgerlitz@users.noreply.github.com`
 - expected first reply: usually within 2 business days
 - production contact alias is configurable via `NEXT_PUBLIC_BUSINESS_CONTACT_EMAIL`
@@ -48,8 +49,7 @@ Commercial licensing entry points:
 
 If you are opening this repository as a hiring reviewer, these are the fastest entry points:
 
-- live app: `https://deploymatecloud.ru`
-- public signup: `https://deploymatecloud.ru/register`
+- product preview screenshots: [Product Preview](#product-preview)
 - release notes: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)
 - roadmap: [ROADMAP.md](ROADMAP.md)
 - product strategy: [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md)
@@ -66,23 +66,22 @@ What to evaluate quickly:
 
 If you want the shortest coherent pass through the project:
 
-1. open the live app at `https://deploymatecloud.ru/login`
-2. create a trial account
-3. inspect `/app` and one deployment detail page for the runtime story
-4. inspect `/app/server-review` for the dedicated server workspace
-5. inspect `/app/users` and `/app/upgrade-requests` for admin depth
-6. return to [ARCHITECTURE.md](ARCHITECTURE.md), [RUNBOOK.md](RUNBOOK.md), and [ROADMAP.md](ROADMAP.md) for system and release framing
-7. read [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md) for the product thesis, ICP, and long-term differentiator
+1. start with the screenshots in [Product Preview](#product-preview)
+2. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
+3. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
+4. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape
+5. read [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md) for the product thesis, ICP, and long-term differentiator
+6. use the runtime routes below as the reviewer map if a live deployment is available
 
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
-- live product surface
+- product screenshots and route map
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 
 ## Product Preview
 
-Public trial signup is enabled, and the deployed app already exposes the richer operator and admin surfaces:
+The repository includes product screenshots that show the richer operator and admin surfaces:
 
 ### Trial onboarding
 
@@ -98,18 +97,12 @@ Public trial signup is enabled, and the deployed app already exposes the richer 
 
 ![Upgrade inbox workspace](docs/screenshots/upgrade-inbox.png)
 
-## Try It Live
+## Optional Runtime Check
 
-Public trial signup is enabled on the live instance:
+If a live deployment is available, use this route map:
 
-- app: `https://deploymatecloud.ru`
-- signup: `https://deploymatecloud.ru/register`
-- login: `https://deploymatecloud.ru/login`
-
-Reviewer path:
-
-1. create a trial account
-2. land in the app immediately after signup
+1. open `/app` for the operator overview
+2. open one deployment detail page for runtime state and observability
 3. open `/app/server-review` to inspect the dedicated server workspace
 4. open `/app/users` and `/app/upgrade-requests` to inspect the richer admin surface
 5. review saved views, bulk actions, audit trail, backup bundle, and restore dry-run tooling
@@ -148,8 +141,8 @@ Recommended reviewer order:
 ### Web Terminal sidecar
 
 - a separate operator-side `Web Terminal` exists for direct server work with Codex and tmux
-- the reference location and maintenance rules live in [WEB-TERMINAL.md](/Users/alexgerlitz/deploymate/WEB-TERMINAL.md)
-- the current public entry is `lab.deploymatecloud.ru`
+- the reference location and maintenance rules live in [WEB-TERMINAL.md](WEB-TERMINAL.md)
+- the public proof is the sidecar contract and maintenance model, not a required live sidecar
 
 ### Deployment operations
 
