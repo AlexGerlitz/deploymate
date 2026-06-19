@@ -138,12 +138,6 @@ Recommended reviewer order:
 
 ## Feature Highlights
 
-### Web Terminal sidecar
-
-- a separate operator-side `Web Terminal` exists for direct server work with Codex and tmux
-- the reference location and maintenance rules live in [WEB-TERMINAL.md](WEB-TERMINAL.md)
-- the public proof is the sidecar contract and maintenance model, not a required live sidecar
-
 ### Deployment operations
 
 - create, redeploy, inspect, and delete Docker deployments
