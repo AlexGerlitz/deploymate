@@ -31,7 +31,26 @@ permissions:
   contents: read
 
 jobs:
+  staging-release-paused:
+    if: vars.STAGING_RELEASE_PAUSED == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Write paused staging summary
+        shell: bash
+        run: |
+          {
+            echo "## Manual Staging Deploy"
+            echo
+            echo "- Surface: \`${{ inputs.surface }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Status: \`paused\`"
+            echo "- Pause reason: \`STAGING_RELEASE_PAUSED=true\`"
+            echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   staging-release:
+    if: vars.STAGING_RELEASE_PAUSED != 'true'
     runs-on: ubuntu-latest
     environment: staging
 

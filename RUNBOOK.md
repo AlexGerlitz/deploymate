@@ -589,6 +589,13 @@ Optional GitHub Actions release workflow secrets:
 The staging workflow uses the same secret names, but scoped under the `staging` environment instead of `production`.
 If `DEPLOY_NOTIFICATION_WEBHOOK` is unset, the workflows simply skip notifications.
 
+Optional GitHub repository variables for staging delivery:
+
+- `STAGING_RELEASE_PAUSED=true` to pause automatic and manual remote staging
+  deploys during a target-host outage, rebuild, or migration. The CI release
+  gate still runs; only the SSH-based remote deploy is skipped. Remove the
+  variable after a successful manual staging deploy proves the target is healthy.
+
 Required GitHub Actions release secrets audit workflow secrets:
 
 - `DEPLOY_HOST`

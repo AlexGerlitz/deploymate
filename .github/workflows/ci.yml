@@ -185,7 +185,8 @@ jobs:
       github.ref == 'refs/heads/develop' &&
       needs.detect-changes.outputs.should_deploy == '1' &&
       needs.production-contract.result == 'success' &&
-      needs.release-gate.result == 'success'
+      needs.release-gate.result == 'success' &&
+      vars.STAGING_RELEASE_PAUSED != 'true'
     runs-on: ubuntu-latest
     environment: staging
 
@@ -261,3 +262,34 @@ jobs:
             --ref "${{ github.ref_name }}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --details "${{ needs.detect-changes.outputs.reason }}"
+
+  staging-release-paused:
+    needs:
+      - detect-changes
+      - production-contract
+      - release-gate
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop' &&
+      needs.detect-changes.outputs.should_deploy == '1' &&
+      needs.production-contract.result == 'success' &&
+      needs.release-gate.result == 'success' &&
+      vars.STAGING_RELEASE_PAUSED == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Write paused staging summary
+        shell: bash
+        run: |
+          {
+            echo "## Staging Deploy"
+            echo
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Surface: \`${{ needs.detect-changes.outputs.surface }}\`"
+            echo "- Change reason: ${{ needs.detect-changes.outputs.reason }}"
+            echo "- Should deploy: \`${{ needs.detect-changes.outputs.should_deploy }}\`"
+            echo "- Status: \`paused\`"
+            echo "- Pause reason: \`STAGING_RELEASE_PAUSED=true\`"
+            echo "- Release gate: \`passed\`"
+            echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
