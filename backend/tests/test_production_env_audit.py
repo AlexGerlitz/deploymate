@@ -600,6 +600,88 @@ exit 1
         self.assertIn("- release audit schedule paused", result.stdout)
         self.assertIn("- staging release paused", result.stdout)
 
+    def test_public_evidence_bundle_summarizes_workflows_and_maintenance(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "run" ] && [ "$2" = "list" ]; then
+  cat <<'JSON'
+[
+  {"workflowName":"CI","status":"completed","conclusion":"success","databaseId":101,"url":"https://example.test/actions/runs/101","headSha":"abc","displayTitle":"CI","event":"push","createdAt":"2026-06-20T00:00:00Z"},
+  {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":102,"url":"https://example.test/actions/runs/102","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-20T00:01:00Z"}
+]
+JSON
+  exit 0
+fi
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  printf 'OPEN\\n'
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+            json_result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/public_evidence_bundle.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--format",
+                    "json",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            markdown_result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/public_evidence_bundle.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--format",
+                    "markdown",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(json_result.returncode, 0, json_result.stdout + json_result.stderr)
+        payload = json.loads(json_result.stdout)
+        self.assertEqual(payload["repo"], "AlexGerlitz/deploymate")
+        self.assertEqual(payload["branch"], "develop")
+        self.assertEqual(payload["maintenance"]["ready_for_unpause"], "0")
+        self.assertEqual(payload["workflows"]["ci"]["conclusion"], "success")
+        self.assertEqual(payload["workflows"]["release_maintenance_status"]["databaseId"], 102)
+
+        self.assertEqual(markdown_result.returncode, 0, markdown_result.stdout + markdown_result.stderr)
+        self.assertIn("# DeployMate Public Evidence Bundle", markdown_result.stdout)
+        self.assertIn("| CI | `completed` | `success` | [101](https://example.test/actions/runs/101) |", markdown_result.stdout)
+        self.assertIn("- release audit schedule paused", markdown_result.stdout)
+        self.assertIn("- `Release Maintenance Status artifact`", markdown_result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

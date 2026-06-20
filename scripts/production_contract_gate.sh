@@ -21,6 +21,9 @@ bash -n \
   scripts/production_env_audit.sh \
   scripts/production_contract_gate.sh
 
+echo "[production-contract] python syntax"
+"$PYTHON_BIN" -m py_compile scripts/public_evidence_bundle.py
+
 echo "[production-contract] release workflow audit"
 bash scripts/release_workflow_audit.sh
 

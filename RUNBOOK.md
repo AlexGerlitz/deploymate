@@ -614,6 +614,18 @@ system is ready to unpause. The workflow writes both
 dashboards can consume JSON, while GitHub summaries and public status pages can
 reuse the Markdown report without parsing logs.
 
+Public evidence bundle:
+
+```bash
+python3 scripts/public_evidence_bundle.py --format markdown
+python3 scripts/public_evidence_bundle.py --format json
+```
+
+The GitHub Actions workflow `Public Evidence Bundle` publishes
+`deploymate-public-evidence.json` and `deploymate-public-evidence.md` artifacts
+for reviewer handoff, public status pages, and portfolio evidence without
+exposing secrets.
+
 Required GitHub Actions release secrets audit workflow secrets:
 
 - `DEPLOY_HOST`

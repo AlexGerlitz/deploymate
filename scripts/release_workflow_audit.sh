@@ -11,6 +11,7 @@ RELEASE_WORKFLOW=".github/workflows/release.yml"
 STAGING_WORKFLOW=".github/workflows/staging.yml"
 SECRETS_AUDIT_WORKFLOW=".github/workflows/release-secrets-audit.yml"
 MAINTENANCE_STATUS_WORKFLOW=".github/workflows/release-maintenance-status.yml"
+PUBLIC_EVIDENCE_WORKFLOW=".github/workflows/public-evidence-bundle.yml"
 SECRETS_AUDIT_ACTION=".github/actions/release-secrets-audit/action.yml"
 RUNBOOK_FILE="RUNBOOK.md"
 
@@ -205,6 +206,32 @@ if "vars.RELEASE_AUDIT_SCHEDULED_PAUSED" not in text or "vars.STAGING_RELEASE_PA
 PY
 }
 
+audit_public_evidence_workflow_shape() {
+  python3 - "$PUBLIC_EVIDENCE_WORKFLOW" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+required_snippets = [
+    "name: Public Evidence Bundle",
+    "workflow_dispatch:",
+    "schedule:",
+    "actions: read",
+    "issues: read",
+    "scripts/public_evidence_bundle.py",
+    "deploymate-public-evidence.json",
+    "deploymate-public-evidence.md",
+    "uses: actions/upload-artifact@v4",
+]
+
+for snippet in required_snippets:
+    if snippet not in text:
+        raise SystemExit(f"[release-audit] {path} is missing {snippet!r}")
+PY
+}
+
 audit_release_surface_classification() {
   local path="$1"
   local expected="$2"
@@ -226,9 +253,12 @@ audit_cache_prepare
 audit_release_secrets_workflow_shape
 audit_release_secrets_action_shape
 audit_release_maintenance_workflow_shape
+audit_public_evidence_workflow_shape
 audit_release_surface_classification "backend/tests/test_production_env_audit.py" "docs"
 audit_release_surface_classification "backend/app/main.py" "backend"
 audit_release_surface_classification ".github/workflows/release-maintenance-status.yml" "docs"
+audit_release_surface_classification ".github/workflows/public-evidence-bundle.yml" "docs"
+audit_release_surface_classification "scripts/public_evidence_bundle.py" "docs"
 
 release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "release-workflow-audit" \
@@ -236,6 +266,7 @@ release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "$STAGING_WORKFLOW" \
   "$SECRETS_AUDIT_WORKFLOW" \
   "$MAINTENANCE_STATUS_WORKFLOW" \
+  "$PUBLIC_EVIDENCE_WORKFLOW" \
   "$SECRETS_AUDIT_ACTION" \
   "$RUNBOOK_FILE")"
 

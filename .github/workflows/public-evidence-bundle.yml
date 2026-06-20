@@ -1,0 +1,60 @@
+name: Public Evidence Bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      check_network:
+        description: "Check public DNS and HTTPS endpoints"
+        required: true
+        type: boolean
+        default: false
+  schedule:
+    - cron: "13 3 * * *"
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+
+jobs:
+  evidence:
+    name: public evidence bundle
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_AUDIT_SCHEDULED_PAUSED: ${{ vars.RELEASE_AUDIT_SCHEDULED_PAUSED }}
+      STAGING_RELEASE_PAUSED: ${{ vars.STAGING_RELEASE_PAUSED }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Generate evidence bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          check_network="${{ inputs.check_network }}"
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            check_network="false"
+          fi
+
+          args=(--repo "$GITHUB_REPOSITORY" --branch "$GITHUB_REF_NAME")
+          if [ "$check_network" = "true" ]; then
+            args+=(--check-network)
+          fi
+
+          python3 scripts/public_evidence_bundle.py "${args[@]}" --format json > deploymate-public-evidence.json
+          python3 scripts/public_evidence_bundle.py "${args[@]}" --format markdown > deploymate-public-evidence.md
+
+          cat deploymate-public-evidence.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload public evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploymate-public-evidence
+          path: |
+            deploymate-public-evidence.json
+            deploymate-public-evidence.md
+          if-no-files-found: error
