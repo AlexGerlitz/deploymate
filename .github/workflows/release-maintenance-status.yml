@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload maintenance status artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-maintenance-status
           path: |

@@ -191,7 +191,7 @@ required_snippets = [
     "--format markdown",
     "release-maintenance-status.json",
     "release-maintenance-status.md",
-    "uses: actions/upload-artifact@v4",
+    "uses: actions/upload-artifact@v7",
 ]
 
 for snippet in required_snippets:
@@ -228,7 +228,7 @@ required_snippets = [
     "scripts/public_evidence_bundle.py",
     "deploymate-public-evidence.json",
     "deploymate-public-evidence.md",
-    "uses: actions/upload-artifact@v4",
+    "uses: actions/upload-artifact@v7",
 ]
 
 for snippet in required_snippets:
