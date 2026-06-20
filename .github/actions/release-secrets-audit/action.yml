@@ -31,6 +31,17 @@ inputs:
     required: false
     default: ""
 
+outputs:
+  audit-status:
+    description: Success or failure status derived from the release secret contract audit.
+    value: ${{ steps.audit.outputs.audit_status }}
+  failure-category:
+    description: Safe machine-readable failure category for failed release secret contract audits.
+    value: ${{ steps.audit.outputs.failure_category }}
+  operator-hint:
+    description: Safe human-readable next action for the classified audit result.
+    value: ${{ steps.audit.outputs.operator_hint }}
+
 runs:
   using: composite
   steps:
@@ -65,12 +76,22 @@ runs:
       id: audit
       shell: bash
       run: |
+        set +e
+        set -o pipefail
+        log_file="${RUNNER_TEMP:-/tmp}/release-secret-contract-audit.log"
         bash scripts/release_secret_contract_audit.sh \
           --host "${{ inputs.deploy-host }}" \
           --repo-dir "${{ inputs.deploy-repo-dir }}" \
           --env-file "${{ inputs.deploy-env-file }}" \
           --admin-username "${{ inputs.admin-username }}" \
-          --admin-password "${{ inputs.admin-password }}"
+          --admin-password "${{ inputs.admin-password }}" 2>&1 | tee "$log_file"
+        audit_exit="${PIPESTATUS[0]}"
+        set -e
+        node scripts/release_audit_failure_classifier.js \
+          --exit-code "$audit_exit" \
+          --log-file "$log_file" \
+          --format github-output >> "$GITHUB_OUTPUT"
+        exit "$audit_exit"
 
     - name: Write audit summary
       if: always()
@@ -82,6 +103,8 @@ runs:
           echo "- Environment: \`${{ inputs.target-environment }}\`"
           echo "- Trigger: \`${{ github.event_name }}\`"
           echo "- Status: \`${{ steps.audit.outcome == 'success' && 'success' || 'failure' }}\`"
+          echo "- Failure category: \`${{ steps.audit.outputs.failure_category || 'not-classified' }}\`"
+          echo "- Operator hint: ${{ steps.audit.outputs.operator_hint || 'Open the failed audit step log.' }}"
           echo "- Incident self-test: \`none\`"
           echo "- Actions run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         } >> "$GITHUB_STEP_SUMMARY"
@@ -108,4 +131,4 @@ runs:
           --commit "${{ github.sha }}" \
           --ref "${{ github.ref_name }}" \
           --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-          --details "trigger=${{ github.event_name }}"
+          --details "trigger=${{ github.event_name }} category=${{ steps.audit.outputs.failure_category || 'not-classified' }}"

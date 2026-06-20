@@ -29,6 +29,10 @@ async function listOpenIssues(github, owner, repo, labels) {
   });
 }
 
+function sanitizeLine(value) {
+  return String(value || "").replace(/[\r\n]+/g, " ").trim();
+}
+
 async function recentFailureStreak({ github, context, owner, repo, envName, isSelfTest, selfTestAction, threshold }) {
   if (isSelfTest) {
     if (selfTestAction === "update") {
@@ -86,6 +90,8 @@ async function triageReleaseAuditIncident({ github, context, core, env }) {
     : `[release-secrets-audit] ${envName} scheduled audit failing`;
   const assignee = (env.INCIDENT_ASSIGNEE || "").trim();
   const threshold = Math.max(parseInt(env.INCIDENT_FAILURE_THRESHOLD || "3", 10) || 3, 1);
+  const failureCategory = sanitizeLine(env.AUDIT_FAILURE_CATEGORY || "not_classified");
+  const operatorHint = sanitizeLine(env.AUDIT_OPERATOR_HINT || "Open the failed run and read the failing step output.");
   const incidentLabel = "incident";
   const incidentTestLabel = "incident:test";
   const mediumSeverityLabel = "severity:medium";
@@ -166,6 +172,10 @@ async function triageReleaseAuditIncident({ github, context, core, env }) {
     `- Workflow run: ${env.RUN_URL}`,
     `- Ref: \`${env.REF_NAME}\``,
     `- Commit: \`${String(env.COMMIT_SHA || "").slice(0, 7)}\``,
+    ...(isSelfTest ? [] : [
+      `- Failure category: \`${failureCategory || "not_classified"}\``,
+      `- Operator hint: ${operatorHint || "Open the failed run and read the failing step output."}`,
+    ]),
     "",
     ...(isSelfTest
       ? [

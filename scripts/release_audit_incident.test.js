@@ -226,11 +226,15 @@ test("opens a scheduled incident using the observed failure streak", async () =>
       JOB_STATUS: "failure",
       INCIDENT_SELF_TEST_ACTION: "none",
       INCIDENT_FAILURE_THRESHOLD: "3",
+      AUDIT_FAILURE_CATEGORY: "ssh_auth_denied",
+      AUDIT_OPERATOR_HINT: "Restore the deploy public key in authorized_keys.",
     },
   });
 
   assert.equal(harness.state.createdIssues.length, 1);
   assert.match(harness.state.createdIssues[0].body, /Consecutive scheduled failures: `2`/);
+  assert.match(harness.state.createdIssues[0].body, /Failure category: `ssh_auth_denied`/);
+  assert.match(harness.state.createdIssues[0].body, /Operator hint: Restore the deploy public key in authorized_keys\./);
   assert.deepEqual(harness.state.createdIssues[0].labels, [
     "ci",
     "release",
@@ -272,11 +276,15 @@ test("updates an existing scheduled incident without duplicate failure comments"
       JOB_STATUS: "failure",
       INCIDENT_SELF_TEST_ACTION: "none",
       INCIDENT_FAILURE_THRESHOLD: "3",
+      AUDIT_FAILURE_CATEGORY: "ssh_host_key_changed",
+      AUDIT_OPERATOR_HINT: "Refresh the pinned known_hosts secret.",
     },
   });
 
   assert.equal(harness.state.updatedIssues.length, 1);
   assert.match(harness.state.updatedIssues[0].body, /Workflow run: https:\/\/github\.com\/AlexGerlitz\/deploymate\/actions\/runs\/5/);
+  assert.match(harness.state.updatedIssues[0].body, /Failure category: `ssh_host_key_changed`/);
+  assert.match(harness.state.updatedIssues[0].body, /Operator hint: Refresh the pinned known_hosts secret\./);
   assert.deepEqual(harness.state.updatedIssues[0].labels, [
     "ci",
     "release",

@@ -20,6 +20,14 @@ inputs:
     description: Consecutive failure threshold before high-severity escalation.
     required: false
     default: "3"
+  failure-category:
+    description: Safe machine-readable failure category from the release audit action.
+    required: false
+    default: ""
+  operator-hint:
+    description: Safe human-readable next action from the release audit action.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -35,6 +43,8 @@ runs:
         INCIDENT_SELF_TEST_ACTION: ${{ inputs.self-test-action }}
         INCIDENT_ASSIGNEE: ${{ inputs.incident-assignee }}
         INCIDENT_FAILURE_THRESHOLD: ${{ inputs.incident-failure-threshold }}
+        AUDIT_FAILURE_CATEGORY: ${{ inputs.failure-category }}
+        AUDIT_OPERATOR_HINT: ${{ inputs.operator-hint }}
       with:
         script: |
           const { triageReleaseAuditIncident } = require(`${process.env.GITHUB_WORKSPACE}/scripts/release_audit_incident.js`);

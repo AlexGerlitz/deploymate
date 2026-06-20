@@ -13,6 +13,8 @@ SECRETS_AUDIT_WORKFLOW=".github/workflows/release-secrets-audit.yml"
 MAINTENANCE_STATUS_WORKFLOW=".github/workflows/release-maintenance-status.yml"
 PUBLIC_EVIDENCE_WORKFLOW=".github/workflows/public-evidence-bundle.yml"
 SECRETS_AUDIT_ACTION=".github/actions/release-secrets-audit/action.yml"
+RELEASE_AUDIT_INCIDENT_ACTION=".github/actions/release-audit-incident/action.yml"
+RELEASE_AUDIT_FAILURE_CLASSIFIER="scripts/release_audit_failure_classifier.js"
 RUNBOOK_FILE="RUNBOOK.md"
 
 extract_workflow_secrets() {
@@ -146,6 +148,12 @@ if text.count("uses: ./.github/actions/release-secrets-audit") != 3:
 if text.count("uses: ./.github/actions/release-audit-incident") != 3:
     raise SystemExit(f"[release-audit] {path} should call the incident action from both scheduled jobs and self-test")
 
+if "failure-category: ${{ steps.audit.outputs['failure-category'] }}" not in text:
+    raise SystemExit(f"[release-audit] {path} should pass the classified failure category into incident triage")
+
+if "operator-hint: ${{ steps.audit.outputs['operator-hint'] }}" not in text:
+    raise SystemExit(f"[release-audit] {path} should pass the classified operator hint into incident triage")
+
 if "vars.RELEASE_AUDIT_SCHEDULED_PAUSED == 'true'" not in text:
     raise SystemExit(f"[release-audit] {path} should expose an explicit scheduled audit pause job")
 
@@ -170,6 +178,37 @@ if "${{ job.status }}" in text:
 
 if text.count("${{ steps.audit.outcome == 'success' && 'success' || 'failure' }}") != 2:
     raise SystemExit(f"[release-audit] {path} should report summary and notification status from steps.audit.outcome")
+
+required_snippets = [
+    "outputs:",
+    "failure-category:",
+    "operator-hint:",
+    "node scripts/release_audit_failure_classifier.js",
+    "--format github-output >> \"$GITHUB_OUTPUT\"",
+]
+for snippet in required_snippets:
+    if snippet not in text:
+        raise SystemExit(f"[release-audit] {path} is missing audit failure classifier snippet {snippet!r}")
+PY
+}
+
+audit_release_incident_action_shape() {
+  python3 - "$RELEASE_AUDIT_INCIDENT_ACTION" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+required_snippets = [
+    "failure-category:",
+    "operator-hint:",
+    "AUDIT_FAILURE_CATEGORY:",
+    "AUDIT_OPERATOR_HINT:",
+]
+for snippet in required_snippets:
+    if snippet not in text:
+        raise SystemExit(f"[release-audit] {path} is missing classified incident snippet {snippet!r}")
 PY
 }
 
@@ -287,6 +326,7 @@ trap cleanup EXIT
 audit_cache_prepare
 audit_release_secrets_workflow_shape
 audit_release_secrets_action_shape
+audit_release_incident_action_shape
 audit_release_maintenance_workflow_shape
 audit_public_evidence_workflow_shape
 audit_public_evidence_docs_shape
@@ -304,6 +344,8 @@ release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "$MAINTENANCE_STATUS_WORKFLOW" \
   "$PUBLIC_EVIDENCE_WORKFLOW" \
   "$SECRETS_AUDIT_ACTION" \
+  "$RELEASE_AUDIT_INCIDENT_ACTION" \
+  "$RELEASE_AUDIT_FAILURE_CLASSIFIER" \
   "$RUNBOOK_FILE")"
 
 if audit_cache_persistent_has "release_workflow_audit" "$release_audit_fingerprint"; then

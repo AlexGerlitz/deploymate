@@ -661,6 +661,18 @@ cat /tmp/deploymate_known_hosts
 5. Re-run `Release Secrets Audit` manually for that environment and close the incident issue only
    after the manual run succeeds.
 
+The audit action also classifies common failure modes in the workflow summary and the
+scheduled incident body:
+
+- `ssh_host_key_changed` means the pinned `DEPLOY_SSH_KNOWN_HOSTS` trust anchor no
+  longer matches the host and must be refreshed only after out-of-band fingerprint
+  confirmation.
+- `ssh_auth_denied` means the host key is trusted, but the deploy key is not accepted;
+  restore the matching public key in `authorized_keys` or rotate `DEPLOY_SSH_PRIVATE_KEY`.
+- `runtime_admin_password_mismatch`, `runtime_admin_username_mismatch`, and
+  `runtime_admin_password_missing` mean the target runtime env file no longer matches
+  the GitHub environment smoke credentials.
+
 Runtime smoke notes:
 
 - if `DEPLOYMATE_SMOKE_SERVER_ID` is set, the script asks `/servers/{server_id}/suggested-ports` for a free external port

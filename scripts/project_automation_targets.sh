@@ -32,7 +32,7 @@ automation_classify_release_path() {
     backend/*)
       printf 'backend\n'
       ;;
-    README.md|RUNBOOK.md|HANDOFF.md|LICENSE|.gitignore|.github/*|scripts/project_automation_targets.sh|scripts/lib/project_automation_targets.sh|scripts/production_contract_gate.sh|scripts/release_workflow_audit.sh|scripts/release_maintenance_status.sh|scripts/public_evidence_bundle.py|scripts/release_audit_incident.js|scripts/release_audit_incident.test.js|scripts/release_audit_mode.js|scripts/release_audit_mode.test.js)
+    README.md|RUNBOOK.md|HANDOFF.md|LICENSE|.gitignore|.github/*|scripts/project_automation_targets.sh|scripts/lib/project_automation_targets.sh|scripts/production_contract_gate.sh|scripts/release_workflow_audit.sh|scripts/release_maintenance_status.sh|scripts/public_evidence_bundle.py|scripts/release_audit_failure_classifier.js|scripts/release_audit_failure_classifier.test.js|scripts/release_audit_incident.js|scripts/release_audit_incident.test.js|scripts/release_audit_mode.js|scripts/release_audit_mode.test.js)
       printf 'docs\n'
       ;;
     *)
