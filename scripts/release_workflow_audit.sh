@@ -232,6 +232,33 @@ for snippet in required_snippets:
 PY
 }
 
+audit_public_evidence_docs_shape() {
+  python3 - <<'PY'
+from pathlib import Path
+
+readme = Path("README.md").read_text(encoding="utf-8")
+runbook = Path("RUNBOOK.md").read_text(encoding="utf-8")
+
+required_readme = [
+    "Public Evidence Bundle",
+    "deploymate-public-evidence.md",
+    "public evidence bundle with CI, release-maintenance, and incident status",
+]
+for snippet in required_readme:
+    if snippet not in readme:
+        raise SystemExit(f"[release-audit] README.md is missing public evidence snippet {snippet!r}")
+
+required_runbook = [
+    "python3 scripts/public_evidence_bundle.py --format markdown",
+    "deploymate-public-evidence.json",
+    "deploymate-public-evidence.md",
+]
+for snippet in required_runbook:
+    if snippet not in runbook:
+        raise SystemExit(f"[release-audit] RUNBOOK.md is missing public evidence snippet {snippet!r}")
+PY
+}
+
 audit_release_surface_classification() {
   local path="$1"
   local expected="$2"
@@ -254,6 +281,7 @@ audit_release_secrets_workflow_shape
 audit_release_secrets_action_shape
 audit_release_maintenance_workflow_shape
 audit_public_evidence_workflow_shape
+audit_public_evidence_docs_shape
 audit_release_surface_classification "backend/tests/test_production_env_audit.py" "docs"
 audit_release_surface_classification "backend/app/main.py" "backend"
 audit_release_surface_classification ".github/workflows/release-maintenance-status.yml" "docs"

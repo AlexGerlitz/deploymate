@@ -55,6 +55,7 @@ If you are opening this repository as a hiring reviewer, these are the fastest e
 - product strategy: [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md)
 - architecture overview: [ARCHITECTURE.md](ARCHITECTURE.md)
 - production/release discipline: [RUNBOOK.md](RUNBOOK.md), [SAFE-RELEASE.md](SAFE-RELEASE.md), [SECURITY.md](SECURITY.md)
+- latest CI and operational proof: run the GitHub Actions workflow `Public Evidence Bundle` and download `deploymate-public-evidence.md`
 
 What to evaluate quickly:
 
@@ -67,15 +68,17 @@ What to evaluate quickly:
 If you want the shortest coherent pass through the project:
 
 1. start with the screenshots in [Product Preview](#product-preview)
-2. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
-3. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
-4. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape
-5. read [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md) for the product thesis, ICP, and long-term differentiator
-6. use the runtime routes below as the reviewer map if a live deployment is available
+2. run `Public Evidence Bundle` in GitHub Actions and download `deploymate-public-evidence.md`
+3. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
+4. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
+5. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape
+6. read [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md) for the product thesis, ICP, and long-term differentiator
+7. use the runtime routes below as the reviewer map if a live deployment is available
 
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
 - product screenshots and route map
+- public evidence bundle with CI, release-maintenance, and incident status
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 
