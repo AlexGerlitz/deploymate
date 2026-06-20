@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT_DIR/scripts/audit_cache.sh"
+source "$ROOT_DIR/scripts/lib/project_automation_targets.sh"
 cd "$ROOT_DIR"
 
 RELEASE_WORKFLOW=".github/workflows/release.yml"
@@ -202,6 +203,17 @@ if "vars.RELEASE_AUDIT_SCHEDULED_PAUSED" not in text or "vars.STAGING_RELEASE_PA
 PY
 }
 
+audit_release_surface_classification() {
+  local path="$1"
+  local expected="$2"
+  local actual
+  actual="$(automation_classify_release_path "$path")"
+  if [ "$actual" != "$expected" ]; then
+    echo "[release-audit] expected $path to classify as $expected, got $actual" >&2
+    return 1
+  fi
+}
+
 TMP_DIR="$(mktemp -d)"
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -212,6 +224,9 @@ audit_cache_prepare
 audit_release_secrets_workflow_shape
 audit_release_secrets_action_shape
 audit_release_maintenance_workflow_shape
+audit_release_surface_classification "backend/tests/test_production_env_audit.py" "docs"
+audit_release_surface_classification "backend/app/main.py" "backend"
+audit_release_surface_classification ".github/workflows/release-maintenance-status.yml" "docs"
 
 release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "release-workflow-audit" \

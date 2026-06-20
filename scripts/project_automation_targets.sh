@@ -26,6 +26,9 @@ automation_classify_release_path() {
     frontend/*)
       printf 'frontend\n'
       ;;
+    backend/tests/*)
+      printf 'docs\n'
+      ;;
     backend/*)
       printf 'backend\n'
       ;;
