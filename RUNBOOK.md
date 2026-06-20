@@ -619,6 +619,7 @@ Public evidence bundle:
 ```bash
 python3 scripts/public_evidence_bundle.py --format markdown
 python3 scripts/public_evidence_bundle.py --format json
+python3 scripts/public_evidence_bundle.py --check-network --format markdown
 ```
 
 The GitHub Actions workflow `Public Evidence Bundle` publishes

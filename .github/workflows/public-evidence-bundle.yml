@@ -14,7 +14,7 @@ on:
         description: "Check public DNS and HTTPS endpoints"
         required: true
         type: boolean
-        default: false
+        default: true
   schedule:
     - cron: "13 3 * * *"
 
@@ -46,7 +46,9 @@ jobs:
           set -euo pipefail
 
           check_network="${{ inputs.check_network }}"
-          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            check_network="true"
+          elif [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
             check_network="false"
           fi
 
