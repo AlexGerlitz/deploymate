@@ -99,6 +99,11 @@ fi
 
 get_repo_variable() {
   local name="$1"
+  local env_value="${!name:-}"
+  if [ -n "$env_value" ]; then
+    printf '%s\n' "$env_value"
+    return 0
+  fi
   if [ "$gh_available" != "1" ]; then
     return 0
   fi

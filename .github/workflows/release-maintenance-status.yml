@@ -1,0 +1,91 @@
+name: Release Maintenance Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      require_ready:
+        description: "Fail the workflow if release maintenance is not ready to unpause"
+        required: true
+        type: boolean
+        default: false
+      check_network:
+        description: "Check public DNS and HTTPS endpoints"
+        required: true
+        type: boolean
+        default: true
+      hosts:
+        description: "Comma-separated public hosts to check"
+        required: true
+        type: string
+        default: "deploymatecloud.ru,lab.deploymatecloud.ru"
+  schedule:
+    - cron: "47 2 * * *"
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  status:
+    name: release maintenance status
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_AUDIT_SCHEDULED_PAUSED: ${{ vars.RELEASE_AUDIT_SCHEDULED_PAUSED }}
+      STAGING_RELEASE_PAUSED: ${{ vars.STAGING_RELEASE_PAUSED }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run maintenance status
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          hosts="${{ inputs.hosts }}"
+          check_network="${{ inputs.check_network }}"
+          require_ready="${{ inputs.require_ready }}"
+
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            hosts="deploymatecloud.ru,lab.deploymatecloud.ru"
+            check_network="true"
+            require_ready="false"
+          fi
+
+          if [ -z "$hosts" ]; then
+            hosts="deploymatecloud.ru,lab.deploymatecloud.ru"
+          fi
+
+          args=(--repo "$GITHUB_REPOSITORY" --hosts "$hosts" --format shell)
+
+          if [ "$check_network" != "true" ]; then
+            args+=(--no-network)
+          fi
+
+          if [ "$require_ready" = "true" ]; then
+            args+=(--require-ready)
+          fi
+
+          set +e
+          status_output="$(bash scripts/release_maintenance_status.sh "${args[@]}" 2>&1)"
+          status_code=$?
+          set -e
+
+          printf '%s\n' "$status_output"
+
+          {
+            echo "## Release Maintenance Status"
+            echo
+            echo "- Trigger: \`$GITHUB_EVENT_NAME\`"
+            echo "- Require ready: \`$require_ready\`"
+            echo "- Network checks: \`$check_network\`"
+            echo "- Hosts: \`$hosts\`"
+            echo
+            echo '```text'
+            printf '%s\n' "$status_output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$status_code"

@@ -606,6 +606,10 @@ bash scripts/release_maintenance_status.sh --require-ready
 The first command is informational and stays zero-exit for dashboards and handoffs.
 The second command fails until release-audit/staging pauses are removed, the
 release-audit incident issues are closed, and the public hosts answer over HTTPS.
+The same check is available in GitHub Actions as `Release Maintenance Status`.
+Run it with `require_ready=false` for a green informational report, or with
+`require_ready=true` when you intentionally want the workflow to fail until the
+system is ready to unpause.
 
 Required GitHub Actions release secrets audit workflow secrets:
 
