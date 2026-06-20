@@ -98,6 +98,9 @@ def load_github_runs(repo: str, branch: str) -> list[dict[str, Any]]:
 
 def latest_workflow(runs: list[dict[str, Any]], workflow_name: str) -> dict[str, Any]:
     for run in runs:
+        if run.get("workflowName") == workflow_name and run.get("status") == "completed":
+            return run
+    for run in runs:
         if run.get("workflowName") == workflow_name:
             return run
     return {

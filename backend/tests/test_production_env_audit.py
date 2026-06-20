@@ -609,6 +609,7 @@ set -euo pipefail
 if [ "$1" = "run" ] && [ "$2" = "list" ]; then
   cat <<'JSON'
 [
+  {"workflowName":"CI","status":"in_progress","conclusion":"","databaseId":100,"url":"https://example.test/actions/runs/100","headSha":"abc","displayTitle":"CI pending","event":"push","createdAt":"2026-06-20T00:02:00Z"},
   {"workflowName":"CI","status":"completed","conclusion":"success","databaseId":101,"url":"https://example.test/actions/runs/101","headSha":"abc","displayTitle":"CI","event":"push","createdAt":"2026-06-20T00:00:00Z"},
   {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":102,"url":"https://example.test/actions/runs/102","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-20T00:01:00Z"}
 ]
@@ -674,6 +675,7 @@ exit 1
         self.assertEqual(payload["branch"], "develop")
         self.assertEqual(payload["maintenance"]["ready_for_unpause"], "0")
         self.assertEqual(payload["workflows"]["ci"]["conclusion"], "success")
+        self.assertEqual(payload["workflows"]["ci"]["databaseId"], 101)
         self.assertEqual(payload["workflows"]["release_maintenance_status"]["databaseId"], 102)
 
         self.assertEqual(markdown_result.returncode, 0, markdown_result.stdout + markdown_result.stderr)
