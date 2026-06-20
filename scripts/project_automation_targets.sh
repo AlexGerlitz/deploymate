@@ -29,7 +29,7 @@ automation_classify_release_path() {
     backend/*)
       printf 'backend\n'
       ;;
-    README.md|RUNBOOK.md|HANDOFF.md|LICENSE|.gitignore|.github/*)
+    README.md|RUNBOOK.md|HANDOFF.md|LICENSE|.gitignore|.github/*|scripts/project_automation_targets.sh|scripts/lib/project_automation_targets.sh|scripts/release_audit_incident.js|scripts/release_audit_incident.test.js|scripts/release_audit_mode.js|scripts/release_audit_mode.test.js)
       printf 'docs\n'
       ;;
     *)
