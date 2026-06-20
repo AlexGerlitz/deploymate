@@ -192,22 +192,28 @@ async function triageReleaseAuditIncident({ github, context, core, env }) {
       assignees: assignee ? [assignee] : existing.assignees.map((entry) => entry.login),
     });
 
-    await github.rest.issues.createComment({
-      owner,
-      repo,
-      issue_number: existing.number,
-      body: [
-        isSelfTest ? "Incident self-test updated the existing issue." : "Scheduled audit is still failing.",
-        "",
-        ...(isSelfTest ? [`- Self-test action: \`${selfTestAction}\``] : []),
-        `- Severity: \`${severityText}\``,
-        `- Consecutive scheduled failures: \`${failureStreak}\``,
-        `- Run: ${env.RUN_URL}`,
-        `- Commit: \`${String(env.COMMIT_SHA || "").slice(0, 7)}\``,
-      ].join("\n"),
-    });
+    if (isSelfTest) {
+      await github.rest.issues.createComment({
+        owner,
+        repo,
+        issue_number: existing.number,
+        body: [
+          "Incident self-test updated the existing issue.",
+          "",
+          `- Self-test action: \`${selfTestAction}\``,
+          `- Severity: \`${severityText}\``,
+          `- Consecutive scheduled failures: \`${failureStreak}\``,
+          `- Run: ${env.RUN_URL}`,
+          `- Commit: \`${String(env.COMMIT_SHA || "").slice(0, 7)}\``,
+        ].join("\n"),
+      });
+    }
 
-    core.notice(`Updated existing incident issue #${existing.number}`);
+    core.notice(
+      isSelfTest
+        ? `Updated existing incident issue #${existing.number}`
+        : `Updated existing incident issue #${existing.number} without duplicate scheduled-failure comment`
+    );
     return;
   }
 

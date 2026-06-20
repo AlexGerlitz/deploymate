@@ -190,6 +190,7 @@ That manual workflow now also supports an `incident_self_test` mode with `open`,
 That workflow also runs every day at `02:17 UTC` (`09:17` in Novosibirsk) for both environments and sends a best-effort webhook notification when `DEPLOY_NOTIFICATION_WEBHOOK` is configured.
 If a scheduled audit fails, GitHub automatically opens or updates one environment-specific incident issue so the failure does not disappear in webhook history alone.
 That incident now gets `incident` plus severity labels, and severity is raised to `severity:high` after the configured number of consecutive scheduled failures.
+Repeated scheduled failures update the existing issue body and labels without adding another comment, so operators still see the latest run while email notifications do not grow on every unchanged failure.
 When the next scheduled audit for that environment succeeds, the workflow comments on the issue and closes it automatically.
 The manual self-test flow uses a separate `[release-secrets-audit:self-test] ...` issue title and the `incident:test` label, so it does not interfere with real scheduled incidents.
 The incident triage logic itself now lives in `scripts/release_audit_incident.js`, and the local regression path for it is `node --test scripts/release_audit_incident.test.js`.

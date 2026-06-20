@@ -238,3 +238,52 @@ test("opens a scheduled incident using the observed failure streak", async () =>
     "severity:medium",
   ]);
 });
+
+test("updates an existing scheduled incident without duplicate failure comments", async () => {
+  const harness = createHarness({
+    openIssues: [
+      {
+        number: 18,
+        title: "[release-secrets-audit] production scheduled audit failing",
+        labels: ["ci", "release", "incident", "severity:high"],
+        assignees: [{ login: "AlexGerlitz" }],
+      },
+    ],
+    workflowRuns: [
+      { id: 999 },
+      { id: 1001 },
+      { id: 1002 },
+    ],
+    jobsByRunId: {
+      1001: [{ name: "audit (production)", status: "completed", conclusion: "failure" }],
+      1002: [{ name: "audit (production)", status: "completed", conclusion: "failure" }],
+    },
+  });
+
+  await triageReleaseAuditIncident({
+    github: harness.github,
+    context: harness.context,
+    core: harness.core,
+    env: {
+      TARGET_ENVIRONMENT: "production",
+      RUN_URL: "https://github.com/AlexGerlitz/deploymate/actions/runs/5",
+      COMMIT_SHA: "abcdef1234567890",
+      REF_NAME: "develop",
+      JOB_STATUS: "failure",
+      INCIDENT_SELF_TEST_ACTION: "none",
+      INCIDENT_FAILURE_THRESHOLD: "3",
+    },
+  });
+
+  assert.equal(harness.state.updatedIssues.length, 1);
+  assert.match(harness.state.updatedIssues[0].body, /Workflow run: https:\/\/github\.com\/AlexGerlitz\/deploymate\/actions\/runs\/5/);
+  assert.deepEqual(harness.state.updatedIssues[0].labels, [
+    "ci",
+    "release",
+    "incident",
+    "severity:high",
+  ]);
+  assert.deepEqual(harness.state.updatedIssues[0].assignees, ["AlexGerlitz"]);
+  assert.equal(harness.state.comments.length, 0);
+  assert.match(harness.state.notices[0], /without duplicate scheduled-failure comment/);
+});
