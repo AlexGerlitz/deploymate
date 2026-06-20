@@ -187,7 +187,9 @@ required_snippets = [
     "permissions:",
     "issues: read",
     "--format json",
+    "--format markdown",
     "release-maintenance-status.json",
+    "release-maintenance-status.md",
     "uses: actions/upload-artifact@v4",
 ]
 

@@ -558,6 +558,7 @@ exit 1
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["repo"], "AlexGerlitz/deploymate")
+        self.assertRegex(payload["generated_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
         self.assertEqual(payload["gh_available"], "1")
         self.assertEqual(payload["release_audit_scheduled_paused"], "true")
         self.assertEqual(payload["staging_release_paused"], "false")
@@ -568,6 +569,36 @@ exit 1
         self.assertEqual(payload["blocker_count"], "2")
         self.assertEqual(payload["blocker_1"], "release audit schedule paused")
         self.assertEqual(payload["blocker_2"], "issue #19 is OPEN")
+
+    def test_release_maintenance_status_markdown_output_is_human_readable(self):
+        env = os.environ.copy()
+        env["RELEASE_AUDIT_SCHEDULED_PAUSED"] = "true"
+        env["STAGING_RELEASE_PAUSED"] = "true"
+
+        result = subprocess.run(
+            [
+                "bash",
+                "scripts/release_maintenance_status.sh",
+                "--repo",
+                "AlexGerlitz/deploymate",
+                "--no-network",
+                "--format",
+                "markdown",
+            ],
+            cwd=self.repo_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("# Release Maintenance Status", result.stdout)
+        self.assertIn("| Repository | `AlexGerlitz/deploymate` |", result.stdout)
+        self.assertIn("| Ready for unpause | `0` |", result.stdout)
+        self.assertIn("- Network checks were skipped for this run.", result.stdout)
+        self.assertIn("- release audit schedule paused", result.stdout)
+        self.assertIn("- staging release paused", result.stdout)
 
 
 if __name__ == "__main__":

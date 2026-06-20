@@ -7,6 +7,7 @@ HOSTS="deploymatecloud.ru,lab.deploymatecloud.ru"
 CHECK_NETWORK=1
 REQUIRE_READY=0
 OUTPUT_FORMAT="human"
+GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 status_keys=()
 status_values=()
 
@@ -20,7 +21,7 @@ Options:
   --hosts <h1,h2>           Comma-separated public hosts to check.
   --no-network              Skip DNS and HTTPS probes.
   --require-ready           Exit non-zero unless all pauses are off, incidents are closed, and public hosts are healthy.
-  --format human|shell|json Output format.
+  --format human|shell|json|markdown Output format.
 
 This script is read-only. It does not read GitHub secrets and does not change remote hosts.
 EOF
@@ -65,8 +66,8 @@ if [ -z "$REPO" ]; then
   exit 1
 fi
 
-if [ "$OUTPUT_FORMAT" != "human" ] && [ "$OUTPUT_FORMAT" != "shell" ] && [ "$OUTPUT_FORMAT" != "json" ]; then
-  echo "[release-maintenance-status] --format must be human, shell, or json" >&2
+if [ "$OUTPUT_FORMAT" != "human" ] && [ "$OUTPUT_FORMAT" != "shell" ] && [ "$OUTPUT_FORMAT" != "json" ] && [ "$OUTPUT_FORMAT" != "markdown" ]; then
+  echo "[release-maintenance-status] --format must be human, shell, json, or markdown" >&2
   exit 1
 fi
 
@@ -114,6 +115,72 @@ emit_json() {
   printf '}\n'
 }
 
+status_value() {
+  local key="$1"
+  local i
+  for i in "${!status_keys[@]}"; do
+    if [ "${status_keys[$i]}" = "$key" ]; then
+      printf '%s' "${status_values[$i]}"
+      return 0
+    fi
+  done
+  return 0
+}
+
+emit_markdown() {
+  local ready_value blocker_count issue_18 issue_19 release_pause staging_pause
+  ready_value="$(status_value ready_for_unpause)"
+  blocker_count="$(status_value blocker_count)"
+  issue_18="$(status_value issue_18_state)"
+  issue_19="$(status_value issue_19_state)"
+  release_pause="$(status_value release_audit_scheduled_paused)"
+  staging_pause="$(status_value staging_release_paused)"
+
+  printf '# Release Maintenance Status\n\n'
+  printf '| Check | Value |\n'
+  printf '| --- | --- |\n'
+  printf '| Generated at | `%s` |\n' "$GENERATED_AT"
+  printf '| Repository | `%s` |\n' "$(status_value repo)"
+  printf '| Ready for unpause | `%s` |\n' "$ready_value"
+  printf '| Release audit schedule paused | `%s` |\n' "$release_pause"
+  printf '| Staging release paused | `%s` |\n' "$staging_pause"
+  printf '| Issue #18 | `%s` |\n' "$issue_18"
+  printf '| Issue #19 | `%s` |\n' "$issue_19"
+  printf '\n'
+
+  printf '## Network\n\n'
+  if [ "$(status_value network_checks)" = "skipped" ]; then
+    printf '%s\n\n' '- Network checks were skipped for this run.'
+  else
+    printf '| Host | DNS | HTTPS | Remote IP |\n'
+    printf '| --- | --- | --- | --- |\n'
+    IFS=',' read -r -a markdown_host_list <<< "$HOSTS"
+    for host in "${markdown_host_list[@]}"; do
+      host="$(printf '%s' "$host" | xargs)"
+      [ -n "$host" ] || continue
+      key="$(safe_key "$host")"
+      printf '| `%s` | `%s` | `%s` | `%s` |\n' \
+        "$host" \
+        "$(status_value "host_${key}_dns")" \
+        "$(status_value "host_${key}_https_code")" \
+        "$(status_value "host_${key}_remote_ip")"
+    done
+    printf '\n'
+  fi
+
+  printf '## Blockers\n\n'
+  if [ -z "$blocker_count" ] || [ "$blocker_count" = "0" ]; then
+    printf '%s\n' '- None.'
+  else
+    local i
+    i=1
+    while [ "$i" -le "$blocker_count" ]; do
+      printf '%s\n' "- $(status_value "blocker_${i}")"
+      i=$((i + 1))
+    done
+  fi
+}
+
 safe_key() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_]+/_/g; s/^_+//; s/_+$//'
 }
@@ -146,6 +213,7 @@ get_issue_state() {
 
 emit_human "[release-maintenance-status] repo: $REPO"
 emit_shell "repo" "$REPO"
+emit_shell "generated_at" "$GENERATED_AT"
 
 if [ "$gh_available" != "1" ]; then
   emit_human "[release-maintenance-status] gh: unavailable"
@@ -230,6 +298,7 @@ fi
 if [ "$ready" = "1" ]; then
   emit_human "[release-maintenance-status] ready_for_unpause=yes"
   emit_shell "ready_for_unpause" "1"
+  emit_shell "blocker_count" "0"
 else
   emit_human "[release-maintenance-status] ready_for_unpause=no"
   emit_shell "ready_for_unpause" "0"
@@ -244,6 +313,10 @@ fi
 
 if [ "$OUTPUT_FORMAT" = "json" ]; then
   emit_json
+fi
+
+if [ "$OUTPUT_FORMAT" = "markdown" ]; then
+  emit_markdown
 fi
 
 if [ "$REQUIRE_READY" = "1" ] && [ "$ready" != "1" ]; then

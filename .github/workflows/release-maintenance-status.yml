@@ -58,27 +58,32 @@ jobs:
             hosts="deploymatecloud.ru,lab.deploymatecloud.ru"
           fi
 
-          args=(--repo "$GITHUB_REPOSITORY" --hosts "$hosts" --format json)
+          base_args=(--repo "$GITHUB_REPOSITORY" --hosts "$hosts")
 
           if [ "$check_network" != "true" ]; then
-            args+=(--no-network)
+            base_args+=(--no-network)
           fi
 
+          json_args=("${base_args[@]}" --format json)
+
           if [ "$require_ready" = "true" ]; then
-            args+=(--require-ready)
+            json_args+=(--require-ready)
           fi
 
           set +e
-          status_output="$(bash scripts/release_maintenance_status.sh "${args[@]}" 2>&1)"
+          status_output="$(bash scripts/release_maintenance_status.sh "${json_args[@]}" 2>&1)"
           status_code=$?
           set -e
 
           printf '%s\n' "$status_output"
           printf '%s\n' "$status_output" > release-maintenance-status.json
+          markdown_output="$(bash scripts/release_maintenance_status.sh "${base_args[@]}" --format markdown 2>&1 || true)"
+          printf '%s\n' "$markdown_output" > release-maintenance-status.md
 
           {
-            echo "## Release Maintenance Status"
+            printf '%s\n' "$markdown_output"
             echo
+            echo "## Raw JSON"
             echo "- Trigger: \`$GITHUB_EVENT_NAME\`"
             echo "- Require ready: \`$require_ready\`"
             echo "- Network checks: \`$check_network\`"
@@ -96,5 +101,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-maintenance-status
-          path: release-maintenance-status.json
+          path: |
+            release-maintenance-status.json
+            release-maintenance-status.md
           if-no-files-found: error
