@@ -41,6 +41,14 @@ wait_for_frontend_smoke_url "$(automation_frontend_ready_path)"
 frontend_smoke_assert_checks "frontend-runtime-smoke" "$BASE_URL" automation_smoke_runtime_checks
 
 curl -sS "${BASE_URL}/deployments/smoke-deployment" > "$DETAIL_HTML"
+if ! grep -Eq 'data-testid="runtime-detail-passport-card"' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] runtime detail lost the runtime passport card" >&2
+  exit 1
+fi
+if ! grep -Eq 'data-testid="runtime-detail-passport-state"[^>]*>ready<' "$DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] healthy runtime passport is not ready" >&2
+  exit 1
+fi
 if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Open running app<' "$DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] healthy runtime detail does not make opening the app the main next step" >&2
   exit 1
@@ -124,6 +132,10 @@ if ! grep -Eq '(<a[^>]*data-testid="runtime-deployment-details-link-smoke-deploy
 fi
 
 curl -sS "${BASE_URL}/deployments/review-worker" > "$FAILED_DETAIL_HTML"
+if ! grep -Eq 'data-testid="runtime-detail-passport-state"[^>]*>blocked<' "$FAILED_DETAIL_HTML"; then
+  echo "[frontend-runtime-smoke] failed runtime passport is not blocked" >&2
+  exit 1
+fi
 if ! grep -Eq 'data-testid="runtime-detail-main-next-step-action-focus"[^>]*>Review runtime issues<' "$FAILED_DETAIL_HTML"; then
   echo "[frontend-runtime-smoke] failed runtime detail is not review-first" >&2
   exit 1

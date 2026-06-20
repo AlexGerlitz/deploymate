@@ -9,8 +9,16 @@ from app.routes.deployments import (
     delete_deployment,
     redeploy_deployment,
 )
-from app.services.deployment_observability import build_deployment_health_response
-from app.schemas import DeploymentCreateRequest
+from app.services.deployment_observability import (
+    build_deployment_health_response,
+    build_deployment_passport,
+)
+from app.schemas import (
+    DeploymentActivitySummaryResponse,
+    DeploymentCreateRequest,
+    DeploymentHealthResponse,
+    DiagnosticItem,
+)
 
 
 def _deployment_record(**overrides):
@@ -267,6 +275,12 @@ class DeploymentRouteTests(unittest.TestCase):
         self.assertEqual(item_by_key["container_runtime"].summary, "Container state is unavailable.")
         self.assertEqual(item_by_key["logs"].status, "warn")
         self.assertEqual(item_by_key["logs"].details, "docker logs failed")
+        self.assertEqual(diagnostics.passport.status, "blocked")
+        self.assertEqual(diagnostics.passport.risk_level, "high")
+        self.assertIn("incident review", diagnostics.passport.summary)
+        self.assertIn("Redeploy only after", diagnostics.passport.next_step)
+        self.assertEqual(diagnostics.passport.evidence_order[0].key, "deployment_status")
+        self.assertIn("No public endpoint", diagnostics.passport.handoff_notes[1])
 
     def test_build_deployment_health_response_returns_unhealthy_when_external_port_missing(self):
         deployment = _deployment_record(
@@ -316,6 +330,63 @@ class DeploymentRouteTests(unittest.TestCase):
         item_by_key = {item.key: item for item in diagnostics.items}
         self.assertEqual(item_by_key["server_record"].status, "warn")
         self.assertIn("404", item_by_key["server_record"].details)
+
+    def test_build_deployment_passport_marks_clean_runtime_ready(self):
+        health = DeploymentHealthResponse(
+            deployment_id="dep-1",
+            container_name="demo-app",
+            url="http://deploymate.example:8080",
+            status="healthy",
+            status_code=200,
+            error=None,
+            checked_at="2026-04-02T10:01:00+00:00",
+            response_time_ms=41,
+        )
+        activity = DeploymentActivitySummaryResponse(
+            total_events=2,
+            success_events=2,
+            error_events=0,
+            recent_failure_count=0,
+            recent_failure_titles=[],
+            last_event_title="Health check passed",
+            last_event_level="success",
+            last_event_at="2026-04-02T10:01:00+00:00",
+        )
+        items = [
+            DiagnosticItem(
+                key="deployment_status",
+                label="Deployment status",
+                status="ok",
+                summary="Current status is running.",
+            ),
+            DiagnosticItem(
+                key="health",
+                label="HTTP health",
+                status="ok",
+                summary="Health check responded with 200 in 41 ms.",
+            ),
+            DiagnosticItem(
+                key="activity",
+                label="Recent activity",
+                status="ok",
+                summary="2 events recorded, 0 errors.",
+            ),
+        ]
+
+        passport = build_deployment_passport(
+            _deployment_record(),
+            health=health,
+            activity=activity,
+            items=items,
+            server_target="deploy@deploymate.example:22",
+        )
+
+        self.assertEqual(passport.status, "ready")
+        self.assertEqual(passport.risk_level, "low")
+        self.assertIn("looks stable", passport.summary)
+        self.assertIn("next deliberate rollout", passport.next_step)
+        self.assertEqual([item.key for item in passport.evidence_order], ["deployment_status", "health", "activity"])
+        self.assertIn("Public endpoint: http://deploymate.example:8080.", passport.handoff_notes)
 
 
 if __name__ == "__main__":

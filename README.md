@@ -65,7 +65,7 @@ If you are opening this repository as a hiring reviewer, these are the fastest e
 
 What to evaluate quickly:
 
-- product depth: deployments, templates, servers, admin users, upgrade requests, backup dry-run
+- product depth: deployments, runtime passport, templates, servers, admin users, upgrade requests, backup dry-run
 - engineering maturity: scripted preflight, smoke coverage, remote release flow, production docs
 - operational thinking: security posture, runtime capability boundaries, release safety checks
 
@@ -137,7 +137,7 @@ Recommended reviewer order:
 
 | Area | What is already implemented |
 | --- | --- |
-| Deployments | create, redeploy, inspect, delete, logs, health, activity |
+| Deployments | create, redeploy, inspect, delete, runtime passport, logs, health, activity |
 | Servers | dedicated `/app/server-review` workspace with saved SSH targets, create/edit/test/diagnostics/delete, and suggested ports |
 | Templates | reusable presets, usage tracking, preview, duplicate, filters |
 | Admin users | filters, saved views, bulk actions, exports, audit trail |
@@ -151,6 +151,7 @@ Recommended reviewer order:
 
 - create, redeploy, inspect, and delete Docker deployments
 - support reusable deployment templates with usage tracking and preview
+- review a runtime passport with risk level, ordered evidence, handoff notes, and the next operator action
 - inspect logs, health, activity, and external port mappings
 - target either local Docker or remote SSH hosts, with production capable of running in remote-only mode
 - optional public signup for safe `trial` accounts

@@ -1137,6 +1137,61 @@ export default function DeploymentDetailsPage({ params }) {
         "Finish with the timeline so the handoff includes what happened most recently and in what order.",
     },
   ];
+  const passportEvidenceStatus =
+    runtimeDecisionState.tone === "healthy"
+      ? "ok"
+      : runtimeDecisionState.tone === "warn"
+        ? "warn"
+        : "error";
+  const runtimePassport = exportDiagnostics?.passport || {
+    status:
+      runtimeDecisionState.tone === "healthy"
+        ? "ready"
+        : runtimeDecisionState.tone === "warn"
+          ? "review"
+          : "blocked",
+    risk_level:
+      runtimeDecisionState.tone === "healthy"
+        ? "low"
+        : runtimeDecisionState.tone === "warn"
+          ? "medium"
+          : "high",
+    summary: runtimeDecisionState.focus,
+    next_step: runtimeDecisionState.nextStep,
+    evidence_order: [
+      {
+        key: "decision",
+        label: "Runtime decision",
+        status: passportEvidenceStatus,
+        summary: runtimeDecisionState.why,
+      },
+      {
+        key: "health",
+        label: "Health",
+        status: health?.status === "healthy" ? "ok" : health?.status ? "error" : "unknown",
+        summary: health?.error || `Health is ${health?.status || "unknown"}.`,
+      },
+      {
+        key: "activity",
+        label: "Activity",
+        status: exportDiagnostics?.activity?.recent_failure_count > 0 ? "error" : "ok",
+        summary: `${exportDiagnostics?.activity?.recent_failure_count || 0} recent failure${
+          exportDiagnostics?.activity?.recent_failure_count === 1 ? "" : "s"
+        }.`,
+      },
+    ],
+    handoff_notes: [
+      plainLanguageSummary || "Runtime summary is not available yet.",
+      `Recommended next step: ${runtimeDecisionState.nextStep}`,
+      `Attention items: ${attentionItems.length}`,
+    ],
+  };
+  const runtimePassportEvidenceItems = Array.isArray(runtimePassport.evidence_order)
+    ? runtimePassport.evidence_order
+    : [];
+  const runtimePassportHandoffNotes = Array.isArray(runtimePassport.handoff_notes)
+    ? runtimePassport.handoff_notes
+    : [];
   const renderRuntimeDecisionPrimaryAction = (className, testId) =>
     runtimeDecisionState.primaryExternal ? (
       <a
@@ -1995,6 +2050,58 @@ export default function DeploymentDetailsPage({ params }) {
                     <p>{item.detail}</p>
                   </article>
                 ))}
+              </div>
+            </article>
+
+            <article
+              className="card compactCard runtimeReviewPanel"
+              data-testid="runtime-detail-passport-card"
+            >
+              <div className="sectionHeader">
+                <div>
+                  <span
+                    className={`status ${
+                      runtimePassport.status === "ready"
+                        ? "healthy"
+                        : runtimePassport.status === "review"
+                          ? "warn"
+                          : "error"
+                    }`}
+                    data-testid="runtime-detail-passport-state"
+                  >
+                    {runtimePassport.status || "unknown"}
+                  </span>
+                  <h2 data-testid="runtime-detail-passport-title">Runtime passport</h2>
+                  <p className="formHint" data-testid="runtime-detail-passport-summary">
+                    {runtimePassport.summary}
+                  </p>
+                </div>
+              </div>
+              <div className="workspaceReviewerGrid runtimeReviewGrid">
+                <article className="workspaceReviewerCard" data-testid="runtime-detail-passport-risk">
+                  <span>Risk</span>
+                  <strong>{runtimePassport.risk_level || "unknown"}</strong>
+                  <p>{runtimePassport.next_step}</p>
+                </article>
+                <article className="workspaceReviewerCard" data-testid="runtime-detail-passport-evidence">
+                  <span>Evidence</span>
+                  <strong>{runtimePassportEvidenceItems.length} signals</strong>
+                  <p>
+                    {runtimePassportEvidenceItems.length > 0
+                      ? runtimePassportEvidenceItems
+                          .slice(0, 3)
+                          .map((item) => `${item.label}: ${item.status}`)
+                          .join(" | ")
+                      : "No ordered evidence is available yet."}
+                  </p>
+                </article>
+                <article className="workspaceReviewerCard" data-testid="runtime-detail-passport-handoff">
+                  <span>Handoff</span>
+                  <strong>{runtimePassportHandoffNotes.length} notes</strong>
+                  <p>
+                    {runtimePassportHandoffNotes[0] || "No handoff notes are available yet."}
+                  </p>
+                </article>
               </div>
             </article>
 

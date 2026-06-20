@@ -10,6 +10,8 @@ ServerAuthType = Literal["password", "ssh_key"]
 UserPlan = Literal["trial", "solo", "team"]
 UserRole = Literal["admin", "member"]
 DiagnosticStatus = Literal["ok", "warn", "error", "unknown"]
+DeploymentPassportRiskLevel = Literal["low", "medium", "high"]
+DeploymentPassportStatus = Literal["ready", "review", "blocked"]
 UpgradeRequestStatus = Literal["new", "in_review", "approved", "rejected", "closed"]
 
 
@@ -187,6 +189,22 @@ class DeploymentActivitySummaryResponse(BaseModel):
     last_event_at: Optional[str] = None
 
 
+class DeploymentPassportEvidenceItem(BaseModel):
+    key: str
+    label: str
+    status: DiagnosticStatus
+    summary: str
+
+
+class DeploymentPassportResponse(BaseModel):
+    status: DeploymentPassportStatus
+    risk_level: DeploymentPassportRiskLevel
+    summary: str
+    next_step: str
+    evidence_order: list[DeploymentPassportEvidenceItem] = Field(default_factory=list)
+    handoff_notes: list[str] = Field(default_factory=list)
+
+
 class DeploymentDiagnosticsResponse(BaseModel):
     deployment_id: str
     container_name: str
@@ -198,6 +216,7 @@ class DeploymentDiagnosticsResponse(BaseModel):
     activity: DeploymentActivitySummaryResponse
     log_excerpt: str = ""
     items: list[DiagnosticItem] = Field(default_factory=list)
+    passport: Optional[DeploymentPassportResponse] = None
 
 
 class ServerCreateRequest(BaseModel):

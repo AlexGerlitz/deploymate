@@ -7,6 +7,8 @@ from app.schemas import (
     DeploymentActivitySummaryResponse,
     DeploymentDiagnosticsResponse,
     DeploymentHealthResponse,
+    DeploymentPassportEvidenceItem,
+    DeploymentPassportResponse,
     DiagnosticItem,
 )
 from app.services.deployments import (
@@ -116,6 +118,96 @@ def build_deployment_health_response(
         error=error,
         checked_at=checked_at,
         response_time_ms=probe["response_time_ms"],
+    )
+
+
+def build_deployment_passport(
+    deployment: dict,
+    *,
+    health: DeploymentHealthResponse,
+    activity: DeploymentActivitySummaryResponse,
+    items: list[DiagnosticItem],
+    server_target: str,
+) -> DeploymentPassportResponse:
+    error_items = [item for item in items if item.status == "error"]
+    warn_items = [item for item in items if item.status == "warn"]
+    deployment_status = deployment.get("status", "unknown")
+    container_name = deployment.get("container_name") or deployment.get("id") or "deployment"
+    health_is_clean = health.status == "healthy"
+    recent_failures = activity.recent_failure_count
+
+    if deployment_status == "failed" or error_items:
+        passport_status = "blocked"
+        risk_level = "high"
+        summary = f"{container_name} needs incident review before another rollout change."
+        next_step = (
+            "Read the failed diagnostics, recent activity, and logs first. "
+            "Redeploy only after the concrete failure reason is clear."
+        )
+    elif not health_is_clean or recent_failures > 0 or warn_items:
+        passport_status = "review"
+        risk_level = "medium"
+        summary = f"{container_name} is not clean enough to treat as finished yet."
+        next_step = (
+            "Review health, warnings, and recent failures, then decide whether the safest next move "
+            "is stability, handoff, or a deliberate redeploy."
+        )
+    else:
+        passport_status = "ready"
+        risk_level = "low"
+        summary = f"{container_name} looks stable from the current runtime signals."
+        next_step = (
+            "Open the running app or review the stable runtime once, then keep it unchanged until "
+            "the next deliberate rollout."
+        )
+
+    item_by_key = {item.key: item for item in items}
+    evidence_order = []
+    for key in ["deployment_status", "health", "activity", "container_runtime", "logs"]:
+        item = item_by_key.get(key)
+        if item is None:
+            continue
+        evidence_order.append(
+            DeploymentPassportEvidenceItem(
+                key=item.key,
+                label=item.label,
+                status=item.status,
+                summary=item.summary,
+            )
+        )
+
+    if not evidence_order:
+        evidence_order.append(
+            DeploymentPassportEvidenceItem(
+                key="runtime",
+                label="Runtime",
+                status="unknown",
+                summary="Runtime evidence is not available yet.",
+            )
+        )
+
+    handoff_notes = [
+        f"Status is {deployment_status}; health is {health.status}.",
+        f"Target for runtime review: {server_target}.",
+        (
+            f"Latest event: {activity.last_event_title} at {activity.last_event_at}."
+            if activity.last_event_title
+            else "No recent activity event is available yet."
+        ),
+        f"Attention summary: {len(error_items)} errors, {len(warn_items)} warnings, {recent_failures} recent failures.",
+    ]
+    if health.url:
+        handoff_notes.insert(1, f"Public endpoint: {health.url}.")
+    else:
+        handoff_notes.insert(1, "No public endpoint is available from this diagnostic pass.")
+
+    return DeploymentPassportResponse(
+        status=passport_status,
+        risk_level=risk_level,
+        summary=summary,
+        next_step=next_step,
+        evidence_order=evidence_order,
+        handoff_notes=handoff_notes,
     )
 
 
@@ -249,6 +341,14 @@ def build_deployment_diagnostics(
             )
         )
 
+    passport = build_deployment_passport(
+        deployment,
+        health=health,
+        activity=activity_summary,
+        items=items,
+        server_target=server_target,
+    )
+
     return DeploymentDiagnosticsResponse(
         deployment_id=deployment["id"],
         container_name=deployment["container_name"],
@@ -260,4 +360,5 @@ def build_deployment_diagnostics(
         activity=activity_summary,
         log_excerpt=log_excerpt,
         items=items,
+        passport=passport,
     )
