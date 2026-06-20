@@ -14,6 +14,7 @@ bash -n \
   scripts/preflight.sh \
   scripts/remote_release.sh \
   scripts/release_secret_contract_audit.sh \
+  scripts/release_maintenance_status.sh \
   scripts/release_smoke_precheck.sh \
   scripts/security_audit.sh \
   scripts/runtime_capability_audit.sh \

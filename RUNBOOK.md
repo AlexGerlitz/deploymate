@@ -596,6 +596,17 @@ Optional GitHub repository variables for staging delivery:
   gate still runs; only the SSH-based remote deploy is skipped. Remove the
   variable after a successful manual staging deploy proves the target is healthy.
 
+Maintenance status check:
+
+```bash
+bash scripts/release_maintenance_status.sh
+bash scripts/release_maintenance_status.sh --require-ready
+```
+
+The first command is informational and stays zero-exit for dashboards and handoffs.
+The second command fails until release-audit/staging pauses are removed, the
+release-audit incident issues are closed, and the public hosts answer over HTTPS.
+
 Required GitHub Actions release secrets audit workflow secrets:
 
 - `DEPLOY_HOST`
