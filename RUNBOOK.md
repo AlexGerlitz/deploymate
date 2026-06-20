@@ -624,7 +624,8 @@ python3 scripts/public_evidence_bundle.py --format json
 The GitHub Actions workflow `Public Evidence Bundle` publishes
 `deploymate-public-evidence.json` and `deploymate-public-evidence.md` artifacts
 for reviewer handoff, public status pages, and portfolio evidence without
-exposing secrets.
+exposing secrets. It can be run manually and also refreshes automatically after
+successful CI runs on `develop`.
 
 Required GitHub Actions release secrets audit workflow secrets:
 

@@ -216,6 +216,11 @@ text = path.read_text(encoding="utf-8")
 
 required_snippets = [
     "name: Public Evidence Bundle",
+    "workflow_run:",
+    "- CI",
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.head_sha",
+    "github.event.workflow_run.head_branch",
     "workflow_dispatch:",
     "schedule:",
     "actions: read",

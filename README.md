@@ -55,7 +55,7 @@ If you are opening this repository as a hiring reviewer, these are the fastest e
 - product strategy: [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md)
 - architecture overview: [ARCHITECTURE.md](ARCHITECTURE.md)
 - production/release discipline: [RUNBOOK.md](RUNBOOK.md), [SAFE-RELEASE.md](SAFE-RELEASE.md), [SECURITY.md](SECURITY.md)
-- latest CI and operational proof: run the GitHub Actions workflow `Public Evidence Bundle` and download `deploymate-public-evidence.md`
+- latest CI and operational proof: use the GitHub Actions workflow `Public Evidence Bundle`, which auto-refreshes after successful `CI`, and download `deploymate-public-evidence.md`
 
 What to evaluate quickly:
 
@@ -68,7 +68,7 @@ What to evaluate quickly:
 If you want the shortest coherent pass through the project:
 
 1. start with the screenshots in [Product Preview](#product-preview)
-2. run `Public Evidence Bundle` in GitHub Actions and download `deploymate-public-evidence.md`
+2. open the latest `Public Evidence Bundle` GitHub Actions artifact and download `deploymate-public-evidence.md`
 3. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
 4. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
 5. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape

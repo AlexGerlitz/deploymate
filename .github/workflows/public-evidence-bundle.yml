@@ -1,6 +1,13 @@
 name: Public Evidence Bundle
 
 on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - develop
   workflow_dispatch:
     inputs:
       check_network:
@@ -19,6 +26,7 @@ permissions:
 jobs:
   evidence:
     name: public evidence bundle
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     env:
@@ -29,6 +37,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
       - name: Generate evidence bundle
         shell: bash
@@ -40,7 +50,12 @@ jobs:
             check_network="false"
           fi
 
-          args=(--repo "$GITHUB_REPOSITORY" --branch "$GITHUB_REF_NAME")
+          branch="$GITHUB_REF_NAME"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
+            branch="${{ github.event.workflow_run.head_branch }}"
+          fi
+
+          args=(--repo "$GITHUB_REPOSITORY" --branch "$branch")
           if [ "$check_network" = "true" ]; then
             args+=(--check-network)
           fi
