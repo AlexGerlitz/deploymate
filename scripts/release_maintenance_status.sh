@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="${GITHUB_REPOSITORY:-AlexGerlitz/deploymate}"
 HOSTS="deploymatecloud.ru,lab.deploymatecloud.ru"
 CHECK_NETWORK=1
@@ -129,12 +130,17 @@ status_value() {
 
 emit_markdown() {
   local ready_value blocker_count issue_18 issue_19 release_pause staging_pause
+  local issue_18_category issue_19_category issue_18_hint issue_19_hint
   ready_value="$(status_value ready_for_unpause)"
   blocker_count="$(status_value blocker_count)"
   issue_18="$(status_value issue_18_state)"
   issue_19="$(status_value issue_19_state)"
   release_pause="$(status_value release_audit_scheduled_paused)"
   staging_pause="$(status_value staging_release_paused)"
+  issue_18_category="$(status_value issue_18_failure_category)"
+  issue_19_category="$(status_value issue_19_failure_category)"
+  issue_18_hint="$(status_value issue_18_operator_hint)"
+  issue_19_hint="$(status_value issue_19_operator_hint)"
 
   printf '# Release Maintenance Status\n\n'
   printf '| Check | Value |\n'
@@ -179,10 +185,26 @@ emit_markdown() {
       i=$((i + 1))
     done
   fi
+
+  printf '\n\n## Incident Diagnostics\n\n'
+  printf '| Issue | State | Failure category | Operator hint |\n'
+  printf '| --- | --- | --- | --- |\n'
+  printf '| `#18` | `%s` | `%s` | %s |\n' "$issue_18" "${issue_18_category:-unavailable}" "$(md_cell "${issue_18_hint:-}")"
+  printf '| `#19` | `%s` | `%s` | %s |\n' "$issue_19" "${issue_19_category:-unavailable}" "$(md_cell "${issue_19_hint:-}")"
 }
 
 safe_key() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_]+/_/g; s/^_+//; s/_+$//'
+}
+
+md_cell() {
+  local value="$1"
+  value="$(printf '%s' "$value" | tr '\r\n' ' ' | sed 's/  */ /g; s/|/\\|/g; s/^ *//; s/ *$//')"
+  if [ -z "$value" ]; then
+    printf '`%s`' "unavailable"
+  else
+    printf '%s' "$value"
+  fi
 }
 
 gh_available=0
@@ -203,12 +225,32 @@ get_repo_variable() {
   gh variable list --repo "$REPO" 2>/dev/null | awk -v name="$name" '$1 == name { print $2; found=1 } END { if (!found) print "" }'
 }
 
-get_issue_state() {
+get_issue_diagnostics_json() {
   local issue="$1"
-  if [ "$gh_available" != "1" ]; then
+  if [ "$gh_available" != "1" ] || ! command -v python3 >/dev/null 2>&1; then
+    printf '{}\n'
     return 0
   fi
-  gh issue view "$issue" --repo "$REPO" --json state -q .state 2>/dev/null || true
+  gh issue view "$issue" --repo "$REPO" --json state,body,comments 2>/dev/null \
+    | python3 "$ROOT_DIR/scripts/release_incident_diagnostics.py" --format json 2>/dev/null \
+    || printf '{}\n'
+}
+
+json_field() {
+  local payload="$1"
+  local key="$2"
+  PAYLOAD="$payload" python3 - "$key" <<'PY' 2>/dev/null || true
+import json
+import os
+import sys
+
+key = sys.argv[1]
+try:
+    payload = json.loads(os.environ.get("PAYLOAD", "{}"))
+except json.JSONDecodeError:
+    payload = {}
+print(payload.get(key, ""))
+PY
 }
 
 emit_human "[release-maintenance-status] repo: $REPO"
@@ -243,10 +285,19 @@ if [ "$staging_release_paused" = "true" ]; then
 fi
 
 for issue in 18 19; do
-  state="$(get_issue_state "$issue")"
+  diagnostics_json="$(get_issue_diagnostics_json "$issue")"
+  state="$(json_field "$diagnostics_json" state)"
+  failure_category="$(json_field "$diagnostics_json" failure_category)"
+  operator_hint="$(json_field "$diagnostics_json" operator_hint)"
   state="${state:-unknown}"
+  failure_category="${failure_category:-unavailable}"
+  operator_hint="${operator_hint:-}"
+
   emit_human "[release-maintenance-status] issue #$issue state=$state"
+  emit_human "[release-maintenance-status] issue #$issue failure_category=$failure_category"
   emit_shell "issue_${issue}_state" "$state"
+  emit_shell "issue_${issue}_failure_category" "$failure_category"
+  emit_shell "issue_${issue}_operator_hint" "$operator_hint"
   if [ "$state" != "CLOSED" ]; then
     mark_not_ready "issue #$issue is $state"
   fi

@@ -196,6 +196,21 @@ def render_markdown(bundle: dict[str, Any]) -> str:
         f"- Issue #19: `{maintenance.get('issue_19_state', 'unknown')}`",
         f"- Network checks: `{maintenance.get('network_checks', 'enabled')}`",
         "",
+        "## Incident Diagnostics",
+        "",
+        "| Issue | State | Failure category | Operator hint |",
+        "| --- | --- | --- | --- |",
+        (
+            f"| #18 | `{md_escape(maintenance.get('issue_18_state', 'unknown'))}` | "
+            f"`{md_escape(maintenance.get('issue_18_failure_category', 'unknown'))}` | "
+            f"{md_escape(maintenance.get('issue_18_operator_hint', '')) or '`unavailable`'} |"
+        ),
+        (
+            f"| #19 | `{md_escape(maintenance.get('issue_19_state', 'unknown'))}` | "
+            f"`{md_escape(maintenance.get('issue_19_failure_category', 'unknown'))}` | "
+            f"{md_escape(maintenance.get('issue_19_operator_hint', '')) or '`unavailable`'} |"
+        ),
+        "",
         "## Current Blockers",
         "",
     ]

@@ -15,6 +15,9 @@ PUBLIC_EVIDENCE_WORKFLOW=".github/workflows/public-evidence-bundle.yml"
 SECRETS_AUDIT_ACTION=".github/actions/release-secrets-audit/action.yml"
 RELEASE_AUDIT_INCIDENT_ACTION=".github/actions/release-audit-incident/action.yml"
 RELEASE_AUDIT_FAILURE_CLASSIFIER="scripts/release_audit_failure_classifier.js"
+RELEASE_MAINTENANCE_SCRIPT="scripts/release_maintenance_status.sh"
+PUBLIC_EVIDENCE_SCRIPT="scripts/public_evidence_bundle.py"
+RELEASE_INCIDENT_DIAGNOSTICS_SCRIPT="scripts/release_incident_diagnostics.py"
 RUNBOOK_FILE="RUNBOOK.md"
 
 extract_workflow_secrets() {
@@ -245,6 +248,26 @@ if "vars.RELEASE_AUDIT_SCHEDULED_PAUSED" not in text or "vars.STAGING_RELEASE_PA
 PY
 }
 
+audit_release_maintenance_script_shape() {
+  python3 - "$RELEASE_MAINTENANCE_SCRIPT" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+required_snippets = [
+    "release_incident_diagnostics.py",
+    "issue_${issue}_failure_category",
+    "issue_${issue}_operator_hint",
+    "## Incident Diagnostics",
+]
+for snippet in required_snippets:
+    if snippet not in text:
+        raise SystemExit(f"[release-audit] {path} is missing incident diagnostics snippet {snippet!r}")
+PY
+}
+
 audit_public_evidence_workflow_shape() {
   python3 - "$PUBLIC_EVIDENCE_WORKFLOW" <<'PY'
 import sys
@@ -273,6 +296,27 @@ required_snippets = [
 for snippet in required_snippets:
     if snippet not in text:
         raise SystemExit(f"[release-audit] {path} is missing {snippet!r}")
+PY
+}
+
+audit_public_evidence_script_shape() {
+  python3 - "$PUBLIC_EVIDENCE_SCRIPT" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+required_snippets = [
+    "## Incident Diagnostics",
+    "issue_18_failure_category",
+    "issue_19_failure_category",
+    "issue_18_operator_hint",
+    "issue_19_operator_hint",
+]
+for snippet in required_snippets:
+    if snippet not in text:
+        raise SystemExit(f"[release-audit] {path} is missing public evidence incident snippet {snippet!r}")
 PY
 }
 
@@ -328,13 +372,16 @@ audit_release_secrets_workflow_shape
 audit_release_secrets_action_shape
 audit_release_incident_action_shape
 audit_release_maintenance_workflow_shape
+audit_release_maintenance_script_shape
 audit_public_evidence_workflow_shape
+audit_public_evidence_script_shape
 audit_public_evidence_docs_shape
 audit_release_surface_classification "backend/tests/test_production_env_audit.py" "docs"
 audit_release_surface_classification "backend/app/main.py" "backend"
 audit_release_surface_classification ".github/workflows/release-maintenance-status.yml" "docs"
 audit_release_surface_classification ".github/workflows/public-evidence-bundle.yml" "docs"
 audit_release_surface_classification "scripts/public_evidence_bundle.py" "docs"
+audit_release_surface_classification "scripts/release_incident_diagnostics.py" "docs"
 
 release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "release-workflow-audit" \
@@ -346,6 +393,9 @@ release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "$SECRETS_AUDIT_ACTION" \
   "$RELEASE_AUDIT_INCIDENT_ACTION" \
   "$RELEASE_AUDIT_FAILURE_CLASSIFIER" \
+  "$RELEASE_MAINTENANCE_SCRIPT" \
+  "$PUBLIC_EVIDENCE_SCRIPT" \
+  "$RELEASE_INCIDENT_DIAGNOSTICS_SCRIPT" \
   "$RUNBOOK_FILE")"
 
 if audit_cache_persistent_has "release_workflow_audit" "$release_audit_fingerprint"; then

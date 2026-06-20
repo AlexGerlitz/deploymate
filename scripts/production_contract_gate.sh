@@ -22,7 +22,9 @@ bash -n \
   scripts/production_contract_gate.sh
 
 echo "[production-contract] python syntax"
-"$PYTHON_BIN" -m py_compile scripts/public_evidence_bundle.py
+"$PYTHON_BIN" -m py_compile \
+  scripts/public_evidence_bundle.py \
+  scripts/release_incident_diagnostics.py
 
 echo "[production-contract] release workflow audit"
 bash scripts/release_workflow_audit.sh
@@ -35,6 +37,7 @@ bash scripts/production_env_audit.sh
 
 echo "[production-contract] script regression tests"
 "$PYTHON_BIN" -m unittest discover -s backend/tests -p 'test_production_env_audit.py'
+"$PYTHON_BIN" scripts/release_incident_diagnostics_test.py
 
 echo "[production-contract] release audit incident module tests"
 node --test \

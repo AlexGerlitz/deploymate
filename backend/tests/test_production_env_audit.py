@@ -523,9 +523,13 @@ if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
 fi
 if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
   if [ "$3" = "18" ]; then
-    printf 'CLOSED\\n'
+    cat <<'JSON'
+{"state":"CLOSED","body":"Resolved incident","comments":[]}
+JSON
   else
-    printf 'OPEN\\n'
+    cat <<'JSON'
+{"state":"OPEN","body":"Failure category: `ssh_auth_denied`\\nOperator hint: Restore deploy key.","comments":[]}
+JSON
   fi
   exit 0
 fi
@@ -563,7 +567,10 @@ exit 1
         self.assertEqual(payload["release_audit_scheduled_paused"], "true")
         self.assertEqual(payload["staging_release_paused"], "false")
         self.assertEqual(payload["issue_18_state"], "CLOSED")
+        self.assertEqual(payload["issue_18_failure_category"], "unavailable")
         self.assertEqual(payload["issue_19_state"], "OPEN")
+        self.assertEqual(payload["issue_19_failure_category"], "ssh_auth_denied")
+        self.assertEqual(payload["issue_19_operator_hint"], "Restore deploy key.")
         self.assertEqual(payload["network_checks"], "skipped")
         self.assertEqual(payload["ready_for_unpause"], "0")
         self.assertEqual(payload["blocker_count"], "2")
