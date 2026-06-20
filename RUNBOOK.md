@@ -609,7 +609,9 @@ release-audit incident issues are closed, and the public hosts answer over HTTPS
 The same check is available in GitHub Actions as `Release Maintenance Status`.
 Run it with `require_ready=false` for a green informational report, or with
 `require_ready=true` when you intentionally want the workflow to fail until the
-system is ready to unpause.
+system is ready to unpause. The workflow writes the same result as a
+`release-maintenance-status.json` artifact so dashboards and public status pages
+can consume the current maintenance state without parsing logs.
 
 Required GitHub Actions release secrets audit workflow secrets:
 

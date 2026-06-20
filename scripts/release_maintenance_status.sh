@@ -7,6 +7,8 @@ HOSTS="deploymatecloud.ru,lab.deploymatecloud.ru"
 CHECK_NETWORK=1
 REQUIRE_READY=0
 OUTPUT_FORMAT="human"
+status_keys=()
+status_values=()
 
 usage() {
   cat <<'EOF'
@@ -18,7 +20,7 @@ Options:
   --hosts <h1,h2>           Comma-separated public hosts to check.
   --no-network              Skip DNS and HTTPS probes.
   --require-ready           Exit non-zero unless all pauses are off, incidents are closed, and public hosts are healthy.
-  --format human|shell      Output format.
+  --format human|shell|json Output format.
 
 This script is read-only. It does not read GitHub secrets and does not change remote hosts.
 EOF
@@ -63,8 +65,13 @@ if [ -z "$REPO" ]; then
   exit 1
 fi
 
-if [ "$OUTPUT_FORMAT" != "human" ] && [ "$OUTPUT_FORMAT" != "shell" ]; then
-  echo "[release-maintenance-status] --format must be human or shell" >&2
+if [ "$OUTPUT_FORMAT" != "human" ] && [ "$OUTPUT_FORMAT" != "shell" ] && [ "$OUTPUT_FORMAT" != "json" ]; then
+  echo "[release-maintenance-status] --format must be human, shell, or json" >&2
+  exit 1
+fi
+
+if [ "$OUTPUT_FORMAT" = "json" ] && ! command -v python3 >/dev/null 2>&1; then
+  echo "[release-maintenance-status] python3 is required for json output" >&2
   exit 1
 fi
 
@@ -83,9 +90,28 @@ emit_human() {
 }
 
 emit_shell() {
+  status_keys+=("$1")
+  status_values+=("$2")
   if [ "$OUTPUT_FORMAT" = "shell" ]; then
     printf '%s=%s\n' "$1" "$2"
   fi
+}
+
+json_string() {
+  python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$1"
+}
+
+emit_json() {
+  local i
+  printf '{\n'
+  for i in "${!status_keys[@]}"; do
+    printf '  %s: %s' "$(json_string "${status_keys[$i]}")" "$(json_string "${status_values[$i]}")"
+    if [ "$i" -lt "$((${#status_keys[@]} - 1))" ]; then
+      printf ','
+    fi
+    printf '\n'
+  done
+  printf '}\n'
 }
 
 safe_key() {
@@ -207,9 +233,17 @@ if [ "$ready" = "1" ]; then
 else
   emit_human "[release-maintenance-status] ready_for_unpause=no"
   emit_shell "ready_for_unpause" "0"
+  emit_shell "blocker_count" "${#reasons[@]}"
+  blocker_index=1
   for reason in "${reasons[@]}"; do
     emit_human "[release-maintenance-status] blocker: $reason"
+    emit_shell "blocker_${blocker_index}" "$reason"
+    blocker_index=$((blocker_index + 1))
   done
+fi
+
+if [ "$OUTPUT_FORMAT" = "json" ]; then
+  emit_json
 fi
 
 if [ "$REQUIRE_READY" = "1" ] && [ "$ready" != "1" ]; then

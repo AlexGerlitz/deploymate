@@ -58,7 +58,7 @@ jobs:
             hosts="deploymatecloud.ru,lab.deploymatecloud.ru"
           fi
 
-          args=(--repo "$GITHUB_REPOSITORY" --hosts "$hosts" --format shell)
+          args=(--repo "$GITHUB_REPOSITORY" --hosts "$hosts" --format json)
 
           if [ "$check_network" != "true" ]; then
             args+=(--no-network)
@@ -74,6 +74,7 @@ jobs:
           set -e
 
           printf '%s\n' "$status_output"
+          printf '%s\n' "$status_output" > release-maintenance-status.json
 
           {
             echo "## Release Maintenance Status"
@@ -83,9 +84,17 @@ jobs:
             echo "- Network checks: \`$check_network\`"
             echo "- Hosts: \`$hosts\`"
             echo
-            echo '```text'
+            echo '```json'
             printf '%s\n' "$status_output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
           exit "$status_code"
+
+      - name: Upload maintenance status artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-maintenance-status
+          path: release-maintenance-status.json
+          if-no-files-found: error

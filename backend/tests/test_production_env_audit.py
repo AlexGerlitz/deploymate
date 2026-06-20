@@ -510,6 +510,65 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
             result.stdout.index("ssh deploymate"),
         )
 
+    def test_release_maintenance_status_json_output_is_machine_readable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  if [ "$3" = "18" ]; then
+    printf 'CLOSED\\n'
+  else
+    printf 'OPEN\\n'
+  fi
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/release_maintenance_status.sh",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--no-network",
+                    "--format",
+                    "json",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["repo"], "AlexGerlitz/deploymate")
+        self.assertEqual(payload["gh_available"], "1")
+        self.assertEqual(payload["release_audit_scheduled_paused"], "true")
+        self.assertEqual(payload["staging_release_paused"], "false")
+        self.assertEqual(payload["issue_18_state"], "CLOSED")
+        self.assertEqual(payload["issue_19_state"], "OPEN")
+        self.assertEqual(payload["network_checks"], "skipped")
+        self.assertEqual(payload["ready_for_unpause"], "0")
+        self.assertEqual(payload["blocker_count"], "2")
+        self.assertEqual(payload["blocker_1"], "release audit schedule paused")
+        self.assertEqual(payload["blocker_2"], "issue #19 is OPEN")
+
 
 if __name__ == "__main__":
     unittest.main()
