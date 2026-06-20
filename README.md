@@ -9,6 +9,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/AlexGerlitz/deploymate/actions/workflows/ci.yml?query=branch%3Adevelop"><img alt="CI" src="https://github.com/AlexGerlitz/deploymate/actions/workflows/ci.yml/badge.svg?branch=develop" /></a>
+  <a href="https://github.com/AlexGerlitz/deploymate/actions/workflows/public-evidence-bundle.yml?query=branch%3Adevelop"><img alt="Public Evidence Bundle" src="https://github.com/AlexGerlitz/deploymate/actions/workflows/public-evidence-bundle.yml/badge.svg?branch=develop" /></a>
+  <a href="https://github.com/AlexGerlitz/deploymate/actions/workflows/release-maintenance-status.yml?query=branch%3Adevelop"><img alt="Release Maintenance Status" src="https://github.com/AlexGerlitz/deploymate/actions/workflows/release-maintenance-status.yml/badge.svg?branch=develop" /></a>
+</p>
+
+<p align="center">
   <strong>Source-available:</strong> PolyForm Noncommercial 1.0.0
   <br />
   Commercial, internal business, client, SaaS, and resale use require a separate commercial license.

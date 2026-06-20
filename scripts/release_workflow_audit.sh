@@ -248,6 +248,9 @@ required_readme = [
     "Public Evidence Bundle",
     "deploymate-public-evidence.md",
     "public evidence bundle with CI, release-maintenance, and incident status",
+    "actions/workflows/ci.yml/badge.svg?branch=develop",
+    "actions/workflows/public-evidence-bundle.yml/badge.svg?branch=develop",
+    "actions/workflows/release-maintenance-status.yml/badge.svg?branch=develop",
 ]
 for snippet in required_readme:
     if snippet not in readme:
