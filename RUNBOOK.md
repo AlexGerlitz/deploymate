@@ -634,6 +634,10 @@ Runtime smoke notes:
 
 Optional GitHub repository variables for scheduled audit incident triage:
 
+- `RELEASE_AUDIT_SCHEDULED_PAUSED=true` to pause the nightly scheduled audit during
+  an intentional target-host rebuild, provider outage, or migration. Manual
+  `Release Secrets Audit` runs remain available and must be used before removing
+  the pause.
 - `RELEASE_AUDIT_INCIDENT_ASSIGNEE` to auto-assign the incident issue to one GitHub login
 - `RELEASE_AUDIT_INCIDENT_FAILURE_THRESHOLD` to control after how many consecutive scheduled failures severity escalates to `severity:high` (default: 3)
 

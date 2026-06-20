@@ -118,6 +118,7 @@ path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
 
 required_jobs = [
+    "scheduled-paused",
     "manual-audit",
     "scheduled-production",
     "scheduled-staging",
@@ -141,6 +142,12 @@ if text.count("uses: ./.github/actions/release-secrets-audit") != 3:
 
 if text.count("uses: ./.github/actions/release-audit-incident") != 3:
     raise SystemExit(f"[release-audit] {path} should call the incident action from both scheduled jobs and self-test")
+
+if "vars.RELEASE_AUDIT_SCHEDULED_PAUSED == 'true'" not in text:
+    raise SystemExit(f"[release-audit] {path} should expose an explicit scheduled audit pause job")
+
+if text.count("vars.RELEASE_AUDIT_SCHEDULED_PAUSED != 'true'") != 2:
+    raise SystemExit(f"[release-audit] {path} should gate production and staging scheduled jobs on the pause variable")
 PY
 }
 
