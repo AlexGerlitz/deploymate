@@ -22,7 +22,11 @@ from app.schemas import (
     ServerUpdateRequest,
 )
 from app.services.deployments import get_suggested_external_ports
-from app.services.server_diagnostics import collect_server_diagnostics, test_server_connection
+from app.services.server_diagnostics import (
+    build_server_passport,
+    collect_server_diagnostics,
+    test_server_connection,
+)
 from app.services.auth import enforce_plan_limit, require_admin
 
 
@@ -123,6 +127,7 @@ def get_server_diagnostics(server_id: str) -> ServerDiagnosticsResponse:
     server = get_server_or_404(server_id)
     diagnostics = collect_server_diagnostics(server)
     items = [DiagnosticItem(**item) for item in diagnostics.get("items", [])]
+    deployment_count = count_deployments_for_server(server_id)
     overall_status = "unknown"
     if any(item.status == "error" for item in items):
         overall_status = "error"
@@ -130,13 +135,19 @@ def get_server_diagnostics(server_id: str) -> ServerDiagnosticsResponse:
         overall_status = "warn"
     elif any(item.status == "ok" for item in items):
         overall_status = "ok"
+    passport = build_server_passport(
+        server,
+        diagnostics,
+        overall_status=overall_status,
+        deployment_count=deployment_count,
+    )
 
     return ServerDiagnosticsResponse(
         server_id=server_id,
         target=str(diagnostics["target"]),
         checked_at=datetime.now(timezone.utc).isoformat(),
         overall_status=overall_status,
-        deployment_count=count_deployments_for_server(server_id),
+        deployment_count=deployment_count,
         hostname=diagnostics.get("hostname"),
         operating_system=diagnostics.get("operating_system"),
         uptime=diagnostics.get("uptime"),
@@ -146,6 +157,7 @@ def get_server_diagnostics(server_id: str) -> ServerDiagnosticsResponse:
         docker_compose_version=diagnostics.get("docker_compose_version"),
         listening_ports=list(diagnostics.get("listening_ports", [])),
         items=items,
+        passport=passport,
     )
 
 

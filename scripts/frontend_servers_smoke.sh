@@ -100,6 +100,12 @@ frontend_smoke_assert_checks "frontend-servers-smoke" "$BASE_URL" automation_smo
     exit 1
   fi
 
+  if ! grep -Eq 'data-testid="server-review-passport-state-smoke-server"[^>]*>review<' "$pending_html"; then
+    echo "[frontend-servers-pending-smoke] pending server passport is not in review state" >&2
+    rm -f "$pending_html"
+    exit 1
+  fi
+
   queue_pos="$(grep -bo 'data-testid=\"server-review-live-queue\"' "$pending_html" | head -n1 | cut -d: -f1)"
   create_pos="$(grep -bo 'data-testid=\"server-review-create-card\"' "$pending_html" | head -n1 | cut -d: -f1)"
   if [ -z "$queue_pos" ] || [ -z "$create_pos" ] || [ "$queue_pos" -ge "$create_pos" ]; then
@@ -140,6 +146,12 @@ frontend_smoke_assert_checks "frontend-servers-smoke" "$BASE_URL" automation_smo
 
   if ! grep -Eq 'Choose what to run' "$ready_html"; then
     echo "[frontend-servers-ready-smoke] ready path lost the step-2-first action copy" >&2
+    rm -f "$ready_html"
+    exit 1
+  fi
+
+  if ! grep -Eq 'data-testid="server-review-passport-state-smoke-server"[^>]*>ready<' "$ready_html"; then
+    echo "[frontend-servers-ready-smoke] ready server passport is not ready" >&2
     rm -f "$ready_html"
     exit 1
   fi

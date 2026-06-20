@@ -65,7 +65,7 @@ If you are opening this repository as a hiring reviewer, these are the fastest e
 
 What to evaluate quickly:
 
-- product depth: deployments, runtime passport, templates, servers, admin users, upgrade requests, backup dry-run
+- product depth: deployments, runtime passport, server passport, templates, admin users, upgrade requests, backup dry-run
 - engineering maturity: scripted preflight, smoke coverage, remote release flow, production docs
 - operational thinking: security posture, runtime capability boundaries, release safety checks
 
@@ -138,7 +138,7 @@ Recommended reviewer order:
 | Area | What is already implemented |
 | --- | --- |
 | Deployments | create, redeploy, inspect, delete, runtime passport, logs, health, activity |
-| Servers | dedicated `/app/server-review` workspace with saved SSH targets, create/edit/test/diagnostics/delete, and suggested ports |
+| Servers | dedicated `/app/server-review` workspace with saved SSH targets, server passport, create/edit/test/diagnostics/delete, and suggested ports |
 | Templates | reusable presets, usage tracking, preview, duplicate, filters |
 | Admin users | filters, saved views, bulk actions, exports, audit trail |
 | Upgrade inbox | filters, saved views, bulk actions, exports, audit trail |
@@ -160,6 +160,7 @@ Recommended reviewer order:
 
 - use the dedicated `/app/server-review` workspace as the main server surface
 - register remote servers with SSH-key auth for new targets
+- review a server passport with readiness status, risk level, ordered evidence, and handoff notes
 - edit, test, diagnose, and delete saved targets from the same review flow
 - fetch suggested free ports before runtime work
 

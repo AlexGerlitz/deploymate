@@ -5,7 +5,9 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas import DiagnosticItem
 from app.services.auth import require_admin
+from app.services.server_diagnostics import build_server_passport
 
 
 class ServerApiFlowTests(unittest.TestCase):
@@ -196,6 +198,11 @@ class ServerApiFlowTests(unittest.TestCase):
         self.assertEqual(diagnostics["overall_status"], "ok")
         self.assertEqual(diagnostics["deployment_count"], 0)
         self.assertEqual(diagnostics["listening_ports"], [22, 80, 443])
+        self.assertEqual(diagnostics["passport"]["status"], "ready")
+        self.assertEqual(diagnostics["passport"]["risk_level"], "low")
+        self.assertIn("ready for the next deployment step", diagnostics["passport"]["summary"])
+        self.assertIn("Deployment Workflow", diagnostics["passport"]["next_step"])
+        self.assertEqual(diagnostics["passport"]["evidence_order"][0]["key"], "ssh")
 
         ports_response = self.client.get(
             f"/servers/{server_id}/suggested-ports?limit=2&start_port=38080"
@@ -207,6 +214,47 @@ class ServerApiFlowTests(unittest.TestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(delete_response.json()["status"], "deleted")
         self.assertIsNone(self.server)
+
+    def test_server_passport_blocks_reachable_server_without_docker(self):
+        diagnostics = {
+            "target": "deploy@203.0.113.10:22",
+            "ssh_ok": True,
+            "docker_ok": False,
+            "operating_system": "Ubuntu 24.04",
+            "items": [
+                DiagnosticItem(
+                    key="ssh",
+                    label="SSH access",
+                    status="ok",
+                    summary="SSH connection is available.",
+                ),
+                DiagnosticItem(
+                    key="docker",
+                    label="Docker engine",
+                    status="error",
+                    summary="Docker is not available.",
+                    details="docker: command not found",
+                ),
+            ],
+        }
+
+        passport = build_server_passport(
+            {
+                "name": "smoke-vps",
+                "host": "203.0.113.10",
+                "port": 22,
+                "username": "deploy",
+            },
+            diagnostics,
+            overall_status="error",
+            deployment_count=0,
+        )
+
+        self.assertEqual(passport.status, "blocked")
+        self.assertEqual(passport.risk_level, "high")
+        self.assertIn("Docker is not ready", passport.summary)
+        self.assertIn("Install or repair Docker", passport.next_step)
+        self.assertEqual([item.key for item in passport.evidence_order], ["ssh", "docker"])
 
 
 if __name__ == "__main__":

@@ -136,10 +136,80 @@ function buildServerStatus(server, testResult, diagnostics) {
   return server.auth_type === "ssh_key" ? "needs-check" : "auth-review";
 }
 
+function buildServerPassport(server, testResult, diagnostics, suggestedPorts) {
+  if (diagnostics?.passport) {
+    return diagnostics.passport;
+  }
+
+  const serverName = server.name || "Server target";
+  const diagnosticsStatus = diagnostics?.overall_status;
+  const testStatus = testResult?.status;
+  const ready =
+    diagnosticsStatus === "ok" ||
+    diagnosticsStatus === "success" ||
+    testStatus === "success";
+  const blocked =
+    diagnosticsStatus === "error" ||
+    testStatus === "error" ||
+    server.auth_type !== "ssh_key";
+  const status = ready ? "ready" : blocked ? "blocked" : "review";
+  const riskLevel = ready ? "low" : blocked ? "high" : "medium";
+  const evidenceItems = Array.isArray(diagnostics?.items) && diagnostics.items.length > 0
+    ? diagnostics.items.map((item) => ({
+        key: item.key || item.label || "diagnostic",
+        label: item.label || item.key || "Diagnostic",
+        status:
+          item.status === "success"
+            ? "ok"
+            : item.status === "failure"
+              ? "error"
+              : item.status || "unknown",
+        summary: item.summary || item.details || "Diagnostic signal collected.",
+      }))
+    : [
+        {
+          key: "connection",
+          label: "Connection",
+          status: testStatus === "success" ? "ok" : testStatus === "error" ? "error" : "unknown",
+          summary: testResult?.message || "Connection check has not run yet.",
+        },
+      ];
+
+  return {
+    status,
+    risk_level: riskLevel,
+    summary: ready
+      ? `${serverName} looks ready for Step 2.`
+      : blocked
+        ? `${serverName} is blocked until the server check is fixed.`
+        : `${serverName} still needs a readiness check.`,
+    next_step: ready
+      ? "Use this server in Deployment Workflow, and recheck only if connection details changed."
+      : blocked
+        ? "Fix the connection or runtime blocker, then run the readiness check again."
+        : "Run full server readiness so SSH, Docker, ports, and basic runtime signals are known.",
+    evidence_order: evidenceItems,
+    handoff_notes: [
+      `${server.username}@${server.host}:${server.port}`,
+      `Suggested ports: ${
+        Array.isArray(suggestedPorts) && suggestedPorts.length > 0
+          ? suggestedPorts.join(", ")
+          : "not loaded"
+      }`,
+      `Deployments on this server: ${
+        typeof diagnostics?.deployment_count === "number"
+          ? diagnostics.deployment_count
+          : "unknown"
+      }`,
+    ],
+  };
+}
+
 function mapServerToItem(server, runtimeState) {
   const testResult = runtimeState.testResults[server.id] || null;
   const diagnostics = runtimeState.diagnostics[server.id] || null;
   const suggestedPorts = runtimeState.suggestedPorts[server.id] || [];
+  const passport = buildServerPassport(server, testResult, diagnostics, suggestedPorts);
 
   return {
     id: server.id,
@@ -152,6 +222,7 @@ function mapServerToItem(server, runtimeState) {
     testResult,
     diagnostics,
     suggestedPorts,
+    passport,
   };
 }
 
@@ -1199,6 +1270,77 @@ function ServerReviewPageContent() {
                         )}
                       </article>
                     </div>
+
+                    <article
+                      className="workspaceGlancePanel serverReviewPassportCard"
+                      data-testid={`server-review-passport-${item.id}`}
+                    >
+                      <div className="sectionHeader">
+                        <div>
+                          <span
+                            className={`status ${
+                              item.passport.status === "ready"
+                                ? "healthy"
+                                : item.passport.status === "review"
+                                  ? "warn"
+                                  : "error"
+                            }`}
+                            data-testid={`server-review-passport-state-${item.id}`}
+                          >
+                            {item.passport.status}
+                          </span>
+                          <h3 data-testid={`server-review-passport-title-${item.id}`}>
+                            Server passport
+                          </h3>
+                          <p
+                            className="formHint"
+                            data-testid={`server-review-passport-summary-${item.id}`}
+                          >
+                            {item.passport.summary}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="workspaceReviewerGrid serverReviewTaskGrid">
+                        <article className="workspaceReviewerCard">
+                          <span>Risk</span>
+                          <strong>{item.passport.risk_level}</strong>
+                          <p>{item.passport.next_step}</p>
+                        </article>
+                        <article className="workspaceReviewerCard">
+                          <span>Evidence</span>
+                          <strong>
+                            {Array.isArray(item.passport.evidence_order)
+                              ? item.passport.evidence_order.length
+                              : 0}{" "}
+                            signals
+                          </strong>
+                          <p data-testid={`server-review-passport-evidence-${item.id}`}>
+                            {Array.isArray(item.passport.evidence_order) &&
+                            item.passport.evidence_order.length > 0
+                              ? item.passport.evidence_order
+                                  .slice(0, 3)
+                                  .map((evidence) => `${evidence.label}: ${evidence.status}`)
+                                  .join(" | ")
+                              : "No ordered evidence is available yet."}
+                          </p>
+                        </article>
+                        <article className="workspaceReviewerCard">
+                          <span>Handoff</span>
+                          <strong>
+                            {Array.isArray(item.passport.handoff_notes)
+                              ? item.passport.handoff_notes.length
+                              : 0}{" "}
+                            notes
+                          </strong>
+                          <p data-testid={`server-review-passport-handoff-${item.id}`}>
+                            {Array.isArray(item.passport.handoff_notes) &&
+                            item.passport.handoff_notes.length > 0
+                              ? item.passport.handoff_notes[0]
+                              : "No handoff notes are available yet."}
+                          </p>
+                        </article>
+                      </div>
+                    </article>
 
                     <div className="workspaceGlancePanel serverReviewTaskNotePanel">
                       <div className="workspaceGlanceHeader">

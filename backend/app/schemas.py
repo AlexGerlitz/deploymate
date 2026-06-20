@@ -12,6 +12,8 @@ UserRole = Literal["admin", "member"]
 DiagnosticStatus = Literal["ok", "warn", "error", "unknown"]
 DeploymentPassportRiskLevel = Literal["low", "medium", "high"]
 DeploymentPassportStatus = Literal["ready", "review", "blocked"]
+ServerPassportRiskLevel = Literal["low", "medium", "high"]
+ServerPassportStatus = Literal["ready", "review", "blocked"]
 UpgradeRequestStatus = Literal["new", "in_review", "approved", "rejected", "closed"]
 
 
@@ -259,6 +261,22 @@ class ServerConnectionTestResponse(BaseModel):
     docker_version: Optional[str] = None
 
 
+class ServerPassportEvidenceItem(BaseModel):
+    key: str
+    label: str
+    status: DiagnosticStatus
+    summary: str
+
+
+class ServerPassportResponse(BaseModel):
+    status: ServerPassportStatus
+    risk_level: ServerPassportRiskLevel
+    summary: str
+    next_step: str
+    evidence_order: list[ServerPassportEvidenceItem] = Field(default_factory=list)
+    handoff_notes: list[str] = Field(default_factory=list)
+
+
 class ServerDiagnosticsResponse(BaseModel):
     server_id: str
     target: str
@@ -274,6 +292,7 @@ class ServerDiagnosticsResponse(BaseModel):
     docker_compose_version: Optional[str] = None
     listening_ports: list[int] = Field(default_factory=list)
     items: list[DiagnosticItem] = Field(default_factory=list)
+    passport: Optional[ServerPassportResponse] = None
 
 
 class ServerSuggestedPortsResponse(BaseModel):

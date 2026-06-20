@@ -1,5 +1,10 @@
 import time
 
+from app.schemas import (
+    DiagnosticItem,
+    ServerPassportEvidenceItem,
+    ServerPassportResponse,
+)
 from app.services.runtime_executors import _run_remote_command
 
 
@@ -139,6 +144,120 @@ def collect_server_diagnostics(server: dict) -> dict[str, object]:
 
     diagnostics["items"] = items
     return diagnostics
+
+
+def build_server_passport(
+    server: dict,
+    diagnostics: dict[str, object],
+    *,
+    overall_status: str,
+    deployment_count: int,
+) -> ServerPassportResponse:
+    raw_items = diagnostics.get("items") or []
+    items = [
+        item if isinstance(item, DiagnosticItem) else DiagnosticItem(**item)
+        for item in raw_items
+    ]
+    error_items = [item for item in items if item.status == "error"]
+    warn_items = [item for item in items if item.status == "warn"]
+    server_name = server.get("name") or diagnostics.get("target") or "Server target"
+    ssh_ok = bool(diagnostics.get("ssh_ok")) or any(
+        item.key == "ssh" and item.status == "ok" for item in items
+    )
+    docker_ok = bool(diagnostics.get("docker_ok")) or any(
+        item.key == "docker" and item.status == "ok" for item in items
+    )
+
+    if not ssh_ok or any(item.key == "ssh" and item.status == "error" for item in items):
+        passport_status = "blocked"
+        risk_level = "high"
+        summary = f"{server_name} is blocked because SSH access is not confirmed."
+        next_step = (
+            "Fix SSH host, port, user, key, or network reachability before using this "
+            "server for deployments."
+        )
+    elif not docker_ok or any(item.key == "docker" and item.status == "error" for item in items):
+        passport_status = "blocked"
+        risk_level = "high"
+        summary = f"{server_name} is reachable, but Docker is not ready for deployments."
+        next_step = "Install or repair Docker on the target, then rerun server readiness before moving to Step 2."
+    elif overall_status == "warn" or warn_items:
+        passport_status = "review"
+        risk_level = "medium"
+        summary = f"{server_name} needs operator review before it becomes the main rollout target."
+        next_step = (
+            "Review warnings, disk, memory, compose, and listening ports, then rerun "
+            "diagnostics if anything changed."
+        )
+    elif overall_status == "ok":
+        passport_status = "ready"
+        risk_level = "low"
+        summary = f"{server_name} looks ready for the next deployment step."
+        next_step = (
+            "Use this server in Deployment Workflow, and rerun readiness only if connection "
+            "details or runtime state changed."
+        )
+    else:
+        passport_status = "review"
+        risk_level = "medium"
+        summary = f"{server_name} still needs a readiness check before deployments use it."
+        next_step = "Run full server diagnostics so DeployMate can confirm SSH, Docker, and basic runtime signals."
+
+    item_by_key = {item.key: item for item in items}
+    evidence_order = []
+    for key in ["ssh", "docker", "disk_usage", "memory", "docker_compose_version", "listening_ports"]:
+        item = item_by_key.get(key)
+        if item is None:
+            continue
+        evidence_order.append(
+            ServerPassportEvidenceItem(
+                key=item.key,
+                label=item.label,
+                status=item.status,
+                summary=item.summary,
+            )
+        )
+
+    if not evidence_order:
+        evidence_order.append(
+            ServerPassportEvidenceItem(
+                key="server_target",
+                label="Server target",
+                status="unknown",
+                summary="No ordered server evidence is available yet.",
+            )
+        )
+
+    fallback_username = server.get("username", "deploy")
+    fallback_host = server.get("host", "unknown")
+    fallback_port = server.get("port", 22)
+    target = str(diagnostics.get("target") or f"{fallback_username}@{fallback_host}:{fallback_port}")
+    handoff_notes = [
+        f"Target: {target}.",
+        f"Overall status: {overall_status}.",
+        f"Deployments using this server: {deployment_count}.",
+        f"SSH: {'ok' if ssh_ok else 'not confirmed'}; Docker: {'ok' if docker_ok else 'not confirmed'}.",
+    ]
+    if diagnostics.get("operating_system"):
+        handoff_notes.append(f"OS: {diagnostics['operating_system']}.")
+    if diagnostics.get("disk_usage"):
+        handoff_notes.append(f"Disk: {diagnostics['disk_usage']}.")
+    if diagnostics.get("memory"):
+        handoff_notes.append(f"Memory: {diagnostics['memory']}.")
+    listening_ports = diagnostics.get("listening_ports")
+    if isinstance(listening_ports, list) and listening_ports:
+        handoff_notes.append(
+            "Listening ports: " + ", ".join(str(port) for port in listening_ports[:12]) + "."
+        )
+
+    return ServerPassportResponse(
+        status=passport_status,
+        risk_level=risk_level,
+        summary=summary,
+        next_step=next_step,
+        evidence_order=evidence_order,
+        handoff_notes=handoff_notes,
+    )
 
 
 def test_server_connection(server: dict) -> dict[str, object]:
