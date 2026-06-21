@@ -198,6 +198,7 @@ class OpsReleaseMaintenanceSummary(BaseModel):
     release_audit_scheduled_paused: bool = False
     staging_release_paused: bool = False
     network_checks: str = "unknown"
+    network_blockers: list[str] = Field(default_factory=list)
     blocker_count: int = 0
     primary_blocker: Optional[str] = None
     next_step: str = "Connect the release maintenance status file before using release unpause decisions."

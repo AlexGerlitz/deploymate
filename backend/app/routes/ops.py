@@ -173,6 +173,18 @@ def _release_network_blockers(payload: dict, blocker_count: int) -> list[str]:
     return [blocker for blocker in _release_blockers(payload, blocker_count) if blocker.startswith("host ")]
 
 
+def _public_target_repair_step(network_blockers: list[str]) -> OpsReleaseRepairStep:
+    details = "; ".join(network_blockers) if network_blockers else "Public DNS/HTTPS status is unavailable."
+    return OpsReleaseRepairStep(
+        key="restore-public-target",
+        title="Restore public DNS and HTTPS target",
+        detail=(
+            "Repair public target probes before treating the live demo as available: "
+            f"{details}."
+        ),
+    )
+
+
 def _incident_checklist_item(incident: OpsReleaseIncidentSummary) -> OpsReleaseChecklistItem:
     if incident.state == "CLOSED":
         return OpsReleaseChecklistItem(
@@ -355,6 +367,7 @@ def _build_release_repair_playbook(
     production: OpsReleaseIncidentSummary,
     staging: OpsReleaseIncidentSummary,
     primary_blocker: str | None,
+    network_blockers: list[str] | None = None,
 ) -> list[OpsReleaseRepairStep]:
     if not available:
         return [
@@ -371,6 +384,7 @@ def _build_release_repair_playbook(
     open_incidents = _open_release_incidents(production, staging)
     incident_label = _release_incident_label(open_incidents)
     open_categories = {incident.failure_category for incident in open_incidents}
+    host_blockers = network_blockers or []
 
     if ready_for_unpause:
         return [
@@ -385,7 +399,7 @@ def _build_release_repair_playbook(
         ]
 
     if "ssh_auth_denied" in open_categories:
-        return [
+        steps = [
             OpsReleaseRepairStep(
                 key="keep-trust-anchor",
                 title="Keep known_hosts unchanged",
@@ -419,10 +433,13 @@ def _build_release_repair_playbook(
                 ),
             ),
         ]
+        if host_blockers:
+            steps.insert(1, _public_target_repair_step(host_blockers))
+        return steps
 
     if open_incidents:
         first_hint = next((incident.operator_hint for incident in open_incidents if incident.operator_hint), "")
-        return [
+        steps = [
             OpsReleaseRepairStep(
                 key="read-incident-diagnostics",
                 title="Read the latest incident diagnostics",
@@ -439,6 +456,12 @@ def _build_release_repair_playbook(
                 detail="Do not remove pauses until a manual audit run succeeds.",
             ),
         ]
+        if host_blockers:
+            steps.insert(1, _public_target_repair_step(host_blockers))
+        return steps
+
+    if host_blockers:
+        return [_public_target_repair_step(host_blockers)]
 
     if primary_blocker:
         return [
@@ -515,6 +538,7 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
                 production=production,
                 staging=staging,
                 primary_blocker=None,
+                network_blockers=[],
             ),
             production=production,
             staging=staging,
@@ -536,7 +560,9 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
             next_step = incident.operator_hint
             break
     else:
-        if primary_blocker:
+        if network_blockers:
+            next_step = "Restore DNS/HTTPS for the public target, then rerun the Public Evidence network check."
+        elif primary_blocker:
             next_step = f"Resolve this release blocker before unpause: {primary_blocker}."
 
     return OpsReleaseMaintenanceSummary(
@@ -547,6 +573,7 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
         release_audit_scheduled_paused=release_audit_scheduled_paused,
         staging_release_paused=staging_release_paused,
         network_checks=network_checks,
+        network_blockers=network_blockers,
         blocker_count=blocker_count,
         primary_blocker=primary_blocker,
         next_step=next_step,
@@ -566,6 +593,7 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
             production=production,
             staging=staging,
             primary_blocker=primary_blocker,
+            network_blockers=network_blockers,
         ),
         production=production,
         staging=staging,
@@ -615,6 +643,15 @@ def _build_release_repair_workflow_steps(
     deploy_key_step_status = _release_status_from_item(checklist, "deploy-key")
     if deploy_key_status and deploy_key_status.status == "blocked":
         deploy_key_step_status = "current"
+    public_network_item = checklist.get("public-network-check") or OpsReleaseChecklistItem(
+        key="public-network-check",
+        label="Public network check",
+        status="unknown",
+        detail="Public network check state is not present in the checklist.",
+    )
+    public_network_step_status = _release_status_from_item(checklist, "public-network-check")
+    if public_network_item.status == "blocked":
+        public_network_step_status = "current"
 
     host_trust_item = checklist.get("ssh-trust-anchor") or OpsReleaseChecklistItem(
         key="ssh-trust-anchor",
@@ -672,6 +709,17 @@ def _build_release_repair_workflow_steps(
             status=host_trust_status,
             detail=host_trust_item.detail,
             operator_action="Do not rotate known_hosts unless the incident category changes to host-key failure.",
+        ),
+        OpsReleaseRepairWorkflowStep(
+            key="public-target-network",
+            title="Public DNS and HTTPS target is reachable",
+            status=public_network_step_status,
+            detail=public_network_item.detail,
+            operator_action=(
+                "Restore DNS/HTTPS for the public target, then rerun Public Evidence Bundle with check_network=true."
+                if public_network_step_status in {"current", "blocked"}
+                else "Keep the public target probes attached to release evidence."
+            ),
         ),
         OpsReleaseRepairWorkflowStep(
             key="restore-deploy-key",
@@ -740,11 +788,14 @@ def _build_release_repair_workflow() -> OpsReleaseRepairWorkflowResponse:
     checklist = release_maintenance.checklist
     checklist_by_key = _release_checklist_by_key(release_maintenance)
     deploy_key_status = checklist_by_key.get("deploy-key")
+    public_network_status = checklist_by_key.get("public-network-check")
     blocked_items = [item for item in checklist if item.status == "blocked"]
     open_incidents = _open_release_incidents(
         release_maintenance.production,
         release_maintenance.staging,
     )
+    public_network_blocked = bool(public_network_status and public_network_status.status == "blocked")
+    deploy_key_blocked = bool(deploy_key_status and deploy_key_status.status == "blocked")
 
     if not release_maintenance.available:
         phase = "status_unwired"
@@ -758,7 +809,24 @@ def _build_release_repair_workflow() -> OpsReleaseRepairWorkflowResponse:
         summary = "Release maintenance is ready for a planned unpause window."
         next_action = "Schedule a watched release window before removing audit and staging pauses."
         typed_confirmation_phrase = "confirm planned release unpause"
-    elif deploy_key_status and deploy_key_status.status == "blocked":
+    elif public_network_blocked and deploy_key_blocked:
+        phase = "repair_required"
+        status = "blocked"
+        summary = "Release automation is blocked by public target probes and deploy-key authentication."
+        next_action = (
+            "Restore public DNS/HTTPS target, repair deploy key, then rerun Release Secrets Audit "
+            "and Public Evidence network check."
+        )
+        typed_confirmation_phrase = "confirm public target and deploy key repair before audit"
+    elif public_network_blocked:
+        phase = "repair_required"
+        status = "blocked"
+        summary = "Live target is blocked by public DNS/HTTPS probes."
+        next_action = (
+            "Restore DNS/HTTPS for the public target, then rerun Public Evidence Bundle with check_network=true."
+        )
+        typed_confirmation_phrase = "confirm public target repair before review"
+    elif deploy_key_blocked:
         phase = "repair_required"
         status = "blocked"
         summary = "Release automation is blocked because the deploy host rejects the GitHub deploy key."

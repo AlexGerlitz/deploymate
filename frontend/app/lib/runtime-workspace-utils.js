@@ -890,6 +890,7 @@ export function buildOpsSnapshot({ currentUser, deployments, servers, notificati
       release_audit_scheduled_paused: false,
       staging_release_paused: false,
       network_checks: "unknown",
+      network_blockers: [],
       blocker_count: 0,
       primary_blocker: null,
       next_step: "Load the server-side operations overview before using release unpause decisions.",

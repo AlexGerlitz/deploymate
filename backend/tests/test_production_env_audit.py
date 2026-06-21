@@ -1143,10 +1143,37 @@ exit 1
         }
         self.assertEqual(payload["maintenance"]["ready_for_unpause"], "0")
         self.assertEqual(payload["maintenance"]["blocker_1"], "host deploymatecloud.ru dns=unavailable")
+        self.assertEqual(
+            payload["maintenance"]["network_blockers"],
+            [
+                "host deploymatecloud.ru dns=unavailable",
+                "host lab.deploymatecloud.ru dns=unavailable",
+            ],
+        )
         self.assertEqual(checklist_by_key["public-network-check"]["status"], "blocked")
         self.assertIn(
             "host deploymatecloud.ru dns=unavailable",
             checklist_by_key["public-network-check"]["detail"],
+        )
+        self.assertEqual(payload["maintenance"]["repair_playbook"][0]["key"], "restore-public-target")
+        self.assertIn(
+            "deploymatecloud.ru",
+            payload["maintenance"]["repair_playbook"][0]["detail"],
+        )
+        self.assertEqual(payload["maintenance"]["repair_workflow"]["phase"], "repair_required")
+        self.assertEqual(payload["maintenance"]["repair_workflow"]["status"], "blocked")
+        self.assertIn("DNS/HTTPS", payload["maintenance"]["repair_workflow"]["summary"])
+        self.assertIn(
+            "check_network=true",
+            payload["maintenance"]["repair_workflow"]["next_action"],
+        )
+        workflow_steps_by_key = {
+            item["key"]: item for item in payload["maintenance"]["repair_workflow"]["steps"]
+        }
+        self.assertEqual(workflow_steps_by_key["public-target-network"]["status"], "current")
+        self.assertIn(
+            "check_network=true",
+            workflow_steps_by_key["public-target-network"]["operator_action"],
         )
 
     def test_public_evidence_publish_updates_marker_comment_without_duplicates(self):

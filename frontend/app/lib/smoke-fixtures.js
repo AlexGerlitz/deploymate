@@ -94,6 +94,7 @@ export const smokeOverviewOpsOverview = {
     release_audit_scheduled_paused: true,
     staging_release_paused: true,
     network_checks: "skipped",
+    network_blockers: [],
     blocker_count: 2,
     primary_blocker: "release audit schedule paused",
     next_step: "Restore the deploy public key before the next release audit rerun.",
@@ -133,6 +134,12 @@ export const smokeOverviewOpsOverview = {
         label: "Deploy key",
         status: "blocked",
         detail: "The deploy host rejects the GitHub deploy key.",
+      },
+      {
+        key: "public-network-check",
+        label: "Public network check",
+        status: "warn",
+        detail: "DNS and HTTPS probes were skipped for this status snapshot.",
       },
     ],
     repair_playbook: [
@@ -217,6 +224,14 @@ export const smokeReleaseRepairWorkflow = {
       status: "complete",
       detail: "The pinned known_hosts trust check already passed.",
       operator_action: "Do not rotate known_hosts for this blocker.",
+    },
+    {
+      key: "public-target-network",
+      title: "Public DNS and HTTPS target is reachable",
+      status: "current",
+      detail: "DNS and HTTPS probes were skipped for this status snapshot.",
+      operator_action:
+        "Restore DNS/HTTPS for the public target, then rerun Public Evidence Bundle with check_network=true.",
     },
     {
       key: "restore-deploy-key",

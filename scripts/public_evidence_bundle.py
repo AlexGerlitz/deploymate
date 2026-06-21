@@ -163,6 +163,7 @@ def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
     maintenance = load_maintenance_status(repo, check_network)
     commit = os.getenv("GITHUB_SHA") or git_value("rev-parse", "HEAD")
     current_branch = branch or os.getenv("GITHUB_REF_NAME") or git_value("rev-parse", "--abbrev-ref", "HEAD")
+    maintenance["network_blockers"] = network_blockers(maintenance)
     maintenance["checklist"] = build_release_checklist(maintenance)
     maintenance["repair_playbook"] = build_repair_playbook(maintenance)
     maintenance["repair_workflow"] = build_repair_workflow(
@@ -250,6 +251,18 @@ def release_blockers(maintenance: dict[str, Any]) -> list[str]:
 
 def network_blockers(maintenance: dict[str, Any]) -> list[str]:
     return [blocker for blocker in release_blockers(maintenance) if blocker.startswith("host ")]
+
+
+def public_target_repair_step(host_blockers: list[str]) -> dict[str, str]:
+    details = "; ".join(host_blockers) if host_blockers else "Public DNS/HTTPS status is unavailable."
+    return {
+        "key": "restore-public-target",
+        "title": "Restore public DNS and HTTPS target",
+        "detail": (
+            "Repair public target probes before treating the live demo as available: "
+            f"{details}."
+        ),
+    }
 
 
 def incident_checklist_item(incident: dict[str, str]) -> dict[str, str]:
@@ -452,6 +465,7 @@ def build_repair_playbook(maintenance: dict[str, Any]) -> list[dict[str, str]]:
     incidents = open_release_incidents(maintenance)
     categories = {item["failure_category"] for item in incidents}
     incident_label = release_incident_label(incidents)
+    host_blockers = list(maintenance.get("network_blockers") or network_blockers(maintenance))
 
     if ready_for_unpause:
         return [
@@ -463,7 +477,7 @@ def build_repair_playbook(maintenance: dict[str, Any]) -> list[dict[str, str]]:
         ]
 
     if "ssh_auth_denied" in categories:
-        return [
+        steps = [
             {
                 "key": "keep-trust-anchor",
                 "title": "Keep known_hosts unchanged",
@@ -488,10 +502,13 @@ def build_repair_playbook(maintenance: dict[str, Any]) -> list[dict[str, str]]:
                 "detail": "Close the GitHub issues and unset pause variables only after the audit is green.",
             },
         ]
+        if host_blockers:
+            steps.insert(1, public_target_repair_step(host_blockers))
+        return steps
 
     if incidents:
         first_hint = next((item["operator_hint"] for item in incidents if item["operator_hint"]), "")
-        return [
+        steps = [
             {
                 "key": "read-incident-diagnostics",
                 "title": "Read the latest incident diagnostics",
@@ -508,8 +525,13 @@ def build_repair_playbook(maintenance: dict[str, Any]) -> list[dict[str, str]]:
                 "detail": "Do not remove pauses until a manual audit run succeeds.",
             },
         ]
+        if host_blockers:
+            steps.insert(1, public_target_repair_step(host_blockers))
+        return steps
 
     primary_blocker = str(maintenance.get("blocker_1", "") or "")
+    if host_blockers:
+        return [public_target_repair_step(host_blockers)]
     if primary_blocker:
         return [
             {
@@ -572,6 +594,16 @@ def build_repair_workflow_steps(
     deploy_key_status = workflow_step_status(deploy_key_item)
     if deploy_key_item.get("status") == "blocked":
         deploy_key_status = "current"
+    public_network_item = checklist.get(
+        "public-network-check",
+        {
+            "detail": "Public network check state is not present in the checklist.",
+            "status": "unknown",
+        },
+    )
+    public_network_status = workflow_step_status(public_network_item)
+    if public_network_item.get("status") == "blocked":
+        public_network_status = "current"
 
     manual_audit_status = "pending"
     close_status = "pending"
@@ -609,6 +641,17 @@ def build_repair_workflow_steps(
             "status": workflow_step_status(host_trust_item),
             "detail": host_trust_item.get("detail", ""),
             "operator_action": "Do not rotate known_hosts unless the failure category changes.",
+        },
+        {
+            "key": "public-target-network",
+            "title": "Public DNS and HTTPS target is reachable",
+            "status": public_network_status,
+            "detail": public_network_item.get("detail", ""),
+            "operator_action": (
+                "Restore DNS/HTTPS for the public target, then rerun Public Evidence Bundle with check_network=true."
+                if public_network_status in {"current", "blocked"}
+                else "Keep the public target probes attached to release evidence."
+            ),
         },
         {
             "key": "restore-deploy-key",
@@ -661,9 +704,12 @@ def build_repair_workflow_handoff(workflow: dict[str, Any]) -> str:
 def build_repair_workflow(maintenance: dict[str, Any], *, repo: str, branch: str) -> dict[str, Any]:
     checklist = checklist_by_key(maintenance)
     deploy_key_item = checklist.get("deploy-key")
+    public_network_item = checklist.get("public-network-check")
     blocked_items = [item for item in maintenance.get("checklist", []) if item.get("status") == "blocked"]
     incidents = open_release_incidents(maintenance)
     manual_audit_command = release_secrets_audit_command(repo, branch)
+    public_network_blocked = bool(public_network_item and public_network_item.get("status") == "blocked")
+    deploy_key_blocked = bool(deploy_key_item and deploy_key_item.get("status") == "blocked")
 
     if not truthy(maintenance.get("available", "1")):
         phase = "status_unwired"
@@ -677,7 +723,24 @@ def build_repair_workflow(maintenance: dict[str, Any], *, repo: str, branch: str
         summary = "Release maintenance is ready for a planned unpause window."
         next_action = "Schedule a watched release window before removing audit and staging pauses."
         typed_confirmation_phrase = "confirm planned release unpause"
-    elif deploy_key_item and deploy_key_item.get("status") == "blocked":
+    elif public_network_blocked and deploy_key_blocked:
+        phase = "repair_required"
+        status = "blocked"
+        summary = "Release automation is blocked by public target probes and deploy-key authentication."
+        next_action = (
+            "Restore public DNS/HTTPS target, repair deploy key, then rerun Release Secrets Audit "
+            "and Public Evidence network check."
+        )
+        typed_confirmation_phrase = "confirm public target and deploy key repair before audit"
+    elif public_network_blocked:
+        phase = "repair_required"
+        status = "blocked"
+        summary = "Live target is blocked by public DNS/HTTPS probes."
+        next_action = (
+            "Restore DNS/HTTPS for the public target, then rerun Public Evidence Bundle with check_network=true."
+        )
+        typed_confirmation_phrase = "confirm public target repair before review"
+    elif deploy_key_blocked:
         phase = "repair_required"
         status = "blocked"
         summary = "Release automation is blocked because the deploy host rejects the GitHub deploy key."
