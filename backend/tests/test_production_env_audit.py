@@ -1413,6 +1413,110 @@ exit 1
             workflow_steps_by_key["public-target-network"]["operator_action"],
         )
 
+    def test_latest_review_packet_artifact_checker_downloads_and_verifies_packet(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            head_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.repo_root,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            packet_source = Path(tmpdir) / "packet-source"
+            packet_output = Path(tmpdir) / "packet-output"
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                f"""#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "run" ] && [ "$2" = "list" ]; then
+  cat <<'JSON'
+[
+  {{"workflowName":"Public Evidence Bundle","status":"completed","conclusion":"success","databaseId":999,"url":"https://example.test/actions/runs/999","headSha":"{head_sha}","createdAt":"2026-06-20T00:03:00Z"}},
+  {{"workflowName":"Public Evidence Bundle","status":"completed","conclusion":"failure","databaseId":998,"url":"https://example.test/actions/runs/998","headSha":"old","createdAt":"2026-06-20T00:02:00Z"}}
+]
+JSON
+  exit 0
+fi
+if [ "$1" = "run" ] && [ "$2" = "download" ]; then
+  source_dir="${{FAKE_PACKET_SOURCE:?}}"
+  output_dir=""
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "--dir" ]; then
+      output_dir="$2"
+      shift 2
+      continue
+    fi
+    shift
+  done
+  mkdir -p "$output_dir"
+  cp "$source_dir"/* "$output_dir"/
+  exit 0
+fi
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  cat <<'JSON'
+{{"state":"OPEN","body":"Failure category: `ssh_auth_denied`\\nOperator hint: Restore the deploy public key.","comments":[]}}
+JSON
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+            env["GITHUB_RUN_ID"] = "999"
+            env["GITHUB_EVENT_NAME"] = "workflow_run"
+            env["FAKE_PACKET_SOURCE"] = str(packet_source)
+
+            export_result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/export_review_packet.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--output",
+                    str(packet_source),
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(export_result.returncode, 0, export_result.stdout + export_result.stderr)
+
+            checker_result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/check_latest_review_packet_artifact.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--output-dir",
+                    str(packet_output),
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(checker_result.returncode, 0, checker_result.stdout + checker_result.stderr)
+            self.assertIn("[review-packet-artifact] ok", checker_result.stdout)
+            self.assertIn("run 999", checker_result.stdout)
+            self.assertTrue((packet_output / "MANIFEST.json").exists())
+
     def test_public_evidence_publish_updates_marker_comment_without_duplicates(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             publish_log = Path(tmpdir) / "publish.log"
