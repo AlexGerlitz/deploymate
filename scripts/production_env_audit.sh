@@ -7,16 +7,18 @@ source "$ROOT_DIR/scripts/audit_cache.sh"
 cd "$ROOT_DIR"
 
 ENV_FILE="${DEPLOYMATE_PRODUCTION_ENV_AUDIT_ENV_FILE:-.env.production}"
+COMPOSE_FILE="${DEPLOYMATE_PRODUCTION_ENV_AUDIT_COMPOSE_FILE:-docker-compose.prod.yml}"
 REQUIRE_RUNTIME_FILES=0
 DEFAULT_KNOWN_HOSTS_FILE="/opt/deploymate/.secrets/deploymate_known_hosts"
 
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/production_env_audit.sh [--env-file <path>] [--require-runtime-files]
+  bash scripts/production_env_audit.sh [--env-file <path>] [--compose-file <path>] [--require-runtime-files]
 
 Options:
   --env-file <path>         Production env file to validate. Default: .env.production
+  --compose-file <path>     Compose file that will run the backend. Default: docker-compose.prod.yml
   --require-runtime-files   Fail if the env file or runtime files such as known_hosts
                             are missing on this machine.
   -h, --help                Show this help
@@ -27,6 +29,10 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --env-file)
       ENV_FILE="${2:-}"
+      shift 2
+      ;;
+    --compose-file)
+      COMPOSE_FILE="${2:-}"
       shift 2
       ;;
     --require-runtime-files)
@@ -47,6 +53,11 @@ done
 
 if [ -z "$ENV_FILE" ]; then
   echo "[production-env-audit] --env-file requires a non-empty path" >&2
+  exit 1
+fi
+
+if [ -z "$COMPOSE_FILE" ]; then
+  echo "[production-env-audit] --compose-file requires a non-empty path" >&2
   exit 1
 fi
 
@@ -112,8 +123,8 @@ require_static_match() {
 
 audit_cache_prepare
 
-audit_key="$(audit_cache_key_for_input "production_env_audit" "${ENV_FILE}|${REQUIRE_RUNTIME_FILES}")"
-audit_metadata="$(printf 'env_file=%s\nrequire_runtime_files=%s\n' "$ENV_FILE" "$REQUIRE_RUNTIME_FILES")"
+audit_key="$(audit_cache_key_for_input "production_env_audit" "${ENV_FILE}|${COMPOSE_FILE}|${REQUIRE_RUNTIME_FILES}")"
+audit_metadata="$(printf 'env_file=%s\ncompose_file=%s\nrequire_runtime_files=%s\n' "$ENV_FILE" "$COMPOSE_FILE" "$REQUIRE_RUNTIME_FILES")"
 audit_files=(
   "scripts/production_env_audit.sh"
   "docker-compose.prod.yml"
@@ -122,6 +133,9 @@ audit_files=(
 
 if [ -f "$ENV_FILE" ]; then
   audit_files+=("$ENV_FILE")
+fi
+if [ -f "$COMPOSE_FILE" ]; then
+  audit_files+=("$COMPOSE_FILE")
 fi
 
 audit_fingerprint="$(audit_cache_fingerprint_inputs "$audit_key" "$audit_metadata" "${audit_files[@]}")"
@@ -171,6 +185,23 @@ require_static_match \
   ".env.production.example" \
   '^DEPLOYMATE_SSH_KNOWN_HOSTS_FILE=/opt/deploymate/\.secrets/deploymate_known_hosts$' \
   ".env.production.example does not set DEPLOYMATE_SSH_KNOWN_HOSTS_FILE to the persistent production path"
+
+echo "[production-env-audit] checking runtime compose contract: $COMPOSE_FILE"
+if [ ! -f "$COMPOSE_FILE" ]; then
+  fail "compose file \"$COMPOSE_FILE\" is missing"
+fi
+require_static_match \
+  "$COMPOSE_FILE" \
+  'DEPLOYMATE_SSH_HOST_KEY_CHECKING:[[:space:]]*(yes|\$\{DEPLOYMATE_SSH_HOST_KEY_CHECKING:-yes\})' \
+  "$COMPOSE_FILE does not keep DEPLOYMATE_SSH_HOST_KEY_CHECKING strict for the backend"
+require_static_match \
+  "$COMPOSE_FILE" \
+  'DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:.*DEPLOYMATE_SSH_KNOWN_HOSTS_FILE.*deploymate_known_hosts' \
+  "$COMPOSE_FILE does not pass DEPLOYMATE_SSH_KNOWN_HOSTS_FILE into the backend"
+require_static_match \
+  "$COMPOSE_FILE" \
+  'DEPLOYMATE_SSH_KNOWN_HOSTS_FILE.*:.*DEPLOYMATE_SSH_KNOWN_HOSTS_FILE.*:ro' \
+  "$COMPOSE_FILE does not mount the SSH known_hosts file into the backend container"
 
 echo "[production-env-audit] checking production env alignment"
 

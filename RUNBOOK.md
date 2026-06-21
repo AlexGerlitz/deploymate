@@ -387,10 +387,13 @@ To verify that production env security defaults still match the hardened contrac
 bash scripts/production_env_audit.sh --env-file .env.production
 ```
 
-On the deployment host, run the stricter form before `docker compose up` so the pinned `known_hosts` file must already exist and be non-empty:
+On the deployment host, run the stricter form before `docker compose up` so the pinned `known_hosts` file must already exist and be non-empty. If the environment uses a stand-specific compose file through `DEPLOY_COMPOSE_FILE`, pass that exact file so the audit verifies the backend receives and mounts the pinned `known_hosts` path that runtime SSH uses.
 
 ```bash
-bash scripts/production_env_audit.sh --env-file .env.production --require-runtime-files
+bash scripts/production_env_audit.sh \
+  --env-file .env.production \
+  --compose-file docker-compose.prod.yml \
+  --require-runtime-files
 ```
 
 ## Frontend-only deploy
@@ -595,6 +598,7 @@ Optional GitHub Actions release workflow secrets:
 
 The staging workflow uses the same secret names, but scoped under the `staging` environment instead of `production`.
 If `DEPLOY_NOTIFICATION_WEBHOOK` is unset, the workflows simply skip notifications.
+When `DEPLOY_COMPOSE_FILE` points at a stand-specific compose file, release audits that exact file before deploy. The backend service in that file must receive the SSH known-hosts env var and mount the same path read-only, otherwise remote runtime checks will fail before deployment.
 
 Optional GitHub repository variables for staging delivery:
 

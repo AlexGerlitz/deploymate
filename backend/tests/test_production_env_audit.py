@@ -213,6 +213,69 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("[production-env-audit] ok", result.stdout)
 
+    def test_production_env_audit_checks_custom_compose_runtime_contract(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            known_hosts_path = temp_path / "known_hosts"
+            known_hosts_path.write_text("host ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestvalue\n", encoding="utf-8")
+            env_path = self._write_env_file(temp_path, known_hosts_file=str(known_hosts_path))
+            compose_path = temp_path / "stand-compose.yml"
+            compose_path.write_text(
+                """
+services:
+  backend:
+    environment:
+      DEPLOYMATE_SSH_HOST_KEY_CHECKING: yes
+      DEPLOYMATE_SSH_KNOWN_HOSTS_FILE: ${DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:-/opt/deploymate/.secrets/deploymate_known_hosts}
+    volumes:
+      - ${DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:-/opt/deploymate/.secrets/deploymate_known_hosts}:${DEPLOYMATE_SSH_KNOWN_HOSTS_FILE:-/opt/deploymate/.secrets/deploymate_known_hosts}:ro
+""".strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = self._run_script(
+                "production_env_audit.sh",
+                "--env-file",
+                str(env_path),
+                "--compose-file",
+                str(compose_path),
+                "--require-runtime-files",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"checking runtime compose contract: {compose_path}", result.stdout)
+
+    def test_production_env_audit_rejects_custom_compose_without_known_hosts_mount(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            known_hosts_path = temp_path / "known_hosts"
+            known_hosts_path.write_text("host ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestvalue\n", encoding="utf-8")
+            env_path = self._write_env_file(temp_path, known_hosts_file=str(known_hosts_path))
+            compose_path = temp_path / "stand-compose.yml"
+            compose_path.write_text(
+                """
+services:
+  backend:
+    environment:
+      DEPLOYMATE_SSH_HOST_KEY_CHECKING: yes
+""".strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = self._run_script(
+                "production_env_audit.sh",
+                "--env-file",
+                str(env_path),
+                "--compose-file",
+                str(compose_path),
+                "--require-runtime-files",
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("DEPLOYMATE_SSH_KNOWN_HOSTS_FILE", result.stderr)
+
     def test_production_env_audit_rejects_placeholder_admin_password(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -398,6 +461,10 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         )
         self.assertIn(
             "docker\\ compose\\ -f\\ /opt/deploymate-stand/docker-compose.yml",
+            result.stdout,
+        )
+        self.assertIn(
+            "production_env_audit.sh\\ --env-file\\ .env.production\\ --compose-file\\ /opt/deploymate-stand/docker-compose.yml",
             result.stdout,
         )
 
