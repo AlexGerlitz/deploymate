@@ -1067,7 +1067,7 @@ exit 1
         self.assertEqual(payload["workflows"]["ci"]["conclusion"], "success")
         self.assertEqual(payload["workflows"]["ci"]["databaseId"], 101)
         self.assertEqual(payload["workflows"]["release_maintenance_status"]["databaseId"], 102)
-        self.assertEqual(payload["workflows"]["public_evidence"]["databaseId"], 103)
+        self.assertEqual(payload["workflows"]["public_evidence"]["databaseId"], "999")
         review_index = payload["review_index"]
         self.assertEqual(review_index["status"], "blocked")
         self.assertEqual(review_index["phase"], "repair_required")

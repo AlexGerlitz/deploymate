@@ -197,6 +197,7 @@ def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
             "python3 scripts/export_review_packet.py --output dist/review",
         ],
     }
+    bundle["workflows"]["public_evidence"] = current_public_evidence_run(bundle)
     bundle["review_index"] = build_review_index(bundle)
     return bundle
 
