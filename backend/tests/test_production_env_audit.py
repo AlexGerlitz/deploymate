@@ -368,6 +368,39 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_remote_release_dry_run_supports_custom_compose_file(self):
+        result = subprocess.run(
+            [
+                "bash",
+                "scripts/remote_release.sh",
+                "--host",
+                "deploymate",
+                "--base-url",
+                "https://deploymate.152.53.178.83.sslip.io",
+                "--admin-username",
+                "admin",
+                "--admin-password",
+                "super-secret-admin-password",
+                "--compose-file",
+                "/opt/deploymate-stand/docker-compose.yml",
+                "--dry-run",
+            ],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "[remote-release] remote compose file: /opt/deploymate-stand/docker-compose.yml",
+            result.stdout,
+        )
+        self.assertIn(
+            "docker\\ compose\\ -f\\ /opt/deploymate-stand/docker-compose.yml",
+            result.stdout,
+        )
+
     def test_post_deploy_smoke_defines_json_query_helper(self):
         script = (self.repo_root / "scripts" / "post_deploy_smoke.sh").read_text(encoding="utf-8")
 

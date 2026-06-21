@@ -9,6 +9,7 @@ DEPLOY_REPO_DIR="${DEPLOYMATE_DEPLOY_REPO_DIR:-/opt/deploymate}"
 DEPLOY_BRANCH="${DEPLOYMATE_DEPLOY_BRANCH:-develop}"
 DEPLOY_REF="${DEPLOYMATE_DEPLOY_REF:-}"
 DEPLOY_ENV_FILE="${DEPLOYMATE_DEPLOY_ENV_FILE:-.env.production}"
+DEPLOY_COMPOSE_FILE="${DEPLOYMATE_DEPLOY_COMPOSE_FILE:-docker-compose.prod.yml}"
 DEPLOY_SURFACE="${DEPLOYMATE_DEPLOY_SURFACE:-full}"
 BASE_URL="${DEPLOYMATE_BASE_URL:-}"
 ADMIN_USERNAME="${DEPLOYMATE_ADMIN_USERNAME:-}"
@@ -30,6 +31,7 @@ Options:
   --branch <name>             Git branch to deploy. Default: develop
   --ref <git-ref>             Exact Git ref or commit SHA to deploy after switching branch
   --env-file <path>           Compose env file on the remote host. Default: .env.production
+  --compose-file <path>       Compose file on the remote host. Default: docker-compose.prod.yml
   --base-url <url>            Base URL for post-deploy smoke
   --admin-username <user>     Admin username for post-deploy smoke
   --admin-password <password> Admin password for post-deploy smoke
@@ -116,6 +118,10 @@ while [ "$#" -gt 0 ]; do
       DEPLOY_ENV_FILE="${2:-}"
       shift 2
       ;;
+    --compose-file)
+      DEPLOY_COMPOSE_FILE="${2:-}"
+      shift 2
+      ;;
     --base-url)
       BASE_URL="${2:-}"
       shift 2
@@ -186,6 +192,7 @@ if [ -n "$DEPLOY_REF" ]; then
 fi
 echo "[remote-release] remote repo: $DEPLOY_REPO_DIR"
 echo "[remote-release] remote env file: $DEPLOY_ENV_FILE"
+echo "[remote-release] remote compose file: $DEPLOY_COMPOSE_FILE"
 echo "[remote-release] smoke runner: $SMOKE_RUNNER"
 
 if [ "$SKIP_SMOKE" != "1" ]; then
@@ -207,16 +214,17 @@ if [ "$SKIP_SMOKE" != "1" ]; then
 fi
 
 quoted_env_file="$(printf '%q' "$DEPLOY_ENV_FILE")"
+quoted_compose_file="$(printf '%q' "$DEPLOY_COMPOSE_FILE")"
 
 case "$DEPLOY_SURFACE" in
   frontend)
-    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $quoted_env_file up -d --build --no-deps frontend && docker compose -f docker-compose.prod.yml --env-file $quoted_env_file ps frontend"
+    REMOTE_COMPOSE_CMD="docker compose -f $quoted_compose_file --env-file $quoted_env_file up -d --build --no-deps frontend && docker compose -f $quoted_compose_file --env-file $quoted_env_file ps frontend"
     ;;
   backend)
-    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $quoted_env_file up -d --build --no-deps backend && docker compose -f docker-compose.prod.yml --env-file $quoted_env_file ps backend"
+    REMOTE_COMPOSE_CMD="docker compose -f $quoted_compose_file --env-file $quoted_env_file up -d --build --no-deps backend && docker compose -f $quoted_compose_file --env-file $quoted_env_file ps backend"
     ;;
   full)
-    REMOTE_COMPOSE_CMD="docker compose -f docker-compose.prod.yml --env-file $quoted_env_file up -d --build && docker compose -f docker-compose.prod.yml --env-file $quoted_env_file ps"
+    REMOTE_COMPOSE_CMD="docker compose -f $quoted_compose_file --env-file $quoted_env_file up -d --build && docker compose -f $quoted_compose_file --env-file $quoted_env_file ps"
     ;;
 esac
 
@@ -230,7 +238,7 @@ if [ "$DEPLOY_SURFACE" = "frontend" ]; then
   else
     REMOTE_TARGET_CMD="git fetch origin $DEPLOY_BRANCH && TARGET_SHA=\$(git rev-parse origin/$DEPLOY_BRANCH)"
   fi
-  REMOTE_CMD="cd $DEPLOY_REPO_DIR && $REMOTE_RECOVER_CMD && $REMOTE_TARGET_CMD && RELEASE_WORKTREE=.release-worktrees/\$TARGET_SHA-\$\$ && mkdir -p .release-worktrees && git worktree add --detach \$RELEASE_WORKTREE \$TARGET_SHA && REMOTE_ENV_FILE=$DEPLOY_ENV_FILE && case \"\$REMOTE_ENV_FILE\" in /*) ;; *) REMOTE_ENV_FILE=$DEPLOY_REPO_DIR/\$REMOTE_ENV_FILE ;; esac && cd \$RELEASE_WORKTREE && bash scripts/runtime_capability_audit.sh --env-file \$REMOTE_ENV_FILE && bash scripts/production_env_audit.sh --env-file \$REMOTE_ENV_FILE --require-runtime-files && COMPOSE_PROJECT_NAME=deploymate docker compose -f docker-compose.prod.yml --env-file \$REMOTE_ENV_FILE up -d --build --no-deps frontend && COMPOSE_PROJECT_NAME=deploymate docker compose -f docker-compose.prod.yml --env-file \$REMOTE_ENV_FILE ps frontend && DEPLOYED_SHA=\$TARGET_SHA && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && cd $DEPLOY_REPO_DIR && (git worktree remove --force \$RELEASE_WORKTREE >/dev/null 2>&1 || true)"
+  REMOTE_CMD="cd $DEPLOY_REPO_DIR && $REMOTE_RECOVER_CMD && $REMOTE_TARGET_CMD && RELEASE_WORKTREE=.release-worktrees/\$TARGET_SHA-\$\$ && mkdir -p .release-worktrees && git worktree add --detach \$RELEASE_WORKTREE \$TARGET_SHA && REMOTE_ENV_FILE=$DEPLOY_ENV_FILE && case \"\$REMOTE_ENV_FILE\" in /*) ;; *) REMOTE_ENV_FILE=$DEPLOY_REPO_DIR/\$REMOTE_ENV_FILE ;; esac && REMOTE_COMPOSE_FILE=$DEPLOY_COMPOSE_FILE && case \"\$REMOTE_COMPOSE_FILE\" in /*) ;; *) REMOTE_COMPOSE_FILE=\$RELEASE_WORKTREE/\$REMOTE_COMPOSE_FILE ;; esac && cd \$RELEASE_WORKTREE && bash scripts/runtime_capability_audit.sh --env-file \$REMOTE_ENV_FILE && bash scripts/production_env_audit.sh --env-file \$REMOTE_ENV_FILE --require-runtime-files && COMPOSE_PROJECT_NAME=deploymate docker compose -f \$REMOTE_COMPOSE_FILE --env-file \$REMOTE_ENV_FILE up -d --build --no-deps frontend && COMPOSE_PROJECT_NAME=deploymate docker compose -f \$REMOTE_COMPOSE_FILE --env-file \$REMOTE_ENV_FILE ps frontend && DEPLOYED_SHA=\$TARGET_SHA && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && cd $DEPLOY_REPO_DIR && (git worktree remove --force \$RELEASE_WORKTREE >/dev/null 2>&1 || true)"
 elif [ -n "$DEPLOY_REF" ]; then
   REMOTE_CMD="cd $DEPLOY_REPO_DIR && git fetch origin $DEPLOY_BRANCH && $REMOTE_SWITCH_CMD && git merge --ff-only origin/$DEPLOY_BRANCH && git fetch origin $DEPLOY_REF && TARGET_SHA=\$(git rev-parse FETCH_HEAD) && git merge --ff-only \$TARGET_SHA && DEPLOYED_SHA=\$(git rev-parse HEAD) && echo [remote-release]\ deployed\ sha:\ \$DEPLOYED_SHA && if [ \"\$DEPLOYED_SHA\" != \"\$TARGET_SHA\" ]; then echo [remote-release]\ deployed\ sha\ mismatch >&2; exit 1; fi && $REMOTE_AUDIT_CMD && $REMOTE_COMPOSE_CMD"
 else

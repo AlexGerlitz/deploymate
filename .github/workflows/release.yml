@@ -66,6 +66,7 @@ jobs:
           deploy_branch: ${{ secrets.DEPLOY_BRANCH }}
           deploy_ref: ${{ github.sha }}
           deploy_env_file: ${{ secrets.DEPLOY_ENV_FILE }}
+          deploy_compose_file: ${{ secrets.DEPLOY_COMPOSE_FILE }}
           runtime_smoke_ssh_private_key: ${{ secrets.RUNTIME_SMOKE_SSH_PRIVATE_KEY }}
           runtime_smoke_server_id: ${{ secrets.RUNTIME_SMOKE_SERVER_ID }}
           runtime_smoke_server_name: ${{ secrets.RUNTIME_SMOKE_SERVER_NAME }}
