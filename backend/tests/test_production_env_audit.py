@@ -1152,9 +1152,14 @@ exit 1
         self.assertEqual(entrypoints_by_key["review-console"]["type"], "frontend_route")
         self.assertEqual(
             entrypoints_by_key["review-console"]["url"],
-            "https://deploymatecloud.ru/review",
+            "https://deploymate.152.53.178.83.sslip.io/review",
         )
         self.assertEqual(entrypoints_by_key["review-console"]["status"], "skipped")
+        self.assertEqual(
+            entrypoints_by_key["fallback-live-target"]["url"],
+            "https://deploymate.152.53.178.83.sslip.io",
+        )
+        self.assertEqual(entrypoints_by_key["fallback-live-target"]["status"], "published")
         self.assertEqual(entrypoints_by_key["release-repair-workflow"]["status"], "blocked")
         self.assertEqual(entrypoints_by_key["deploy-key-recovery"]["conclusion"], "success")
         self.assertEqual(entrypoints_by_key["live-target"]["status"], "skipped")
@@ -1201,8 +1206,13 @@ exit 1
             markdown_result.stdout,
         )
         self.assertIn(
-            "| [Review console](https://deploymatecloud.ru/review) | `frontend_route` | "
+            "| [Review console](https://deploymate.152.53.178.83.sslip.io/review) | `frontend_route` | "
             "`skipped` | `skipped` |",
+            markdown_result.stdout,
+        )
+        self.assertIn(
+            "| [Fallback live target](https://deploymate.152.53.178.83.sslip.io) | "
+            "`public_probe` | `published` | `fallback` |",
             markdown_result.stdout,
         )
         self.assertIn(
