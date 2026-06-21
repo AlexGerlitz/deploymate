@@ -473,6 +473,8 @@ services:
 
         self.assertIn("json_get()", script)
         self.assertIn("json_query()", script)
+        self.assertIn("find_runtime_server_id()", script)
+        self.assertIn("runtime smoke server reused", script)
 
     def test_release_secret_contract_audit_accepts_matching_credentials(self):
         with tempfile.TemporaryDirectory() as temp_dir:

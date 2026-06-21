@@ -36,6 +36,7 @@ RUNTIME_LOGS_BODY_FILE="$(mktemp)"
 RUNTIME_DELETE_BODY_FILE="$(mktemp)"
 RUNTIME_PORTS_BODY_FILE="$(mktemp)"
 RUNTIME_SERVER_CREATE_BODY_FILE="$(mktemp)"
+RUNTIME_SERVERS_BODY_FILE="$(mktemp)"
 RUNTIME_SERVER_DELETE_BODY_FILE="$(mktemp)"
 
 CURL_ARGS=()
@@ -78,6 +79,7 @@ cleanup() {
     "$RUNTIME_DELETE_BODY_FILE" \
     "$RUNTIME_PORTS_BODY_FILE" \
     "$RUNTIME_SERVER_CREATE_BODY_FILE" \
+    "$RUNTIME_SERVERS_BODY_FILE" \
     "$RUNTIME_SERVER_DELETE_BODY_FILE"
 }
 
@@ -211,6 +213,31 @@ else:
 PY
 }
 
+find_runtime_server_id() {
+  local file="$1"
+
+  python3 - "$file" "$RUNTIME_SERVER_NAME" "$RUNTIME_SERVER_HOST" "$RUNTIME_SERVER_PORT" "$RUNTIME_SERVER_USERNAME" <<'PY'
+import json
+import sys
+
+path, name, host, raw_port, username = sys.argv[1:6]
+port = int(raw_port)
+
+with open(path, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
+
+for item in data if isinstance(data, list) else []:
+    if (
+        item.get("name") == name
+        and item.get("host") == host
+        and int(item.get("port", 0)) == port
+        and item.get("username") == username
+    ):
+        print(item.get("id", ""))
+        break
+PY
+}
+
 ensure_runtime_server_id() {
   if [ -n "$RUNTIME_SERVER_ID" ]; then
     return 0
@@ -248,7 +275,7 @@ print(json.dumps({
     "ssh_key": ssh_key,
 }, ensure_ascii=True))
 PY
-)"
+  )"
 
   local create_status
   create_status="$(
@@ -258,6 +285,21 @@ PY
       -X POST "$BASE_URL/api/servers" \
       --data "$payload"
   )"
+  if [ "$create_status" = "403" ]; then
+    local list_status
+    list_status="$(
+      curl_smoke -sS -o "$RUNTIME_SERVERS_BODY_FILE" -w "%{http_code}" \
+        -b "$COOKIE_JAR" \
+        "$BASE_URL/api/servers"
+    )"
+    check_http_status "runtime smoke server list" "200" "$list_status" "$RUNTIME_SERVERS_BODY_FILE" >&2
+
+    RUNTIME_SERVER_ID="$(find_runtime_server_id "$RUNTIME_SERVERS_BODY_FILE")"
+    if [ -n "$RUNTIME_SERVER_ID" ] && [ "$RUNTIME_SERVER_ID" != "null" ]; then
+      echo "[smoke] runtime smoke server reused: $RUNTIME_SERVER_ID" >&2
+      return 0
+    fi
+  fi
   check_http_status "runtime smoke server create" "200" "$create_status" "$RUNTIME_SERVER_CREATE_BODY_FILE" >&2
 
   RUNTIME_SERVER_ID="$(json_get "$RUNTIME_SERVER_CREATE_BODY_FILE" "id")"
