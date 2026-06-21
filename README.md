@@ -693,7 +693,7 @@ Next likely improvements:
 
 1. move server credentials to external secret management
 2. split local Docker execution into a narrower executor boundary
-3. add first-class known-host management and fingerprint review inside the product
+3. deepen first-class known-host management and fingerprint review inside the product
 4. deepen automated smoke coverage around deployment runtime flows
 
 Longer-term direction: see [ROADMAP.md](ROADMAP.md).

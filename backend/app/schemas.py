@@ -303,6 +303,16 @@ class ServerPassportEvidenceItem(BaseModel):
     summary: str
 
 
+class ServerSshTrustSummary(BaseModel):
+    status: DiagnosticStatus = "unknown"
+    mode: str = "yes"
+    known_hosts_path: Optional[str] = None
+    known_hosts_configured: bool = False
+    known_hosts_entries: int = 0
+    review_command: str
+    next_step: str
+
+
 class ServerPassportResponse(BaseModel):
     status: ServerPassportStatus
     risk_level: ServerPassportRiskLevel
@@ -326,6 +336,7 @@ class ServerDiagnosticsResponse(BaseModel):
     docker_version: Optional[str] = None
     docker_compose_version: Optional[str] = None
     listening_ports: list[int] = Field(default_factory=list)
+    ssh_trust: Optional[ServerSshTrustSummary] = None
     items: list[DiagnosticItem] = Field(default_factory=list)
     passport: Optional[ServerPassportResponse] = None
 

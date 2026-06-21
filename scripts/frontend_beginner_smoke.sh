@@ -103,7 +103,7 @@ run_beginner_export_payload_smoke() {
     set -euo pipefail
     cd "$REPO_ROOT"
 
-    node --experimental-default-type=module --input-type=module <<'NODE'
+    node --input-type=module <<'NODE'
 import { buildAccessControlledRuntimeExportPayload } from "./frontend/app/lib/runtime-workspace-utils.js";
 import {
   smokeActivity,
@@ -654,6 +654,18 @@ run_beginner_first_deploy_smoke() {
 
     if ! grep -Eq 'href="/app/deployment-workflow\?server=smoke-server&amp;source=server-review"' "$server_review_html"; then
       echo "[frontend-beginner-first-deploy-smoke] server review did not preserve the ready handoff into deployment workflow" >&2
+      rm -f "$server_review_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'data-testid="server-review-ssh-trust-smoke-server"' "$server_review_html"; then
+      echo "[frontend-beginner-first-deploy-smoke] server review lost the SSH trust review card" >&2
+      rm -f "$server_review_html"
+      exit 1
+    fi
+
+    if ! grep -Eq 'known_hosts.*entries.*1' "$server_review_html"; then
+      echo "[frontend-beginner-first-deploy-smoke] server review lost the known_hosts evidence copy" >&2
       rm -f "$server_review_html"
       exit 1
     fi

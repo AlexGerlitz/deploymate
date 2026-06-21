@@ -156,6 +156,7 @@ def get_server_diagnostics(server_id: str) -> ServerDiagnosticsResponse:
         docker_version=diagnostics.get("docker_version"),
         docker_compose_version=diagnostics.get("docker_compose_version"),
         listening_ports=list(diagnostics.get("listening_ports", [])),
+        ssh_trust=diagnostics.get("ssh_trust"),
         items=items,
         passport=passport,
     )

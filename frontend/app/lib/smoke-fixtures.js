@@ -270,7 +270,24 @@ export const smokeServerDiagnostics = {
     memory: "42%",
     docker_compose_version: "v2.29.2",
     listening_ports: [22, 80, 443, 38080],
+    ssh_trust: {
+      status: "ok",
+      mode: "yes",
+      known_hosts_path: "/etc/deploymate/known_hosts",
+      known_hosts_configured: true,
+      known_hosts_entries: 1,
+      review_command:
+        "bash scripts/prepare_known_hosts.sh --host 203.0.113.10 --port 22 --output /tmp/deploymate_known_hosts",
+      next_step: "Strict SSH trust is pinned. Recheck only after a host rebuild or provider-side change.",
+    },
     items: [
+      {
+        key: "ssh_trust",
+        label: "SSH trust",
+        status: "success",
+        summary: "Strict SSH trust is pinned.",
+        details: "Known host entry is present for the smoke server.",
+      },
       {
         key: "ssh",
         label: "SSH",

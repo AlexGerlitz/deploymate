@@ -1,4 +1,6 @@
 import unittest
+import os
+import tempfile
 from datetime import datetime, timezone
 from unittest.mock import patch
 
@@ -7,7 +9,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.schemas import DiagnosticItem
 from app.services.auth import require_admin
-from app.services.server_diagnostics import build_server_passport
+from app.services.server_diagnostics import build_server_passport, build_ssh_trust_summary
 
 
 class ServerApiFlowTests(unittest.TestCase):
@@ -104,7 +106,23 @@ class ServerApiFlowTests(unittest.TestCase):
             "docker_version": "Docker version 29.3.1, build c2be9cc",
             "docker_compose_version": "Docker Compose version v2.39.4",
             "listening_ports": [22, 80, 443],
+            "ssh_trust": {
+                "status": "ok",
+                "mode": "yes",
+                "known_hosts_path": "/etc/deploymate/known_hosts",
+                "known_hosts_configured": True,
+                "known_hosts_entries": 1,
+                "review_command": "bash scripts/prepare_known_hosts.sh --host 203.0.113.20 --port 2222 --output /tmp/deploymate_known_hosts",
+                "next_step": "Strict SSH trust is pinned.",
+            },
             "items": [
+                {
+                    "key": "ssh_trust",
+                    "label": "SSH trust",
+                    "status": "ok",
+                    "summary": "Strict SSH trust is pinned.",
+                    "details": "Known host entry is present.",
+                },
                 {
                     "key": "ssh",
                     "label": "SSH access",
@@ -198,11 +216,16 @@ class ServerApiFlowTests(unittest.TestCase):
         self.assertEqual(diagnostics["overall_status"], "ok")
         self.assertEqual(diagnostics["deployment_count"], 0)
         self.assertEqual(diagnostics["listening_ports"], [22, 80, 443])
+        self.assertEqual(diagnostics["ssh_trust"]["status"], "ok")
+        self.assertEqual(diagnostics["ssh_trust"]["mode"], "yes")
+        self.assertTrue(diagnostics["ssh_trust"]["known_hosts_configured"])
+        self.assertIn("prepare_known_hosts.sh", diagnostics["ssh_trust"]["review_command"])
         self.assertEqual(diagnostics["passport"]["status"], "ready")
         self.assertEqual(diagnostics["passport"]["risk_level"], "low")
         self.assertIn("ready for the next deployment step", diagnostics["passport"]["summary"])
         self.assertIn("Deployment Workflow", diagnostics["passport"]["next_step"])
-        self.assertEqual(diagnostics["passport"]["evidence_order"][0]["key"], "ssh")
+        self.assertEqual(diagnostics["passport"]["evidence_order"][0]["key"], "ssh_trust")
+        self.assertEqual(diagnostics["passport"]["evidence_order"][1]["key"], "ssh")
 
         ports_response = self.client.get(
             f"/servers/{server_id}/suggested-ports?limit=2&start_port=38080"
@@ -255,6 +278,56 @@ class ServerApiFlowTests(unittest.TestCase):
         self.assertIn("Docker is not ready", passport.summary)
         self.assertIn("Install or repair Docker", passport.next_step)
         self.assertEqual([item.key for item in passport.evidence_order], ["ssh", "docker"])
+
+    def test_ssh_trust_summary_requires_known_hosts_in_strict_mode(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            missing_known_hosts = os.path.join(tmpdir, "known_hosts")
+            with patch.dict(
+                os.environ,
+                {
+                    "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "yes",
+                    "DEPLOYMATE_SSH_KNOWN_HOSTS_FILE": missing_known_hosts,
+                },
+                clear=False,
+            ):
+                summary = build_ssh_trust_summary(
+                    {
+                        "host": "203.0.113.10",
+                        "port": 22,
+                    }
+                )
+
+        self.assertEqual(summary.status, "error")
+        self.assertEqual(summary.mode, "yes")
+        self.assertFalse(summary.known_hosts_configured)
+        self.assertIn("prepare_known_hosts.sh", summary.review_command)
+        self.assertIn("known_hosts", summary.next_step)
+
+    def test_ssh_trust_summary_counts_known_host_entries(self):
+        with tempfile.NamedTemporaryFile("w", delete=False) as handle:
+            handle.write("# comment\n203.0.113.10 ssh-ed25519 AAAAC3NzaSmoke\n\n")
+            known_hosts_path = handle.name
+
+        self.addCleanup(lambda: os.path.exists(known_hosts_path) and os.unlink(known_hosts_path))
+
+        with patch.dict(
+            os.environ,
+            {
+                "DEPLOYMATE_SSH_HOST_KEY_CHECKING": "yes",
+                "DEPLOYMATE_SSH_KNOWN_HOSTS_FILE": known_hosts_path,
+            },
+            clear=False,
+        ):
+            summary = build_ssh_trust_summary(
+                {
+                    "host": "203.0.113.10",
+                    "port": 22,
+                }
+            )
+
+        self.assertEqual(summary.status, "ok")
+        self.assertTrue(summary.known_hosts_configured)
+        self.assertEqual(summary.known_hosts_entries, 1)
 
 
 if __name__ == "__main__":

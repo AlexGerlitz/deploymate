@@ -1306,6 +1306,22 @@ function ServerReviewPageContent() {
                           <strong>{item.passport.risk_level}</strong>
                           <p>{item.passport.next_step}</p>
                         </article>
+                        {item.diagnostics?.ssh_trust ? (
+                          <article
+                            className="workspaceReviewerCard"
+                            data-testid={`server-review-ssh-trust-${item.id}`}
+                          >
+                            <span>SSH trust</span>
+                            <strong data-testid={`server-review-ssh-trust-state-${item.id}`}>
+                              {item.diagnostics.ssh_trust.status}
+                            </strong>
+                            <p data-testid={`server-review-ssh-trust-copy-${item.id}`}>
+                              Mode {item.diagnostics.ssh_trust.mode}; known_hosts entries{" "}
+                              {item.diagnostics.ssh_trust.known_hosts_entries ?? 0}.{" "}
+                              {item.diagnostics.ssh_trust.next_step}
+                            </p>
+                          </article>
+                        ) : null}
                         <article className="workspaceReviewerCard">
                           <span>Evidence</span>
                           <strong>
