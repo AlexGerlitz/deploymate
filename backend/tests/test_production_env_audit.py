@@ -17,6 +17,7 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
         env = os.environ.copy()
         env["DEPLOYMATE_AUDIT_CACHE_DIR"] = str(cache_dir / "run")
         env["DEPLOYMATE_PERSISTENT_AUDIT_CACHE_DIR"] = str(cache_dir / "persistent")
+        env["DEPLOYMATE_RUN_RUNTIME_AUDITS"] = "1"
         Path(env["DEPLOYMATE_AUDIT_CACHE_DIR"]).mkdir(parents=True, exist_ok=True)
 
         return subprocess.run(
@@ -1011,6 +1012,133 @@ exit 1
         self.assertIn("Deploy key can authenticate", issue_comment_result.stdout)
         self.assertIn("confirm deploy key repair before audit", issue_comment_result.stdout)
         self.assertIn("Re-running the publisher updates this same comment", issue_comment_result.stdout)
+
+    def test_public_evidence_publish_updates_marker_comment_without_duplicates(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            publish_log = Path(tmpdir) / "publish.log"
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "run" ] && [ "$2" = "list" ]; then
+  cat <<'JSON'
+[
+  {"workflowName":"CI","status":"completed","conclusion":"success","databaseId":101,"url":"https://example.test/actions/runs/101","headSha":"abc","displayTitle":"CI","event":"push","createdAt":"2026-06-20T00:00:00Z"},
+  {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":102,"url":"https://example.test/actions/runs/102","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-20T00:01:00Z"}
+]
+JSON
+  exit 0
+fi
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  cat <<'JSON'
+{"state":"OPEN","body":"Failure category: `ssh_auth_denied`\\nOperator hint: Restore the deploy public key.","comments":[]}
+JSON
+  exit 0
+fi
+if [ "$1" = "api" ]; then
+  endpoint="$2"
+  method="GET"
+  input_file=""
+  shift 2
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --method)
+        method="$2"
+        shift 2
+        ;;
+      --input)
+        input_file="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [ "$method" = "GET" ] && [ "$endpoint" = "repos/AlexGerlitz/deploymate/issues/18/comments?per_page=100" ]; then
+    cat <<'JSON'
+[{"id":9001,"html_url":"https://example.test/comments/9001","body":"<!-- deploymate:release-repair-evidence -->\\nold body"}]
+JSON
+    exit 0
+  fi
+  if [ "$method" = "GET" ] && [ "$endpoint" = "repos/AlexGerlitz/deploymate/issues/19/comments?per_page=100" ]; then
+    printf '[]\\n'
+    exit 0
+  fi
+  if [ "$method" = "PATCH" ] && [ "$endpoint" = "repos/AlexGerlitz/deploymate/issues/comments/9001" ]; then
+    printf 'PATCH %s %s\\n' "$endpoint" "$(cat "$input_file")" >> "$DEPLOYMATE_FAKE_GH_LOG"
+    cat <<'JSON'
+{"id":9001,"html_url":"https://example.test/comments/9001"}
+JSON
+    exit 0
+  fi
+  if [ "$method" = "POST" ] && [ "$endpoint" = "repos/AlexGerlitz/deploymate/issues/19/comments" ]; then
+    printf 'POST %s %s\\n' "$endpoint" "$(cat "$input_file")" >> "$DEPLOYMATE_FAKE_GH_LOG"
+    cat <<'JSON'
+{"id":9002,"html_url":"https://example.test/comments/9002"}
+JSON
+    exit 0
+  fi
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+            env["DEPLOYMATE_FAKE_GH_LOG"] = str(publish_log)
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/public_evidence_bundle.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--format",
+                    "json",
+                    "--publish-open-incident-comments",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            log_text = publish_log.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        published = payload["published_issue_comments"]
+        self.assertEqual(
+            published,
+            [
+                {
+                    "issue_number": 18,
+                    "action": "updated",
+                    "comment_id": 9001,
+                    "url": "https://example.test/comments/9001",
+                },
+                {
+                    "issue_number": 19,
+                    "action": "created",
+                    "comment_id": 9002,
+                    "url": "https://example.test/comments/9002",
+                },
+            ],
+        )
+        self.assertIn("PATCH repos/AlexGerlitz/deploymate/issues/comments/9001", log_text)
+        self.assertIn("POST repos/AlexGerlitz/deploymate/issues/19/comments", log_text)
+        self.assertIn("deploymate:release-repair-evidence", log_text)
+        self.assertIn("Deploy key can authenticate", log_text)
 
 
 if __name__ == "__main__":
