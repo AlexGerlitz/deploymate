@@ -188,11 +188,13 @@ def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
         "maintenance": maintenance,
         "workflows": selected_workflows,
         "reviewer_path": [
+            "/review",
             "README.md",
             "docs/releases/v0.1.0.md",
             "RUNBOOK.md",
             "SAFE-RELEASE.md",
             "Release Maintenance Status artifact",
+            "python3 scripts/export_review_packet.py --output dist/review",
         ],
     }
     bundle["review_index"] = build_review_index(bundle)
@@ -902,6 +904,18 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
     entrypoints.extend(
         [
             {
+                "key": "review-console",
+                "label": "Review console",
+                "type": "frontend_route",
+                "status": live_target_status,
+                "conclusion": str(maintenance.get("network_checks", "unknown")),
+                "url": "https://deploymatecloud.ru/review",
+                "detail": (
+                    "Public route that ties product route map, CI evidence, "
+                    "local packet command, and artifact entrypoints together."
+                ),
+            },
+            {
                 "key": "release-repair-workflow",
                 "label": "Release repair workflow",
                 "type": "evidence_section",
@@ -942,6 +956,11 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
                 "key": "public-evidence",
                 "title": "Open public evidence",
                 "detail": "Read deploymate-public-evidence.md and this review index before checking the live target.",
+            },
+            {
+                "key": "review-console",
+                "title": "Open review console",
+                "detail": "Open /review when the live frontend is available; if it is paused, keep this artifact as the review source.",
             },
             {
                 "key": "incidents",

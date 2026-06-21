@@ -1084,10 +1084,20 @@ exit 1
             entrypoints_by_key["public-evidence"]["url"],
             "https://github.com/AlexGerlitz/deploymate/actions/runs/999",
         )
+        self.assertEqual(entrypoints_by_key["review-console"]["type"], "frontend_route")
+        self.assertEqual(
+            entrypoints_by_key["review-console"]["url"],
+            "https://deploymatecloud.ru/review",
+        )
+        self.assertEqual(entrypoints_by_key["review-console"]["status"], "skipped")
         self.assertEqual(entrypoints_by_key["release-repair-workflow"]["status"], "blocked")
         self.assertEqual(entrypoints_by_key["live-target"]["status"], "skipped")
         self.assertIn(
             "public-evidence",
+            [item["key"] for item in review_index["reviewer_sequence"]],
+        )
+        self.assertIn(
+            "review-console",
             [item["key"] for item in review_index["reviewer_sequence"]],
         )
         self.assertIn(
@@ -1117,6 +1127,11 @@ exit 1
             markdown_result.stdout,
         )
         self.assertIn(
+            "| [Review console](https://deploymatecloud.ru/review) | `frontend_route` | "
+            "`skipped` | `skipped` |",
+            markdown_result.stdout,
+        )
+        self.assertIn(
             "| CI | `completed` | `success` | [101](https://example.test/actions/runs/101) |",
             markdown_result.stdout,
         )
@@ -1134,7 +1149,12 @@ exit 1
         self.assertIn("- Phase: `repair_required`", markdown_result.stdout)
         self.assertIn("| Deploy key can authenticate | `current` |", markdown_result.stdout)
         self.assertIn("confirm deploy key repair before audit", markdown_result.stdout)
+        self.assertIn("- `/review`", markdown_result.stdout)
         self.assertIn("- `Release Maintenance Status artifact`", markdown_result.stdout)
+        self.assertIn(
+            "- `python3 scripts/export_review_packet.py --output dist/review`",
+            markdown_result.stdout,
+        )
 
         self.assertEqual(
             issue_comment_result.returncode,
