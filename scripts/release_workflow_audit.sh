@@ -293,12 +293,16 @@ required_snippets = [
     "check_network=\"true\"",
     "publish_incident_comment=\"false\"",
     "scripts/public_evidence_bundle.py",
+    "scripts/export_review_packet.py",
     "--format review-index",
     "--publish-open-incident-comments",
+    "review_packet_args=(--repo \"$GITHUB_REPOSITORY\" --branch \"$branch\" --output deploymate-review-packet)",
     "deploymate-public-evidence.json",
     "deploymate-review-index.json",
     "deploymate-public-evidence.md",
     "deploymate-incident-comment-publish-result.json",
+    "name: deploymate-review-packet",
+    "path: deploymate-review-packet/",
     "uses: actions/upload-artifact@v7",
 ]
 
@@ -344,8 +348,8 @@ release_notes = Path("docs/releases/v0.1.0.md").read_text(encoding="utf-8")
 
 required_readme = [
     "Public Evidence Bundle",
-    "deploymate-public-evidence.md",
-    "public evidence bundle with CI, release-maintenance, incident status, and repair playbook",
+    "deploymate-review-packet",
+    "public review packet with CI, release-maintenance, incident status, repair playbook, README, manifest, and SHA-256 checksums",
     "## Live Target Status",
     "Public network check",
     "availability is intentionally verified through release maintenance evidence",
@@ -361,6 +365,7 @@ required_runbook = [
     "python3 scripts/public_evidence_bundle.py --format markdown",
     "deploymate-public-evidence.json",
     "deploymate-public-evidence.md",
+    "deploymate-review-packet",
 ]
 for snippet in required_runbook:
     if snippet not in runbook:

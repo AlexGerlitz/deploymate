@@ -62,7 +62,7 @@ If you are opening this repository as a hiring reviewer, these are the fastest e
 - product strategy: [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md)
 - architecture overview: [ARCHITECTURE.md](ARCHITECTURE.md)
 - production/release discipline: [RUNBOOK.md](RUNBOOK.md), [SAFE-RELEASE.md](SAFE-RELEASE.md), [SECURITY.md](SECURITY.md)
-- latest CI and operational proof: use the GitHub Actions workflow `Public Evidence Bundle`, which auto-refreshes after successful `CI`, and download `deploymate-public-evidence.md`
+- latest CI and operational proof: use the GitHub Actions workflow `Public Evidence Bundle`, which auto-refreshes after successful `CI`, and download the `deploymate-review-packet` artifact
 
 What to evaluate quickly:
 
@@ -76,7 +76,7 @@ If you want the shortest coherent pass through the project:
 
 1. start with the screenshots in [Product Preview](#product-preview)
 2. open `/review` when a live frontend is available
-3. open the latest `Public Evidence Bundle` GitHub Actions artifact and download `deploymate-public-evidence.md`, or generate the same local review packet with `python3 scripts/export_review_packet.py`
+3. open the latest `Public Evidence Bundle` GitHub Actions run and download `deploymate-review-packet`, or generate the same local packet with `python3 scripts/export_review_packet.py`
 4. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
 5. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
 6. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape
@@ -86,8 +86,8 @@ If you want the shortest coherent pass through the project:
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
 - product screenshots and route map
-- public evidence bundle with CI, release-maintenance, incident status, and repair playbook
-- local review packet with README, manifest, and SHA-256 checksums when GitHub artifacts are unavailable
+- public review packet with CI, release-maintenance, incident status, repair playbook, README, manifest, and SHA-256 checksums
+- local review packet generation when GitHub artifacts are unavailable
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 

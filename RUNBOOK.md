@@ -629,23 +629,24 @@ python3 scripts/public_evidence_bundle.py --check-network --format markdown
 python3 scripts/export_review_packet.py --output dist/review
 ```
 
-The GitHub Actions workflow `Public Evidence Bundle` publishes
-`deploymate-public-evidence.json` and `deploymate-public-evidence.md` artifacts
-for reviewer handoff, public status pages, and portfolio evidence without
-exposing secrets. It can be run manually and also refreshes automatically after
-successful CI runs on `develop`. The bundle includes release incident
-diagnostics and a repair playbook so a reviewer can see both the current blocker
-and the intended operator recovery path.
+The GitHub Actions workflow `Public Evidence Bundle` publishes both the raw
+`deploymate-public-evidence` artifact, including `deploymate-public-evidence.json`
+and `deploymate-public-evidence.md`, and a ready-to-open
+`deploymate-review-packet` artifact for reviewer handoff, public status pages,
+and portfolio evidence without exposing secrets. It can be run manually and also
+refreshes automatically after successful CI runs on `develop`. The bundle
+includes release incident diagnostics and a repair playbook so a reviewer can see
+both the current blocker and the intended operator recovery path.
 
 The public `/review` route is the frontend entrypoint for the same reviewer
 path. It links the evidence workflows, product route map, and local review-packet
 command without requiring GitHub artifact access first.
 
-The local review packet writes `README.md`, the JSON bundle, review index,
-Markdown report, repair issue comment, and `MANIFEST.json` with file sizes and
-SHA-256 checksums.
-Use it when GitHub artifact download or the Actions API is unavailable but the
-current checkout still needs a portable review handoff.
+The review packet writes `README.md`, the JSON bundle, review index, Markdown
+report, repair issue comment, and `MANIFEST.json` with file sizes and SHA-256
+checksums. Use the GitHub artifact for external review, or generate it locally
+when GitHub artifact download or the Actions API is unavailable but the current
+checkout still needs a portable review handoff.
 
 The app can surface the same release-maintenance state in the Operations overview
 when the release maintenance status file path points to either

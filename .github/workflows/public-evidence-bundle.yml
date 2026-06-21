@@ -78,6 +78,11 @@ jobs:
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format review-index > deploymate-review-index.json
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format markdown > deploymate-public-evidence.md
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format issue-comment > deploymate-release-repair-issue-comment.md
+          review_packet_args=(--repo "$GITHUB_REPOSITORY" --branch "$branch" --output deploymate-review-packet)
+          if [ "$check_network" = "true" ]; then
+            review_packet_args+=(--check-network)
+          fi
+          python3 scripts/export_review_packet.py "${review_packet_args[@]}"
           if [ "$publish_incident_comment" = "true" ]; then
             python3 scripts/public_evidence_bundle.py \
               "${args[@]}" \
@@ -99,4 +104,11 @@ jobs:
             deploymate-public-evidence.md
             deploymate-release-repair-issue-comment.md
             deploymate-incident-comment-publish-result.json
+          if-no-files-found: error
+
+      - name: Upload review packet
+        uses: actions/upload-artifact@v7
+        with:
+          name: deploymate-review-packet
+          path: deploymate-review-packet/
           if-no-files-found: error
