@@ -577,6 +577,135 @@ exit 1
         self.assertEqual(payload["blocker_1"], "release audit schedule paused")
         self.assertEqual(payload["blocker_2"], "issue #19 is OPEN")
 
+    def test_release_maintenance_status_marks_enabled_network_checks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  cat <<'JSON'
+{"state":"CLOSED","body":"Resolved incident","comments":[]}
+JSON
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            fake_dig = Path(tmpdir) / "dig"
+            fake_dig.write_text("#!/usr/bin/env bash\nprintf '203.0.113.10\\n'\n", encoding="utf-8")
+            fake_dig.chmod(0o755)
+
+            fake_curl = Path(tmpdir) / "curl"
+            fake_curl.write_text(
+                "#!/usr/bin/env bash\nprintf 'code=204 remote=203.0.113.10'\n",
+                encoding="utf-8",
+            )
+            fake_curl.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/release_maintenance_status.sh",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--hosts",
+                    "example.com",
+                    "--format",
+                    "json",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["network_checks"], "enabled")
+        self.assertEqual(payload["host_example_com_dns"], "203.0.113.10")
+        self.assertEqual(payload["host_example_com_https_code"], "204")
+        self.assertEqual(payload["host_example_com_remote_ip"], "203.0.113.10")
+        self.assertEqual(payload["ready_for_unpause"], "1")
+        self.assertEqual(payload["blocker_count"], "0")
+
+    def test_release_maintenance_status_tolerates_dns_probe_failure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  cat <<'JSON'
+{"state":"CLOSED","body":"Resolved incident","comments":[]}
+JSON
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            fake_dig = Path(tmpdir) / "dig"
+            fake_dig.write_text(
+                "#!/usr/bin/env bash\nprintf ';; connection timed out; no servers could be reached\\n'\nexit 9\n",
+                encoding="utf-8",
+            )
+            fake_dig.chmod(0o755)
+
+            fake_curl = Path(tmpdir) / "curl"
+            fake_curl.write_text(
+                "#!/usr/bin/env bash\nprintf 'code=204 remote=203.0.113.10'\n",
+                encoding="utf-8",
+            )
+            fake_curl.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/release_maintenance_status.sh",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--hosts",
+                    "example.com",
+                    "--format",
+                    "json",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["network_checks"], "enabled")
+        self.assertEqual(payload["host_example_com_dns"], "unavailable")
+        self.assertEqual(payload["host_example_com_https_code"], "204")
+        self.assertEqual(payload["ready_for_unpause"], "1")
+
     def test_release_maintenance_status_markdown_output_is_human_readable(self):
         env = os.environ.copy()
         env["RELEASE_AUDIT_SCHEDULED_PAUSED"] = "true"

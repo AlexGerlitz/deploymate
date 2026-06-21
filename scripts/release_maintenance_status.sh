@@ -304,6 +304,7 @@ for issue in 18 19; do
 done
 
 if [ "$CHECK_NETWORK" = "1" ]; then
+  emit_shell "network_checks" "enabled"
   IFS=',' read -r -a host_list <<< "$HOSTS"
   for host in "${host_list[@]}"; do
     host="$(printf '%s' "$host" | xargs)"
@@ -312,7 +313,10 @@ if [ "$CHECK_NETWORK" = "1" ]; then
 
     dns_value=""
     if command -v dig >/dev/null 2>&1; then
-      dns_value="$(dig +short A "$host" | paste -sd ',' -)"
+      dns_value="$(dig +time=2 +tries=1 +short A "$host" 2>/dev/null \
+        | awk '/^[0-9.]+$/ { print }' \
+        | paste -sd ',' - \
+        || true)"
     fi
 
     http_code="000"
