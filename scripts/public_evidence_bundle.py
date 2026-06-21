@@ -18,8 +18,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 RELEASE_SECRETS_AUDIT_WORKFLOW = "release-secrets-audit.yml"
 DEPLOY_KEY_RECOVERY_WORKFLOW = "deploy-key-recovery.yml"
 ISSUE_COMMENT_MARKER = "<!-- deploymate:release-repair-evidence -->"
-PRIMARY_LIVE_URL = "https://deploymatecloud.ru"
 FALLBACK_LIVE_URL = "https://deploymate.152.53.178.83.sslip.io"
+PRIMARY_LIVE_URL = FALLBACK_LIVE_URL
+CUSTOM_DOMAIN_URL = "https://deploymatecloud.ru"
 FALLBACK_REVIEW_URL = f"{FALLBACK_LIVE_URL}/review"
 
 
@@ -963,6 +964,18 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
                 "detail": (
                     "; ".join(maintenance.get("network_blockers") or [])
                     or "Public DNS and HTTPS probes are not blocking this snapshot."
+                ),
+            },
+            {
+                "key": "custom-domain-target",
+                "label": "Custom domain target",
+                "type": "public_probe",
+                "status": "planned",
+                "conclusion": "not-current-release-target",
+                "url": CUSTOM_DOMAIN_URL,
+                "detail": (
+                    "Reserved custom-domain target. The current checked release "
+                    "target is the sslip.io live host until DNS is intentionally moved."
                 ),
             },
         ]

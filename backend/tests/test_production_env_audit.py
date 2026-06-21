@@ -1196,6 +1196,15 @@ exit 1
         self.assertEqual(entrypoints_by_key["release-repair-workflow"]["status"], "blocked")
         self.assertEqual(entrypoints_by_key["deploy-key-recovery"]["conclusion"], "success")
         self.assertEqual(entrypoints_by_key["live-target"]["status"], "skipped")
+        self.assertEqual(
+            entrypoints_by_key["live-target"]["url"],
+            "https://deploymate.152.53.178.83.sslip.io",
+        )
+        self.assertEqual(entrypoints_by_key["custom-domain-target"]["status"], "planned")
+        self.assertEqual(
+            entrypoints_by_key["custom-domain-target"]["url"],
+            "https://deploymatecloud.ru",
+        )
         self.assertIn(
             "public-evidence",
             [item["key"] for item in review_index["reviewer_sequence"]],
@@ -1395,7 +1404,8 @@ exit 1
             self.assertIn("`PROJECT_STATUS.md`", packet_readme)
             self.assertIn("`deploymate-public-evidence.md`", packet_readme)
             self.assertIn("`deploymate-review-index.json`", packet_readme)
-            self.assertIn("https://deploymatecloud.ru/review", packet_readme)
+            self.assertIn("https://deploymate.152.53.178.83.sslip.io", packet_readme)
+            self.assertNotIn("https://deploymatecloud.ru/review", packet_readme)
             project_status = (output_dir / "PROJECT_STATUS.md").read_text(encoding="utf-8")
             self.assertIn("# DeployMate Project Status", project_status)
             self.assertIn("## Built Surface", project_status)

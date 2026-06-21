@@ -15,7 +15,8 @@ from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 EVIDENCE_SCRIPT = ROOT_DIR / "scripts" / "public_evidence_bundle.py"
-FALLBACK_REVIEW_URL = "https://deploymate.152.53.178.83.sslip.io/review"
+FALLBACK_LIVE_URL = "https://deploymate.152.53.178.83.sslip.io"
+FALLBACK_REVIEW_URL = f"{FALLBACK_LIVE_URL}/review"
 PACKET_FILES = {
     "json": "deploymate-public-evidence.json",
     "review-index": "deploymate-review-index.json",
@@ -241,7 +242,7 @@ def build_packet_readme(
         "2. `deploymate-public-evidence.md`",
         "3. `deploymate-review-index.json`",
         f"4. `{FALLBACK_REVIEW_URL}` for the live fallback review console",
-        "5. `/review` or `https://deploymatecloud.ru/review` when the primary live frontend is available",
+        f"5. `{FALLBACK_LIVE_URL}` as the current checked live target; use a custom domain only after release maintenance evidence covers it",
         "",
         "## Files",
         "",
