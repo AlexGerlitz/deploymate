@@ -286,13 +286,17 @@ required_snippets = [
     "workflow_dispatch:",
     "schedule:",
     "actions: read",
-    "issues: read",
+    "issues: write",
     "default: true",
+    "publish_incident_comment:",
     "if [ \"$GITHUB_EVENT_NAME\" = \"schedule\" ]; then",
     "check_network=\"true\"",
+    "publish_incident_comment=\"true\"",
     "scripts/public_evidence_bundle.py",
+    "--publish-open-incident-comments",
     "deploymate-public-evidence.json",
     "deploymate-public-evidence.md",
+    "deploymate-incident-comment-publish-result.json",
     "uses: actions/upload-artifact@v7",
 ]
 

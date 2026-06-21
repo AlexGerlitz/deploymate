@@ -15,13 +15,18 @@ on:
         required: true
         type: boolean
         default: true
+      publish_incident_comment:
+        description: "Update the marker comment on open release incident issues"
+        required: true
+        type: boolean
+        default: false
   schedule:
     - cron: "13 3 * * *"
 
 permissions:
   actions: read
   contents: read
-  issues: read
+  issues: write
 
 jobs:
   evidence:
@@ -52,6 +57,13 @@ jobs:
             check_network="false"
           fi
 
+          publish_incident_comment="${{ inputs.publish_incident_comment }}"
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            publish_incident_comment="true"
+          elif [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            publish_incident_comment="false"
+          fi
+
           branch="$GITHUB_REF_NAME"
           if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
             branch="${{ github.event.workflow_run.head_branch }}"
@@ -65,7 +77,14 @@ jobs:
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format json > deploymate-public-evidence.json
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format markdown > deploymate-public-evidence.md
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format issue-comment > deploymate-release-repair-issue-comment.md
-          printf '{"published":false,"reason":"publish_incident_comment input is false or unavailable"}\n' > deploymate-incident-comment-publish-result.json
+          if [ "$publish_incident_comment" = "true" ]; then
+            python3 scripts/public_evidence_bundle.py \
+              "${args[@]}" \
+              --format json \
+              --publish-open-incident-comments > deploymate-incident-comment-publish-result.json
+          else
+            printf '{"published":false,"reason":"publish_incident_comment is false for this event"}\n' > deploymate-incident-comment-publish-result.json
+          fi
 
           cat deploymate-public-evidence.md >> "$GITHUB_STEP_SUMMARY"
 
