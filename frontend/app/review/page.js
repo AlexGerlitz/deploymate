@@ -91,6 +91,10 @@ const productRoutes = [
 
 const artifacts = [
   {
+    name: "PROJECT_STATUS.md",
+    detail: "Compact engineering status, current blockers, and verification commands.",
+  },
+  {
     name: "deploymate-public-evidence.md",
     detail: "Human-readable release and review report.",
   },

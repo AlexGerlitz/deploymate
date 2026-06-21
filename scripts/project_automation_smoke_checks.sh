@@ -40,6 +40,7 @@ automation_smoke_review_checks() {
 /review|public review sequence|data-testid="public-review-sequence"
 /review|public review product routes|data-testid="public-review-product-routes"
 /review|public review artifacts|data-testid="public-review-artifacts"
+/review|public review project status artifact|PROJECT_STATUS.md
 /review|public evidence bundle copy|Public Evidence Bundle
 EOF
 }

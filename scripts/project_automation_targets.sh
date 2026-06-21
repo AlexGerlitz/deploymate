@@ -33,7 +33,7 @@ automation_classify_release_path() {
     backend/*)
       printf 'backend\n'
       ;;
-    Makefile|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|.gitignore|.github/*|scripts/project_automation_targets.sh|scripts/lib/project_automation_targets.sh|scripts/production_contract_gate.sh|scripts/release_workflow_audit.sh|scripts/release_maintenance_status.sh|scripts/sync_release_maintenance_status.sh|scripts/public_evidence_bundle.py|scripts/verify_review_packet.py|scripts/check_latest_review_packet_artifact.py|scripts/public_review_gate.sh|scripts/release_audit_failure_classifier.js|scripts/release_audit_failure_classifier.test.js|scripts/release_audit_incident.js|scripts/release_audit_incident.test.js|scripts/release_audit_mode.js|scripts/release_audit_mode.test.js|scripts/release_incident_diagnostics.py|scripts/release_incident_diagnostics_test.py)
+    Makefile|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|.gitignore|.github/*|scripts/project_automation_targets.sh|scripts/lib/project_automation_targets.sh|scripts/production_contract_gate.sh|scripts/release_workflow_audit.sh|scripts/release_maintenance_status.sh|scripts/sync_release_maintenance_status.sh|scripts/public_evidence_bundle.py|scripts/export_review_packet.py|scripts/verify_review_packet.py|scripts/check_latest_review_packet_artifact.py|scripts/public_review_gate.sh|scripts/release_audit_failure_classifier.js|scripts/release_audit_failure_classifier.test.js|scripts/release_audit_incident.js|scripts/release_audit_incident.test.js|scripts/release_audit_mode.js|scripts/release_audit_mode.test.js|scripts/release_incident_diagnostics.py|scripts/release_incident_diagnostics_test.py)
       printf 'docs\n'
       ;;
     *)
@@ -222,7 +222,7 @@ automation_backend_syntax_scope_for_path() {
 automation_security_scope_for_path() {
   local path="$1"
   case "$path" in
-    Makefile|.github/*|RUNBOOK.md|SAFE-RELEASE.md|scripts/release_workflow.sh|scripts/release_workflow_audit.sh|scripts/release_maintenance_status.sh|scripts/sync_release_maintenance_status.sh|scripts/public_evidence_bundle.py|scripts/verify_review_packet.py|scripts/check_latest_review_packet_artifact.py|scripts/public_review_gate.sh|scripts/remote_release.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/preflight.sh|scripts/security_audit.sh|scripts/production_contract_gate.sh|scripts/dev_fast_check.sh|scripts/dev_verify_changed.sh|scripts/derive_local_fast_context.sh)
+    Makefile|.github/*|RUNBOOK.md|SAFE-RELEASE.md|scripts/release_workflow.sh|scripts/release_workflow_audit.sh|scripts/release_maintenance_status.sh|scripts/sync_release_maintenance_status.sh|scripts/public_evidence_bundle.py|scripts/export_review_packet.py|scripts/verify_review_packet.py|scripts/check_latest_review_packet_artifact.py|scripts/public_review_gate.sh|scripts/remote_release.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/preflight.sh|scripts/security_audit.sh|scripts/production_contract_gate.sh|scripts/dev_fast_check.sh|scripts/dev_verify_changed.sh|scripts/derive_local_fast_context.sh)
       printf 'release_workflow_contract\n'
       ;;
     backend/app/db.py|backend/app/routes/servers.py|backend/app/routes/ops.py|backend/app/services/server_credentials.py|backend/app/services/runtime_executors.py|backend/tests/test_server_credentials.py|backend/tests/test_server_credentials_policy.py|scripts/server_credentials_audit.sh)

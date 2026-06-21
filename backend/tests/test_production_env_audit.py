@@ -1232,6 +1232,7 @@ exit 1
 
             expected_files = {
                 "README.md",
+                "PROJECT_STATUS.md",
                 "deploymate-public-evidence.json",
                 "deploymate-review-index.json",
                 "deploymate-public-evidence.md",
@@ -1269,9 +1270,17 @@ exit 1
             self.assertIn("## Review Index", markdown)
             packet_readme = (output_dir / "README.md").read_text(encoding="utf-8")
             self.assertIn("# DeployMate Review Packet", packet_readme)
+            self.assertIn("`PROJECT_STATUS.md`", packet_readme)
             self.assertIn("`deploymate-public-evidence.md`", packet_readme)
             self.assertIn("`deploymate-review-index.json`", packet_readme)
             self.assertIn("https://deploymatecloud.ru/review", packet_readme)
+            project_status = (output_dir / "PROJECT_STATUS.md").read_text(encoding="utf-8")
+            self.assertIn("# DeployMate Project Status", project_status)
+            self.assertIn("## Built Surface", project_status)
+            self.assertIn("## Current Blockers", project_status)
+            self.assertIn("## Verification Commands", project_status)
+            self.assertIn("make public-review", project_status)
+            self.assertIn("Release automation is blocked", project_status)
 
             verify_result = subprocess.run(
                 [

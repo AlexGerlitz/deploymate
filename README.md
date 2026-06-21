@@ -87,7 +87,7 @@ If you want the shortest coherent pass through the project:
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
 - product screenshots and route map
-- public review packet with CI, release-maintenance, incident status, repair playbook, README, manifest, and SHA-256 checksums
+- public review packet with `PROJECT_STATUS.md`, CI, release-maintenance, incident status, repair playbook, README, manifest, and SHA-256 checksums
 - one-command public review gate with `make public-review`
 - latest artifact checker `scripts/check_latest_review_packet_artifact.py` and local manifest verifier `scripts/verify_review_packet.py`
 - local review packet generation when GitHub artifacts are unavailable

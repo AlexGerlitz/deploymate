@@ -22,6 +22,7 @@ PACKET_FILES = {
     "issue-comment": "deploymate-release-repair-issue-comment.md",
 }
 PACKET_README = "README.md"
+PACKET_STATUS = "PROJECT_STATUS.md"
 
 
 def run_command(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -87,6 +88,131 @@ def command_for_manifest(command: list[str]) -> str:
     return " ".join(display)
 
 
+def text_value(value: Any, default: str = "unavailable") -> str:
+    if isinstance(value, str) and value:
+        return value
+    if value is None:
+        return default
+    return str(value)
+
+
+def dict_value(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def list_value(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    return []
+
+
+def workflow_status_line(workflows: dict[str, Any], key: str, label: str) -> str:
+    workflow = dict_value(workflows.get(key))
+    status = text_value(workflow.get("status"))
+    conclusion = text_value(workflow.get("conclusion"))
+    url = text_value(workflow.get("url"), "")
+    run = text_value(workflow.get("databaseId"), "")
+    if url:
+        return f"- {label}: `{status}` / `{conclusion}` ([run {run}]({url}))"
+    return f"- {label}: `{status}` / `{conclusion}`"
+
+
+def build_project_status_markdown(
+    *,
+    evidence: dict[str, Any],
+    repo: str,
+    branch: str,
+    commit: str,
+    generated_at: str,
+    check_network: bool,
+) -> str:
+    review_index = dict_value(evidence.get("review_index"))
+    workflows = dict_value(evidence.get("workflows"))
+    maintenance = dict_value(evidence.get("maintenance"))
+    blockers = [
+        text_value(item)
+        for item in list_value(review_index.get("primary_blockers"))
+        if text_value(item, "")
+    ]
+    next_action = text_value(review_index.get("next_action"))
+    project_status = text_value(review_index.get("status"))
+    phase = text_value(review_index.get("phase"))
+    summary = text_value(review_index.get("summary"))
+    ready_for_unpause = text_value(maintenance.get("ready_for_unpause"))
+    public_network = text_value(maintenance.get("network_checks"))
+
+    lines = [
+        "# DeployMate Project Status",
+        "",
+        "Generated from `deploymate-public-evidence.json` inside the review packet.",
+        "",
+        "| Field | Value |",
+        "| --- | --- |",
+        f"| Repository | `{repo}` |",
+        f"| Branch | `{branch}` |",
+        f"| Commit | `{commit}` |",
+        f"| Generated at | `{generated_at}` |",
+        f"| Evidence status | `{project_status}` |",
+        f"| Evidence phase | `{phase}` |",
+        f"| Network checks | `{'enabled' if check_network else 'skipped'}` |",
+        f"| Public network status | `{public_network}` |",
+        f"| Ready for unpause | `{ready_for_unpause}` |",
+        "",
+        "## Built Surface",
+        "",
+        "- self-hosted Docker deployment control panel",
+        "- deployment workflow, templates, runtime queue, and runtime detail pages",
+        "- operator workspace with release-maintenance status and export actions",
+        "- admin users, upgrade requests, audit-oriented views, backup bundle, and restore dry-run",
+        "- public evidence bundle, review packet, manifest verification, and one-command public review gate",
+        "",
+        "## Current Evidence",
+        "",
+        workflow_status_line(workflows, "ci", "CI"),
+        workflow_status_line(workflows, "public_evidence", "Public Evidence Bundle"),
+        workflow_status_line(workflows, "release_maintenance_status", "Release Maintenance Status"),
+        workflow_status_line(workflows, "release_secrets_audit", "Release Secrets Audit"),
+        "",
+        "## Current Status",
+        "",
+        summary,
+        "",
+        "Next operator action:",
+        "",
+        f"- {next_action}",
+        "",
+        "## Current Blockers",
+        "",
+    ]
+
+    if blockers:
+        lines.extend(f"- {blocker}" for blocker in blockers)
+    else:
+        lines.append("- none reported in the review index")
+
+    lines.extend(
+        [
+            "",
+            "## Verification Commands",
+            "",
+            "- `make public-review`",
+            "- `python3 scripts/export_review_packet.py --output dist/review`",
+            "- `python3 scripts/verify_review_packet.py dist/review`",
+            "- `python3 scripts/check_latest_review_packet_artifact.py`",
+            "",
+            "## Not Claimed Yet",
+            "",
+            "- the live target is only reviewable when the public evidence bundle reports the public network check as ok",
+            "- automatic staging and production release remain paused while release incidents are open",
+            "- commercial SaaS readiness still requires real tenants, billing, support process, SLA, and customer rollout evidence",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def build_packet_readme(
     *,
     repo: str,
@@ -109,14 +235,15 @@ def build_packet_readme(
         "",
         "## Open First",
         "",
-        "1. `deploymate-public-evidence.md`",
-        "2. `deploymate-review-index.json`",
-        "3. `/review` or `https://deploymatecloud.ru/review` when the live frontend is available",
+        "1. `PROJECT_STATUS.md`",
+        "2. `deploymate-public-evidence.md`",
+        "3. `deploymate-review-index.json`",
+        "4. `/review` or `https://deploymatecloud.ru/review` when the live frontend is available",
         "",
         "## Files",
         "",
     ]
-    for filename in [PACKET_README, *PACKET_FILES.values(), "MANIFEST.json"]:
+    for filename in [PACKET_README, PACKET_STATUS, *PACKET_FILES.values(), "MANIFEST.json"]:
         lines.append(f"- `{filename}`")
 
     lines.extend(
@@ -148,6 +275,19 @@ def export_packet(repo: str, branch: str, output_dir: Path, check_network: bool)
             )
         write_text(output_dir / filename, result.stdout)
 
+    evidence = json.loads((output_dir / PACKET_FILES["json"]).read_text(encoding="utf-8"))
+    write_text(
+        output_dir / PACKET_STATUS,
+        build_project_status_markdown(
+            evidence=evidence,
+            repo=repo,
+            branch=branch,
+            commit=commit,
+            generated_at=generated_at,
+            check_network=check_network,
+        ),
+    )
+
     write_text(
         output_dir / PACKET_README,
         build_packet_readme(
@@ -169,7 +309,7 @@ def export_packet(repo: str, branch: str, output_dir: Path, check_network: bool)
         "check_network": check_network,
         "files": [
             packet_file_entry(output_dir, filename)
-            for filename in [PACKET_README, *PACKET_FILES.values()]
+            for filename in [PACKET_README, PACKET_STATUS, *PACKET_FILES.values()]
         ],
         "commands": commands,
     }

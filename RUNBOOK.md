@@ -645,9 +645,9 @@ The public `/review` route is the frontend entrypoint for the same reviewer
 path. It links the evidence workflows, product route map, and local review-packet
 command without requiring GitHub artifact access first.
 
-The review packet writes `README.md`, the JSON bundle, review index, Markdown
-report, repair issue comment, and `MANIFEST.json` with file sizes and SHA-256
-checksums. The workflow verifies that manifest with
+The review packet writes `README.md`, `PROJECT_STATUS.md`, the JSON bundle,
+review index, Markdown report, repair issue comment, and `MANIFEST.json` with
+file sizes and SHA-256 checksums. The workflow verifies that manifest with
 `python3 scripts/verify_review_packet.py deploymate-review-packet` before upload.
 Use `python3 scripts/check_latest_review_packet_artifact.py` to download and
 verify the latest successful GitHub artifact from the current branch. Generate
