@@ -14,6 +14,7 @@ from typing import Any
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+RELEASE_SECRETS_AUDIT_WORKFLOW = "release-secrets-audit.yml"
 
 
 def run_command(args: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -116,13 +117,22 @@ def latest_workflow(runs: list[dict[str, Any]], workflow_name: str) -> dict[str,
     }
 
 
+def release_secrets_audit_command(repo: str, branch: str) -> str:
+    return f"gh workflow run {RELEASE_SECRETS_AUDIT_WORKFLOW} --repo {repo} --ref {branch}"
+
+
 def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
     runs = load_github_runs(repo, branch)
     maintenance = load_maintenance_status(repo, check_network)
-    maintenance["checklist"] = build_release_checklist(maintenance)
-    maintenance["repair_playbook"] = build_repair_playbook(maintenance)
     commit = os.getenv("GITHUB_SHA") or git_value("rev-parse", "HEAD")
     current_branch = branch or os.getenv("GITHUB_REF_NAME") or git_value("rev-parse", "--abbrev-ref", "HEAD")
+    maintenance["checklist"] = build_release_checklist(maintenance)
+    maintenance["repair_playbook"] = build_repair_playbook(maintenance)
+    maintenance["repair_workflow"] = build_repair_workflow(
+        maintenance,
+        repo=repo,
+        branch=current_branch,
+    )
 
     selected_workflows = {
         "ci": latest_workflow(runs, "CI"),
@@ -454,6 +464,209 @@ def build_repair_playbook(maintenance: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def truthy(value: Any) -> bool:
+    return str(value or "").lower() in {"1", "true", "yes", "on"}
+
+
+def checklist_by_key(maintenance: dict[str, Any]) -> dict[str, dict[str, str]]:
+    return {item["key"]: item for item in maintenance.get("checklist", [])}
+
+
+def workflow_step_status(item: dict[str, str] | None) -> str:
+    if item is None:
+        return "pending"
+    if item.get("status") == "ok":
+        return "complete"
+    if item.get("status") == "blocked":
+        return "blocked"
+    if item.get("status") == "warn":
+        return "current"
+    return "pending"
+
+
+def build_repair_workflow_steps(
+    maintenance: dict[str, Any],
+    *,
+    phase: str,
+    manual_audit_command: str,
+) -> list[dict[str, str]]:
+    checklist = checklist_by_key(maintenance)
+    host_trust_item = checklist.get(
+        "ssh-trust-anchor",
+        {
+            "detail": "SSH trust anchor state is not present in the checklist.",
+            "status": "unknown",
+        },
+    )
+    deploy_key_item = checklist.get(
+        "deploy-key",
+        {
+            "detail": "Deploy key state is not present in the checklist.",
+            "status": "unknown",
+        },
+    )
+    deploy_key_status = workflow_step_status(deploy_key_item)
+    if deploy_key_item.get("status") == "blocked":
+        deploy_key_status = "current"
+
+    manual_audit_status = "pending"
+    close_status = "pending"
+    if phase == "ready_for_manual_audit":
+        manual_audit_status = "current"
+    elif phase == "ready_for_unpause":
+        manual_audit_status = "complete"
+        close_status = "current"
+    elif phase == "status_unwired":
+        manual_audit_status = "blocked"
+
+    return [
+        {
+            "key": "status-json",
+            "title": "Release status is connected",
+            "status": "complete" if truthy(maintenance.get("available", "1")) else "current",
+            "detail": "Release maintenance status is available in the public evidence bundle.",
+            "operator_action": "Keep this status snapshot attached to the release incident.",
+        },
+        {
+            "key": "pause-guard",
+            "title": "Release pauses stay active",
+            "status": (
+                "complete"
+                if truthy(maintenance.get("release_audit_scheduled_paused"))
+                or truthy(maintenance.get("staging_release_paused"))
+                else "pending"
+            ),
+            "detail": "Release automation stays paused while repair evidence is collected.",
+            "operator_action": "Do not remove release pauses until a manual audit succeeds.",
+        },
+        {
+            "key": "ssh-trust-anchor",
+            "title": "SSH trust anchor is verified",
+            "status": workflow_step_status(host_trust_item),
+            "detail": host_trust_item.get("detail", ""),
+            "operator_action": "Do not rotate known_hosts unless the failure category changes.",
+        },
+        {
+            "key": "restore-deploy-key",
+            "title": "Deploy key can authenticate",
+            "status": deploy_key_status,
+            "detail": deploy_key_item.get("detail", ""),
+            "operator_action": (
+                "Install the matching public key in authorized_keys or rotate DEPLOY_SSH_PRIVATE_KEY."
+                if deploy_key_status in {"current", "blocked"}
+                else "Keep the current deploy key contract unchanged."
+            ),
+        },
+        {
+            "key": "manual-audit-rerun",
+            "title": "Manual Release Secrets Audit is green",
+            "status": manual_audit_status,
+            "detail": "Release Secrets Audit must prove SSH auth before pauses can be removed.",
+            "operator_action": manual_audit_command,
+        },
+        {
+            "key": "close-and-unpause",
+            "title": "Incidents are closed and pauses are removed",
+            "status": close_status,
+            "detail": "Close GitHub incident issues and remove pause variables only after green evidence.",
+            "operator_action": "Schedule a watched release window, close incidents, then remove release pauses.",
+        },
+    ]
+
+
+def build_repair_workflow_handoff(workflow: dict[str, Any]) -> str:
+    lines = [
+        "# Release Repair Handoff",
+        "",
+        f"- Phase: {workflow['phase']}",
+        f"- Status: {workflow['status']}",
+        f"- Summary: {workflow['summary']}",
+        f"- Next action: {workflow['next_action']}",
+        f"- Manual audit: `{workflow['manual_audit_command']}`",
+        f"- Confirmation phrase: `{workflow['typed_confirmation_phrase']}`",
+        "",
+        "## Operator Steps",
+    ]
+    lines.extend(
+        f"{index}. [{step['status']}] {step['title']}: {step['operator_action']}"
+        for index, step in enumerate(workflow["steps"], start=1)
+    )
+    return "\n".join(lines)
+
+
+def build_repair_workflow(maintenance: dict[str, Any], *, repo: str, branch: str) -> dict[str, Any]:
+    checklist = checklist_by_key(maintenance)
+    deploy_key_item = checklist.get("deploy-key")
+    blocked_items = [item for item in maintenance.get("checklist", []) if item.get("status") == "blocked"]
+    incidents = open_release_incidents(maintenance)
+    manual_audit_command = release_secrets_audit_command(repo, branch)
+
+    if not truthy(maintenance.get("available", "1")):
+        phase = "status_unwired"
+        status = "review"
+        summary = "Release maintenance status is not connected."
+        next_action = "Regenerate the maintenance JSON before using release unpause decisions."
+        typed_confirmation_phrase = "confirm release status sync"
+    elif truthy(maintenance.get("ready_for_unpause")):
+        phase = "ready_for_unpause"
+        status = "ready"
+        summary = "Release maintenance is ready for a planned unpause window."
+        next_action = "Schedule a watched release window before removing audit and staging pauses."
+        typed_confirmation_phrase = "confirm planned release unpause"
+    elif deploy_key_item and deploy_key_item.get("status") == "blocked":
+        phase = "repair_required"
+        status = "blocked"
+        summary = "Release automation is blocked because the deploy host rejects the GitHub deploy key."
+        next_action = (
+            "Restore the deploy public key in authorized_keys or rotate DEPLOY_SSH_PRIVATE_KEY, "
+            "then rerun Release Secrets Audit manually."
+        )
+        typed_confirmation_phrase = "confirm deploy key repair before audit"
+    elif blocked_items or incidents:
+        phase = "repair_required"
+        status = "blocked"
+        summary = "Release automation still has open blockers before unpause."
+        next_action = str(maintenance.get("blocker_1") or "Resolve release blockers before unpause.")
+        typed_confirmation_phrase = "confirm release blocker repair"
+    else:
+        phase = "ready_for_manual_audit"
+        status = "review"
+        summary = "No blocking checklist item remains; manual audit evidence is needed next."
+        next_action = f"Run `{manual_audit_command}` and attach the result to the release incidents."
+        typed_confirmation_phrase = "confirm manual release audit"
+
+    workflow = {
+        "phase": phase,
+        "status": status,
+        "summary": summary,
+        "next_action": next_action,
+        "typed_confirmation_phrase": typed_confirmation_phrase,
+        "manual_audit_command": manual_audit_command,
+        "audit_trail": [
+            f"source=public_evidence_bundle",
+            f"phase={phase}",
+            f"status={status}",
+            f"ready_for_unpause={maintenance.get('ready_for_unpause', 'unknown')}",
+            f"blocker_count={maintenance.get('blocker_count', '0')}",
+            (
+                f"production_issue=#18 state={maintenance.get('issue_18_state', 'unknown')} "
+                f"category={maintenance.get('issue_18_failure_category', 'unknown')}"
+            ),
+            (
+                f"staging_issue=#19 state={maintenance.get('issue_19_state', 'unknown')} "
+                f"category={maintenance.get('issue_19_failure_category', 'unknown')}"
+            ),
+        ],
+        "steps": build_repair_workflow_steps(
+            maintenance,
+            phase=phase,
+            manual_audit_command=manual_audit_command,
+        ),
+    }
+    workflow["handoff_markdown"] = build_repair_workflow_handoff(workflow)
+    return workflow
+
+
 def md_escape(value: Any) -> str:
     text = str(value if value is not None else "")
     return text.replace("|", "\\|")
@@ -558,6 +771,35 @@ def render_markdown(bundle: dict[str, Any]) -> str:
         lines.append(
             f"{index}. **{md_escape(step['title'])}**: {md_escape(step['detail'])}"
         )
+
+    repair_workflow = maintenance.get("repair_workflow", {})
+    repair_workflow_steps = repair_workflow.get("steps", [])
+    if repair_workflow:
+        lines.extend(
+            [
+                "",
+                "## Release Repair Workflow Packet",
+                "",
+                f"- Phase: `{md_escape(repair_workflow.get('phase', 'unknown'))}`",
+                f"- Status: `{md_escape(repair_workflow.get('status', 'unknown'))}`",
+                f"- Summary: {md_escape(repair_workflow.get('summary', ''))}",
+                f"- Next action: {md_escape(repair_workflow.get('next_action', ''))}",
+                f"- Manual audit: `{md_escape(repair_workflow.get('manual_audit_command', ''))}`",
+                (
+                    f"- Confirmation phrase: "
+                    f"`{md_escape(repair_workflow.get('typed_confirmation_phrase', ''))}`"
+                ),
+                "",
+                "| Step | State | Operator action |",
+                "| --- | --- | --- |",
+            ]
+        )
+        for step in repair_workflow_steps:
+            lines.append(
+                f"| {md_escape(step.get('title', step.get('key', 'unknown')))} | "
+                f"`{md_escape(step.get('status', 'unknown'))}` | "
+                f"{md_escape(step.get('operator_action', ''))} |"
+            )
 
     lines.extend(
         [

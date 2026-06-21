@@ -950,6 +950,20 @@ exit 1
         self.assertEqual(checklist_by_key["ssh-trust-anchor"]["status"], "ok")
         self.assertEqual(checklist_by_key["deploy-key"]["status"], "blocked")
         self.assertEqual(payload["maintenance"]["repair_playbook"][1]["key"], "restore-deploy-key")
+        self.assertEqual(payload["maintenance"]["repair_workflow"]["phase"], "repair_required")
+        self.assertEqual(payload["maintenance"]["repair_workflow"]["status"], "blocked")
+        self.assertIn(
+            "release-secrets-audit.yml",
+            payload["maintenance"]["repair_workflow"]["manual_audit_command"],
+        )
+        workflow_steps_by_key = {
+            item["key"]: item for item in payload["maintenance"]["repair_workflow"]["steps"]
+        }
+        self.assertEqual(workflow_steps_by_key["restore-deploy-key"]["status"], "current")
+        self.assertIn(
+            "authorized_keys",
+            workflow_steps_by_key["restore-deploy-key"]["operator_action"],
+        )
         self.assertEqual(payload["workflows"]["ci"]["conclusion"], "success")
         self.assertEqual(payload["workflows"]["ci"]["databaseId"], 101)
         self.assertEqual(payload["workflows"]["release_maintenance_status"]["databaseId"], 102)
@@ -962,6 +976,10 @@ exit 1
         self.assertIn("| Deploy key | `blocked` |", markdown_result.stdout)
         self.assertIn("## Release Repair Playbook", markdown_result.stdout)
         self.assertIn("**Restore the deploy public key**", markdown_result.stdout)
+        self.assertIn("## Release Repair Workflow Packet", markdown_result.stdout)
+        self.assertIn("- Phase: `repair_required`", markdown_result.stdout)
+        self.assertIn("| Deploy key can authenticate | `current` |", markdown_result.stdout)
+        self.assertIn("confirm deploy key repair before audit", markdown_result.stdout)
         self.assertIn("- `Release Maintenance Status artifact`", markdown_result.stdout)
 
 

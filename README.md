@@ -182,7 +182,7 @@ Recommended reviewer order:
 - review release maintenance status, pauses, incident categories, and repair steps in the operations overview
 - separate SSH trust-anchor status from deploy-key authentication status before unpausing release automation
 - use the authenticated release repair workflow to copy the next action and export handoff/audit-trail evidence
-- export the same release readiness checklist through the public evidence bundle
+- export the same release readiness checklist and repair workflow packet through the public evidence bundle
 
 ## Stack
 
@@ -701,7 +701,7 @@ Next likely improvements:
 
 1. move server credentials to external secret management
 2. split local Docker execution into a narrower executor boundary
-3. let the release repair workflow attach green audit evidence back to the incident records
+3. let the release repair workflow attach green audit evidence back to the incident records automatically
 4. deepen automated smoke coverage around deployment runtime flows
 
 Longer-term direction: see [ROADMAP.md](ROADMAP.md).
