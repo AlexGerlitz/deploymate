@@ -1,0 +1,45 @@
+name: Deploy Key Recovery Packet
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Environment whose DEPLOY_SSH_PRIVATE_KEY should be inspected"
+        required: true
+        type: choice
+        default: production
+        options:
+          - production
+          - staging
+
+permissions:
+  contents: read
+
+jobs:
+  recovery:
+    name: deploy key recovery (${{ inputs.target_environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Generate deploy key recovery packet
+        shell: bash
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: |
+          bash scripts/deploy_key_recovery_packet.sh \
+            --target-environment "$TARGET_ENVIRONMENT" \
+            --output-dir deploy-key-recovery
+
+          cat deploy-key-recovery/deploy-key-recovery.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deploy key recovery packet
+        uses: actions/upload-artifact@v7
+        with:
+          name: deploymate-deploy-key-recovery-${{ inputs.target_environment }}
+          path: deploy-key-recovery/
+          if-no-files-found: error

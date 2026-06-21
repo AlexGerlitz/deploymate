@@ -36,6 +36,7 @@ automation_smoke_review_checks() {
 /review|public review summary grid|data-testid="public-review-summary-grid"
 /review|public review CI card|data-testid="public-review-evidence-card-ci"
 /review|public review evidence card|data-testid="public-review-evidence-card-public-evidence"
+/review|public review deploy key recovery card|data-testid="public-review-evidence-card-deploy-key-recovery"
 /review|public review local packet command|data-testid="public-review-local-packet-command"
 /review|public review sequence|data-testid="public-review-sequence"
 /review|public review product routes|data-testid="public-review-product-routes"

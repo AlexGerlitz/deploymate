@@ -658,6 +658,20 @@ local packet export, manifest verification, and latest GitHub artifact
 verification. Add `PUBLIC_REVIEW_FLAGS=--with-frontend` when the `/review`
 frontend route should be smoked in the same pass.
 
+Deploy key recovery packet:
+
+```bash
+gh workflow run deploy-key-recovery.yml --repo AlexGerlitz/deploymate --ref develop -f target_environment=production
+gh workflow run deploy-key-recovery.yml --repo AlexGerlitz/deploymate --ref develop -f target_environment=staging
+```
+
+Use `Deploy Key Recovery Packet` when release incidents are classified as
+`ssh_auth_denied`. The workflow derives the deploy public key and SHA-256
+fingerprint from the selected GitHub environment `DEPLOY_SSH_PRIVATE_KEY`
+without writing the private key to the artifact. The artifact gives the exact
+`authorized_keys` line that must be installed for the deploy user before
+rerunning `Release Secrets Audit`.
+
 The app can surface the same release-maintenance state in the Operations overview
 when the release maintenance status file path points to either
 `release-maintenance-status.json` or `deploymate-public-evidence.json`. The

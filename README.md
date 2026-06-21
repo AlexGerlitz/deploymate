@@ -91,6 +91,7 @@ If you are evaluating whether this is more than a UI shell, the quickest evidenc
 - one-command public review gate with `make public-review`
 - latest artifact checker `scripts/check_latest_review_packet_artifact.py` and local manifest verifier `scripts/verify_review_packet.py`
 - local review packet generation when GitHub artifacts are unavailable
+- deploy key recovery workflow that derives the exact public key/fingerprint needed for `authorized_keys` without exposing the private key
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 

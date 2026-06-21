@@ -16,6 +16,7 @@ from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 RELEASE_SECRETS_AUDIT_WORKFLOW = "release-secrets-audit.yml"
+DEPLOY_KEY_RECOVERY_WORKFLOW = "deploy-key-recovery.yml"
 ISSUE_COMMENT_MARKER = "<!-- deploymate:release-repair-evidence -->"
 
 
@@ -176,6 +177,7 @@ def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
         "ci": latest_workflow(runs, "CI"),
         "release_maintenance_status": latest_workflow(runs, "Release Maintenance Status"),
         "release_secrets_audit": latest_workflow(runs, "Release Secrets Audit"),
+        "deploy_key_recovery": latest_workflow(runs, "Deploy Key Recovery Packet"),
         "public_evidence": latest_workflow(runs, "Public Evidence Bundle"),
         "staging": latest_workflow(runs, "Staging"),
     }
@@ -900,6 +902,15 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
             workflows["release_secrets_audit"],
             detail="Manual audit that must pass before release pauses can be removed.",
         ),
+        workflow_entrypoint(
+            "deploy-key-recovery",
+            "Deploy key recovery packet",
+            workflows["deploy_key_recovery"],
+            detail=(
+                "Manual packet that derives the deploy public key and fingerprint "
+                "from the GitHub environment secret without exposing the private key."
+            ),
+        ),
     ]
     entrypoints.extend(issue_entrypoint(bundle["repo"], incident) for incident in incidents)
     entrypoints.extend(
@@ -974,6 +985,14 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
                 "detail": "Use the current step in Release Repair Workflow Packet as the operator handoff.",
             },
             {
+                "key": "deploy-key-recovery",
+                "title": "Generate deploy key recovery packet",
+                "detail": (
+                    "Run Deploy Key Recovery Packet for the blocked environment "
+                    "to get the exact public key line needed for authorized_keys."
+                ),
+            },
+            {
                 "key": "live-target",
                 "title": "Verify live target last",
                 "detail": "Treat the live demo as available only after public DNS/HTTPS probes are green.",
@@ -981,6 +1000,14 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
         ],
         "manual_commands": {
             "release_secrets_audit": str(repair_workflow.get("manual_audit_command", "")),
+            "deploy_key_recovery_production": (
+                f"gh workflow run {DEPLOY_KEY_RECOVERY_WORKFLOW} --repo {bundle['repo']} "
+                f"--ref {bundle['branch']} -f target_environment=production"
+            ),
+            "deploy_key_recovery_staging": (
+                f"gh workflow run {DEPLOY_KEY_RECOVERY_WORKFLOW} --repo {bundle['repo']} "
+                f"--ref {bundle['branch']} -f target_environment=staging"
+            ),
             "public_evidence_network_publish": (
                 f"gh workflow run public-evidence-bundle.yml --repo {bundle['repo']} "
                 f"--ref {bundle['branch']} -f check_network=true -f publish_incident_comment=true"
@@ -1038,6 +1065,7 @@ def build_issue_comment(bundle: dict[str, Any]) -> str:
             workflow_row("CI", workflows["ci"]),
             workflow_row("Release Maintenance Status", workflows["release_maintenance_status"]),
             workflow_row("Release Secrets Audit", workflows["release_secrets_audit"]),
+            workflow_row("Deploy Key Recovery Packet", workflows["deploy_key_recovery"]),
             workflow_row("Public Evidence Bundle", current_public_evidence_run(bundle)),
             "",
             "### Operator steps",
@@ -1216,6 +1244,7 @@ def render_markdown(bundle: dict[str, Any]) -> str:
             workflow_row("CI", workflows["ci"]),
             workflow_row("Release Maintenance Status", workflows["release_maintenance_status"]),
             workflow_row("Release Secrets Audit", workflows["release_secrets_audit"]),
+            workflow_row("Deploy Key Recovery Packet", workflows["deploy_key_recovery"]),
             workflow_row("Public Evidence Bundle", current_public_evidence_run(bundle)),
             workflow_row("Staging", workflows["staging"]),
             "",

@@ -30,6 +30,69 @@ class ProductionEnvAuditScriptTests(unittest.TestCase):
             check=False,
         )
 
+    def test_deploy_key_recovery_packet_derives_public_material_only(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            key_path = Path(tmpdir) / "deploy_key"
+            output_dir = Path(tmpdir) / "recovery"
+            keygen = subprocess.run(
+                [
+                    "ssh-keygen",
+                    "-t",
+                    "ed25519",
+                    "-N",
+                    "",
+                    "-C",
+                    "deploymate-test",
+                    "-f",
+                    str(key_path),
+                ],
+                cwd=self.repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(keygen.returncode, 0, keygen.stdout + keygen.stderr)
+
+            env = os.environ.copy()
+            env["DEPLOY_SSH_PRIVATE_KEY"] = key_path.read_text(encoding="utf-8")
+            env["GITHUB_REPOSITORY"] = "AlexGerlitz/deploymate"
+            env["GITHUB_SERVER_URL"] = "https://github.com"
+            env["GITHUB_RUN_ID"] = "12345"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/deploy_key_recovery_packet.sh",
+                    "--target-environment",
+                    "production",
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("[deploy-key-recovery] fingerprint SHA256:", result.stdout)
+
+            payload = json.loads((output_dir / "deploy-key-recovery.json").read_text(encoding="utf-8"))
+            markdown = (output_dir / "deploy-key-recovery.md").read_text(encoding="utf-8")
+            public_key = key_path.with_suffix(".pub").read_text(encoding="utf-8").strip()
+
+            self.assertEqual(payload["repo"], "AlexGerlitz/deploymate")
+            self.assertEqual(payload["target_environment"], "production")
+            self.assertEqual(payload["key_type"], "ssh-ed25519")
+            self.assertTrue(payload["fingerprint"].startswith("SHA256:"))
+            self.assertEqual(payload["public_key"], " ".join(public_key.split()[:2]))
+            self.assertIn(payload["public_key"], payload["authorized_keys_line"])
+            self.assertIn("deploymate-production-github-actions", payload["authorized_keys_line"])
+            self.assertIn("DEPLOY_SSH_PRIVATE_KEY", markdown)
+            self.assertIn("It does not contain the private key.", markdown)
+            self.assertNotIn("OPENSSH PRIVATE KEY", markdown)
+            self.assertNotIn("OPENSSH PRIVATE KEY", payload["authorized_keys_line"])
+
     def _start_precheck_server(self, mode: str):
         session_cookie = "deploymate_session=test-session"
 
@@ -939,6 +1002,7 @@ if [ "$1" = "run" ] && [ "$2" = "list" ]; then
   {"workflowName":"CI","status":"in_progress","conclusion":"","databaseId":100,"url":"https://example.test/actions/runs/100","headSha":"abc","displayTitle":"CI pending","event":"push","createdAt":"2026-06-20T00:02:00Z"},
   {"workflowName":"CI","status":"completed","conclusion":"success","databaseId":101,"url":"https://example.test/actions/runs/101","headSha":"abc","displayTitle":"CI","event":"push","createdAt":"2026-06-20T00:00:00Z"},
   {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":102,"url":"https://example.test/actions/runs/102","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-20T00:01:00Z"},
+  {"workflowName":"Deploy Key Recovery Packet","status":"completed","conclusion":"success","databaseId":104,"url":"https://example.test/actions/runs/104","headSha":"abc","displayTitle":"Deploy Key Recovery Packet","event":"workflow_dispatch","createdAt":"2026-06-20T00:02:30Z"},
   {"workflowName":"Public Evidence Bundle","status":"completed","conclusion":"success","databaseId":103,"url":"https://example.test/actions/runs/103","headSha":"abc","displayTitle":"Public Evidence Bundle","event":"workflow_run","createdAt":"2026-06-20T00:03:00Z"}
 ]
 JSON
@@ -1067,6 +1131,7 @@ exit 1
         self.assertEqual(payload["workflows"]["ci"]["conclusion"], "success")
         self.assertEqual(payload["workflows"]["ci"]["databaseId"], 101)
         self.assertEqual(payload["workflows"]["release_maintenance_status"]["databaseId"], 102)
+        self.assertEqual(payload["workflows"]["deploy_key_recovery"]["databaseId"], 104)
         self.assertEqual(payload["workflows"]["public_evidence"]["databaseId"], "999")
         review_index = payload["review_index"]
         self.assertEqual(review_index["status"], "blocked")
@@ -1091,6 +1156,7 @@ exit 1
         )
         self.assertEqual(entrypoints_by_key["review-console"]["status"], "skipped")
         self.assertEqual(entrypoints_by_key["release-repair-workflow"]["status"], "blocked")
+        self.assertEqual(entrypoints_by_key["deploy-key-recovery"]["conclusion"], "success")
         self.assertEqual(entrypoints_by_key["live-target"]["status"], "skipped")
         self.assertIn(
             "public-evidence",
@@ -1103,6 +1169,14 @@ exit 1
         self.assertIn(
             "public-evidence-bundle.yml",
             review_index["manual_commands"]["public_evidence_network_publish"],
+        )
+        self.assertIn(
+            "deploy-key-recovery.yml",
+            review_index["manual_commands"]["deploy_key_recovery_production"],
+        )
+        self.assertIn(
+            "target_environment=staging",
+            review_index["manual_commands"]["deploy_key_recovery_staging"],
         )
 
         self.assertEqual(
@@ -1138,6 +1212,11 @@ exit 1
         self.assertIn(
             "| Public Evidence Bundle | `completed` | `success` | "
             "[999](https://github.com/AlexGerlitz/deploymate/actions/runs/999) |",
+            markdown_result.stdout,
+        )
+        self.assertIn(
+            "| Deploy Key Recovery Packet | `completed` | `success` | "
+            "[104](https://example.test/actions/runs/104) |",
             markdown_result.stdout,
         )
         self.assertIn("- release audit schedule paused", markdown_result.stdout)

@@ -174,6 +174,7 @@ def build_project_status_markdown(
         workflow_status_line(workflows, "public_evidence", "Public Evidence Bundle"),
         workflow_status_line(workflows, "release_maintenance_status", "Release Maintenance Status"),
         workflow_status_line(workflows, "release_secrets_audit", "Release Secrets Audit"),
+        workflow_status_line(workflows, "deploy_key_recovery", "Deploy Key Recovery Packet"),
         "",
         "## Current Status",
         "",

@@ -31,6 +31,14 @@ const evidenceCards = [
       "Scheduled/manual snapshot for release pauses, incidents, public target checks, and next operator action.",
     href: "https://github.com/AlexGerlitz/deploymate/actions/workflows/release-maintenance-status.yml?query=branch%3Adevelop",
   },
+  {
+    key: "deploy-key-recovery",
+    label: "Recovery",
+    title: "Deploy key recovery packet",
+    detail:
+      "Manual workflow that derives the deploy public key and fingerprint without exposing the private key.",
+    href: "https://github.com/AlexGerlitz/deploymate/actions/workflows/deploy-key-recovery.yml?query=branch%3Adevelop",
+  },
 ];
 
 const reviewSequence = [

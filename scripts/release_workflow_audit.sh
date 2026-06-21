@@ -11,6 +11,7 @@ RELEASE_WORKFLOW=".github/workflows/release.yml"
 STAGING_WORKFLOW=".github/workflows/staging.yml"
 SECRETS_AUDIT_WORKFLOW=".github/workflows/release-secrets-audit.yml"
 MAINTENANCE_STATUS_WORKFLOW=".github/workflows/release-maintenance-status.yml"
+DEPLOY_KEY_RECOVERY_WORKFLOW=".github/workflows/deploy-key-recovery.yml"
 PUBLIC_EVIDENCE_WORKFLOW=".github/workflows/public-evidence-bundle.yml"
 SECRETS_AUDIT_ACTION=".github/actions/release-secrets-audit/action.yml"
 RELEASE_AUDIT_INCIDENT_ACTION=".github/actions/release-audit-incident/action.yml"
@@ -18,6 +19,7 @@ RELEASE_AUDIT_FAILURE_CLASSIFIER="scripts/release_audit_failure_classifier.js"
 RELEASE_MAINTENANCE_SCRIPT="scripts/release_maintenance_status.sh"
 PUBLIC_EVIDENCE_SCRIPT="scripts/public_evidence_bundle.py"
 REVIEW_PACKET_EXPORT_SCRIPT="scripts/export_review_packet.py"
+DEPLOY_KEY_RECOVERY_SCRIPT="scripts/deploy_key_recovery_packet.sh"
 REVIEW_PACKET_VERIFY_SCRIPT="scripts/verify_review_packet.py"
 LATEST_REVIEW_PACKET_SCRIPT="scripts/check_latest_review_packet_artifact.py"
 PUBLIC_REVIEW_GATE_SCRIPT="scripts/public_review_gate.sh"
@@ -318,6 +320,57 @@ for snippet in required_snippets:
 PY
 }
 
+audit_deploy_key_recovery_workflow_shape() {
+  python3 - "$DEPLOY_KEY_RECOVERY_WORKFLOW" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+required_snippets = [
+    "name: Deploy Key Recovery Packet",
+    "workflow_dispatch:",
+    "target_environment:",
+    "environment: ${{ inputs.target_environment }}",
+    "DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}",
+    "bash scripts/deploy_key_recovery_packet.sh",
+    "--target-environment \"$TARGET_ENVIRONMENT\"",
+    "cat deploy-key-recovery/deploy-key-recovery.md >> \"$GITHUB_STEP_SUMMARY\"",
+    "uses: actions/upload-artifact@v7",
+    "name: deploymate-deploy-key-recovery-${{ inputs.target_environment }}",
+    "path: deploy-key-recovery/",
+]
+for snippet in required_snippets:
+    if snippet not in text:
+        raise SystemExit(f"[release-audit] {path} is missing deploy key recovery workflow snippet {snippet!r}")
+PY
+}
+
+audit_deploy_key_recovery_script_shape() {
+  python3 - "$DEPLOY_KEY_RECOVERY_SCRIPT" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+required_snippets = [
+    "DEPLOY_SSH_PRIVATE_KEY is required",
+    "ssh-keygen -y -f",
+    "deploy-key-recovery.json",
+    "deploy-key-recovery.md",
+    "authorized_keys Line",
+    "This packet contains only public-key material",
+    "It does not contain the private key.",
+    "[deploy-key-recovery] fingerprint",
+]
+for snippet in required_snippets:
+    if snippet not in text:
+        raise SystemExit(f"[release-audit] {path} is missing deploy key recovery script snippet {snippet!r}")
+PY
+}
+
 audit_public_evidence_script_shape() {
   python3 - "$PUBLIC_EVIDENCE_SCRIPT" <<'PY'
 import sys
@@ -332,6 +385,10 @@ required_snippets = [
     "## Release Repair Playbook",
     "build_review_index",
     "build_repair_playbook",
+    "Deploy Key Recovery Packet",
+    "deploy_key_recovery",
+    "deploy_key_recovery_production",
+    "deploy_key_recovery_staging",
     "review_index",
     "issue_18_failure_category",
     "issue_19_failure_category",
@@ -358,6 +415,7 @@ required_snippets = [
     "# DeployMate Project Status",
     "## Built Surface",
     "## Current Evidence",
+    "Deploy Key Recovery Packet",
     "## Current Blockers",
     "## Verification Commands",
     "## Not Claimed Yet",
@@ -461,6 +519,7 @@ required_readme = [
     "deploymate-review-packet",
     "PROJECT_STATUS.md",
     "make public-review",
+    "deploy key recovery workflow",
     "check_latest_review_packet_artifact.py",
     "verify_review_packet.py",
     "public review packet with `PROJECT_STATUS.md`, CI, release-maintenance, incident status, repair playbook, README, manifest, and SHA-256 checksums",
@@ -481,6 +540,8 @@ required_runbook = [
     "deploymate-public-evidence.md",
     "deploymate-review-packet",
     "PROJECT_STATUS.md",
+    "Deploy Key Recovery Packet",
+    "deploy-key-recovery.yml",
     "python3 scripts/check_latest_review_packet_artifact.py",
     "make public-review",
     "PUBLIC_REVIEW_FLAGS=--with-frontend",
@@ -532,6 +593,8 @@ audit_release_incident_action_shape
 audit_release_maintenance_workflow_shape
 audit_release_maintenance_script_shape
 audit_public_evidence_workflow_shape
+audit_deploy_key_recovery_workflow_shape
+audit_deploy_key_recovery_script_shape
 audit_public_evidence_script_shape
 audit_review_packet_export_script_shape
 audit_review_packet_verify_script_shape
@@ -543,8 +606,10 @@ audit_release_surface_classification "backend/app/main.py" "backend"
 audit_release_surface_classification "Makefile" "docs"
 audit_release_surface_classification ".github/workflows/release-maintenance-status.yml" "docs"
 audit_release_surface_classification ".github/workflows/public-evidence-bundle.yml" "docs"
+audit_release_surface_classification ".github/workflows/deploy-key-recovery.yml" "docs"
 audit_release_surface_classification "scripts/public_evidence_bundle.py" "docs"
 audit_release_surface_classification "scripts/export_review_packet.py" "docs"
+audit_release_surface_classification "scripts/deploy_key_recovery_packet.sh" "docs"
 audit_release_surface_classification "scripts/verify_review_packet.py" "docs"
 audit_release_surface_classification "scripts/check_latest_review_packet_artifact.py" "docs"
 audit_release_surface_classification "scripts/public_review_gate.sh" "docs"
@@ -556,6 +621,7 @@ release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "$STAGING_WORKFLOW" \
   "$SECRETS_AUDIT_WORKFLOW" \
   "$MAINTENANCE_STATUS_WORKFLOW" \
+  "$DEPLOY_KEY_RECOVERY_WORKFLOW" \
   "$PUBLIC_EVIDENCE_WORKFLOW" \
   "$SECRETS_AUDIT_ACTION" \
   "$RELEASE_AUDIT_INCIDENT_ACTION" \
@@ -563,6 +629,7 @@ release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "$RELEASE_MAINTENANCE_SCRIPT" \
   "$PUBLIC_EVIDENCE_SCRIPT" \
   "$REVIEW_PACKET_EXPORT_SCRIPT" \
+  "$DEPLOY_KEY_RECOVERY_SCRIPT" \
   "$REVIEW_PACKET_VERIFY_SCRIPT" \
   "$LATEST_REVIEW_PACKET_SCRIPT" \
   "$PUBLIC_REVIEW_GATE_SCRIPT" \

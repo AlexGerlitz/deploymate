@@ -16,6 +16,7 @@ bash -n \
   scripts/release_secret_contract_audit.sh \
   scripts/release_maintenance_status.sh \
   scripts/sync_release_maintenance_status.sh \
+  scripts/deploy_key_recovery_packet.sh \
   scripts/release_smoke_precheck.sh \
   scripts/security_audit.sh \
   scripts/runtime_capability_audit.sh \
