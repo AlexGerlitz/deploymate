@@ -167,6 +167,14 @@ class OpsReleaseRepairStep(BaseModel):
     detail: str
 
 
+class OpsReleaseRepairWorkflowStep(BaseModel):
+    key: str
+    title: str
+    status: Literal["complete", "current", "blocked", "pending"] = "pending"
+    detail: str
+    operator_action: str
+
+
 class OpsReleaseIncidentSummary(BaseModel):
     environment: Literal["production", "staging"]
     issue_number: int
@@ -201,6 +209,21 @@ class OpsReleaseMaintenanceSummary(BaseModel):
     staging: OpsReleaseIncidentSummary = Field(
         default_factory=lambda: OpsReleaseIncidentSummary(environment="staging", issue_number=19)
     )
+
+
+class OpsReleaseRepairWorkflowResponse(BaseModel):
+    generated_at: str
+    phase: Literal["status_unwired", "repair_required", "ready_for_manual_audit", "ready_for_unpause"]
+    status: Literal["blocked", "review", "ready"]
+    summary: str
+    next_action: str
+    typed_confirmation_phrase: str
+    manual_audit_command: str
+    handoff_markdown: str
+    audit_trail: list[str] = Field(default_factory=list)
+    checklist: list[OpsReleaseChecklistItem] = Field(default_factory=list)
+    steps: list[OpsReleaseRepairWorkflowStep] = Field(default_factory=list)
+    release_maintenance: OpsReleaseMaintenanceSummary = Field(default_factory=OpsReleaseMaintenanceSummary)
 
 
 class OpsOverviewResponse(BaseModel):

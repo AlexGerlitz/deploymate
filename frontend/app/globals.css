@@ -519,6 +519,13 @@ summary:focus-visible {
   font-size: 13px;
 }
 
+.overviewReleaseWorkflowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .overviewAttentionList {
   display: grid;
   gap: 12px;
@@ -1993,6 +2000,16 @@ summary:focus-visible {
 .status.ok {
   background: #e8f7ea;
   color: #1d6b2f;
+}
+
+.status.complete {
+  background: #e8f7ea;
+  color: #1d6b2f;
+}
+
+.status.current {
+  background: #e9f1ff;
+  color: #1956a6;
 }
 
 .status.warn,

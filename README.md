@@ -143,7 +143,7 @@ Recommended reviewer order:
 | Admin users | filters, saved views, bulk actions, exports, audit trail |
 | Upgrade inbox | filters, saved views, bulk actions, exports, audit trail |
 | Recovery | backup bundle export and restore dry-run conflict analysis |
-| Release safety | preflight, admin smoke, post-deploy smoke, release readiness checklist |
+| Release safety | preflight, admin smoke, post-deploy smoke, release readiness checklist, repair workflow handoff |
 
 ## Feature Highlights
 
@@ -181,6 +181,7 @@ Recommended reviewer order:
 
 - review release maintenance status, pauses, incident categories, and repair steps in the operations overview
 - separate SSH trust-anchor status from deploy-key authentication status before unpausing release automation
+- use the authenticated release repair workflow to copy the next action and export handoff/audit-trail evidence
 - export the same release readiness checklist through the public evidence bundle
 
 ## Stack
@@ -700,7 +701,7 @@ Next likely improvements:
 
 1. move server credentials to external secret management
 2. split local Docker execution into a narrower executor boundary
-3. move release repair from checklist guidance into an authenticated in-product operator workflow
+3. let the release repair workflow attach green audit evidence back to the incident records
 4. deepen automated smoke coverage around deployment runtime flows
 
 Longer-term direction: see [ROADMAP.md](ROADMAP.md).

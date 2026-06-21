@@ -19,6 +19,8 @@ from app.schemas import (
     OpsReleaseIncidentSummary,
     OpsReleaseMaintenanceSummary,
     OpsReleaseRepairStep,
+    OpsReleaseRepairWorkflowResponse,
+    OpsReleaseRepairWorkflowStep,
     OpsRuntimeCapabilitiesSummary,
     OpsServersSummary,
     OpsTemplatesSummary,
@@ -35,6 +37,9 @@ from app.services.server_credentials import SERVER_CREDENTIALS_KEY_ENV
 
 router = APIRouter(prefix="/ops", dependencies=[Depends(require_auth)])
 RELEASE_MAINTENANCE_STATUS_FILE_ENV = "DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE"
+RELEASE_SECRETS_AUDIT_COMMAND = (
+    "gh workflow run release-secrets-audit.yml --repo AlexGerlitz/deploymate --ref develop"
+)
 
 
 def _collection_or_empty(
@@ -541,6 +546,259 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
     )
 
 
+def _release_checklist_by_key(
+    release_maintenance: OpsReleaseMaintenanceSummary,
+) -> dict[str, OpsReleaseChecklistItem]:
+    return {item.key: item for item in release_maintenance.checklist}
+
+
+def _release_status_from_item(
+    checklist: dict[str, OpsReleaseChecklistItem],
+    key: str,
+    *,
+    ok_status: str = "complete",
+    unknown_status: str = "pending",
+) -> str:
+    item = checklist.get(key)
+    if item is None:
+        return unknown_status
+    if item.status == "ok":
+        return ok_status
+    if item.status == "blocked":
+        return "blocked"
+    if item.status == "warn":
+        return "current"
+    return unknown_status
+
+
+def _build_release_repair_workflow_steps(
+    release_maintenance: OpsReleaseMaintenanceSummary,
+    *,
+    phase: str,
+) -> list[OpsReleaseRepairWorkflowStep]:
+    checklist = _release_checklist_by_key(release_maintenance)
+    deploy_key_status = checklist.get("deploy-key")
+
+    status_json_status = "complete" if release_maintenance.available else "current"
+    pause_guard_status = (
+        "complete"
+        if release_maintenance.release_audit_scheduled_paused or release_maintenance.staging_release_paused
+        else "pending"
+    )
+    host_trust_status = _release_status_from_item(checklist, "ssh-trust-anchor")
+    deploy_key_step_status = _release_status_from_item(checklist, "deploy-key")
+    if deploy_key_status and deploy_key_status.status == "blocked":
+        deploy_key_step_status = "current"
+
+    host_trust_item = checklist.get("ssh-trust-anchor") or OpsReleaseChecklistItem(
+        key="ssh-trust-anchor",
+        label="SSH trust anchor",
+        status="unknown",
+        detail="SSH trust anchor state is not present in the checklist.",
+    )
+    deploy_key_item = checklist.get("deploy-key") or OpsReleaseChecklistItem(
+        key="deploy-key",
+        label="Deploy key",
+        status="unknown",
+        detail="Deploy key state is not present in the checklist.",
+    )
+
+    manual_audit_status = "pending"
+    close_status = "pending"
+    if phase == "ready_for_manual_audit":
+        manual_audit_status = "current"
+    elif phase == "ready_for_unpause":
+        manual_audit_status = "complete"
+        close_status = "current"
+    elif phase == "status_unwired":
+        manual_audit_status = "blocked"
+
+    return [
+        OpsReleaseRepairWorkflowStep(
+            key="status-json",
+            title="Release status is connected",
+            status=status_json_status,
+            detail=(
+                f"Status source is {release_maintenance.source}."
+                if release_maintenance.available
+                else "Runtime does not see the generated release maintenance status JSON yet."
+            ),
+            operator_action=(
+                "Keep using this status snapshot for release decisions."
+                if release_maintenance.available
+                else "Run the maintenance status sync and set DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE."
+            ),
+        ),
+        OpsReleaseRepairWorkflowStep(
+            key="pause-guard",
+            title="Release pauses stay active",
+            status=pause_guard_status,
+            detail=(
+                "Scheduled audit or staging release is paused while repair evidence is collected."
+                if pause_guard_status == "complete"
+                else "Release pauses are not active in the current snapshot."
+            ),
+            operator_action="Keep pauses enabled until a manual release audit succeeds.",
+        ),
+        OpsReleaseRepairWorkflowStep(
+            key="ssh-trust-anchor",
+            title="SSH trust anchor is verified",
+            status=host_trust_status,
+            detail=host_trust_item.detail,
+            operator_action="Do not rotate known_hosts unless the incident category changes to host-key failure.",
+        ),
+        OpsReleaseRepairWorkflowStep(
+            key="restore-deploy-key",
+            title="Deploy key can authenticate",
+            status=deploy_key_step_status,
+            detail=deploy_key_item.detail,
+            operator_action=(
+                "Install the matching public key in authorized_keys or rotate DEPLOY_SSH_PRIVATE_KEY."
+                if deploy_key_step_status in {"current", "blocked"}
+                else "Keep the current deploy key contract unchanged."
+            ),
+        ),
+        OpsReleaseRepairWorkflowStep(
+            key="manual-audit-rerun",
+            title="Manual Release Secrets Audit is green",
+            status=manual_audit_status,
+            detail="The release audit must prove SSH auth before pauses can be removed.",
+            operator_action=RELEASE_SECRETS_AUDIT_COMMAND,
+        ),
+        OpsReleaseRepairWorkflowStep(
+            key="close-and-unpause",
+            title="Incidents are closed and pauses are removed",
+            status=close_status,
+            detail="Close GitHub incident issues and remove pause variables only after green evidence.",
+            operator_action="Schedule a watched release window, close incidents, then remove release pauses.",
+        ),
+    ]
+
+
+def _build_release_repair_handoff(
+    *,
+    generated_at: str,
+    phase: str,
+    status: str,
+    summary: str,
+    next_action: str,
+    typed_confirmation_phrase: str,
+    checklist: list[OpsReleaseChecklistItem],
+    steps: list[OpsReleaseRepairWorkflowStep],
+) -> str:
+    lines = [
+        "# Release Repair Handoff",
+        "",
+        f"- Generated: {generated_at}",
+        f"- Phase: {phase}",
+        f"- Status: {status}",
+        f"- Summary: {summary}",
+        f"- Next action: {next_action}",
+        f"- Manual audit: `{RELEASE_SECRETS_AUDIT_COMMAND}`",
+        f"- Confirmation phrase: `{typed_confirmation_phrase}`",
+        "",
+        "## Readiness Checklist",
+    ]
+    lines.extend(f"- [{item.status}] {item.label}: {item.detail}" for item in checklist)
+    lines.extend(["", "## Operator Steps"])
+    lines.extend(
+        f"{index}. [{step.status}] {step.title}: {step.operator_action}"
+        for index, step in enumerate(steps, start=1)
+    )
+    return "\n".join(lines)
+
+
+def _build_release_repair_workflow() -> OpsReleaseRepairWorkflowResponse:
+    release_maintenance = _build_release_maintenance_summary()
+    generated_at = datetime.now(timezone.utc).isoformat()
+    checklist = release_maintenance.checklist
+    checklist_by_key = _release_checklist_by_key(release_maintenance)
+    deploy_key_status = checklist_by_key.get("deploy-key")
+    blocked_items = [item for item in checklist if item.status == "blocked"]
+    open_incidents = _open_release_incidents(
+        release_maintenance.production,
+        release_maintenance.staging,
+    )
+
+    if not release_maintenance.available:
+        phase = "status_unwired"
+        status = "review"
+        summary = "Release maintenance status is not connected to this runtime."
+        next_action = release_maintenance.next_step
+        typed_confirmation_phrase = "confirm release status sync"
+    elif release_maintenance.ready_for_unpause:
+        phase = "ready_for_unpause"
+        status = "ready"
+        summary = "Release maintenance is ready for a planned unpause window."
+        next_action = "Schedule a watched release window before removing audit and staging pauses."
+        typed_confirmation_phrase = "confirm planned release unpause"
+    elif deploy_key_status and deploy_key_status.status == "blocked":
+        phase = "repair_required"
+        status = "blocked"
+        summary = "Release automation is blocked because the deploy host rejects the GitHub deploy key."
+        next_action = (
+            "Restore the deploy public key in authorized_keys or rotate DEPLOY_SSH_PRIVATE_KEY, "
+            "then rerun Release Secrets Audit manually."
+        )
+        typed_confirmation_phrase = "confirm deploy key repair before audit"
+    elif blocked_items or open_incidents:
+        phase = "repair_required"
+        status = "blocked"
+        summary = "Release automation still has open blockers before unpause."
+        next_action = release_maintenance.next_step
+        typed_confirmation_phrase = "confirm release blocker repair"
+    else:
+        phase = "ready_for_manual_audit"
+        status = "review"
+        summary = "No blocking checklist item remains; manual audit evidence is needed next."
+        next_action = f"Run `{RELEASE_SECRETS_AUDIT_COMMAND}` and attach the result to the release incidents."
+        typed_confirmation_phrase = "confirm manual release audit"
+
+    steps = _build_release_repair_workflow_steps(release_maintenance, phase=phase)
+    audit_trail = [
+        f"generated_at={generated_at}",
+        f"source={release_maintenance.source}",
+        f"phase={phase}",
+        f"status={status}",
+        f"ready_for_unpause={release_maintenance.ready_for_unpause}",
+        f"blocker_count={release_maintenance.blocker_count}",
+        (
+            f"production_issue=#{release_maintenance.production.issue_number} "
+            f"state={release_maintenance.production.state} "
+            f"category={release_maintenance.production.failure_category}"
+        ),
+        (
+            f"staging_issue=#{release_maintenance.staging.issue_number} "
+            f"state={release_maintenance.staging.state} "
+            f"category={release_maintenance.staging.failure_category}"
+        ),
+    ]
+
+    return OpsReleaseRepairWorkflowResponse(
+        generated_at=generated_at,
+        phase=phase,
+        status=status,
+        summary=summary,
+        next_action=next_action,
+        typed_confirmation_phrase=typed_confirmation_phrase,
+        manual_audit_command=RELEASE_SECRETS_AUDIT_COMMAND,
+        handoff_markdown=_build_release_repair_handoff(
+            generated_at=generated_at,
+            phase=phase,
+            status=status,
+            summary=summary,
+            next_action=next_action,
+            typed_confirmation_phrase=typed_confirmation_phrase,
+            checklist=checklist,
+            steps=steps,
+        ),
+        audit_trail=audit_trail,
+        checklist=checklist,
+        steps=steps,
+        release_maintenance=release_maintenance,
+    )
+
+
 def _sanitize_server_export(item: dict) -> dict:
     return {
         "id": item.get("id"),
@@ -824,6 +1082,13 @@ def get_ops_overview(
     user=Depends(require_auth),
 ) -> OpsOverviewResponse:
     return _build_ops_overview(user, notifications_limit=notifications_limit)
+
+
+@router.get("/release-repair-workflow", response_model=OpsReleaseRepairWorkflowResponse)
+def get_release_repair_workflow(user=Depends(require_auth)) -> OpsReleaseRepairWorkflowResponse:
+    if not user_is_admin(user):
+        raise HTTPException(status_code=403, detail="Release repair workflow is admin-only.")
+    return _build_release_repair_workflow()
 
 
 @router.get("/exports/deployments")

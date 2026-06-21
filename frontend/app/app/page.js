@@ -12,6 +12,7 @@ import {
   smokeOverviewOpsOverview,
   smokeOverviewServers,
   smokeOverviewTemplates,
+  smokeReleaseRepairWorkflow,
   smokeServers,
   smokeUser,
 } from "../lib/smoke-fixtures";
@@ -78,6 +79,11 @@ export default function HomePage() {
   const [notificationsError, setNotificationsError] = useState("");
   const [templatesError, setTemplatesError] = useState("");
   const [opsOverview, setOpsOverview] = useState(smokeMode ? smokeHomeOpsOverview : null);
+  const [releaseRepairWorkflow, setReleaseRepairWorkflow] = useState(
+    smokeMode ? smokeReleaseRepairWorkflow : null,
+  );
+  const [releaseRepairLoading, setReleaseRepairLoading] = useState(!smokeMode);
+  const [releaseRepairError, setReleaseRepairError] = useState("");
   const [opsActionMessage, setOpsActionMessage] = useState("");
   const [opsActionError, setOpsActionError] = useState("");
 
@@ -479,6 +485,47 @@ export default function HomePage() {
     }
   }
 
+  async function loadReleaseRepairWorkflow(user, silent = false) {
+    if (!user?.is_admin) {
+      setReleaseRepairWorkflow(null);
+      setReleaseRepairError("");
+      setReleaseRepairLoading(false);
+      return;
+    }
+
+    if (!silent) {
+      setReleaseRepairLoading(true);
+      setReleaseRepairError("");
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/ops/release-repair-workflow`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const data = await readJsonOrError(response, "Failed to load release repair workflow.");
+      setReleaseRepairWorkflow(data);
+    } catch (requestError) {
+      if (requestError instanceof Error && requestError.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      if (!silent) {
+        setReleaseRepairWorkflow(null);
+        setReleaseRepairError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Failed to load release repair workflow.",
+        );
+      }
+    } finally {
+      if (!silent) {
+        setReleaseRepairLoading(false);
+      }
+    }
+  }
+
   async function refreshPage(silent = false) {
     if (smokeMode) {
       return;
@@ -491,6 +538,7 @@ export default function HomePage() {
       loadNotifications(silent),
       loadTemplates(silent),
       loadOpsOverview(silent),
+      loadReleaseRepairWorkflow(user, silent),
     ]);
   }
 
@@ -578,6 +626,43 @@ export default function HomePage() {
           : "Failed to download operations snapshot.",
       );
     }
+  }
+
+  async function handleCopyReleaseRepairNextAction() {
+    clearOpsMessages();
+
+    try {
+      await navigator.clipboard.writeText(
+        releaseRepairWorkflow?.next_action || "Release repair workflow is not loaded.",
+      );
+      setOpsActionMessage("Release repair next action copied to clipboard.");
+    } catch {
+      setOpsActionError("Failed to copy release repair next action.");
+    }
+  }
+
+  function handleDownloadReleaseRepairHandoff() {
+    clearOpsMessages();
+
+    const blob = new Blob([releaseRepairWorkflow?.handoff_markdown || ""], {
+      type: "text/markdown;charset=utf-8",
+    });
+    triggerFileDownload("deploymate-release-repair-handoff.md", blob);
+    setOpsActionMessage("Release repair handoff downloaded.");
+  }
+
+  function handleDownloadReleaseRepairTrail() {
+    clearOpsMessages();
+
+    downloadJsonFile("deploymate-release-repair-audit-trail.json", {
+      generated_at: releaseRepairWorkflow?.generated_at || null,
+      phase: releaseRepairWorkflow?.phase || "unknown",
+      status: releaseRepairWorkflow?.status || "unknown",
+      audit_trail: releaseRepairWorkflow?.audit_trail || [],
+      steps: releaseRepairWorkflow?.steps || [],
+      checklist: releaseRepairWorkflow?.checklist || [],
+    });
+    setOpsActionMessage("Release repair audit trail downloaded.");
   }
 
   async function handleDownloadRemoteExport(filename, url) {
@@ -720,6 +805,7 @@ export default function HomePage() {
           {serversError ? <div className="banner error">{serversError}</div> : null}
           {notificationsError ? <div className="banner error">{notificationsError}</div> : null}
           {templatesError ? <div className="banner error">{templatesError}</div> : null}
+          {releaseRepairError ? <div className="banner error">{releaseRepairError}</div> : null}
           {opsActionError ? <div className="banner error">{opsActionError}</div> : null}
           {opsActionMessage ? <div className="banner success">{opsActionMessage}</div> : null}
           {degradedOpsAttentionItems.length > 0 ? (
@@ -995,6 +1081,77 @@ export default function HomePage() {
                   </ol>
                 ) : null}
               </div>
+              {currentUser?.is_admin && releaseRepairWorkflow ? (
+                <div className="overviewCard" data-testid="ops-release-repair-workflow-card">
+                  <span className="overviewLabel">Release repair workflow</span>
+                  <strong className="overviewValue">{releaseRepairWorkflow.status}</strong>
+                  <div className="overviewMeta">
+                    <span>Phase {releaseRepairWorkflow.phase}</span>
+                    <span>
+                      Loaded{" "}
+                      {releaseRepairLoading
+                        ? "refreshing"
+                        : formatDate(releaseRepairWorkflow.generated_at)}
+                    </span>
+                    <span>{releaseRepairWorkflow.summary}</span>
+                    <span>Next action: {releaseRepairWorkflow.next_action}</span>
+                    <span>Manual audit: {releaseRepairWorkflow.manual_audit_command}</span>
+                    <span>
+                      Confirm with: {releaseRepairWorkflow.typed_confirmation_phrase}
+                    </span>
+                  </div>
+                  {Array.isArray(releaseRepairWorkflow.steps) &&
+                  releaseRepairWorkflow.steps.length > 0 ? (
+                    <div
+                      className="overviewReleaseChecklist"
+                      data-testid="ops-release-repair-workflow-steps"
+                    >
+                      {releaseRepairWorkflow.steps.slice(0, 6).map((step) => (
+                        <div
+                          key={step.key}
+                          className="overviewReleaseChecklistItem"
+                          data-testid={`ops-release-repair-step-${step.key}`}
+                        >
+                          <span className={`status ${step.status || "pending"}`}>
+                            {step.status || "pending"}
+                          </span>
+                          <div>
+                            <strong>{step.title}</strong>
+                            <span>{step.detail}</span>
+                            <span>{step.operator_action}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="overviewReleaseWorkflowActions">
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={handleCopyReleaseRepairNextAction}
+                      data-testid="ops-release-repair-copy-next-action-button"
+                    >
+                      Copy next action
+                    </button>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={handleDownloadReleaseRepairHandoff}
+                      data-testid="ops-release-repair-handoff-button"
+                    >
+                      Download handoff
+                    </button>
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={handleDownloadReleaseRepairTrail}
+                      data-testid="ops-release-repair-audit-trail-button"
+                    >
+                      Download trail
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {opsSnapshot.attention_items.length > 0 ? (

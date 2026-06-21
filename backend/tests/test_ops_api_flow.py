@@ -353,6 +353,64 @@ class OpsApiFlowTests(unittest.TestCase):
         self.assertEqual(checklist_by_key["deploy-key"]["status"], "ok")
         self.assertEqual(release["repair_playbook"][0]["key"], "planned-unpause")
 
+    def test_release_repair_workflow_guides_deploy_key_repair(self):
+        with tempfile.NamedTemporaryFile("w", delete=False) as handle:
+            json.dump(
+                {
+                    "generated_at": "2026-06-21T02:36:36Z",
+                    "ready_for_unpause": "0",
+                    "release_audit_scheduled_paused": "true",
+                    "staging_release_paused": "true",
+                    "network_checks": "enabled",
+                    "issue_18_state": "OPEN",
+                    "issue_18_failure_category": "ssh_auth_denied",
+                    "issue_18_operator_hint": "Restore the deploy public key.",
+                    "issue_19_state": "OPEN",
+                    "issue_19_failure_category": "ssh_auth_denied",
+                    "issue_19_operator_hint": "Restore the deploy public key.",
+                    "blocker_count": "2",
+                    "blocker_1": "release audit schedule paused",
+                },
+                handle,
+            )
+            status_path = handle.name
+
+        self.addCleanup(lambda: os.path.exists(status_path) and os.unlink(status_path))
+
+        with patch.dict(
+            os.environ,
+            {
+                "DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE": status_path,
+            },
+            clear=False,
+        ):
+            response = self.client.get("/ops/release-repair-workflow")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["phase"], "repair_required")
+        self.assertEqual(payload["status"], "blocked")
+        self.assertIn("deploy key", payload["summary"].lower())
+        self.assertIn("gh workflow run release-secrets-audit.yml", payload["manual_audit_command"])
+        self.assertIn("deploy key", payload["typed_confirmation_phrase"])
+        self.assertIn("Deploy key", payload["handoff_markdown"])
+        self.assertIn("production_issue=#18 state=OPEN category=ssh_auth_denied", payload["audit_trail"])
+
+        steps_by_key = {step["key"]: step for step in payload["steps"]}
+        self.assertEqual(steps_by_key["status-json"]["status"], "complete")
+        self.assertEqual(steps_by_key["ssh-trust-anchor"]["status"], "complete")
+        self.assertEqual(steps_by_key["restore-deploy-key"]["status"], "current")
+        self.assertIn("authorized_keys", steps_by_key["restore-deploy-key"]["operator_action"])
+        self.assertEqual(steps_by_key["manual-audit-rerun"]["status"], "pending")
+
+    def test_release_repair_workflow_is_admin_only(self):
+        self.user["role"] = "member"
+
+        response = self.client.get("/ops/release-repair-workflow")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "Release repair workflow is admin-only.")
+
     def test_ops_export_returns_503_when_source_loader_fails(self):
         with patch("app.routes.ops.list_servers", side_effect=RuntimeError("db unavailable")):
             response = self.client.get("/ops/exports/servers?format=json")

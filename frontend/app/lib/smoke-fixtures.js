@@ -176,6 +176,68 @@ export const smokeOverviewOpsOverview = {
   ],
 };
 
+export const smokeReleaseRepairWorkflow = {
+  generated_at: "2026-04-07T00:03:00Z",
+  phase: "repair_required",
+  status: "blocked",
+  summary: "Release automation is blocked because the deploy host rejects the GitHub deploy key.",
+  next_action:
+    "Restore the deploy public key in authorized_keys or rotate DEPLOY_SSH_PRIVATE_KEY, then rerun Release Secrets Audit manually.",
+  typed_confirmation_phrase: "confirm deploy key repair before audit",
+  manual_audit_command:
+    "gh workflow run release-secrets-audit.yml --repo AlexGerlitz/deploymate --ref develop",
+  handoff_markdown:
+    "# Release Repair Handoff\n\n- Phase: repair_required\n- Next action: Restore the deploy public key.",
+  audit_trail: [
+    "generated_at=2026-04-07T00:03:00Z",
+    "source=smoke_fixture",
+    "phase=repair_required",
+    "status=blocked",
+    "production_issue=#18 state=OPEN category=ssh_auth_denied",
+  ],
+  checklist: smokeOverviewOpsOverview.release_maintenance.checklist,
+  steps: [
+    {
+      key: "status-json",
+      title: "Release status is connected",
+      status: "complete",
+      detail: "Status source is smoke_fixture.",
+      operator_action: "Keep using this status snapshot for release decisions.",
+    },
+    {
+      key: "pause-guard",
+      title: "Release pauses stay active",
+      status: "complete",
+      detail: "Scheduled audit and staging release are paused while repair evidence is collected.",
+      operator_action: "Keep pauses enabled until a manual release audit succeeds.",
+    },
+    {
+      key: "ssh-trust-anchor",
+      title: "SSH trust anchor is verified",
+      status: "complete",
+      detail: "The pinned known_hosts trust check already passed.",
+      operator_action: "Do not rotate known_hosts for this blocker.",
+    },
+    {
+      key: "restore-deploy-key",
+      title: "Deploy key can authenticate",
+      status: "current",
+      detail: "The deploy host rejects the GitHub deploy key.",
+      operator_action:
+        "Install the matching public key in authorized_keys or rotate DEPLOY_SSH_PRIVATE_KEY.",
+    },
+    {
+      key: "manual-audit-rerun",
+      title: "Manual Release Secrets Audit is green",
+      status: "pending",
+      detail: "The release audit must prove SSH auth before pauses can be removed.",
+      operator_action:
+        "gh workflow run release-secrets-audit.yml --repo AlexGerlitz/deploymate --ref develop",
+    },
+  ],
+  release_maintenance: smokeOverviewOpsOverview.release_maintenance,
+};
+
 export const smokeDeployments = [
   {
     id: "smoke-deployment",
