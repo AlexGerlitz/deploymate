@@ -176,10 +176,11 @@ def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
         "ci": latest_workflow(runs, "CI"),
         "release_maintenance_status": latest_workflow(runs, "Release Maintenance Status"),
         "release_secrets_audit": latest_workflow(runs, "Release Secrets Audit"),
+        "public_evidence": latest_workflow(runs, "Public Evidence Bundle"),
         "staging": latest_workflow(runs, "Staging"),
     }
 
-    return {
+    bundle = {
         "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "repo": repo,
         "branch": current_branch,
@@ -194,6 +195,8 @@ def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
             "Release Maintenance Status artifact",
         ],
     }
+    bundle["review_index"] = build_review_index(bundle)
+    return bundle
 
 
 def open_release_incidents(maintenance: dict[str, Any]) -> list[dict[str, str]]:
@@ -794,9 +797,182 @@ def build_repair_workflow(maintenance: dict[str, Any], *, repo: str, branch: str
     return workflow
 
 
+def current_public_evidence_run(bundle: dict[str, Any]) -> dict[str, Any]:
+    run_id = os.getenv("GITHUB_RUN_ID", "").strip()
+    if not run_id:
+        return bundle["workflows"].get("public_evidence", {})
+    return {
+        "workflowName": "Public Evidence Bundle",
+        "status": "completed",
+        "conclusion": "success",
+        "databaseId": run_id,
+        "url": f"https://github.com/{bundle['repo']}/actions/runs/{run_id}",
+        "headSha": bundle["commit"],
+        "displayTitle": "Public Evidence Bundle",
+        "event": os.getenv("GITHUB_EVENT_NAME", ""),
+        "createdAt": bundle["generated_at"],
+    }
+
+
+def workflow_entrypoint(
+    key: str,
+    label: str,
+    run: dict[str, Any],
+    *,
+    detail: str,
+) -> dict[str, str]:
+    return {
+        "key": key,
+        "label": label,
+        "type": "github_actions",
+        "status": str(run.get("status", "unavailable") or "unavailable"),
+        "conclusion": str(run.get("conclusion", "unavailable") or "unavailable"),
+        "url": str(run.get("url", "") or ""),
+        "detail": detail,
+    }
+
+
+def issue_entrypoint(repo: str, incident: dict[str, str]) -> dict[str, str]:
+    issue_number = incident["issue_number"]
+    return {
+        "key": f"{incident['environment']}-incident",
+        "label": f"{incident['environment'].title()} incident #{issue_number}",
+        "type": "github_issue",
+        "status": incident.get("state", "unknown"),
+        "conclusion": incident.get("failure_category", "unknown"),
+        "url": f"https://github.com/{repo}/issues/{issue_number}",
+        "detail": incident.get("operator_hint") or "Open the incident and read the latest repair evidence.",
+    }
+
+
+def dedupe_values(values: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
+    maintenance = bundle["maintenance"]
+    repair_workflow = maintenance.get("repair_workflow", {})
+    workflows = bundle["workflows"]
+    incidents = release_incidents(maintenance)
+    open_incidents = [incident for incident in incidents if incident["state"] != "CLOSED"]
+    primary_blockers = release_blockers(maintenance)
+    primary_blockers.extend(
+        f"issue #{incident['issue_number']} {incident['environment']} category={incident['failure_category']}"
+        for incident in open_incidents
+    )
+
+    live_target_status = "blocked" if maintenance.get("network_blockers") else "ok"
+    if str(maintenance.get("network_checks", "unknown")) == "skipped":
+        live_target_status = "skipped"
+
+    entrypoints = [
+        workflow_entrypoint(
+            "ci",
+            "CI run",
+            workflows["ci"],
+            detail="Code, tests, and release contract checks for the current branch.",
+        ),
+        workflow_entrypoint(
+            "public-evidence",
+            "Public evidence bundle",
+            current_public_evidence_run(bundle),
+            detail="Single artifact set containing release status, repair workflow, and review data.",
+        ),
+        workflow_entrypoint(
+            "release-maintenance-status",
+            "Release maintenance status",
+            workflows["release_maintenance_status"],
+            detail="Scheduled/manual status snapshot for release pauses, incidents, and target checks.",
+        ),
+        workflow_entrypoint(
+            "release-secrets-audit",
+            "Release secrets audit",
+            workflows["release_secrets_audit"],
+            detail="Manual audit that must pass before release pauses can be removed.",
+        ),
+    ]
+    entrypoints.extend(issue_entrypoint(bundle["repo"], incident) for incident in incidents)
+    entrypoints.extend(
+        [
+            {
+                "key": "release-repair-workflow",
+                "label": "Release repair workflow",
+                "type": "evidence_section",
+                "status": str(repair_workflow.get("status", "unknown")),
+                "conclusion": str(repair_workflow.get("phase", "unknown")),
+                "url": "",
+                "detail": str(repair_workflow.get("next_action", "")),
+            },
+            {
+                "key": "live-target",
+                "label": "Live target",
+                "type": "public_probe",
+                "status": live_target_status,
+                "conclusion": str(maintenance.get("network_checks", "unknown")),
+                "url": "https://deploymatecloud.ru",
+                "detail": (
+                    "; ".join(maintenance.get("network_blockers") or [])
+                    or "Public DNS and HTTPS probes are not blocking this snapshot."
+                ),
+            },
+        ]
+    )
+
+    return {
+        "status": str(repair_workflow.get("status", "unknown")),
+        "phase": str(repair_workflow.get("phase", "unknown")),
+        "summary": str(repair_workflow.get("summary", "")),
+        "next_action": str(repair_workflow.get("next_action", "")),
+        "primary_blockers": dedupe_values(primary_blockers),
+        "entrypoints": entrypoints,
+        "reviewer_sequence": [
+            {
+                "key": "ci",
+                "title": "Confirm CI",
+                "detail": "Open the CI run and verify it completed successfully for the reviewed commit.",
+            },
+            {
+                "key": "public-evidence",
+                "title": "Open public evidence",
+                "detail": "Read deploymate-public-evidence.md and this review index before checking the live target.",
+            },
+            {
+                "key": "incidents",
+                "title": "Check release incidents",
+                "detail": "Open issues #18 and #19 and compare their marker comments with this bundle.",
+            },
+            {
+                "key": "repair-workflow",
+                "title": "Follow the repair workflow",
+                "detail": "Use the current step in Release Repair Workflow Packet as the operator handoff.",
+            },
+            {
+                "key": "live-target",
+                "title": "Verify live target last",
+                "detail": "Treat the live demo as available only after public DNS/HTTPS probes are green.",
+            },
+        ],
+        "manual_commands": {
+            "release_secrets_audit": str(repair_workflow.get("manual_audit_command", "")),
+            "public_evidence_network_publish": (
+                f"gh workflow run public-evidence-bundle.yml --repo {bundle['repo']} "
+                f"--ref {bundle['branch']} -f check_network=true -f publish_incident_comment=true"
+            ),
+        },
+    }
+
+
 def build_issue_comment(bundle: dict[str, Any]) -> str:
     maintenance = bundle["maintenance"]
     repair_workflow = maintenance.get("repair_workflow", {})
+    review_index = bundle.get("review_index", {})
     workflows = bundle["workflows"]
     incidents = release_incidents(maintenance)
     steps = repair_workflow.get("steps", [])
@@ -814,6 +990,12 @@ def build_issue_comment(bundle: dict[str, Any]) -> str:
         f"- Next action: {repair_workflow.get('next_action', '')}",
         f"- Manual audit: `{repair_workflow.get('manual_audit_command', '')}`",
         f"- Confirmation phrase: `{repair_workflow.get('typed_confirmation_phrase', '')}`",
+        "",
+        "### Review index",
+        "",
+        f"- Status: `{review_index.get('status', 'unknown')}`",
+        f"- Summary: {review_index.get('summary', '')}",
+        f"- Primary blockers: {', '.join(review_index.get('primary_blockers', [])) or '`none`'}",
         "",
         "### Current incidents",
         "",
@@ -942,9 +1124,22 @@ def workflow_row(label: str, run: dict[str, Any]) -> str:
     )
 
 
+def entrypoint_row(entrypoint: dict[str, Any]) -> str:
+    url = entrypoint.get("url") or ""
+    label = md_escape(entrypoint.get("label", entrypoint.get("key", "unknown")))
+    label_text = f"[{label}]({url})" if url else label
+    return (
+        f"| {label_text} | `{md_escape(entrypoint.get('type', 'unknown'))}` | "
+        f"`{md_escape(entrypoint.get('status', 'unknown'))}` | "
+        f"`{md_escape(entrypoint.get('conclusion', 'unknown'))}` | "
+        f"{md_escape(entrypoint.get('detail', ''))} |"
+    )
+
+
 def render_markdown(bundle: dict[str, Any]) -> str:
     maintenance = bundle["maintenance"]
     workflows = bundle["workflows"]
+    review_index = bundle.get("review_index", {})
     blocker_count = int(maintenance.get("blocker_count", "0") or "0")
     blockers = [maintenance.get(f"blocker_{index}", "") for index in range(1, blocker_count + 1)]
     blockers = [item for item in blockers if item]
@@ -960,41 +1155,89 @@ def render_markdown(bundle: dict[str, Any]) -> str:
         f"| Commit | `{md_escape(bundle['commit'])}` |",
         f"| Ready for unpause | `{md_escape(maintenance.get('ready_for_unpause', 'unknown'))}` |",
         "",
-        "## Workflow Evidence",
+        "## Review Index",
         "",
-        "| Workflow | Status | Conclusion | Run |",
-        "| --- | --- | --- | --- |",
-        workflow_row("CI", workflows["ci"]),
-        workflow_row("Release Maintenance Status", workflows["release_maintenance_status"]),
-        workflow_row("Release Secrets Audit", workflows["release_secrets_audit"]),
-        workflow_row("Staging", workflows["staging"]),
+        f"- Status: `{md_escape(review_index.get('status', 'unknown'))}`",
+        f"- Phase: `{md_escape(review_index.get('phase', 'unknown'))}`",
+        f"- Summary: {md_escape(review_index.get('summary', ''))}",
+        f"- Next action: {md_escape(review_index.get('next_action', ''))}",
         "",
-        "## Maintenance Evidence",
-        "",
-        f"- Release audit schedule paused: `{maintenance.get('release_audit_scheduled_paused', 'unknown')}`",
-        f"- Staging release paused: `{maintenance.get('staging_release_paused', 'unknown')}`",
-        f"- Issue #18: `{maintenance.get('issue_18_state', 'unknown')}`",
-        f"- Issue #19: `{maintenance.get('issue_19_state', 'unknown')}`",
-        f"- Network checks: `{maintenance.get('network_checks', 'enabled')}`",
-        "",
-        "## Incident Diagnostics",
-        "",
-        "| Issue | State | Failure category | Operator hint |",
-        "| --- | --- | --- | --- |",
-        (
-            f"| #18 | `{md_escape(maintenance.get('issue_18_state', 'unknown'))}` | "
-            f"`{md_escape(maintenance.get('issue_18_failure_category', 'unknown'))}` | "
-            f"{md_escape(maintenance.get('issue_18_operator_hint', '')) or '`unavailable`'} |"
-        ),
-        (
-            f"| #19 | `{md_escape(maintenance.get('issue_19_state', 'unknown'))}` | "
-            f"`{md_escape(maintenance.get('issue_19_failure_category', 'unknown'))}` | "
-            f"{md_escape(maintenance.get('issue_19_operator_hint', '')) or '`unavailable`'} |"
-        ),
-        "",
-        "## Current Blockers",
+        "### Primary Blockers",
         "",
     ]
+    primary_blockers = review_index.get("primary_blockers", [])
+    if primary_blockers:
+        lines.extend(f"- {md_escape(blocker)}" for blocker in primary_blockers)
+    else:
+        lines.append("- None.")
+
+    lines.extend(
+        [
+            "",
+            "### Entrypoints",
+            "",
+            "| Entrypoint | Type | Status | Conclusion | Detail |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    lines.extend(entrypoint_row(entrypoint) for entrypoint in review_index.get("entrypoints", []))
+
+    lines.extend(
+        [
+            "",
+            "### Reviewer Sequence",
+            "",
+        ]
+    )
+    for index, step in enumerate(review_index.get("reviewer_sequence", []), start=1):
+        lines.append(
+            f"{index}. **{md_escape(step.get('title', step.get('key', 'unknown')))}**: "
+            f"{md_escape(step.get('detail', ''))}"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Workflow Evidence",
+            "",
+            "| Workflow | Status | Conclusion | Run |",
+            "| --- | --- | --- | --- |",
+            workflow_row("CI", workflows["ci"]),
+            workflow_row("Release Maintenance Status", workflows["release_maintenance_status"]),
+            workflow_row("Release Secrets Audit", workflows["release_secrets_audit"]),
+            workflow_row("Public Evidence Bundle", workflows["public_evidence"]),
+            workflow_row("Staging", workflows["staging"]),
+            "",
+            "## Maintenance Evidence",
+            "",
+            (
+                "- Release audit schedule paused: "
+                f"`{maintenance.get('release_audit_scheduled_paused', 'unknown')}`"
+            ),
+            f"- Staging release paused: `{maintenance.get('staging_release_paused', 'unknown')}`",
+            f"- Issue #18: `{maintenance.get('issue_18_state', 'unknown')}`",
+            f"- Issue #19: `{maintenance.get('issue_19_state', 'unknown')}`",
+            f"- Network checks: `{maintenance.get('network_checks', 'enabled')}`",
+            "",
+            "## Incident Diagnostics",
+            "",
+            "| Issue | State | Failure category | Operator hint |",
+            "| --- | --- | --- | --- |",
+            (
+                f"| #18 | `{md_escape(maintenance.get('issue_18_state', 'unknown'))}` | "
+                f"`{md_escape(maintenance.get('issue_18_failure_category', 'unknown'))}` | "
+                f"{md_escape(maintenance.get('issue_18_operator_hint', '')) or '`unavailable`'} |"
+            ),
+            (
+                f"| #19 | `{md_escape(maintenance.get('issue_19_state', 'unknown'))}` | "
+                f"`{md_escape(maintenance.get('issue_19_failure_category', 'unknown'))}` | "
+                f"{md_escape(maintenance.get('issue_19_operator_hint', '')) or '`unavailable`'} |"
+            ),
+            "",
+            "## Current Blockers",
+            "",
+        ]
+    )
 
     if blockers:
         lines.extend(f"- {blocker}" for blocker in blockers)
@@ -1077,7 +1320,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a public DeployMate evidence bundle.")
     parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY", "AlexGerlitz/deploymate"))
     parser.add_argument("--branch", default=os.getenv("GITHUB_REF_NAME", "develop"))
-    parser.add_argument("--format", choices=("json", "markdown", "issue-comment"), default="markdown")
+    parser.add_argument(
+        "--format",
+        choices=("json", "markdown", "issue-comment", "review-index"),
+        default="markdown",
+    )
     parser.add_argument("--check-network", action="store_true")
     parser.add_argument(
         "--publish-open-incident-comments",
@@ -1097,6 +1344,11 @@ def main() -> int:
 
     if args.format == "issue-comment":
         sys.stdout.write(build_issue_comment(bundle))
+        return 0
+
+    if args.format == "review-index":
+        json.dump(bundle["review_index"], sys.stdout, indent=2)
+        sys.stdout.write("\n")
         return 0
 
     sys.stdout.write(render_markdown(bundle))

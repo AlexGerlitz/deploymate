@@ -75,6 +75,7 @@ jobs:
           fi
 
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format json > deploymate-public-evidence.json
+          python3 scripts/public_evidence_bundle.py "${args[@]}" --format review-index > deploymate-review-index.json
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format markdown > deploymate-public-evidence.md
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format issue-comment > deploymate-release-repair-issue-comment.md
           if [ "$publish_incident_comment" = "true" ]; then
@@ -94,6 +95,7 @@ jobs:
           name: deploymate-public-evidence
           path: |
             deploymate-public-evidence.json
+            deploymate-review-index.json
             deploymate-public-evidence.md
             deploymate-release-repair-issue-comment.md
             deploymate-incident-comment-publish-result.json

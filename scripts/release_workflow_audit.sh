@@ -293,8 +293,10 @@ required_snippets = [
     "check_network=\"true\"",
     "publish_incident_comment=\"false\"",
     "scripts/public_evidence_bundle.py",
+    "--format review-index",
     "--publish-open-incident-comments",
     "deploymate-public-evidence.json",
+    "deploymate-review-index.json",
     "deploymate-public-evidence.md",
     "deploymate-incident-comment-publish-result.json",
     "uses: actions/upload-artifact@v7",
@@ -316,8 +318,11 @@ text = path.read_text(encoding="utf-8")
 
 required_snippets = [
     "## Incident Diagnostics",
+    "## Review Index",
     "## Release Repair Playbook",
+    "build_review_index",
     "build_repair_playbook",
+    "review_index",
     "issue_18_failure_category",
     "issue_19_failure_category",
     "issue_18_operator_hint",

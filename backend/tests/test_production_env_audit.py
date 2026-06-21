@@ -937,10 +937,11 @@ if [ "$1" = "run" ] && [ "$2" = "list" ]; then
 [
   {"workflowName":"CI","status":"in_progress","conclusion":"","databaseId":100,"url":"https://example.test/actions/runs/100","headSha":"abc","displayTitle":"CI pending","event":"push","createdAt":"2026-06-20T00:02:00Z"},
   {"workflowName":"CI","status":"completed","conclusion":"success","databaseId":101,"url":"https://example.test/actions/runs/101","headSha":"abc","displayTitle":"CI","event":"push","createdAt":"2026-06-20T00:00:00Z"},
-  {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":102,"url":"https://example.test/actions/runs/102","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-20T00:01:00Z"}
+  {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":102,"url":"https://example.test/actions/runs/102","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-20T00:01:00Z"},
+  {"workflowName":"Public Evidence Bundle","status":"completed","conclusion":"success","databaseId":103,"url":"https://example.test/actions/runs/103","headSha":"abc","displayTitle":"Public Evidence Bundle","event":"workflow_run","createdAt":"2026-06-20T00:03:00Z"}
 ]
 JSON
-  exit 0
+          exit 0
 fi
 if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
   printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
@@ -961,6 +962,8 @@ exit 1
 
             env = os.environ.copy()
             env["PATH"] = f"{tmpdir}:{env['PATH']}"
+            env["GITHUB_RUN_ID"] = ""
+            env["GITHUB_EVENT_NAME"] = ""
 
             json_result = subprocess.run(
                 [
@@ -972,6 +975,23 @@ exit 1
                     "develop",
                     "--format",
                     "json",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            review_index_result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/public_evidence_bundle.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--format",
+                    "review-index",
                 ],
                 cwd=self.repo_root,
                 env=env,
@@ -1046,10 +1066,59 @@ exit 1
         self.assertEqual(payload["workflows"]["ci"]["conclusion"], "success")
         self.assertEqual(payload["workflows"]["ci"]["databaseId"], 101)
         self.assertEqual(payload["workflows"]["release_maintenance_status"]["databaseId"], 102)
+        self.assertEqual(payload["workflows"]["public_evidence"]["databaseId"], 103)
+        review_index = payload["review_index"]
+        self.assertEqual(review_index["status"], "blocked")
+        self.assertEqual(review_index["phase"], "repair_required")
+        self.assertIn("deploy key", review_index["summary"])
+        self.assertIn(
+            "issue #18 production category=ssh_auth_denied",
+            review_index["primary_blockers"],
+        )
+        entrypoints_by_key = {
+            item["key"]: item for item in review_index["entrypoints"]
+        }
+        self.assertEqual(entrypoints_by_key["ci"]["conclusion"], "success")
+        self.assertEqual(
+            entrypoints_by_key["public-evidence"]["url"],
+            "https://example.test/actions/runs/103",
+        )
+        self.assertEqual(entrypoints_by_key["release-repair-workflow"]["status"], "blocked")
+        self.assertEqual(entrypoints_by_key["live-target"]["status"], "skipped")
+        self.assertIn(
+            "public-evidence",
+            [item["key"] for item in review_index["reviewer_sequence"]],
+        )
+        self.assertIn(
+            "public-evidence-bundle.yml",
+            review_index["manual_commands"]["public_evidence_network_publish"],
+        )
+
+        self.assertEqual(
+            review_index_result.returncode,
+            0,
+            review_index_result.stdout + review_index_result.stderr,
+        )
+        review_index_payload = json.loads(review_index_result.stdout)
+        self.assertEqual(review_index_payload["status"], "blocked")
+        self.assertEqual(
+            review_index_payload["entrypoints"][0]["key"],
+            "ci",
+        )
 
         self.assertEqual(markdown_result.returncode, 0, markdown_result.stdout + markdown_result.stderr)
         self.assertIn("# DeployMate Public Evidence Bundle", markdown_result.stdout)
-        self.assertIn("| CI | `completed` | `success` | [101](https://example.test/actions/runs/101) |", markdown_result.stdout)
+        self.assertIn("## Review Index", markdown_result.stdout)
+        self.assertIn("### Entrypoints", markdown_result.stdout)
+        self.assertIn(
+            "| [CI run](https://example.test/actions/runs/101) | `github_actions` | "
+            "`completed` | `success` |",
+            markdown_result.stdout,
+        )
+        self.assertIn(
+            "| CI | `completed` | `success` | [101](https://example.test/actions/runs/101) |",
+            markdown_result.stdout,
+        )
         self.assertIn("- release audit schedule paused", markdown_result.stdout)
         self.assertIn("## Release Readiness Checklist", markdown_result.stdout)
         self.assertIn("| Deploy key | `blocked` |", markdown_result.stdout)
@@ -1068,6 +1137,7 @@ exit 1
         )
         self.assertIn("<!-- deploymate:release-repair-evidence -->", issue_comment_result.stdout)
         self.assertIn("## DeployMate Release Repair Evidence", issue_comment_result.stdout)
+        self.assertIn("### Review index", issue_comment_result.stdout)
         self.assertIn("- Phase: `repair_required`", issue_comment_result.stdout)
         self.assertIn("- Status: `blocked`", issue_comment_result.stdout)
         self.assertIn("Deploy key can authenticate", issue_comment_result.stdout)
