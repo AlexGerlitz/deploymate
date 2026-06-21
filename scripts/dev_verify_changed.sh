@@ -152,6 +152,11 @@ while IFS='=' read -r key value; do
   esac
 done <<< "$detect_output"
 
+if [ "$surface" = "skip" ]; then
+  echo "[dev-verify-changed] skipping local gate: $reason"
+  exit 0
+fi
+
 for path in "${changed_files[@]}"; do
   case "$path" in
     backend/*)
@@ -162,11 +167,6 @@ for path in "${changed_files[@]}"; do
       ;;
   esac
 done
-
-if [ "$surface" = "skip" ]; then
-  echo "[dev-verify-changed] skipping local gate: $reason"
-  exit 0
-fi
 
 runtime_audit_output="$(bash scripts/detect_runtime_audit_need.sh "${changed_files[@]}")"
 printf '%s\n' "$runtime_audit_output"
