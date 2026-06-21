@@ -641,8 +641,9 @@ The public `/review` route is the frontend entrypoint for the same reviewer
 path. It links the evidence workflows, product route map, and local review-packet
 command without requiring GitHub artifact access first.
 
-The local review packet writes the JSON bundle, review index, Markdown report,
-repair issue comment, and `MANIFEST.json` with file sizes and SHA-256 checksums.
+The local review packet writes `README.md`, the JSON bundle, review index,
+Markdown report, repair issue comment, and `MANIFEST.json` with file sizes and
+SHA-256 checksums.
 Use it when GitHub artifact download or the Actions API is unavailable but the
 current checkout still needs a portable review handoff.
 

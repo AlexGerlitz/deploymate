@@ -12,9 +12,23 @@ SERVER_LOG="${FRONTEND_SMOKE_LOG:-/tmp/deploymate-frontend-shared-smoke.log}"
 DIST_DIR="${FRONTEND_SMOKE_DIST_DIR:-.next-smoke-${PORT}}"
 PERSIST_SERVER="${FRONTEND_SMOKE_PERSIST_SERVER:-0}"
 KEEP_ALIVE_ON_EXIT="${FRONTEND_SMOKE_KEEP_ALIVE_ON_EXIT:-0}"
+FRONTEND_SMOKE_CURL_CONNECT_TIMEOUT="${FRONTEND_SMOKE_CURL_CONNECT_TIMEOUT:-3}"
+FRONTEND_SMOKE_CURL_MAX_TIME="${FRONTEND_SMOKE_CURL_MAX_TIME:-20}"
+FRONTEND_SMOKE_STOP_TIMEOUT="${FRONTEND_SMOKE_STOP_TIMEOUT:-10}"
 SERVER_REGISTRY_DIR="${FRONTEND_SMOKE_REGISTRY_DIR:-$(automation_frontend_smoke_registry_dir)}"
 FRONTEND_DIR="$(automation_frontend_dir)"
 FRONTEND_READY_PATH="$(automation_frontend_ready_path)"
+
+frontend_smoke_curl() {
+  command curl \
+    --connect-timeout "$FRONTEND_SMOKE_CURL_CONNECT_TIMEOUT" \
+    --max-time "$FRONTEND_SMOKE_CURL_MAX_TIME" \
+    "$@"
+}
+
+curl() {
+  frontend_smoke_curl "$@"
+}
 
 frontend_smoke_server_key() {
   printf '%s\n' "port-${PORT}_dist-${DIST_DIR}_restore-${NEXT_PUBLIC_SMOKE_RESTORE_REPORT:-0}_role-${NEXT_PUBLIC_SMOKE_USER_ROLE:-admin}" | tr '/ :' '___'
@@ -32,6 +46,22 @@ frontend_smoke_pid_alive() {
 
 frontend_smoke_url_alive() {
   curl -sS -o /dev/null "$BASE_URL$FRONTEND_READY_PATH"
+}
+
+frontend_smoke_wait_for_pid_exit() {
+  local pid="${1:-}"
+  local timeout="${2:-$FRONTEND_SMOKE_STOP_TIMEOUT}"
+
+  [ -n "$pid" ] || return 0
+
+  for _ in $(seq 1 "$timeout"); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  return 1
 }
 
 frontend_smoke_port_pids() {
@@ -187,6 +217,11 @@ stop_frontend_smoke_server() {
 
   if [ -n "${FRONTEND_SMOKE_SERVER_PID:-}" ] && kill -0 "$FRONTEND_SMOKE_SERVER_PID" 2>/dev/null; then
     kill "$FRONTEND_SMOKE_SERVER_PID" >/dev/null 2>&1 || true
+    if ! frontend_smoke_wait_for_pid_exit "$FRONTEND_SMOKE_SERVER_PID" "$FRONTEND_SMOKE_STOP_TIMEOUT"; then
+      echo "[frontend-smoke] dev server pid ${FRONTEND_SMOKE_SERVER_PID} did not stop within ${FRONTEND_SMOKE_STOP_TIMEOUT}s; forcing stop" >&2
+      kill -9 "$FRONTEND_SMOKE_SERVER_PID" >/dev/null 2>&1 || true
+      frontend_smoke_wait_for_pid_exit "$FRONTEND_SMOKE_SERVER_PID" 5 || true
+    fi
     wait "$FRONTEND_SMOKE_SERVER_PID" 2>/dev/null || true
   fi
   frontend_smoke_kill_port || true

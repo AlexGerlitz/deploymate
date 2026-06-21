@@ -87,7 +87,7 @@ If you are evaluating whether this is more than a UI shell, the quickest evidenc
 
 - product screenshots and route map
 - public evidence bundle with CI, release-maintenance, incident status, and repair playbook
-- local review packet with manifest and SHA-256 checksums when GitHub artifacts are unavailable
+- local review packet with README, manifest, and SHA-256 checksums when GitHub artifacts are unavailable
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 

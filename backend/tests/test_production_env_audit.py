@@ -1231,6 +1231,7 @@ exit 1
             self.assertIn("[review-packet] wrote", result.stdout)
 
             expected_files = {
+                "README.md",
                 "deploymate-public-evidence.json",
                 "deploymate-review-index.json",
                 "deploymate-public-evidence.md",
@@ -1266,6 +1267,11 @@ exit 1
             )
             markdown = (output_dir / "deploymate-public-evidence.md").read_text(encoding="utf-8")
             self.assertIn("## Review Index", markdown)
+            packet_readme = (output_dir / "README.md").read_text(encoding="utf-8")
+            self.assertIn("# DeployMate Review Packet", packet_readme)
+            self.assertIn("`deploymate-public-evidence.md`", packet_readme)
+            self.assertIn("`deploymate-review-index.json`", packet_readme)
+            self.assertIn("https://deploymatecloud.ru/review", packet_readme)
 
     def test_public_evidence_bundle_blocks_failed_public_network_checks(self):
         with tempfile.TemporaryDirectory() as tmpdir:

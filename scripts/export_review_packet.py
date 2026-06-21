@@ -21,6 +21,7 @@ PACKET_FILES = {
     "markdown": "deploymate-public-evidence.md",
     "issue-comment": "deploymate-release-repair-issue-comment.md",
 }
+PACKET_README = "README.md"
 
 
 def run_command(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -86,9 +87,55 @@ def command_for_manifest(command: list[str]) -> str:
     return " ".join(display)
 
 
+def build_packet_readme(
+    *,
+    repo: str,
+    branch: str,
+    commit: str,
+    generated_at: str,
+    check_network: bool,
+    commands: list[str],
+) -> str:
+    lines = [
+        "# DeployMate Review Packet",
+        "",
+        "| Field | Value |",
+        "| --- | --- |",
+        f"| Repository | `{repo}` |",
+        f"| Branch | `{branch}` |",
+        f"| Commit | `{commit}` |",
+        f"| Generated at | `{generated_at}` |",
+        f"| Network checks | `{'enabled' if check_network else 'skipped'}` |",
+        "",
+        "## Open First",
+        "",
+        "1. `deploymate-public-evidence.md`",
+        "2. `deploymate-review-index.json`",
+        "3. `/review` or `https://deploymatecloud.ru/review` when the live frontend is available",
+        "",
+        "## Files",
+        "",
+    ]
+    for filename in [PACKET_README, *PACKET_FILES.values(), "MANIFEST.json"]:
+        lines.append(f"- `{filename}`")
+
+    lines.extend(
+        [
+            "",
+            "## Rebuild",
+            "",
+        ]
+    )
+    lines.extend(f"- `{command}`" for command in commands)
+    lines.append("")
+    return "\n".join(lines)
+
+
 def export_packet(repo: str, branch: str, output_dir: Path, check_network: bool) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     commands = []
+    generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    commit = git_value("rev-parse", "HEAD")
 
     for output_format, filename in PACKET_FILES.items():
         command = evidence_command(repo, branch, output_format, check_network)
@@ -101,16 +148,28 @@ def export_packet(repo: str, branch: str, output_dir: Path, check_network: bool)
             )
         write_text(output_dir / filename, result.stdout)
 
+    write_text(
+        output_dir / PACKET_README,
+        build_packet_readme(
+            repo=repo,
+            branch=branch,
+            commit=commit,
+            generated_at=generated_at,
+            check_network=check_network,
+            commands=commands,
+        ),
+    )
+
     manifest = {
-        "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "generated_at": generated_at,
         "repo": repo,
         "branch": branch,
-        "commit": git_value("rev-parse", "HEAD"),
+        "commit": commit,
         "source": "local-review-packet",
         "check_network": check_network,
         "files": [
             packet_file_entry(output_dir, filename)
-            for filename in PACKET_FILES.values()
+            for filename in [PACKET_README, *PACKET_FILES.values()]
         ],
         "commands": commands,
     }
