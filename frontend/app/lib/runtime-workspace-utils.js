@@ -893,6 +893,14 @@ export function buildOpsSnapshot({ currentUser, deployments, servers, notificati
       blocker_count: 0,
       primary_blocker: null,
       next_step: "Load the server-side operations overview before using release unpause decisions.",
+      repair_playbook: [
+        {
+          key: "load-ops-overview",
+          title: "Load server-side release status",
+          detail:
+            "Connect DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE before making release unpause decisions.",
+        },
+      ],
       production: {
         environment: "production",
         issue_number: 18,
@@ -937,6 +945,15 @@ export function buildOpsSummaryText(snapshot) {
     );
     if (snapshot.release_maintenance.next_step) {
       lines.push(`Release next step: ${snapshot.release_maintenance.next_step}`);
+    }
+    if (
+      Array.isArray(snapshot.release_maintenance.repair_playbook) &&
+      snapshot.release_maintenance.repair_playbook.length > 0
+    ) {
+      lines.push("Release repair playbook:");
+      snapshot.release_maintenance.repair_playbook.forEach((step, index) => {
+        lines.push(`${index + 1}. ${step.title}: ${step.detail}`);
+      });
     }
   }
 

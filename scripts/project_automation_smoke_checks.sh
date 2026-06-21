@@ -48,6 +48,8 @@ automation_smoke_ops_checks() {
 /app|ops templates card|data-testid="ops-overview-templates-card"
 /app|ops capabilities card|data-testid="ops-overview-capabilities-card"
 /app|ops release maintenance card|data-testid="ops-overview-release-card"
+/app|ops release repair playbook|data-testid="ops-release-repair-playbook"
+/app|ops release repair key step|Restore the deploy public key
 /app|ops attention list or empty banner|data-testid="ops-attention-list"|data-testid="ops-attention-empty-banner"
 /app|ops smoke deployment count copy|Deployments
 /app|ops smoke servers copy|Servers

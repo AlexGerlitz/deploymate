@@ -466,6 +466,29 @@ summary:focus-visible {
   font-size: 14px;
 }
 
+.overviewRepairList {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding-left: 20px;
+  color: #455164;
+  font-size: 13px;
+}
+
+.overviewRepairList li {
+  padding-left: 2px;
+}
+
+.overviewRepairList strong {
+  display: block;
+  color: #132238;
+}
+
+.overviewRepairList span {
+  display: block;
+  margin-top: 2px;
+}
+
 .overviewAttentionList {
   display: grid;
   gap: 12px;

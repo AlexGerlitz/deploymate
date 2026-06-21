@@ -127,6 +127,8 @@ elif source == "evidence":
         raise SystemExit("evidence json missing maintenance object")
     if not isinstance(workflows, dict):
         raise SystemExit("evidence json missing workflows object")
+    if not isinstance(maintenance.get("repair_playbook"), list):
+        raise SystemExit("evidence maintenance missing repair_playbook list")
     required = ["ready_for_unpause", "blocker_count", "issue_18_state", "issue_19_state"]
     missing = [key for key in required if key not in maintenance]
     if missing:

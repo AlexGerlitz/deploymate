@@ -285,6 +285,16 @@ class OpsApiFlowTests(unittest.TestCase):
         self.assertEqual(release["production"]["state"], "OPEN")
         self.assertEqual(release["production"]["failure_category"], "ssh_auth_denied")
         self.assertEqual(release["next_step"], "Restore the deploy public key.")
+        self.assertEqual(
+            [step["key"] for step in release["repair_playbook"]],
+            [
+                "keep-trust-anchor",
+                "restore-deploy-key",
+                "rerun-release-audit",
+                "close-and-unpause",
+            ],
+        )
+        self.assertIn("authorized_keys", release["repair_playbook"][1]["detail"])
         titles = [item["title"] for item in payload["attention_items"]]
         self.assertIn("Release maintenance is not ready for unpause", titles)
 
@@ -327,6 +337,7 @@ class OpsApiFlowTests(unittest.TestCase):
             release["next_step"],
             "Release maintenance is ready; remove pauses only during a planned release window.",
         )
+        self.assertEqual(release["repair_playbook"][0]["key"], "planned-unpause")
 
     def test_ops_export_returns_503_when_source_loader_fails(self):
         with patch("app.routes.ops.list_servers", side_effect=RuntimeError("db unavailable")):

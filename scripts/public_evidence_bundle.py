@@ -119,6 +119,7 @@ def latest_workflow(runs: list[dict[str, Any]], workflow_name: str) -> dict[str,
 def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
     runs = load_github_runs(repo, branch)
     maintenance = load_maintenance_status(repo, check_network)
+    maintenance["repair_playbook"] = build_repair_playbook(maintenance)
     commit = os.getenv("GITHUB_SHA") or git_value("rev-parse", "HEAD")
     current_branch = branch or os.getenv("GITHUB_REF_NAME") or git_value("rev-parse", "--abbrev-ref", "HEAD")
 
@@ -144,6 +145,128 @@ def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
             "Release Maintenance Status artifact",
         ],
     }
+
+
+def open_release_incidents(maintenance: dict[str, Any]) -> list[dict[str, str]]:
+    incidents = []
+    for issue_number, environment in ((18, "production"), (19, "staging")):
+        state = str(maintenance.get(f"issue_{issue_number}_state", "unknown"))
+        if state == "CLOSED":
+            continue
+        incidents.append(
+            {
+                "environment": environment,
+                "issue_number": str(issue_number),
+                "state": state,
+                "failure_category": str(
+                    maintenance.get(f"issue_{issue_number}_failure_category", "unknown")
+                ),
+                "operator_hint": str(maintenance.get(f"issue_{issue_number}_operator_hint", "")),
+            }
+        )
+    return incidents
+
+
+def release_incident_label(incidents: list[dict[str, str]]) -> str:
+    if not incidents:
+        return "release incidents"
+    return ", ".join(f"{item['environment']} #{item['issue_number']}" for item in incidents)
+
+
+def build_repair_playbook(maintenance: dict[str, Any]) -> list[dict[str, str]]:
+    available = str(maintenance.get("available", "1")).lower() in {"1", "true", "yes", "on"}
+    ready_for_unpause = str(maintenance.get("ready_for_unpause", "0")).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if not available:
+        return [
+            {
+                "key": "refresh-maintenance-status",
+                "title": "Refresh release maintenance status",
+                "detail": "Regenerate the maintenance JSON before making release unpause decisions.",
+            }
+        ]
+
+    incidents = open_release_incidents(maintenance)
+    categories = {item["failure_category"] for item in incidents}
+    incident_label = release_incident_label(incidents)
+
+    if ready_for_unpause:
+        return [
+            {
+                "key": "planned-unpause",
+                "title": "Unpause only in a planned release window",
+                "detail": "Remove pause variables only while an operator is watching the next audit or deploy.",
+            }
+        ]
+
+    if "ssh_auth_denied" in categories:
+        return [
+            {
+                "key": "keep-trust-anchor",
+                "title": "Keep known_hosts unchanged",
+                "detail": "SSH host trust already passed; repair the deploy key instead of rotating the host fingerprint.",
+            },
+            {
+                "key": "restore-deploy-key",
+                "title": "Restore the deploy public key",
+                "detail": (
+                    f"Repair {incident_label}: install the matching public key in authorized_keys "
+                    "or rotate DEPLOY_SSH_PRIVATE_KEY."
+                ),
+            },
+            {
+                "key": "rerun-release-audit",
+                "title": "Rerun Release Secrets Audit manually",
+                "detail": "Keep scheduled audit and staging pauses enabled until the manual audit succeeds.",
+            },
+            {
+                "key": "close-and-unpause",
+                "title": "Close incidents and remove pauses after green audit",
+                "detail": "Close the GitHub issues and unset pause variables only after the audit is green.",
+            },
+        ]
+
+    if incidents:
+        first_hint = next((item["operator_hint"] for item in incidents if item["operator_hint"]), "")
+        return [
+            {
+                "key": "read-incident-diagnostics",
+                "title": "Read the latest incident diagnostics",
+                "detail": f"Start with {incident_label}; the current failure category is in the issue body.",
+            },
+            {
+                "key": "apply-operator-hint",
+                "title": "Apply the operator hint",
+                "detail": first_hint or "Use the failure category and workflow logs to repair the environment.",
+            },
+            {
+                "key": "rerun-release-audit",
+                "title": "Rerun Release Secrets Audit manually",
+                "detail": "Do not remove pauses until a manual audit run succeeds.",
+            },
+        ]
+
+    primary_blocker = str(maintenance.get("blocker_1", "") or "")
+    if primary_blocker:
+        return [
+            {
+                "key": "resolve-primary-blocker",
+                "title": "Resolve the primary release blocker",
+                "detail": f"Clear this blocker before unpausing release automation: {primary_blocker}.",
+            }
+        ]
+
+    return [
+        {
+            "key": "rerun-maintenance-check",
+            "title": "Rerun maintenance status",
+            "detail": "Refresh release maintenance status before unpausing.",
+        }
+    ]
 
 
 def md_escape(value: Any) -> str:
@@ -219,6 +342,19 @@ def render_markdown(bundle: dict[str, Any]) -> str:
         lines.extend(f"- {blocker}" for blocker in blockers)
     else:
         lines.append("- None.")
+
+    repair_steps = build_repair_playbook(maintenance)
+    lines.extend(
+        [
+            "",
+            "## Release Repair Playbook",
+            "",
+        ]
+    )
+    for index, step in enumerate(repair_steps, start=1):
+        lines.append(
+            f"{index}. **{md_escape(step['title'])}**: {md_escape(step['detail'])}"
+        )
 
     lines.extend(
         [

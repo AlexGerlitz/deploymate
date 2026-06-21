@@ -862,6 +862,7 @@ exit 1
         self.assertEqual(payload["maintenance"]["ready_for_unpause"], "1")
         self.assertEqual(payload["maintenance"]["issue_18_state"], "CLOSED")
         self.assertEqual(payload["maintenance"]["issue_19_state"], "CLOSED")
+        self.assertEqual(payload["maintenance"]["repair_playbook"][0]["key"], "planned-unpause")
 
     def test_public_evidence_bundle_summarizes_workflows_and_maintenance(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -885,7 +886,9 @@ if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
   exit 0
 fi
 if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
-  printf 'OPEN\\n'
+  cat <<'JSON'
+{"state":"OPEN","body":"Failure category: `ssh_auth_denied`\\nOperator hint: Restore the deploy public key.","comments":[]}
+JSON
   exit 0
 fi
 exit 1
@@ -937,6 +940,7 @@ exit 1
         self.assertEqual(payload["repo"], "AlexGerlitz/deploymate")
         self.assertEqual(payload["branch"], "develop")
         self.assertEqual(payload["maintenance"]["ready_for_unpause"], "0")
+        self.assertEqual(payload["maintenance"]["repair_playbook"][1]["key"], "restore-deploy-key")
         self.assertEqual(payload["workflows"]["ci"]["conclusion"], "success")
         self.assertEqual(payload["workflows"]["ci"]["databaseId"], 101)
         self.assertEqual(payload["workflows"]["release_maintenance_status"]["databaseId"], 102)
@@ -945,6 +949,8 @@ exit 1
         self.assertIn("# DeployMate Public Evidence Bundle", markdown_result.stdout)
         self.assertIn("| CI | `completed` | `success` | [101](https://example.test/actions/runs/101) |", markdown_result.stdout)
         self.assertIn("- release audit schedule paused", markdown_result.stdout)
+        self.assertIn("## Release Repair Playbook", markdown_result.stdout)
+        self.assertIn("**Restore the deploy public key**", markdown_result.stdout)
         self.assertIn("- `Release Maintenance Status artifact`", markdown_result.stdout)
 
 

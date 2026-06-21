@@ -626,7 +626,9 @@ The GitHub Actions workflow `Public Evidence Bundle` publishes
 `deploymate-public-evidence.json` and `deploymate-public-evidence.md` artifacts
 for reviewer handoff, public status pages, and portfolio evidence without
 exposing secrets. It can be run manually and also refreshes automatically after
-successful CI runs on `develop`.
+successful CI runs on `develop`. The bundle includes release incident
+diagnostics and a repair playbook so a reviewer can see both the current blocker
+and the intended operator recovery path.
 
 The app can surface the same release-maintenance state in the Operations overview
 when the release maintenance status file path points to either

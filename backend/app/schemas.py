@@ -161,6 +161,12 @@ class OpsRuntimeCapabilitiesSummary(BaseModel):
     remote_only_recommended: bool = True
 
 
+class OpsReleaseRepairStep(BaseModel):
+    key: str
+    title: str
+    detail: str
+
+
 class OpsReleaseIncidentSummary(BaseModel):
     environment: Literal["production", "staging"]
     issue_number: int
@@ -180,6 +186,7 @@ class OpsReleaseMaintenanceSummary(BaseModel):
     blocker_count: int = 0
     primary_blocker: Optional[str] = None
     next_step: str = "Connect the release maintenance status file before using release unpause decisions."
+    repair_playbook: list[OpsReleaseRepairStep] = Field(default_factory=list)
     production: OpsReleaseIncidentSummary = Field(
         default_factory=lambda: OpsReleaseIncidentSummary(environment="production", issue_number=18)
     )

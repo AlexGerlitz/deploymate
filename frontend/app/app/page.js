@@ -100,6 +100,7 @@ export default function HomePage() {
     blocker_count: 0,
     primary_blocker: null,
     next_step: "Load operations overview before using release unpause decisions.",
+    repair_playbook: [],
     production: {
       state: "unknown",
       failure_category: "unavailable",
@@ -958,6 +959,17 @@ export default function HomePage() {
                   </span>
                   <span>{releaseMaintenanceDetail}</span>
                 </div>
+                {Array.isArray(releaseMaintenance.repair_playbook) &&
+                releaseMaintenance.repair_playbook.length > 0 ? (
+                  <ol className="overviewRepairList" data-testid="ops-release-repair-playbook">
+                    {releaseMaintenance.repair_playbook.slice(0, 4).map((step, index) => (
+                      <li key={step.key || `${step.title}-${index}`}>
+                        <strong>{step.title}</strong>
+                        <span>{step.detail}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
               </div>
             </div>
 

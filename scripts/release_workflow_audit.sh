@@ -312,6 +312,8 @@ text = path.read_text(encoding="utf-8")
 
 required_snippets = [
     "## Incident Diagnostics",
+    "## Release Repair Playbook",
+    "build_repair_playbook",
     "issue_18_failure_category",
     "issue_19_failure_category",
     "issue_18_operator_hint",
@@ -333,7 +335,7 @@ runbook = Path("RUNBOOK.md").read_text(encoding="utf-8")
 required_readme = [
     "Public Evidence Bundle",
     "deploymate-public-evidence.md",
-    "public evidence bundle with CI, release-maintenance, and incident status",
+    "public evidence bundle with CI, release-maintenance, incident status, and repair playbook",
     "actions/workflows/ci.yml/badge.svg?branch=develop",
     "actions/workflows/public-evidence-bundle.yml/badge.svg?branch=develop",
     "actions/workflows/release-maintenance-status.yml/badge.svg?branch=develop",

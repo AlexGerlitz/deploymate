@@ -97,6 +97,23 @@ export const smokeOverviewOpsOverview = {
     blocker_count: 2,
     primary_blocker: "release audit schedule paused",
     next_step: "Restore the deploy public key before the next release audit rerun.",
+    repair_playbook: [
+      {
+        key: "keep-trust-anchor",
+        title: "Keep known_hosts unchanged",
+        detail: "SSH host trust already passed, so repair the deploy key instead.",
+      },
+      {
+        key: "restore-deploy-key",
+        title: "Restore the deploy public key",
+        detail: "Install the matching public key in authorized_keys or rotate DEPLOY_SSH_PRIVATE_KEY.",
+      },
+      {
+        key: "rerun-release-audit",
+        title: "Rerun Release Secrets Audit manually",
+        detail: "Keep pauses enabled until the manual audit succeeds.",
+      },
+    ],
     production: {
       environment: "production",
       issue_number: 18,
@@ -420,6 +437,28 @@ export const smokeOpsOverview = {
     blocker_count: 4,
     primary_blocker: "issue #18 is OPEN",
     next_step: "Restore the deploy public key before the next release audit rerun.",
+    repair_playbook: [
+      {
+        key: "keep-trust-anchor",
+        title: "Keep known_hosts unchanged",
+        detail: "SSH host trust already passed, so repair the deploy key instead.",
+      },
+      {
+        key: "restore-deploy-key",
+        title: "Restore the deploy public key",
+        detail: "Install the matching public key in authorized_keys or rotate DEPLOY_SSH_PRIVATE_KEY.",
+      },
+      {
+        key: "rerun-release-audit",
+        title: "Rerun Release Secrets Audit manually",
+        detail: "Keep pauses enabled until the manual audit succeeds.",
+      },
+      {
+        key: "close-and-unpause",
+        title: "Close incidents and remove pauses after green audit",
+        detail: "Close the GitHub issues and unset pause variables only after the audit is green.",
+      },
+    ],
     production: {
       environment: "production",
       issue_number: 18,

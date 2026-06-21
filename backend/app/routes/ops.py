@@ -17,6 +17,7 @@ from app.schemas import (
     OpsOverviewResponse,
     OpsReleaseIncidentSummary,
     OpsReleaseMaintenanceSummary,
+    OpsReleaseRepairStep,
     OpsRuntimeCapabilitiesSummary,
     OpsServersSummary,
     OpsTemplatesSummary,
@@ -141,6 +142,129 @@ def _release_incident_summary(
     )
 
 
+def _open_release_incidents(
+    production: OpsReleaseIncidentSummary,
+    staging: OpsReleaseIncidentSummary,
+) -> list[OpsReleaseIncidentSummary]:
+    return [incident for incident in (production, staging) if incident.state != "CLOSED"]
+
+
+def _release_incident_label(incidents: list[OpsReleaseIncidentSummary]) -> str:
+    if not incidents:
+        return "release incidents"
+    return ", ".join(f"{item.environment} #{item.issue_number}" for item in incidents)
+
+
+def _build_release_repair_playbook(
+    *,
+    available: bool,
+    ready_for_unpause: bool,
+    production: OpsReleaseIncidentSummary,
+    staging: OpsReleaseIncidentSummary,
+    primary_blocker: str | None,
+) -> list[OpsReleaseRepairStep]:
+    if not available:
+        return [
+            OpsReleaseRepairStep(
+                key="publish-status-json",
+                title="Publish release status JSON",
+                detail=(
+                    "Run scripts/sync_release_maintenance_status.sh on a trusted runner and point "
+                    "DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE at the generated JSON file."
+                ),
+            )
+        ]
+
+    open_incidents = _open_release_incidents(production, staging)
+    incident_label = _release_incident_label(open_incidents)
+    open_categories = {incident.failure_category for incident in open_incidents}
+
+    if ready_for_unpause:
+        return [
+            OpsReleaseRepairStep(
+                key="planned-unpause",
+                title="Unpause only in a planned release window",
+                detail=(
+                    "The maintenance check is ready. Remove release pauses only when an operator is "
+                    "watching the next release or scheduled audit run."
+                ),
+            )
+        ]
+
+    if "ssh_auth_denied" in open_categories:
+        return [
+            OpsReleaseRepairStep(
+                key="keep-trust-anchor",
+                title="Keep known_hosts unchanged",
+                detail=(
+                    "This category means SSH host trust already passed. Do not rotate the host "
+                    "fingerprint unless a separate host-key incident appears."
+                ),
+            ),
+            OpsReleaseRepairStep(
+                key="restore-deploy-key",
+                title="Restore the deploy public key",
+                detail=(
+                    f"Repair {incident_label}: install the matching public key in authorized_keys "
+                    "for the deploy user, or rotate the GitHub environment DEPLOY_SSH_PRIVATE_KEY."
+                ),
+            ),
+            OpsReleaseRepairStep(
+                key="rerun-release-audit",
+                title="Rerun Release Secrets Audit manually",
+                detail=(
+                    "Keep scheduled audit and staging pauses enabled until the manual audit proves "
+                    "the key works."
+                ),
+            ),
+            OpsReleaseRepairStep(
+                key="close-and-unpause",
+                title="Close incidents and remove pauses after green audit",
+                detail=(
+                    "Close the GitHub incident issues and unset the pause variables only after the "
+                    "manual audit succeeds for the affected environments."
+                ),
+            ),
+        ]
+
+    if open_incidents:
+        first_hint = next((incident.operator_hint for incident in open_incidents if incident.operator_hint), "")
+        return [
+            OpsReleaseRepairStep(
+                key="read-incident-diagnostics",
+                title="Read the latest incident diagnostics",
+                detail=f"Start with {incident_label}; the current blocker category is captured in the issue body.",
+            ),
+            OpsReleaseRepairStep(
+                key="apply-operator-hint",
+                title="Apply the operator hint",
+                detail=first_hint or "Use the failure category and workflow logs to repair the environment.",
+            ),
+            OpsReleaseRepairStep(
+                key="rerun-release-audit",
+                title="Rerun Release Secrets Audit manually",
+                detail="Do not remove pauses until a manual audit run succeeds.",
+            ),
+        ]
+
+    if primary_blocker:
+        return [
+            OpsReleaseRepairStep(
+                key="resolve-primary-blocker",
+                title="Resolve the primary release blocker",
+                detail=f"Clear this blocker before unpausing release automation: {primary_blocker}.",
+            )
+        ]
+
+    return [
+        OpsReleaseRepairStep(
+            key="rerun-maintenance-check",
+            title="Rerun maintenance status",
+            detail="Refresh the release maintenance status and review the generated blockers before unpausing.",
+        )
+    ]
+
+
 def _first_release_blocker(payload: dict, blocker_count: int) -> str | None:
     for index in range(1, blocker_count + 1):
         value = _string_value(payload, f"blocker_{index}")
@@ -181,12 +305,20 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
                 "Publish the latest release-maintenance-status JSON to the runtime before using "
                 "release unpause decisions."
             ),
+            repair_playbook=_build_release_repair_playbook(
+                available=False,
+                ready_for_unpause=False,
+                production=OpsReleaseIncidentSummary(environment="production", issue_number=18),
+                staging=OpsReleaseIncidentSummary(environment="staging", issue_number=19),
+                primary_blocker=None,
+            ),
         )
 
     blocker_count = _int_status_value(payload, "blocker_count")
     production = _release_incident_summary(payload, environment="production", issue_number=18)
     staging = _release_incident_summary(payload, environment="staging", issue_number=19)
     primary_blocker = _first_release_blocker(payload, blocker_count)
+    ready_for_unpause = _bool_status_value(payload, "ready_for_unpause")
     next_step = "Release maintenance is ready; remove pauses only during a planned release window."
 
     for incident in (production, staging):
@@ -201,13 +333,20 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
         available=True,
         source=source,
         generated_at=_string_value(payload, "generated_at") or None,
-        ready_for_unpause=_bool_status_value(payload, "ready_for_unpause"),
+        ready_for_unpause=ready_for_unpause,
         release_audit_scheduled_paused=_bool_status_value(payload, "release_audit_scheduled_paused"),
         staging_release_paused=_bool_status_value(payload, "staging_release_paused"),
         network_checks=_string_value(payload, "network_checks", "unknown"),
         blocker_count=blocker_count,
         primary_blocker=primary_blocker,
         next_step=next_step,
+        repair_playbook=_build_release_repair_playbook(
+            available=True,
+            ready_for_unpause=ready_for_unpause,
+            production=production,
+            staging=staging,
+            primary_blocker=primary_blocker,
+        ),
         production=production,
         staging=staging,
     )

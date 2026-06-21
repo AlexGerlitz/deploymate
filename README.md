@@ -84,7 +84,7 @@ If you want the shortest coherent pass through the project:
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
 - product screenshots and route map
-- public evidence bundle with CI, release-maintenance, and incident status
+- public evidence bundle with CI, release-maintenance, incident status, and repair playbook
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 
