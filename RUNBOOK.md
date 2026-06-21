@@ -635,6 +635,19 @@ runtime setting is DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE. This is a
 read-only bridge: the UI explains readiness, incident categories, and the next
 operator action without reading GitHub secrets or changing release variables.
 
+To refresh that file from the deployment host or a trusted operator runner:
+
+```bash
+bash scripts/sync_release_maintenance_status.sh \
+  --source maintenance \
+  --output /opt/deploymate/runtime/release-maintenance-status.json \
+  --no-network
+```
+
+Use `--source evidence` when the dashboard should read the full public evidence
+bundle shape. Add `--check-network` only for scheduled/manual checks where DNS
+and HTTPS probe latency is acceptable.
+
 Required GitHub Actions release secrets audit workflow secrets:
 
 - `DEPLOY_HOST`

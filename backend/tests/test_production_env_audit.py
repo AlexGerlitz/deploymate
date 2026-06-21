@@ -736,6 +736,133 @@ exit 1
         self.assertIn("- release audit schedule paused", result.stdout)
         self.assertIn("- staging release paused", result.stdout)
 
+    def test_sync_release_maintenance_status_writes_runtime_status_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\ttrue\\t2026-06-21T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\tfalse\\t2026-06-21T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  if [ "$3" = "18" ]; then
+    cat <<'JSON'
+{"state":"OPEN","body":"Failure category: `ssh_auth_denied`\\nOperator hint: Restore deploy key.","comments":[]}
+JSON
+  else
+    cat <<'JSON'
+{"state":"CLOSED","body":"Resolved incident","comments":[]}
+JSON
+  fi
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            output_path = Path(tmpdir) / "runtime" / "release-maintenance-status.json"
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/sync_release_maintenance_status.sh",
+                    "--source",
+                    "maintenance",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--output",
+                    str(output_path),
+                    "--no-network",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("[sync-release-maintenance] wrote maintenance status", result.stdout)
+        self.assertEqual(payload["network_checks"], "skipped")
+        self.assertEqual(payload["issue_18_state"], "OPEN")
+        self.assertEqual(payload["issue_18_failure_category"], "ssh_auth_denied")
+        self.assertEqual(payload["issue_18_operator_hint"], "Restore deploy key.")
+        self.assertEqual(payload["ready_for_unpause"], "0")
+
+    def test_sync_release_maintenance_status_writes_public_evidence_bundle(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "run" ] && [ "$2" = "list" ]; then
+  cat <<'JSON'
+[
+  {"workflowName":"CI","status":"completed","conclusion":"success","databaseId":201,"url":"https://example.test/actions/runs/201","headSha":"abc","displayTitle":"CI","event":"push","createdAt":"2026-06-21T00:00:00Z"},
+  {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":202,"url":"https://example.test/actions/runs/202","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-21T00:01:00Z"}
+]
+JSON
+  exit 0
+fi
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\tfalse\\t2026-06-21T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\tfalse\\t2026-06-21T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  cat <<'JSON'
+{"state":"CLOSED","body":"Resolved incident","comments":[]}
+JSON
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            output_path = Path(tmpdir) / "runtime" / "deploymate-public-evidence.json"
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/sync_release_maintenance_status.sh",
+                    "--source",
+                    "evidence",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--output",
+                    str(output_path),
+                    "--no-network",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("[sync-release-maintenance] wrote evidence status", result.stdout)
+        self.assertEqual(payload["workflows"]["ci"]["databaseId"], 201)
+        self.assertEqual(payload["maintenance"]["network_checks"], "skipped")
+        self.assertEqual(payload["maintenance"]["ready_for_unpause"], "1")
+        self.assertEqual(payload["maintenance"]["issue_18_state"], "CLOSED")
+        self.assertEqual(payload["maintenance"]["issue_19_state"], "CLOSED")
+
     def test_public_evidence_bundle_summarizes_workflows_and_maintenance(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_gh = Path(tmpdir) / "gh"
