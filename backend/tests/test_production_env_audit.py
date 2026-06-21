@@ -963,8 +963,8 @@ exit 1
 
             env = os.environ.copy()
             env["PATH"] = f"{tmpdir}:{env['PATH']}"
-            env["GITHUB_RUN_ID"] = ""
-            env["GITHUB_EVENT_NAME"] = ""
+            env["GITHUB_RUN_ID"] = "999"
+            env["GITHUB_EVENT_NAME"] = "workflow_run"
 
             json_result = subprocess.run(
                 [
@@ -1082,7 +1082,7 @@ exit 1
         self.assertEqual(entrypoints_by_key["ci"]["conclusion"], "success")
         self.assertEqual(
             entrypoints_by_key["public-evidence"]["url"],
-            "https://example.test/actions/runs/103",
+            "https://github.com/AlexGerlitz/deploymate/actions/runs/999",
         )
         self.assertEqual(entrypoints_by_key["release-repair-workflow"]["status"], "blocked")
         self.assertEqual(entrypoints_by_key["live-target"]["status"], "skipped")
@@ -1118,6 +1118,11 @@ exit 1
         )
         self.assertIn(
             "| CI | `completed` | `success` | [101](https://example.test/actions/runs/101) |",
+            markdown_result.stdout,
+        )
+        self.assertIn(
+            "| Public Evidence Bundle | `completed` | `success` | "
+            "[999](https://github.com/AlexGerlitz/deploymate/actions/runs/999) |",
             markdown_result.stdout,
         )
         self.assertIn("- release audit schedule paused", markdown_result.stdout)

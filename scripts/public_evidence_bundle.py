@@ -1018,16 +1018,7 @@ def build_issue_comment(bundle: dict[str, Any]) -> str:
             workflow_row("CI", workflows["ci"]),
             workflow_row("Release Maintenance Status", workflows["release_maintenance_status"]),
             workflow_row("Release Secrets Audit", workflows["release_secrets_audit"]),
-            workflow_row("Public Evidence Bundle", {
-                "status": "completed",
-                "conclusion": "success",
-                "databaseId": os.getenv("GITHUB_RUN_ID", ""),
-                "url": (
-                    f"https://github.com/{bundle['repo']}/actions/runs/{os.getenv('GITHUB_RUN_ID', '')}"
-                    if os.getenv("GITHUB_RUN_ID")
-                    else ""
-                ),
-            }),
+            workflow_row("Public Evidence Bundle", current_public_evidence_run(bundle)),
             "",
             "### Operator steps",
             "",
@@ -1205,7 +1196,7 @@ def render_markdown(bundle: dict[str, Any]) -> str:
             workflow_row("CI", workflows["ci"]),
             workflow_row("Release Maintenance Status", workflows["release_maintenance_status"]),
             workflow_row("Release Secrets Audit", workflows["release_secrets_audit"]),
-            workflow_row("Public Evidence Bundle", workflows["public_evidence"]),
+            workflow_row("Public Evidence Bundle", current_public_evidence_run(bundle)),
             workflow_row("Staging", workflows["staging"]),
             "",
             "## Maintenance Evidence",
