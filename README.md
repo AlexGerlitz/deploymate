@@ -55,7 +55,8 @@ Commercial licensing entry points:
 
 If you are opening this repository as a hiring reviewer, these are the fastest entry points:
 
-- live review route: `/review`
+- live review route: `https://deploymate.152.53.178.83.sslip.io/review`
+- primary release target: `https://deploymatecloud.ru` when release maintenance evidence is green
 - product preview screenshots: [Product Preview](#product-preview)
 - release notes: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)
 - roadmap: [ROADMAP.md](ROADMAP.md)
@@ -75,7 +76,7 @@ What to evaluate quickly:
 If you want the shortest coherent pass through the project:
 
 1. start with the screenshots in [Product Preview](#product-preview)
-2. open `/review` when a live frontend is available
+2. open `https://deploymate.152.53.178.83.sslip.io/review` for the live fallback review console
 3. open the latest `Public Evidence Bundle` GitHub Actions run and download `deploymate-review-packet`, or generate the same local packet with `python3 scripts/export_review_packet.py`
 4. run `make public-review` to verify the release/evidence contract, local packet, and latest GitHub artifact through `scripts/check_latest_review_packet_artifact.py`
 5. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
@@ -98,17 +99,21 @@ If you are evaluating whether this is more than a UI shell, the quickest evidenc
 ## Live Target Status
 
 The public deployment target is treated as an operational dependency, not as an
-unverified marketing promise. Before using `https://deploymatecloud.ru` for a
-live review, open the latest `Public Evidence Bundle` artifact and check:
+unverified marketing promise. The stable fallback review console is currently:
+
+- `https://deploymate.152.53.178.83.sslip.io/review`
+
+Before using the primary release target `https://deploymatecloud.ru` for a live
+review, open the latest `Public Evidence Bundle` artifact and check:
 
 - `Public network check`
 - `Ready for unpause`
 - open release incidents and the release repair workflow packet
 
-If the public network check is not `ok`, use the screenshots, route map, release
-notes, and evidence bundle as the reviewer path until the target host is
-restored. This keeps the project reviewable even while DNS, HTTPS, or deploy-key
-repair is in progress.
+If the primary public network check is not `ok`, use the fallback review console,
+screenshots, route map, release notes, and evidence bundle as the reviewer path
+until the primary target host is restored. This keeps the project reviewable even
+while DNS, HTTPS, or deploy-key repair is in progress.
 
 ## Product Preview
 

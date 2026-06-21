@@ -18,6 +18,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 RELEASE_SECRETS_AUDIT_WORKFLOW = "release-secrets-audit.yml"
 DEPLOY_KEY_RECOVERY_WORKFLOW = "deploy-key-recovery.yml"
 ISSUE_COMMENT_MARKER = "<!-- deploymate:release-repair-evidence -->"
+PRIMARY_LIVE_URL = "https://deploymatecloud.ru"
+FALLBACK_LIVE_URL = "https://deploymate.152.53.178.83.sslip.io"
+FALLBACK_REVIEW_URL = f"{FALLBACK_LIVE_URL}/review"
 
 
 def run_command(args: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -190,6 +193,7 @@ def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
         "maintenance": maintenance,
         "workflows": selected_workflows,
         "reviewer_path": [
+            FALLBACK_REVIEW_URL,
             "/review",
             "README.md",
             "docs/releases/v0.1.0.md",
@@ -921,10 +925,23 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
                 "type": "frontend_route",
                 "status": live_target_status,
                 "conclusion": str(maintenance.get("network_checks", "unknown")),
-                "url": "https://deploymatecloud.ru/review",
+                "url": FALLBACK_REVIEW_URL,
                 "detail": (
-                    "Public route that ties product route map, CI evidence, "
-                    "local packet command, and artifact entrypoints together."
+                    "Fallback public route that ties product route map, CI evidence, "
+                    "local packet command, and artifact entrypoints together while "
+                    "the primary release target is under repair."
+                ),
+            },
+            {
+                "key": "fallback-live-target",
+                "label": "Fallback live target",
+                "type": "public_probe",
+                "status": "published",
+                "conclusion": "fallback",
+                "url": FALLBACK_LIVE_URL,
+                "detail": (
+                    "German VPS fallback target used for review while the primary "
+                    "custom domain release target is repaired."
                 ),
             },
             {
@@ -942,7 +959,7 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
                 "type": "public_probe",
                 "status": live_target_status,
                 "conclusion": str(maintenance.get("network_checks", "unknown")),
-                "url": "https://deploymatecloud.ru",
+                "url": PRIMARY_LIVE_URL,
                 "detail": (
                     "; ".join(maintenance.get("network_blockers") or [])
                     or "Public DNS and HTTPS probes are not blocking this snapshot."
@@ -972,7 +989,7 @@ def build_review_index(bundle: dict[str, Any]) -> dict[str, Any]:
             {
                 "key": "review-console",
                 "title": "Open review console",
-                "detail": "Open /review when the live frontend is available; if it is paused, keep this artifact as the review source.",
+                "detail": f"Open {FALLBACK_REVIEW_URL}; if the primary live target is paused, keep this artifact as the review source.",
             },
             {
                 "key": "incidents",

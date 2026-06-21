@@ -41,6 +41,8 @@ const evidenceCards = [
   },
 ];
 
+const fallbackReviewUrl = "https://deploymate.152.53.178.83.sslip.io/review";
+
 const reviewSequence = [
   {
     step: "01",
@@ -55,7 +57,7 @@ const reviewSequence = [
   {
     step: "03",
     title: "Walk the product routes",
-    detail: "Use the live app surfaces for workspace, runtime detail, server review, admin, and requests.",
+    detail: "Use the fallback live console for workspace, runtime detail, server review, admin, and requests.",
   },
   {
     step: "04",
@@ -156,8 +158,14 @@ export default function ReviewPage() {
 
               <div className="buttonRow reviewHeroActions">
                 <a
-                  href="https://github.com/AlexGerlitz/deploymate/actions/workflows/public-evidence-bundle.yml?query=branch%3Adevelop"
+                  href={fallbackReviewUrl}
                   className="landingButton primaryButton"
+                >
+                  Open live fallback
+                </a>
+                <a
+                  href="https://github.com/AlexGerlitz/deploymate/actions/workflows/public-evidence-bundle.yml?query=branch%3Adevelop"
+                  className="landingButton secondaryButton"
                 >
                   Open evidence workflow
                 </a>

@@ -554,7 +554,8 @@ for snippet in required_runbook:
 required_release_notes = [
     "live target availability tracked by release maintenance evidence",
     "open the latest `Public Evidence Bundle` artifact and check `Public network check`",
-    "if the public target is paused or unavailable, use the screenshots, release evidence, and route map from `README.md`",
+    "open the fallback review console at `https://deploymate.152.53.178.83.sslip.io/review`",
+    "if the primary public target is paused or unavailable, use the fallback console, screenshots, release evidence, and route map from `README.md`",
 ]
 for snippet in required_release_notes:
     if snippet not in release_notes:
