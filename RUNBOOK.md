@@ -628,6 +628,13 @@ for reviewer handoff, public status pages, and portfolio evidence without
 exposing secrets. It can be run manually and also refreshes automatically after
 successful CI runs on `develop`.
 
+The app can surface the same release-maintenance state in the Operations overview
+when the release maintenance status file path points to either
+`release-maintenance-status.json` or `deploymate-public-evidence.json`. The
+runtime setting is DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE. This is a
+read-only bridge: the UI explains readiness, incident categories, and the next
+operator action without reading GitHub secrets or changing release variables.
+
 Required GitHub Actions release secrets audit workflow secrets:
 
 - `DEPLOY_HOST`

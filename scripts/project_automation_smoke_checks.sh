@@ -47,12 +47,14 @@ automation_smoke_ops_checks() {
 /app|ops activity card|data-testid="ops-overview-activity-card"
 /app|ops templates card|data-testid="ops-overview-templates-card"
 /app|ops capabilities card|data-testid="ops-overview-capabilities-card"
+/app|ops release maintenance card|data-testid="ops-overview-release-card"
 /app|ops attention list or empty banner|data-testid="ops-attention-list"|data-testid="ops-attention-empty-banner"
 /app|ops smoke deployment count copy|Deployments
 /app|ops smoke servers copy|Servers
 /app|ops smoke activity copy|Activity
 /app|ops smoke templates copy|Templates
 /app|ops runtime posture copy|remote-only|mixed
+/app|ops release maintenance copy|Release maintenance
 EOF
 }
 

@@ -882,6 +882,32 @@ export function buildOpsSnapshot({ currentUser, deployments, servers, notificati
         process.env.NEXT_PUBLIC_SERVER_CREDENTIALS_KEY_CONFIGURED,
       ),
     },
+    release_maintenance: {
+      available: false,
+      source: "client_fallback",
+      generated_at: null,
+      ready_for_unpause: false,
+      release_audit_scheduled_paused: false,
+      staging_release_paused: false,
+      network_checks: "unknown",
+      blocker_count: 0,
+      primary_blocker: null,
+      next_step: "Load the server-side operations overview before using release unpause decisions.",
+      production: {
+        environment: "production",
+        issue_number: 18,
+        state: "unknown",
+        failure_category: "unavailable",
+        operator_hint: null,
+      },
+      staging: {
+        environment: "staging",
+        issue_number: 19,
+        state: "unknown",
+        failure_category: "unavailable",
+        operator_hint: null,
+      },
+    },
     attention_items: attentionItems,
   };
 }
@@ -903,6 +929,15 @@ export function buildOpsSummaryText(snapshot) {
     lines.push(
       `Top template: ${snapshot.templates.top_template_name} (${snapshot.templates.top_template_use_count} uses)`,
     );
+  }
+
+  if (snapshot.release_maintenance) {
+    lines.push(
+      `Release maintenance: ${snapshot.release_maintenance.ready_for_unpause ? "ready" : "not ready"}, source ${snapshot.release_maintenance.source || "unknown"}, blockers ${snapshot.release_maintenance.blocker_count ?? "unknown"}`,
+    );
+    if (snapshot.release_maintenance.next_step) {
+      lines.push(`Release next step: ${snapshot.release_maintenance.next_step}`);
+    }
   }
 
   if (Array.isArray(snapshot.attention_items) && snapshot.attention_items.length > 0) {

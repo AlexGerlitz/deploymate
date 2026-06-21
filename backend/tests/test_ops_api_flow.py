@@ -1,4 +1,5 @@
 import unittest
+import json
 import os
 import tempfile
 from unittest.mock import patch
@@ -237,6 +238,95 @@ class OpsApiFlowTests(unittest.TestCase):
         payload = response.json()
         titles = [item["title"] for item in payload["attention_items"]]
         self.assertIn("Strict SSH trust is enabled but not ready", titles)
+
+    def test_ops_overview_includes_release_maintenance_diagnostics(self):
+        with tempfile.NamedTemporaryFile("w", delete=False) as handle:
+            json.dump(
+                {
+                    "generated_at": "2026-06-21T02:36:36Z",
+                    "ready_for_unpause": "0",
+                    "release_audit_scheduled_paused": "true",
+                    "staging_release_paused": "true",
+                    "network_checks": "enabled",
+                    "issue_18_state": "OPEN",
+                    "issue_18_failure_category": "ssh_auth_denied",
+                    "issue_18_operator_hint": "Restore the deploy public key.",
+                    "issue_19_state": "CLOSED",
+                    "issue_19_failure_category": "unavailable",
+                    "blocker_count": "3",
+                    "blocker_1": "release audit schedule paused",
+                },
+                handle,
+            )
+            status_path = handle.name
+
+        self.addCleanup(lambda: os.path.exists(status_path) and os.unlink(status_path))
+
+        with patch.dict(
+            os.environ,
+            {
+                "DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE": status_path,
+            },
+            clear=False,
+        ):
+            response = self.client.get("/ops/overview?notifications_limit=100")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        release = payload["release_maintenance"]
+        self.assertTrue(release["available"])
+        self.assertEqual(release["source"], "release_maintenance_status")
+        self.assertFalse(release["ready_for_unpause"])
+        self.assertTrue(release["release_audit_scheduled_paused"])
+        self.assertTrue(release["staging_release_paused"])
+        self.assertEqual(release["network_checks"], "enabled")
+        self.assertEqual(release["blocker_count"], 3)
+        self.assertEqual(release["primary_blocker"], "release audit schedule paused")
+        self.assertEqual(release["production"]["state"], "OPEN")
+        self.assertEqual(release["production"]["failure_category"], "ssh_auth_denied")
+        self.assertEqual(release["next_step"], "Restore the deploy public key.")
+        titles = [item["title"] for item in payload["attention_items"]]
+        self.assertIn("Release maintenance is not ready for unpause", titles)
+
+    def test_ops_overview_accepts_public_evidence_bundle_status(self):
+        with tempfile.NamedTemporaryFile("w", delete=False) as handle:
+            json.dump(
+                {
+                    "maintenance": {
+                        "generated_at": "2026-06-21T02:43:00Z",
+                        "ready_for_unpause": "1",
+                        "release_audit_scheduled_paused": "false",
+                        "staging_release_paused": "false",
+                        "network_checks": "skipped",
+                        "issue_18_state": "CLOSED",
+                        "issue_19_state": "CLOSED",
+                        "blocker_count": "0",
+                    }
+                },
+                handle,
+            )
+            status_path = handle.name
+
+        self.addCleanup(lambda: os.path.exists(status_path) and os.unlink(status_path))
+
+        with patch.dict(
+            os.environ,
+            {
+                "DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE": status_path,
+            },
+            clear=False,
+        ):
+            response = self.client.get("/ops/overview?notifications_limit=100")
+
+        self.assertEqual(response.status_code, 200)
+        release = response.json()["release_maintenance"]
+        self.assertTrue(release["available"])
+        self.assertEqual(release["source"], "public_evidence_bundle")
+        self.assertTrue(release["ready_for_unpause"])
+        self.assertEqual(
+            release["next_step"],
+            "Release maintenance is ready; remove pauses only during a planned release window.",
+        )
 
     def test_ops_export_returns_503_when_source_loader_fails(self):
         with patch("app.routes.ops.list_servers", side_effect=RuntimeError("db unavailable")):

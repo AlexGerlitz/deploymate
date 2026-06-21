@@ -161,6 +161,33 @@ class OpsRuntimeCapabilitiesSummary(BaseModel):
     remote_only_recommended: bool = True
 
 
+class OpsReleaseIncidentSummary(BaseModel):
+    environment: Literal["production", "staging"]
+    issue_number: int
+    state: str = "unknown"
+    failure_category: str = "unavailable"
+    operator_hint: Optional[str] = None
+
+
+class OpsReleaseMaintenanceSummary(BaseModel):
+    available: bool = False
+    source: str = "not_configured"
+    generated_at: Optional[str] = None
+    ready_for_unpause: bool = False
+    release_audit_scheduled_paused: bool = False
+    staging_release_paused: bool = False
+    network_checks: str = "unknown"
+    blocker_count: int = 0
+    primary_blocker: Optional[str] = None
+    next_step: str = "Connect the release maintenance status file before using release unpause decisions."
+    production: OpsReleaseIncidentSummary = Field(
+        default_factory=lambda: OpsReleaseIncidentSummary(environment="production", issue_number=18)
+    )
+    staging: OpsReleaseIncidentSummary = Field(
+        default_factory=lambda: OpsReleaseIncidentSummary(environment="staging", issue_number=19)
+    )
+
+
 class OpsOverviewResponse(BaseModel):
     generated_at: str
     user: Optional[OpsUserSummary] = None
@@ -169,6 +196,7 @@ class OpsOverviewResponse(BaseModel):
     notifications: OpsNotificationsSummary = Field(default_factory=OpsNotificationsSummary)
     templates: OpsTemplatesSummary = Field(default_factory=OpsTemplatesSummary)
     capabilities: OpsRuntimeCapabilitiesSummary = Field(default_factory=OpsRuntimeCapabilitiesSummary)
+    release_maintenance: OpsReleaseMaintenanceSummary = Field(default_factory=OpsReleaseMaintenanceSummary)
     attention_items: list[OpsAttentionItem] = Field(default_factory=list)
 
 

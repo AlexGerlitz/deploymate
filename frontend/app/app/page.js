@@ -90,6 +90,35 @@ export default function HomePage() {
       notifications,
       templates,
     });
+  const releaseMaintenance = opsSnapshot.release_maintenance || {
+    available: false,
+    source: "unavailable",
+    ready_for_unpause: false,
+    release_audit_scheduled_paused: false,
+    staging_release_paused: false,
+    network_checks: "unknown",
+    blocker_count: 0,
+    primary_blocker: null,
+    next_step: "Load operations overview before using release unpause decisions.",
+    production: {
+      state: "unknown",
+      failure_category: "unavailable",
+    },
+    staging: {
+      state: "unknown",
+      failure_category: "unavailable",
+    },
+  };
+  const releaseMaintenanceState = !releaseMaintenance.available
+    ? "unwired"
+    : releaseMaintenance.ready_for_unpause
+      ? "ready"
+      : "not ready";
+  const releaseMaintenanceDetail = releaseMaintenance.available
+    ? releaseMaintenance.next_step ||
+      releaseMaintenance.primary_blocker ||
+      "Review release maintenance before unpausing."
+    : releaseMaintenance.next_step || "Connect release maintenance status before unpausing.";
   const canAccessServers = Boolean(currentUser?.is_admin);
   const memberRemoteOnly = !canAccessServers && !localDeploymentsEnabled;
   const memberHasLiveDeployments = memberRemoteOnly && opsSnapshot.deployments.total > 0;
@@ -910,6 +939,24 @@ export default function HomePage() {
                   <span>
                     Cred key {opsSnapshot.capabilities?.server_credentials_key_configured ? "configured" : "missing"}
                   </span>
+                </div>
+              </div>
+              <div className="overviewCard" data-testid="ops-overview-release-card">
+                <span className="overviewLabel">Release maintenance</span>
+                <strong className="overviewValue">{releaseMaintenanceState}</strong>
+                <div className="overviewMeta">
+                  <span>Source {releaseMaintenance.source || "unknown"}</span>
+                  <span>Network checks {releaseMaintenance.network_checks || "unknown"}</span>
+                  <span>Blockers {releaseMaintenance.blocker_count ?? "unknown"}</span>
+                  <span>
+                    Production {releaseMaintenance.production?.state || "unknown"} ·{" "}
+                    {releaseMaintenance.production?.failure_category || "unavailable"}
+                  </span>
+                  <span>
+                    Staging {releaseMaintenance.staging?.state || "unknown"} ·{" "}
+                    {releaseMaintenance.staging?.failure_category || "unavailable"}
+                  </span>
+                  <span>{releaseMaintenanceDetail}</span>
                 </div>
               </div>
             </div>

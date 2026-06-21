@@ -1,7 +1,9 @@
 import csv
 import io
+import json
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable, Iterable
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,6 +15,8 @@ from app.schemas import (
     OpsDeploymentsSummary,
     OpsNotificationsSummary,
     OpsOverviewResponse,
+    OpsReleaseIncidentSummary,
+    OpsReleaseMaintenanceSummary,
     OpsRuntimeCapabilitiesSummary,
     OpsServersSummary,
     OpsTemplatesSummary,
@@ -28,6 +32,7 @@ from app.services.server_credentials import SERVER_CREDENTIALS_KEY_ENV
 
 
 router = APIRouter(prefix="/ops", dependencies=[Depends(require_auth)])
+RELEASE_MAINTENANCE_STATUS_FILE_ENV = "DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE"
 
 
 def _collection_or_empty(
@@ -100,6 +105,111 @@ def _build_runtime_capabilities_summary() -> OpsRuntimeCapabilitiesSummary:
         strict_known_hosts_configured=strict_known_hosts_configured,
         server_credentials_key_configured=bool(os.getenv(SERVER_CREDENTIALS_KEY_ENV, "").strip()),
         remote_only_recommended=True,
+    )
+
+
+def _string_value(payload: dict, key: str, default: str = "") -> str:
+    value = payload.get(key)
+    if value is None:
+        return default
+    return str(value)
+
+
+def _bool_status_value(payload: dict, key: str) -> bool:
+    return _string_value(payload, key).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _int_status_value(payload: dict, key: str, default: int = 0) -> int:
+    try:
+        return int(_string_value(payload, key, str(default)) or default)
+    except ValueError:
+        return default
+
+
+def _release_incident_summary(
+    payload: dict,
+    *,
+    environment: str,
+    issue_number: int,
+) -> OpsReleaseIncidentSummary:
+    return OpsReleaseIncidentSummary(
+        environment=environment,
+        issue_number=issue_number,
+        state=_string_value(payload, f"issue_{issue_number}_state", "unknown"),
+        failure_category=_string_value(payload, f"issue_{issue_number}_failure_category", "unavailable"),
+        operator_hint=_string_value(payload, f"issue_{issue_number}_operator_hint") or None,
+    )
+
+
+def _first_release_blocker(payload: dict, blocker_count: int) -> str | None:
+    for index in range(1, blocker_count + 1):
+        value = _string_value(payload, f"blocker_{index}")
+        if value:
+            return value
+    return None
+
+
+def _load_release_maintenance_payload() -> tuple[dict | None, str]:
+    raw_path = os.getenv(RELEASE_MAINTENANCE_STATUS_FILE_ENV, "").strip()
+    if not raw_path:
+        return None, "not_configured"
+
+    path = Path(raw_path)
+    if not path.is_file():
+        return None, "missing_file"
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, "unreadable_file"
+
+    maintenance = payload.get("maintenance") if isinstance(payload, dict) else None
+    if isinstance(maintenance, dict):
+        return maintenance, "public_evidence_bundle"
+    if isinstance(payload, dict):
+        return payload, "release_maintenance_status"
+    return None, "unreadable_file"
+
+
+def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
+    payload, source = _load_release_maintenance_payload()
+    if payload is None:
+        return OpsReleaseMaintenanceSummary(
+            available=False,
+            source=source,
+            next_step=(
+                "Publish the latest release-maintenance-status JSON to the runtime before using "
+                "release unpause decisions."
+            ),
+        )
+
+    blocker_count = _int_status_value(payload, "blocker_count")
+    production = _release_incident_summary(payload, environment="production", issue_number=18)
+    staging = _release_incident_summary(payload, environment="staging", issue_number=19)
+    primary_blocker = _first_release_blocker(payload, blocker_count)
+    next_step = "Release maintenance is ready; remove pauses only during a planned release window."
+
+    for incident in (production, staging):
+        if incident.state != "CLOSED" and incident.operator_hint:
+            next_step = incident.operator_hint
+            break
+    else:
+        if primary_blocker:
+            next_step = f"Resolve this release blocker before unpause: {primary_blocker}."
+
+    return OpsReleaseMaintenanceSummary(
+        available=True,
+        source=source,
+        generated_at=_string_value(payload, "generated_at") or None,
+        ready_for_unpause=_bool_status_value(payload, "ready_for_unpause"),
+        release_audit_scheduled_paused=_bool_status_value(payload, "release_audit_scheduled_paused"),
+        staging_release_paused=_bool_status_value(payload, "staging_release_paused"),
+        network_checks=_string_value(payload, "network_checks", "unknown"),
+        blocker_count=blocker_count,
+        primary_blocker=primary_blocker,
+        next_step=next_step,
+        production=production,
+        staging=staging,
     )
 
 
@@ -208,6 +318,7 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
     )
     top_template = popular_templates[0] if popular_templates else None
     capabilities = _build_runtime_capabilities_summary()
+    release_maintenance = _build_release_maintenance_summary()
 
     if user.get("must_change_password"):
         attention_items.append(
@@ -305,6 +416,23 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
             )
         )
 
+    if not release_maintenance.available:
+        attention_items.append(
+            OpsAttentionItem(
+                level="info",
+                title="Release maintenance status is not connected",
+                detail=release_maintenance.next_step,
+            )
+        )
+    elif not release_maintenance.ready_for_unpause:
+        attention_items.append(
+            OpsAttentionItem(
+                level="error",
+                title="Release maintenance is not ready for unpause",
+                detail=release_maintenance.next_step,
+            )
+        )
+
     return OpsOverviewResponse(
         generated_at=datetime.now(timezone.utc).isoformat(),
         user=OpsUserSummary(
@@ -343,6 +471,7 @@ def _build_ops_overview(user: dict, *, notifications_limit: int = 100) -> OpsOve
             top_template_use_count=int((top_template or {}).get("use_count") or 0),
         ),
         capabilities=capabilities,
+        release_maintenance=release_maintenance,
         attention_items=attention_items,
     )
 
