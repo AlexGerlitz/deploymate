@@ -97,6 +97,44 @@ export const smokeOverviewOpsOverview = {
     blocker_count: 2,
     primary_blocker: "release audit schedule paused",
     next_step: "Restore the deploy public key before the next release audit rerun.",
+    checklist: [
+      {
+        key: "scheduled-audit-pause",
+        label: "Scheduled audit pause",
+        status: "blocked",
+        detail: "Scheduled release audit is paused until a manual audit succeeds.",
+      },
+      {
+        key: "staging-release-pause",
+        label: "Staging release pause",
+        status: "blocked",
+        detail: "Automatic staging release is paused until the release audit is repaired.",
+      },
+      {
+        key: "production-incident",
+        label: "Production incident",
+        status: "blocked",
+        detail: "Issue #18 is open with category ssh_auth_denied.",
+      },
+      {
+        key: "staging-incident",
+        label: "Staging incident",
+        status: "blocked",
+        detail: "Issue #19 is open with category ssh_auth_denied.",
+      },
+      {
+        key: "ssh-trust-anchor",
+        label: "SSH trust anchor",
+        status: "ok",
+        detail: "The pinned known_hosts trust check already passed.",
+      },
+      {
+        key: "deploy-key",
+        label: "Deploy key",
+        status: "blocked",
+        detail: "The deploy host rejects the GitHub deploy key.",
+      },
+    ],
     repair_playbook: [
       {
         key: "keep-trust-anchor",

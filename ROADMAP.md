@@ -52,7 +52,7 @@ Near-term slices:
 - keep tightening the reviewer path from login to runtime to admin surfaces
 - tighten the newbie path from server connection to “service is healthy / service needs help”
 - keep the repo root easy to skim for product, architecture, and release context
-- make release milestones legible through docs and public notes
+- make release milestones legible through docs, public notes, and readiness evidence
 
 ### 2. Runtime confidence
 
@@ -75,6 +75,7 @@ Near-term slices:
 - keep improving backup/export ergonomics
 - evolve restore planning beyond dry-run into more explicit import preparation
 - keep destructive restore/apply behind stronger safety boundaries
+- continue turning release repair into guided operator workflows without hiding manual secret ownership
 
 ## Next Technical Priorities
 
@@ -89,6 +90,7 @@ Near-term slices:
 - continue tightening SSH trust and credential handling
 - keep production defaults remote-only
 - narrow local Docker execution to explicit opt-in use cases only
+- preserve separate readiness signals for host trust, deploy-key auth, pauses, and open incidents
 
 ### Product polish
 

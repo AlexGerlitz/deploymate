@@ -143,7 +143,7 @@ Recommended reviewer order:
 | Admin users | filters, saved views, bulk actions, exports, audit trail |
 | Upgrade inbox | filters, saved views, bulk actions, exports, audit trail |
 | Recovery | backup bundle export and restore dry-run conflict analysis |
-| Release safety | preflight, admin smoke, post-deploy smoke |
+| Release safety | preflight, admin smoke, post-deploy smoke, release readiness checklist |
 
 ## Feature Highlights
 
@@ -176,6 +176,12 @@ Recommended reviewer order:
 - download a structured backup bundle
 - run restore dry-run analysis without applying changes
 - inspect conflicts before any future restore workflow
+
+### Release safety
+
+- review release maintenance status, pauses, incident categories, and repair steps in the operations overview
+- separate SSH trust-anchor status from deploy-key authentication status before unpausing release automation
+- export the same release readiness checklist through the public evidence bundle
 
 ## Stack
 
@@ -550,6 +556,7 @@ PRs are not just ceremony here:
 - deployment detail now includes quick reference, attention overview, and copyable runtime summary ergonomics
 - backend local Docker execution is now explicit opt-in; remote-only is the default runtime posture
 - operations overview now exposes backend runtime capability posture, including local Docker, SSH trust mode, and credential-key readiness
+- operations overview now exposes release readiness as a checklist covering pauses, incidents, SSH trust, deploy-key auth, and network checks
 - preflight and security audit now check that production frontend and backend local-runtime flags stay aligned
 - preflight and remote release now also fail on insecure production env overrides such as memory-backed auth throttling, non-strict SSH trust, placeholder admin passwords, or missing pinned `known_hosts`
 - the local release gate now runs auth, admin, admin-interactions, beginner, ops, restore, runtime, servers, and templates frontend smokes before build
@@ -693,7 +700,7 @@ Next likely improvements:
 
 1. move server credentials to external secret management
 2. split local Docker execution into a narrower executor boundary
-3. deepen first-class known-host management and fingerprint review inside the product
+3. move release repair from checklist guidance into an authenticated in-product operator workflow
 4. deepen automated smoke coverage around deployment runtime flows
 
 Longer-term direction: see [ROADMAP.md](ROADMAP.md).

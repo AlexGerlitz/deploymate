@@ -119,6 +119,7 @@ def latest_workflow(runs: list[dict[str, Any]], workflow_name: str) -> dict[str,
 def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
     runs = load_github_runs(repo, branch)
     maintenance = load_maintenance_status(repo, check_network)
+    maintenance["checklist"] = build_release_checklist(maintenance)
     maintenance["repair_playbook"] = build_repair_playbook(maintenance)
     commit = os.getenv("GITHUB_SHA") or git_value("rev-parse", "HEAD")
     current_branch = branch or os.getenv("GITHUB_REF_NAME") or git_value("rev-parse", "--abbrev-ref", "HEAD")
@@ -167,10 +168,194 @@ def open_release_incidents(maintenance: dict[str, Any]) -> list[dict[str, str]]:
     return incidents
 
 
+def release_incidents(maintenance: dict[str, Any]) -> list[dict[str, str]]:
+    return [
+        {
+            "environment": environment,
+            "issue_number": str(issue_number),
+            "state": str(maintenance.get(f"issue_{issue_number}_state", "unknown")),
+            "failure_category": str(
+                maintenance.get(f"issue_{issue_number}_failure_category", "unknown")
+            ),
+            "operator_hint": str(maintenance.get(f"issue_{issue_number}_operator_hint", "")),
+        }
+        for issue_number, environment in ((18, "production"), (19, "staging"))
+    ]
+
+
 def release_incident_label(incidents: list[dict[str, str]]) -> str:
     if not incidents:
         return "release incidents"
     return ", ".join(f"{item['environment']} #{item['issue_number']}" for item in incidents)
+
+
+def incident_checklist_item(incident: dict[str, str]) -> dict[str, str]:
+    environment = incident["environment"]
+    issue_number = incident["issue_number"]
+    state = incident.get("state", "unknown")
+    if state == "CLOSED":
+        return {
+            "key": f"{environment}-incident",
+            "label": f"{environment.title()} incident",
+            "status": "ok",
+            "detail": f"Issue #{issue_number} is closed.",
+        }
+    if state == "OPEN":
+        category = incident.get("failure_category") or "unavailable"
+        return {
+            "key": f"{environment}-incident",
+            "label": f"{environment.title()} incident",
+            "status": "blocked",
+            "detail": f"Issue #{issue_number} is open with category {category}.",
+        }
+    return {
+        "key": f"{environment}-incident",
+        "label": f"{environment.title()} incident",
+        "status": "unknown",
+        "detail": f"Issue #{issue_number} state is {state or 'unknown'}.",
+    }
+
+
+def build_release_checklist(maintenance: dict[str, Any]) -> list[dict[str, str]]:
+    available = str(maintenance.get("available", "1")).lower() in {"1", "true", "yes", "on"}
+    if not available:
+        return [
+            {
+                "key": "release-status-json",
+                "label": "Release status JSON",
+                "status": "unknown",
+                "detail": "Runtime is not connected to the generated release maintenance status file.",
+            }
+        ]
+
+    ready_for_unpause = str(maintenance.get("ready_for_unpause", "0")).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    release_audit_paused = str(
+        maintenance.get("release_audit_scheduled_paused", "false")
+    ).lower() in {"1", "true", "yes", "on"}
+    staging_release_paused = str(maintenance.get("staging_release_paused", "false")).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    network_checks = str(maintenance.get("network_checks", "unknown") or "unknown")
+    all_incidents = release_incidents(maintenance)
+    open_incidents = [item for item in all_incidents if item["state"] != "CLOSED"]
+    categories = {item["failure_category"] for item in open_incidents}
+
+    checklist = [
+        {
+            "key": "scheduled-audit-pause",
+            "label": "Scheduled audit pause",
+            "status": "blocked" if release_audit_paused else "ok",
+            "detail": (
+                "Scheduled release audit is paused until a manual audit succeeds."
+                if release_audit_paused
+                else "Scheduled release audit is allowed to run."
+            ),
+        },
+        {
+            "key": "staging-release-pause",
+            "label": "Staging release pause",
+            "status": "blocked" if staging_release_paused else "ok",
+            "detail": (
+                "Automatic staging release is paused until the release audit is repaired."
+                if staging_release_paused
+                else "Automatic staging release is not paused."
+            ),
+        },
+    ]
+    checklist.extend(incident_checklist_item(incident) for incident in all_incidents)
+
+    if "ssh_host_key_changed" in categories:
+        checklist.extend(
+            [
+                {
+                    "key": "ssh-trust-anchor",
+                    "label": "SSH trust anchor",
+                    "status": "blocked",
+                    "detail": "The deploy host fingerprint changed; confirm and repin known_hosts before deploy.",
+                },
+                {
+                    "key": "deploy-key",
+                    "label": "Deploy key",
+                    "status": "unknown",
+                    "detail": "Deploy key verification waits until the SSH trust anchor is repaired.",
+                },
+            ]
+        )
+    elif "ssh_auth_denied" in categories:
+        checklist.extend(
+            [
+                {
+                    "key": "ssh-trust-anchor",
+                    "label": "SSH trust anchor",
+                    "status": "ok",
+                    "detail": "The pinned known_hosts trust check already passed; do not rotate it for this blocker.",
+                },
+                {
+                    "key": "deploy-key",
+                    "label": "Deploy key",
+                    "status": "blocked",
+                    "detail": "The deploy host rejects the GitHub deploy key; repair authorized_keys or rotate the secret.",
+                },
+            ]
+        )
+    elif ready_for_unpause:
+        checklist.extend(
+            [
+                {
+                    "key": "ssh-trust-anchor",
+                    "label": "SSH trust anchor",
+                    "status": "ok",
+                    "detail": "No release incident is currently blocking SSH trust.",
+                },
+                {
+                    "key": "deploy-key",
+                    "label": "Deploy key",
+                    "status": "ok",
+                    "detail": "No release incident is currently blocking deploy authentication.",
+                },
+            ]
+        )
+    else:
+        checklist.extend(
+            [
+                {
+                    "key": "ssh-trust-anchor",
+                    "label": "SSH trust anchor",
+                    "status": "unknown",
+                    "detail": "Review the current incident category before changing host trust.",
+                },
+                {
+                    "key": "deploy-key",
+                    "label": "Deploy key",
+                    "status": "unknown",
+                    "detail": "Review the current incident category before changing deploy keys.",
+                },
+            ]
+        )
+
+    checklist.append(
+        {
+            "key": "public-network-check",
+            "label": "Public network check",
+            "status": "warn" if network_checks == "skipped" else "ok" if network_checks == "enabled" else "unknown",
+            "detail": (
+                "DNS and HTTPS probes were skipped for this status snapshot."
+                if network_checks == "skipped"
+                else "DNS and HTTPS probes were included in this status snapshot."
+                if network_checks == "enabled"
+                else f"Network check state is {network_checks}."
+            ),
+        }
+    )
+    return checklist
 
 
 def build_repair_playbook(maintenance: dict[str, Any]) -> list[dict[str, str]]:
@@ -342,6 +527,24 @@ def render_markdown(bundle: dict[str, Any]) -> str:
         lines.extend(f"- {blocker}" for blocker in blockers)
     else:
         lines.append("- None.")
+
+    checklist = maintenance.get("checklist", [])
+    if checklist:
+        lines.extend(
+            [
+                "",
+                "## Release Readiness Checklist",
+                "",
+                "| Check | Status | Detail |",
+                "| --- | --- | --- |",
+            ]
+        )
+        for item in checklist:
+            lines.append(
+                f"| {md_escape(item.get('label', item.get('key', 'unknown')))} | "
+                f"`{md_escape(item.get('status', 'unknown'))}` | "
+                f"{md_escape(item.get('detail', ''))} |"
+            )
 
     repair_steps = build_repair_playbook(maintenance)
     lines.extend(

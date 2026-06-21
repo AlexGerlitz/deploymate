@@ -100,6 +100,7 @@ export default function HomePage() {
     blocker_count: 0,
     primary_blocker: null,
     next_step: "Load operations overview before using release unpause decisions.",
+    checklist: [],
     repair_playbook: [],
     production: {
       state: "unknown",
@@ -959,6 +960,29 @@ export default function HomePage() {
                   </span>
                   <span>{releaseMaintenanceDetail}</span>
                 </div>
+                {Array.isArray(releaseMaintenance.checklist) &&
+                releaseMaintenance.checklist.length > 0 ? (
+                  <div
+                    className="overviewReleaseChecklist"
+                    data-testid="ops-release-readiness-checklist"
+                  >
+                    {releaseMaintenance.checklist.slice(0, 8).map((item) => (
+                      <div
+                        key={item.key || item.label}
+                        className="overviewReleaseChecklistItem"
+                        data-testid={`ops-release-checklist-${item.key || item.label}`}
+                      >
+                        <span className={`status ${item.status || "unknown"}`}>
+                          {item.status || "unknown"}
+                        </span>
+                        <div>
+                          <strong>{item.label}</strong>
+                          <span>{item.detail}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {Array.isArray(releaseMaintenance.repair_playbook) &&
                 releaseMaintenance.repair_playbook.length > 0 ? (
                   <ol className="overviewRepairList" data-testid="ops-release-repair-playbook">

@@ -175,6 +175,13 @@ class OpsReleaseIncidentSummary(BaseModel):
     operator_hint: Optional[str] = None
 
 
+class OpsReleaseChecklistItem(BaseModel):
+    key: str
+    label: str
+    status: Literal["ok", "warn", "blocked", "unknown"] = "unknown"
+    detail: str
+
+
 class OpsReleaseMaintenanceSummary(BaseModel):
     available: bool = False
     source: str = "not_configured"
@@ -186,6 +193,7 @@ class OpsReleaseMaintenanceSummary(BaseModel):
     blocker_count: int = 0
     primary_blocker: Optional[str] = None
     next_step: str = "Connect the release maintenance status file before using release unpause decisions."
+    checklist: list[OpsReleaseChecklistItem] = Field(default_factory=list)
     repair_playbook: list[OpsReleaseRepairStep] = Field(default_factory=list)
     production: OpsReleaseIncidentSummary = Field(
         default_factory=lambda: OpsReleaseIncidentSummary(environment="production", issue_number=18)

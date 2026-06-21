@@ -285,6 +285,14 @@ class OpsApiFlowTests(unittest.TestCase):
         self.assertEqual(release["production"]["state"], "OPEN")
         self.assertEqual(release["production"]["failure_category"], "ssh_auth_denied")
         self.assertEqual(release["next_step"], "Restore the deploy public key.")
+        checklist_by_key = {item["key"]: item for item in release["checklist"]}
+        self.assertEqual(checklist_by_key["scheduled-audit-pause"]["status"], "blocked")
+        self.assertEqual(checklist_by_key["staging-release-pause"]["status"], "blocked")
+        self.assertEqual(checklist_by_key["production-incident"]["status"], "blocked")
+        self.assertEqual(checklist_by_key["staging-incident"]["status"], "ok")
+        self.assertEqual(checklist_by_key["ssh-trust-anchor"]["status"], "ok")
+        self.assertEqual(checklist_by_key["deploy-key"]["status"], "blocked")
+        self.assertIn("authorized_keys", checklist_by_key["deploy-key"]["detail"])
         self.assertEqual(
             [step["key"] for step in release["repair_playbook"]],
             [
@@ -337,6 +345,12 @@ class OpsApiFlowTests(unittest.TestCase):
             release["next_step"],
             "Release maintenance is ready; remove pauses only during a planned release window.",
         )
+        checklist_by_key = {item["key"]: item for item in release["checklist"]}
+        self.assertEqual(checklist_by_key["scheduled-audit-pause"]["status"], "ok")
+        self.assertEqual(checklist_by_key["staging-release-pause"]["status"], "ok")
+        self.assertEqual(checklist_by_key["production-incident"]["status"], "ok")
+        self.assertEqual(checklist_by_key["staging-incident"]["status"], "ok")
+        self.assertEqual(checklist_by_key["deploy-key"]["status"], "ok")
         self.assertEqual(release["repair_playbook"][0]["key"], "planned-unpause")
 
     def test_ops_export_returns_503_when_source_loader_fails(self):

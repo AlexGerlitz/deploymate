@@ -489,6 +489,36 @@ summary:focus-visible {
   margin-top: 2px;
 }
 
+.overviewReleaseChecklist {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.overviewReleaseChecklistItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.overviewReleaseChecklistItem strong {
+  display: block;
+  color: #132238;
+  font-size: 13px;
+}
+
+.overviewReleaseChecklistItem span:not(.status) {
+  display: block;
+  margin-top: 2px;
+  color: #455164;
+  font-size: 13px;
+}
+
 .overviewAttentionList {
   display: grid;
   gap: 12px;
@@ -1954,7 +1984,8 @@ summary:focus-visible {
 
 .status.unhealthy,
 .status.unavailable,
-.status.error {
+.status.error,
+.status.blocked {
   background: #fdeaea;
   color: #9e1c1c;
 }

@@ -940,6 +940,15 @@ exit 1
         self.assertEqual(payload["repo"], "AlexGerlitz/deploymate")
         self.assertEqual(payload["branch"], "develop")
         self.assertEqual(payload["maintenance"]["ready_for_unpause"], "0")
+        checklist_by_key = {
+            item["key"]: item for item in payload["maintenance"]["checklist"]
+        }
+        self.assertEqual(checklist_by_key["scheduled-audit-pause"]["status"], "blocked")
+        self.assertEqual(checklist_by_key["staging-release-pause"]["status"], "blocked")
+        self.assertEqual(checklist_by_key["production-incident"]["status"], "blocked")
+        self.assertEqual(checklist_by_key["staging-incident"]["status"], "blocked")
+        self.assertEqual(checklist_by_key["ssh-trust-anchor"]["status"], "ok")
+        self.assertEqual(checklist_by_key["deploy-key"]["status"], "blocked")
         self.assertEqual(payload["maintenance"]["repair_playbook"][1]["key"], "restore-deploy-key")
         self.assertEqual(payload["workflows"]["ci"]["conclusion"], "success")
         self.assertEqual(payload["workflows"]["ci"]["databaseId"], 101)
@@ -949,6 +958,8 @@ exit 1
         self.assertIn("# DeployMate Public Evidence Bundle", markdown_result.stdout)
         self.assertIn("| CI | `completed` | `success` | [101](https://example.test/actions/runs/101) |", markdown_result.stdout)
         self.assertIn("- release audit schedule paused", markdown_result.stdout)
+        self.assertIn("## Release Readiness Checklist", markdown_result.stdout)
+        self.assertIn("| Deploy key | `blocked` |", markdown_result.stdout)
         self.assertIn("## Release Repair Playbook", markdown_result.stdout)
         self.assertIn("**Restore the deploy public key**", markdown_result.stdout)
         self.assertIn("- `Release Maintenance Status artifact`", markdown_result.stdout)

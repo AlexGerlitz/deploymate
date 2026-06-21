@@ -15,6 +15,7 @@ from app.schemas import (
     OpsDeploymentsSummary,
     OpsNotificationsSummary,
     OpsOverviewResponse,
+    OpsReleaseChecklistItem,
     OpsReleaseIncidentSummary,
     OpsReleaseMaintenanceSummary,
     OpsReleaseRepairStep,
@@ -153,6 +154,169 @@ def _release_incident_label(incidents: list[OpsReleaseIncidentSummary]) -> str:
     if not incidents:
         return "release incidents"
     return ", ".join(f"{item.environment} #{item.issue_number}" for item in incidents)
+
+
+def _incident_checklist_item(incident: OpsReleaseIncidentSummary) -> OpsReleaseChecklistItem:
+    if incident.state == "CLOSED":
+        return OpsReleaseChecklistItem(
+            key=f"{incident.environment}-incident",
+            label=f"{incident.environment.title()} incident",
+            status="ok",
+            detail=f"Issue #{incident.issue_number} is closed.",
+        )
+
+    if incident.state == "OPEN":
+        category = incident.failure_category or "unavailable"
+        return OpsReleaseChecklistItem(
+            key=f"{incident.environment}-incident",
+            label=f"{incident.environment.title()} incident",
+            status="blocked",
+            detail=f"Issue #{incident.issue_number} is open with category {category}.",
+        )
+
+    return OpsReleaseChecklistItem(
+        key=f"{incident.environment}-incident",
+        label=f"{incident.environment.title()} incident",
+        status="unknown",
+        detail=f"Issue #{incident.issue_number} state is {incident.state or 'unknown'}.",
+    )
+
+
+def _build_release_checklist(
+    *,
+    available: bool,
+    ready_for_unpause: bool,
+    release_audit_scheduled_paused: bool,
+    staging_release_paused: bool,
+    network_checks: str,
+    production: OpsReleaseIncidentSummary,
+    staging: OpsReleaseIncidentSummary,
+) -> list[OpsReleaseChecklistItem]:
+    if not available:
+        return [
+            OpsReleaseChecklistItem(
+                key="release-status-json",
+                label="Release status JSON",
+                status="unknown",
+                detail="Runtime is not connected to the generated release maintenance status file.",
+            )
+        ]
+
+    open_incidents = _open_release_incidents(production, staging)
+    open_categories = {incident.failure_category for incident in open_incidents}
+    ssh_auth_blocked = "ssh_auth_denied" in open_categories
+    host_key_blocked = "ssh_host_key_changed" in open_categories
+
+    checklist = [
+        OpsReleaseChecklistItem(
+            key="scheduled-audit-pause",
+            label="Scheduled audit pause",
+            status="blocked" if release_audit_scheduled_paused else "ok",
+            detail=(
+                "Scheduled release audit is paused until a manual audit succeeds."
+                if release_audit_scheduled_paused
+                else "Scheduled release audit is allowed to run."
+            ),
+        ),
+        OpsReleaseChecklistItem(
+            key="staging-release-pause",
+            label="Staging release pause",
+            status="blocked" if staging_release_paused else "ok",
+            detail=(
+                "Automatic staging release is paused until the release audit is repaired."
+                if staging_release_paused
+                else "Automatic staging release is not paused."
+            ),
+        ),
+        _incident_checklist_item(production),
+        _incident_checklist_item(staging),
+    ]
+
+    if host_key_blocked:
+        checklist.extend(
+            [
+                OpsReleaseChecklistItem(
+                    key="ssh-trust-anchor",
+                    label="SSH trust anchor",
+                    status="blocked",
+                    detail="The deploy host fingerprint changed; confirm and repin known_hosts before deploy.",
+                ),
+                OpsReleaseChecklistItem(
+                    key="deploy-key",
+                    label="Deploy key",
+                    status="unknown",
+                    detail="Deploy key verification waits until the SSH trust anchor is repaired.",
+                ),
+            ]
+        )
+    elif ssh_auth_blocked:
+        checklist.extend(
+            [
+                OpsReleaseChecklistItem(
+                    key="ssh-trust-anchor",
+                    label="SSH trust anchor",
+                    status="ok",
+                    detail="The pinned known_hosts trust check already passed; do not rotate it for this blocker.",
+                ),
+                OpsReleaseChecklistItem(
+                    key="deploy-key",
+                    label="Deploy key",
+                    status="blocked",
+                    detail="The deploy host rejects the GitHub deploy key; repair authorized_keys or rotate the secret.",
+                ),
+            ]
+        )
+    elif ready_for_unpause:
+        checklist.extend(
+            [
+                OpsReleaseChecklistItem(
+                    key="ssh-trust-anchor",
+                    label="SSH trust anchor",
+                    status="ok",
+                    detail="No release incident is currently blocking SSH trust.",
+                ),
+                OpsReleaseChecklistItem(
+                    key="deploy-key",
+                    label="Deploy key",
+                    status="ok",
+                    detail="No release incident is currently blocking deploy authentication.",
+                ),
+            ]
+        )
+    else:
+        checklist.extend(
+            [
+                OpsReleaseChecklistItem(
+                    key="ssh-trust-anchor",
+                    label="SSH trust anchor",
+                    status="unknown",
+                    detail="Review the current incident category before changing host trust.",
+                ),
+                OpsReleaseChecklistItem(
+                    key="deploy-key",
+                    label="Deploy key",
+                    status="unknown",
+                    detail="Review the current incident category before changing deploy keys.",
+                ),
+            ]
+        )
+
+    checklist.append(
+        OpsReleaseChecklistItem(
+            key="public-network-check",
+            label="Public network check",
+            status="warn" if network_checks == "skipped" else "ok" if network_checks == "enabled" else "unknown",
+            detail=(
+                "DNS and HTTPS probes were skipped for this status snapshot."
+                if network_checks == "skipped"
+                else "DNS and HTTPS probes were included in this status snapshot."
+                if network_checks == "enabled"
+                else f"Network check state is {network_checks or 'unknown'}."
+            ),
+        )
+    )
+
+    return checklist
 
 
 def _build_release_repair_playbook(
@@ -298,6 +462,8 @@ def _load_release_maintenance_payload() -> tuple[dict | None, str]:
 def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
     payload, source = _load_release_maintenance_payload()
     if payload is None:
+        production = OpsReleaseIncidentSummary(environment="production", issue_number=18)
+        staging = OpsReleaseIncidentSummary(environment="staging", issue_number=19)
         return OpsReleaseMaintenanceSummary(
             available=False,
             source=source,
@@ -305,13 +471,24 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
                 "Publish the latest release-maintenance-status JSON to the runtime before using "
                 "release unpause decisions."
             ),
+            checklist=_build_release_checklist(
+                available=False,
+                ready_for_unpause=False,
+                release_audit_scheduled_paused=False,
+                staging_release_paused=False,
+                network_checks="unknown",
+                production=production,
+                staging=staging,
+            ),
             repair_playbook=_build_release_repair_playbook(
                 available=False,
                 ready_for_unpause=False,
-                production=OpsReleaseIncidentSummary(environment="production", issue_number=18),
-                staging=OpsReleaseIncidentSummary(environment="staging", issue_number=19),
+                production=production,
+                staging=staging,
                 primary_blocker=None,
             ),
+            production=production,
+            staging=staging,
         )
 
     blocker_count = _int_status_value(payload, "blocker_count")
@@ -319,6 +496,9 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
     staging = _release_incident_summary(payload, environment="staging", issue_number=19)
     primary_blocker = _first_release_blocker(payload, blocker_count)
     ready_for_unpause = _bool_status_value(payload, "ready_for_unpause")
+    release_audit_scheduled_paused = _bool_status_value(payload, "release_audit_scheduled_paused")
+    staging_release_paused = _bool_status_value(payload, "staging_release_paused")
+    network_checks = _string_value(payload, "network_checks", "unknown")
     next_step = "Release maintenance is ready; remove pauses only during a planned release window."
 
     for incident in (production, staging):
@@ -334,12 +514,21 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
         source=source,
         generated_at=_string_value(payload, "generated_at") or None,
         ready_for_unpause=ready_for_unpause,
-        release_audit_scheduled_paused=_bool_status_value(payload, "release_audit_scheduled_paused"),
-        staging_release_paused=_bool_status_value(payload, "staging_release_paused"),
-        network_checks=_string_value(payload, "network_checks", "unknown"),
+        release_audit_scheduled_paused=release_audit_scheduled_paused,
+        staging_release_paused=staging_release_paused,
+        network_checks=network_checks,
         blocker_count=blocker_count,
         primary_blocker=primary_blocker,
         next_step=next_step,
+        checklist=_build_release_checklist(
+            available=True,
+            ready_for_unpause=ready_for_unpause,
+            release_audit_scheduled_paused=release_audit_scheduled_paused,
+            staging_release_paused=staging_release_paused,
+            network_checks=network_checks,
+            production=production,
+            staging=staging,
+        ),
         repair_playbook=_build_release_repair_playbook(
             available=True,
             ready_for_unpause=ready_for_unpause,

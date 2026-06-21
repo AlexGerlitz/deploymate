@@ -893,6 +893,14 @@ export function buildOpsSnapshot({ currentUser, deployments, servers, notificati
       blocker_count: 0,
       primary_blocker: null,
       next_step: "Load the server-side operations overview before using release unpause decisions.",
+      checklist: [
+        {
+          key: "release-status-json",
+          label: "Release status JSON",
+          status: "unknown",
+          detail: "Runtime is not connected to the generated release maintenance status file.",
+        },
+      ],
       repair_playbook: [
         {
           key: "load-ops-overview",
@@ -945,6 +953,15 @@ export function buildOpsSummaryText(snapshot) {
     );
     if (snapshot.release_maintenance.next_step) {
       lines.push(`Release next step: ${snapshot.release_maintenance.next_step}`);
+    }
+    if (
+      Array.isArray(snapshot.release_maintenance.checklist) &&
+      snapshot.release_maintenance.checklist.length > 0
+    ) {
+      lines.push("Release readiness checklist:");
+      snapshot.release_maintenance.checklist.forEach((item) => {
+        lines.push(`- [${item.status}] ${item.label}: ${item.detail}`);
+      });
     }
     if (
       Array.isArray(snapshot.release_maintenance.repair_playbook) &&
