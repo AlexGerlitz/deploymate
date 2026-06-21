@@ -29,6 +29,21 @@ automation_smoke_auth_checks() {
 EOF
 }
 
+automation_smoke_review_checks() {
+  cat <<'EOF'
+/review|public review page|data-testid="public-review-page"
+/review|public review title|data-testid="public-review-title"
+/review|public review summary grid|data-testid="public-review-summary-grid"
+/review|public review CI card|data-testid="public-review-evidence-card-ci"
+/review|public review evidence card|data-testid="public-review-evidence-card-public-evidence"
+/review|public review local packet command|data-testid="public-review-local-packet-command"
+/review|public review sequence|data-testid="public-review-sequence"
+/review|public review product routes|data-testid="public-review-product-routes"
+/review|public review artifacts|data-testid="public-review-artifacts"
+/review|public evidence bundle copy|Public Evidence Bundle
+EOF
+}
+
 automation_smoke_ops_checks() {
   cat <<'EOF'
 /app|ops overview card|data-testid="ops-overview-card"

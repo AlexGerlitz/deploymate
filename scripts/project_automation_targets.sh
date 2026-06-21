@@ -6,6 +6,7 @@ automation_frontend_fast_smokes_default_lines() {
   cat <<'EOF'
 auth
 ops
+review
 runtime
 EOF
 }
@@ -71,9 +72,13 @@ automation_frontend_smoke_targets_for_path() {
     frontend/app/deployments/*)
       printf '%s\n' runtime
       ;;
+    frontend/app/review/*)
+      printf '%s\n' review
+      ;;
     frontend/app/page.js|frontend/app/layout.js|frontend/app/globals.css|frontend/app/commercial-license/page.js|frontend/app/upgrade/page.js|frontend/app/lib/public-contact.js)
       printf '%s\n' auth
       printf '%s\n' ops
+      printf '%s\n' review
       ;;
     frontend/tests/*|frontend/package.json|frontend/package-lock.json|frontend/Dockerfile|frontend/next.config.mjs|frontend/middleware.js|frontend/*)
       automation_frontend_fast_smokes_default_lines
@@ -151,7 +156,7 @@ automation_frontend_fast_scope_for_path() {
     frontend/*)
       printf 'frontend\n'
       ;;
-    frontend/Dockerfile|docker-compose.yml|docker-compose.prod.yml|deploy/*|infra/*|scripts/release_workflow.sh|scripts/preflight.sh|scripts/remote_release.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh)
+    frontend/Dockerfile|docker-compose.yml|docker-compose.prod.yml|deploy/*|infra/*|scripts/frontend_review_smoke.sh|scripts/project_automation_smoke_checks.sh|scripts/release_workflow.sh|scripts/preflight.sh|scripts/remote_release.sh|scripts/release_secret_contract_audit.sh|scripts/release_smoke_precheck.sh|scripts/post_deploy_smoke.sh|scripts/production_env_audit.sh|scripts/production_contract_gate.sh)
       printf 'frontend_delivery_contract\n'
       ;;
     .github/*|README.md|RUNBOOK.md|HANDOFF.md|LICENSE|NOTICE|COMMERCIAL-LICENSE.md|docs/*|backend/*)

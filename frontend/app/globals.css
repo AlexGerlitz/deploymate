@@ -2973,6 +2973,122 @@ button.landingButton.primaryButton:disabled {
   color: #334155;
 }
 
+.reviewHero {
+  padding-bottom: 20px;
+}
+
+.reviewHeroGrid {
+  display: grid;
+  gap: 22px;
+  align-items: stretch;
+}
+
+.reviewHeroActions {
+  margin-top: 24px;
+}
+
+.reviewStatusPanel,
+.reviewSummaryCard,
+.reviewSequenceCard,
+.reviewRouteCard,
+.reviewArtifactCard {
+  border: 1px solid rgba(34, 49, 73, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 16px 38px rgba(21, 30, 46, 0.05);
+}
+
+.reviewStatusPanel {
+  display: grid;
+  gap: 14px;
+  align-self: end;
+  padding: 22px;
+  background:
+    linear-gradient(180deg, rgba(19, 34, 56, 0.96) 0%, rgba(31, 70, 58, 0.96) 100%);
+  color: #f7fbff;
+}
+
+.reviewStatusPanel .heroSummaryLabel {
+  color: rgba(247, 251, 255, 0.78);
+}
+
+.reviewStatusPanel code,
+.reviewArtifactCard code {
+  display: block;
+  overflow-wrap: anywhere;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.08);
+  padding: 10px 12px;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.reviewStatusPanel code {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff7e8;
+}
+
+.reviewStatusPanel p,
+.reviewSummaryCard p,
+.reviewSequenceCard p,
+.reviewRouteCard p,
+.reviewArtifactCard p {
+  margin: 0;
+  color: #596171;
+  line-height: 1.7;
+}
+
+.reviewStatusPanel p {
+  color: rgba(241, 247, 252, 0.82);
+}
+
+.reviewSummaryGrid,
+.reviewSequence,
+.reviewRouteGrid,
+.reviewArtifactGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.reviewSummaryCard,
+.reviewSequenceCard,
+.reviewRouteCard,
+.reviewArtifactCard {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+}
+
+.reviewSummaryCard span,
+.reviewRouteCard span,
+.reviewSequenceCard span {
+  color: var(--accent-gold);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.reviewSummaryCard strong,
+.reviewSequenceCard strong,
+.reviewRouteCard strong {
+  color: var(--text-primary);
+  font-family: var(--font-display), sans-serif;
+  font-size: 22px;
+  line-height: 1.16;
+  letter-spacing: -0.03em;
+}
+
+.reviewSection {
+  padding-top: 30px;
+  padding-bottom: 42px;
+}
+
+.reviewArtifactCard code {
+  color: #132238;
+}
+
 .darkBand {
   background:
     radial-gradient(circle at top right, rgba(240, 181, 90, 0.14), transparent 24%),
@@ -5101,6 +5217,16 @@ button.landingButton.primaryButton:disabled {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .reviewSummaryGrid,
+  .reviewRouteGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .reviewSequence,
+  .reviewArtifactGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .capabilityGrid,
   .proofGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5165,6 +5291,10 @@ button.landingButton.primaryButton:disabled {
 @media (min-width: 920px) {
   .landingHeroGrid {
     grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  }
+
+  .reviewHeroGrid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
   }
 
   .deploymentWorkflowHeroLayout {

@@ -73,6 +73,9 @@ export default function LandingPage() {
             <a href="#product" className="landingButton ghostButton">
               Product
             </a>
+            <Link href="/review" className="landingButton ghostButton">
+              Review
+            </Link>
             <a href="#pricing" className="landingButton ghostButton">
               Pricing
             </a>

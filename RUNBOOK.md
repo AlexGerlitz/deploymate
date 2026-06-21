@@ -58,7 +58,7 @@ These commands:
 5. skip the backend fast suite entirely when a mixed local diff does not actually touch backend or release-runtime backend contract
 6. narrow backend syntax in preflight to changed backend Python files when possible, and skip it entirely for frontend-only local diffs
 7. skip the frontend fast smokes entirely when a mixed local diff does not actually touch frontend or frontend delivery contract
-8. keep frontend verification on targeted fast smokes when changed files map cleanly, otherwise fall back to the default `auth + ops + runtime`
+8. keep frontend verification on targeted fast smokes when changed files map cleanly, otherwise fall back to the default `auth + ops + review + runtime`
 9. auto-derive the same local diff context for explicit surface commands like `make frontend`, `make backend`, `make profile-frontend`, and `make profile-backend`
 10. keep `release_workflow_audit` enabled for release-contract diffs while still letting local `security_audit` stay on changed-file scope when a full tracked-file scan is unnecessary
 11. keep experimental persistent frontend smoke-server controls available, but leave the default fast loop on the safer per-command lifecycle unless `FRONTEND_SMOKE_PERSIST_SERVER=1` is set explicitly
@@ -134,6 +134,12 @@ For ops-overview focused frontend changes, also run:
 
 ```bash
 npm --prefix frontend run smoke:ops
+```
+
+For public review route changes, also run:
+
+```bash
+npm --prefix frontend run smoke:review
 ```
 
 For auth-surface frontend changes, also run:
@@ -630,6 +636,10 @@ exposing secrets. It can be run manually and also refreshes automatically after
 successful CI runs on `develop`. The bundle includes release incident
 diagnostics and a repair playbook so a reviewer can see both the current blocker
 and the intended operator recovery path.
+
+The public `/review` route is the frontend entrypoint for the same reviewer
+path. It links the evidence workflows, product route map, and local review-packet
+command without requiring GitHub artifact access first.
 
 The local review packet writes the JSON bundle, review index, Markdown report,
 repair issue comment, and `MANIFEST.json` with file sizes and SHA-256 checksums.

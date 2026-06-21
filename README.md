@@ -55,6 +55,7 @@ Commercial licensing entry points:
 
 If you are opening this repository as a hiring reviewer, these are the fastest entry points:
 
+- live review route: `/review`
 - product preview screenshots: [Product Preview](#product-preview)
 - release notes: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)
 - roadmap: [ROADMAP.md](ROADMAP.md)
@@ -74,12 +75,13 @@ What to evaluate quickly:
 If you want the shortest coherent pass through the project:
 
 1. start with the screenshots in [Product Preview](#product-preview)
-2. open the latest `Public Evidence Bundle` GitHub Actions artifact and download `deploymate-public-evidence.md`, or generate the same local review packet with `python3 scripts/export_review_packet.py`
-3. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
-4. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
-5. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape
-6. read [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md) for the product thesis, ICP, and long-term differentiator
-7. use the runtime routes below as the reviewer map if a live deployment is available
+2. open `/review` when a live frontend is available
+3. open the latest `Public Evidence Bundle` GitHub Actions artifact and download `deploymate-public-evidence.md`, or generate the same local review packet with `python3 scripts/export_review_packet.py`
+4. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
+5. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
+6. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape
+7. read [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md) for the product thesis, ICP, and long-term differentiator
+8. use the runtime routes below as the reviewer map if a live deployment is available
 
 If you are evaluating whether this is more than a UI shell, the quickest evidence is:
 
@@ -567,6 +569,7 @@ PRs are not just ceremony here:
 - dedicated beginner-path frontend smoke in [scripts/frontend_beginner_smoke.sh](scripts/frontend_beginner_smoke.sh) for `/app`, `/app/server-review`, and `/app/deployment-workflow`
 - dedicated admin-interactions frontend smoke in [scripts/frontend_admin_interactions_smoke.sh](scripts/frontend_admin_interactions_smoke.sh) for saved views and bulk-action surfaces
 - dedicated ops frontend smoke in [scripts/frontend_ops_smoke.sh](scripts/frontend_ops_smoke.sh)
+- dedicated public review frontend smoke in [scripts/frontend_review_smoke.sh](scripts/frontend_review_smoke.sh)
 - dedicated restore-report frontend smoke in [scripts/frontend_restore_smoke.sh](scripts/frontend_restore_smoke.sh)
 - dedicated runtime frontend smoke in [scripts/frontend_runtime_smoke.sh](scripts/frontend_runtime_smoke.sh)
 - dedicated servers frontend smoke in [scripts/frontend_servers_smoke.sh](scripts/frontend_servers_smoke.sh)
@@ -577,7 +580,7 @@ PRs are not just ceremony here:
 - operations overview now exposes release readiness as a checklist covering pauses, incidents, SSH trust, deploy-key auth, and network checks
 - preflight and security audit now check that production frontend and backend local-runtime flags stay aligned
 - preflight and remote release now also fail on insecure production env overrides such as memory-backed auth throttling, non-strict SSH trust, placeholder admin passwords, or missing pinned `known_hosts`
-- the local release gate now runs auth, admin, admin-interactions, beginner, ops, restore, runtime, servers, and templates frontend smokes before build
+- the local release gate now runs auth, admin, admin-interactions, beginner, ops, public review, restore, runtime, servers, and templates frontend smokes before build
 - backend unit tests for restore analysis, admin helpers, and SSH option policy
 - release and rollback notes in [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md)
 

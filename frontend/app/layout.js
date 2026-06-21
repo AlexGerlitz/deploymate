@@ -26,6 +26,9 @@ export default function RootLayout({ children }) {
           <Link href="/" className="siteFooterLink">
             Home
           </Link>
+          <Link href="/review" className="siteFooterLink">
+            Review
+          </Link>
           <Link href="/login" className="siteFooterLink">
             Open app
           </Link>

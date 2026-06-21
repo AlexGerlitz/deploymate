@@ -7,7 +7,7 @@ source "$ROOT_DIR/scripts/lib/project_automation_targets.sh"
 
 if [ "$#" -eq 0 ]; then
   printf 'frontend_fast_mode=default\n'
-  printf 'frontend_fast_smokes=auth ops runtime\n'
+  printf 'frontend_fast_smokes=auth ops review runtime\n'
   printf 'reason=no changed files provided\n'
   exit 0
 fi

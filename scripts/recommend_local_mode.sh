@@ -180,7 +180,7 @@ elif [ "$surface" = "frontend" ]; then
   recommended_profile_command="make profile-frontend"
   if [ "$frontend_fast_mode" = "targeted" ]; then
     case "$frontend_fast_smokes" in
-      auth|ops|runtime)
+      auth|ops|review|runtime)
         recommended_command="make frontend-hot"
         recommended_mode="frontend-hot"
         recommended_run_command="make frontend-hot"
@@ -274,7 +274,7 @@ else
     fi
   elif [ "$backend_fast_mode" = "skip" ] && [ "${frontend_fast_mode:-default}" != "skip" ]; then
     recommended_profile_command="make profile-frontend"
-    if [ "$frontend_fast_mode" = "targeted" ] && { [ "$frontend_fast_smokes" = "auth" ] || [ "$frontend_fast_smokes" = "ops" ] || [ "$frontend_fast_smokes" = "runtime" ]; }; then
+    if [ "$frontend_fast_mode" = "targeted" ] && { [ "$frontend_fast_smokes" = "auth" ] || [ "$frontend_fast_smokes" = "ops" ] || [ "$frontend_fast_smokes" = "review" ] || [ "$frontend_fast_smokes" = "runtime" ]; }; then
       recommended_command="make frontend-hot"
       recommended_mode="frontend-hot"
       recommended_run_command="make frontend-hot"
@@ -349,7 +349,7 @@ if [ -f "$LAST_LOOP_STATE_FILE" ]; then
         if [ "$surface" = "full" ]; then
           case "${LAST_AUTO_LOCAL_BOTTLENECK_PHASE:-}" in
             frontend_phase)
-              if [ "${frontend_fast_mode:-default}" = "targeted" ] && { [ "${frontend_fast_smokes:-}" = "auth" ] || [ "${frontend_fast_smokes:-}" = "ops" ] || [ "${frontend_fast_smokes:-}" = "runtime" ]; }; then
+              if [ "${frontend_fast_mode:-default}" = "targeted" ] && { [ "${frontend_fast_smokes:-}" = "auth" ] || [ "${frontend_fast_smokes:-}" = "ops" ] || [ "${frontend_fast_smokes:-}" = "review" ] || [ "${frontend_fast_smokes:-}" = "runtime" ]; }; then
                 followup_command="make frontend-hot"
                 followup_reason="last mixed profile was frontend-heavy; next tweak is cheaper through the frontend hot loop"
               else
