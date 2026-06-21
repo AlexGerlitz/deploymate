@@ -24,6 +24,7 @@ bash -n \
 
 echo "[production-contract] python syntax"
 "$PYTHON_BIN" -m py_compile \
+  scripts/export_review_packet.py \
   scripts/public_evidence_bundle.py \
   scripts/release_incident_diagnostics.py
 

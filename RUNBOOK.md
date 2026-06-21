@@ -620,6 +620,7 @@ Public evidence bundle:
 python3 scripts/public_evidence_bundle.py --format markdown
 python3 scripts/public_evidence_bundle.py --format json
 python3 scripts/public_evidence_bundle.py --check-network --format markdown
+python3 scripts/export_review_packet.py --output dist/review
 ```
 
 The GitHub Actions workflow `Public Evidence Bundle` publishes
@@ -629,6 +630,11 @@ exposing secrets. It can be run manually and also refreshes automatically after
 successful CI runs on `develop`. The bundle includes release incident
 diagnostics and a repair playbook so a reviewer can see both the current blocker
 and the intended operator recovery path.
+
+The local review packet writes the JSON bundle, review index, Markdown report,
+repair issue comment, and `MANIFEST.json` with file sizes and SHA-256 checksums.
+Use it when GitHub artifact download or the Actions API is unavailable but the
+current checkout still needs a portable review handoff.
 
 The app can surface the same release-maintenance state in the Operations overview
 when the release maintenance status file path points to either

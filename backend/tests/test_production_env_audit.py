@@ -1,4 +1,5 @@
 import os
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -1143,6 +1144,103 @@ exit 1
         self.assertIn("Deploy key can authenticate", issue_comment_result.stdout)
         self.assertIn("confirm deploy key repair before audit", issue_comment_result.stdout)
         self.assertIn("Re-running the publisher updates this same comment", issue_comment_result.stdout)
+
+    def test_review_packet_export_writes_manifest_and_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "run" ] && [ "$2" = "list" ]; then
+  cat <<'JSON'
+[
+  {"workflowName":"CI","status":"completed","conclusion":"success","databaseId":101,"url":"https://example.test/actions/runs/101","headSha":"abc","displayTitle":"CI","event":"push","createdAt":"2026-06-20T00:00:00Z"},
+  {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":102,"url":"https://example.test/actions/runs/102","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-20T00:01:00Z"},
+  {"workflowName":"Public Evidence Bundle","status":"completed","conclusion":"success","databaseId":103,"url":"https://example.test/actions/runs/103","headSha":"abc","displayTitle":"Public Evidence Bundle","event":"workflow_run","createdAt":"2026-06-20T00:03:00Z"}
+]
+JSON
+  exit 0
+fi
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\ttrue\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  cat <<'JSON'
+{"state":"OPEN","body":"Failure category: `ssh_auth_denied`\\nOperator hint: Restore the deploy public key.","comments":[]}
+JSON
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            output_dir = Path(tmpdir) / "review"
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+            env["GITHUB_RUN_ID"] = ""
+            env["GITHUB_EVENT_NAME"] = ""
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/export_review_packet.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--output",
+                    str(output_dir),
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("[review-packet] wrote", result.stdout)
+
+            expected_files = {
+                "deploymate-public-evidence.json",
+                "deploymate-review-index.json",
+                "deploymate-public-evidence.md",
+                "deploymate-release-repair-issue-comment.md",
+            }
+            manifest_path = output_dir / "MANIFEST.json"
+            self.assertTrue(manifest_path.exists())
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["repo"], "AlexGerlitz/deploymate")
+            self.assertEqual(manifest["branch"], "develop")
+            self.assertEqual(manifest["source"], "local-review-packet")
+            self.assertFalse(manifest["check_network"])
+            self.assertEqual(
+                {item["path"] for item in manifest["files"]},
+                expected_files,
+            )
+            self.assertEqual(len(manifest["commands"]), 4)
+
+            for item in manifest["files"]:
+                artifact_path = output_dir / item["path"]
+                self.assertTrue(artifact_path.exists(), item["path"])
+                self.assertEqual(item["bytes"], artifact_path.stat().st_size)
+                digest = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+                self.assertEqual(item["sha256"], digest)
+
+            review_index = json.loads(
+                (output_dir / "deploymate-review-index.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(review_index["status"], "blocked")
+            self.assertIn(
+                "public-evidence",
+                [item["key"] for item in review_index["reviewer_sequence"]],
+            )
+            markdown = (output_dir / "deploymate-public-evidence.md").read_text(encoding="utf-8")
+            self.assertIn("## Review Index", markdown)
 
     def test_public_evidence_bundle_blocks_failed_public_network_checks(self):
         with tempfile.TemporaryDirectory() as tmpdir:

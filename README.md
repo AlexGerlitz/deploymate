@@ -74,7 +74,7 @@ What to evaluate quickly:
 If you want the shortest coherent pass through the project:
 
 1. start with the screenshots in [Product Preview](#product-preview)
-2. open the latest `Public Evidence Bundle` GitHub Actions artifact and download `deploymate-public-evidence.md`
+2. open the latest `Public Evidence Bundle` GitHub Actions artifact and download `deploymate-public-evidence.md`, or generate the same local review packet with `python3 scripts/export_review_packet.py`
 3. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
 4. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
 5. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape
@@ -85,6 +85,7 @@ If you are evaluating whether this is more than a UI shell, the quickest evidenc
 
 - product screenshots and route map
 - public evidence bundle with CI, release-maintenance, incident status, and repair playbook
+- local review packet with manifest and SHA-256 checksums when GitHub artifacts are unavailable
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 
