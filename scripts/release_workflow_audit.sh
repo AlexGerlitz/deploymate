@@ -331,11 +331,15 @@ from pathlib import Path
 
 readme = Path("README.md").read_text(encoding="utf-8")
 runbook = Path("RUNBOOK.md").read_text(encoding="utf-8")
+release_notes = Path("docs/releases/v0.1.0.md").read_text(encoding="utf-8")
 
 required_readme = [
     "Public Evidence Bundle",
     "deploymate-public-evidence.md",
     "public evidence bundle with CI, release-maintenance, incident status, and repair playbook",
+    "## Live Target Status",
+    "Public network check",
+    "availability is intentionally verified through release maintenance evidence",
     "actions/workflows/ci.yml/badge.svg?branch=develop",
     "actions/workflows/public-evidence-bundle.yml/badge.svg?branch=develop",
     "actions/workflows/release-maintenance-status.yml/badge.svg?branch=develop",
@@ -352,6 +356,22 @@ required_runbook = [
 for snippet in required_runbook:
     if snippet not in runbook:
         raise SystemExit(f"[release-audit] RUNBOOK.md is missing public evidence snippet {snippet!r}")
+
+required_release_notes = [
+    "live target availability tracked by release maintenance evidence",
+    "open the latest `Public Evidence Bundle` artifact and check `Public network check`",
+    "if the public target is paused or unavailable, use the screenshots, release evidence, and route map from `README.md`",
+]
+for snippet in required_release_notes:
+    if snippet not in release_notes:
+        raise SystemExit(f"[release-audit] docs/releases/v0.1.0.md is missing live target status snippet {snippet!r}")
+
+for stale_claim in [
+    "with a live demo at `https://deploymatecloud.ru`",
+    "1. open `https://deploymatecloud.ru/register`",
+]:
+    if stale_claim in release_notes:
+        raise SystemExit(f"[release-audit] docs/releases/v0.1.0.md still overclaims live target status: {stale_claim!r}")
 PY
 }
 

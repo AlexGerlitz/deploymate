@@ -88,6 +88,21 @@ If you are evaluating whether this is more than a UI shell, the quickest evidenc
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations
 
+## Live Target Status
+
+The public deployment target is treated as an operational dependency, not as an
+unverified marketing promise. Before using `https://deploymatecloud.ru` for a
+live review, open the latest `Public Evidence Bundle` artifact and check:
+
+- `Public network check`
+- `Ready for unpause`
+- open release incidents and the release repair workflow packet
+
+If the public network check is not `ok`, use the screenshots, route map, release
+notes, and evidence bundle as the reviewer path until the target host is
+restored. This keeps the project reviewable even while DNS, HTTPS, or deploy-key
+repair is in progress.
+
 ## Product Preview
 
 The repository includes product screenshots that show the richer operator and admin surfaces:
@@ -709,4 +724,7 @@ Longer-term direction: see [ROADMAP.md](ROADMAP.md).
 
 ## Status
 
-The project is actively iterated in `develop`, with a working production deployment, scripted release checks, and a substantial admin/ops surface already in place.
+The project is actively iterated in `develop`, with a substantial admin/ops
+surface, scripted release checks, and public evidence artifacts. Public target
+availability is intentionally verified through release maintenance evidence
+instead of being assumed from a stale URL.
