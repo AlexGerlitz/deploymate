@@ -236,6 +236,22 @@ def release_incident_label(incidents: list[dict[str, str]]) -> str:
     return ", ".join(f"{item['environment']} #{item['issue_number']}" for item in incidents)
 
 
+def release_blockers(maintenance: dict[str, Any]) -> list[str]:
+    try:
+        blocker_count = int(str(maintenance.get("blocker_count", "0") or "0"))
+    except ValueError:
+        return []
+    return [
+        str(maintenance.get(f"blocker_{index}", "") or "")
+        for index in range(1, blocker_count + 1)
+        if str(maintenance.get(f"blocker_{index}", "") or "")
+    ]
+
+
+def network_blockers(maintenance: dict[str, Any]) -> list[str]:
+    return [blocker for blocker in release_blockers(maintenance) if blocker.startswith("host ")]
+
+
 def incident_checklist_item(incident: dict[str, str]) -> dict[str, str]:
     environment = incident["environment"]
     issue_number = incident["issue_number"]
@@ -291,6 +307,7 @@ def build_release_checklist(maintenance: dict[str, Any]) -> list[dict[str, str]]
         "on",
     }
     network_checks = str(maintenance.get("network_checks", "unknown") or "unknown")
+    host_blockers = network_blockers(maintenance)
     all_incidents = release_incidents(maintenance)
     open_incidents = [item for item in all_incidents if item["state"] != "CLOSED"]
     categories = {item["failure_category"] for item in open_incidents}
@@ -392,10 +409,20 @@ def build_release_checklist(maintenance: dict[str, Any]) -> list[dict[str, str]]
         {
             "key": "public-network-check",
             "label": "Public network check",
-            "status": "warn" if network_checks == "skipped" else "ok" if network_checks == "enabled" else "unknown",
+            "status": (
+                "warn"
+                if network_checks == "skipped"
+                else "blocked"
+                if host_blockers
+                else "ok"
+                if network_checks == "enabled"
+                else "unknown"
+            ),
             "detail": (
                 "DNS and HTTPS probes were skipped for this status snapshot."
                 if network_checks == "skipped"
+                else f"Public host probes are failing: {'; '.join(host_blockers)}."
+                if host_blockers
                 else "DNS and HTTPS probes were included in this status snapshot."
                 if network_checks == "enabled"
                 else f"Network check state is {network_checks}."

@@ -161,6 +161,18 @@ def _release_incident_label(incidents: list[OpsReleaseIncidentSummary]) -> str:
     return ", ".join(f"{item.environment} #{item.issue_number}" for item in incidents)
 
 
+def _release_blockers(payload: dict, blocker_count: int) -> list[str]:
+    return [
+        _string_value(payload, f"blocker_{index}")
+        for index in range(1, blocker_count + 1)
+        if _string_value(payload, f"blocker_{index}")
+    ]
+
+
+def _release_network_blockers(payload: dict, blocker_count: int) -> list[str]:
+    return [blocker for blocker in _release_blockers(payload, blocker_count) if blocker.startswith("host ")]
+
+
 def _incident_checklist_item(incident: OpsReleaseIncidentSummary) -> OpsReleaseChecklistItem:
     if incident.state == "CLOSED":
         return OpsReleaseChecklistItem(
@@ -196,6 +208,7 @@ def _build_release_checklist(
     network_checks: str,
     production: OpsReleaseIncidentSummary,
     staging: OpsReleaseIncidentSummary,
+    network_blockers: list[str] | None = None,
 ) -> list[OpsReleaseChecklistItem]:
     if not available:
         return [
@@ -211,6 +224,7 @@ def _build_release_checklist(
     open_categories = {incident.failure_category for incident in open_incidents}
     ssh_auth_blocked = "ssh_auth_denied" in open_categories
     host_key_blocked = "ssh_host_key_changed" in open_categories
+    host_blockers = network_blockers or []
 
     checklist = [
         OpsReleaseChecklistItem(
@@ -310,10 +324,20 @@ def _build_release_checklist(
         OpsReleaseChecklistItem(
             key="public-network-check",
             label="Public network check",
-            status="warn" if network_checks == "skipped" else "ok" if network_checks == "enabled" else "unknown",
+            status=(
+                "warn"
+                if network_checks == "skipped"
+                else "blocked"
+                if host_blockers
+                else "ok"
+                if network_checks == "enabled"
+                else "unknown"
+            ),
             detail=(
                 "DNS and HTTPS probes were skipped for this status snapshot."
                 if network_checks == "skipped"
+                else f"Public host probes are failing: {'; '.join(host_blockers)}."
+                if host_blockers
                 else "DNS and HTTPS probes were included in this status snapshot."
                 if network_checks == "enabled"
                 else f"Network check state is {network_checks or 'unknown'}."
@@ -504,6 +528,7 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
     release_audit_scheduled_paused = _bool_status_value(payload, "release_audit_scheduled_paused")
     staging_release_paused = _bool_status_value(payload, "staging_release_paused")
     network_checks = _string_value(payload, "network_checks", "unknown")
+    network_blockers = _release_network_blockers(payload, blocker_count)
     next_step = "Release maintenance is ready; remove pauses only during a planned release window."
 
     for incident in (production, staging):
@@ -533,6 +558,7 @@ def _build_release_maintenance_summary() -> OpsReleaseMaintenanceSummary:
             network_checks=network_checks,
             production=production,
             staging=staging,
+            network_blockers=network_blockers,
         ),
         repair_playbook=_build_release_repair_playbook(
             available=True,

@@ -341,7 +341,11 @@ if [ "$CHECK_NETWORK" = "1" ]; then
       2*|3*)
         ;;
       *)
-        mark_not_ready "host $host https=$http_code"
+        if [ "$dns_value" = "unavailable" ]; then
+          mark_not_ready "host $host dns=unavailable"
+        else
+          mark_not_ready "host $host https=$http_code"
+        fi
         ;;
     esac
   done

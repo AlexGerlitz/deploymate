@@ -707,6 +707,67 @@ exit 1
         self.assertEqual(payload["host_example_com_https_code"], "204")
         self.assertEqual(payload["ready_for_unpause"], "1")
 
+    def test_release_maintenance_status_blocks_unresolved_public_host_when_https_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  cat <<'JSON'
+{"state":"CLOSED","body":"Resolved incident","comments":[]}
+JSON
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            fake_dig = Path(tmpdir) / "dig"
+            fake_dig.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            fake_dig.chmod(0o755)
+
+            fake_curl = Path(tmpdir) / "curl"
+            fake_curl.write_text("#!/usr/bin/env bash\nprintf 'code=000 remote='\n", encoding="utf-8")
+            fake_curl.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    "scripts/release_maintenance_status.sh",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--hosts",
+                    "example.com",
+                    "--format",
+                    "json",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["network_checks"], "enabled")
+        self.assertEqual(payload["host_example_com_dns"], "unavailable")
+        self.assertEqual(payload["host_example_com_https_code"], "000")
+        self.assertEqual(payload["ready_for_unpause"], "0")
+        self.assertEqual(payload["blocker_count"], "1")
+        self.assertEqual(payload["blocker_1"], "host example.com dns=unavailable")
+
     def test_release_maintenance_status_markdown_output_is_human_readable(self):
         env = os.environ.copy()
         env["RELEASE_AUDIT_SCHEDULED_PAUSED"] = "true"
@@ -1012,6 +1073,81 @@ exit 1
         self.assertIn("Deploy key can authenticate", issue_comment_result.stdout)
         self.assertIn("confirm deploy key repair before audit", issue_comment_result.stdout)
         self.assertIn("Re-running the publisher updates this same comment", issue_comment_result.stdout)
+
+    def test_public_evidence_bundle_blocks_failed_public_network_checks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_gh = Path(tmpdir) / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "run" ] && [ "$2" = "list" ]; then
+  cat <<'JSON'
+[
+  {"workflowName":"CI","status":"completed","conclusion":"success","databaseId":101,"url":"https://example.test/actions/runs/101","headSha":"abc","displayTitle":"CI","event":"push","createdAt":"2026-06-20T00:00:00Z"},
+  {"workflowName":"Release Maintenance Status","status":"completed","conclusion":"success","databaseId":102,"url":"https://example.test/actions/runs/102","headSha":"abc","displayTitle":"Release Maintenance Status","event":"workflow_dispatch","createdAt":"2026-06-20T00:01:00Z"}
+]
+JSON
+  exit 0
+fi
+if [ "$1" = "variable" ] && [ "$2" = "list" ]; then
+  printf 'RELEASE_AUDIT_SCHEDULED_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  printf 'STAGING_RELEASE_PAUSED\\tfalse\\t2026-06-20T00:00:00Z\\n'
+  exit 0
+fi
+if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
+  cat <<'JSON'
+{"state":"CLOSED","body":"Resolved incident","comments":[]}
+JSON
+  exit 0
+fi
+exit 1
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+
+            fake_dig = Path(tmpdir) / "dig"
+            fake_dig.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            fake_dig.chmod(0o755)
+
+            fake_curl = Path(tmpdir) / "curl"
+            fake_curl.write_text("#!/usr/bin/env bash\nprintf 'code=000 remote='\n", encoding="utf-8")
+            fake_curl.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:{env['PATH']}"
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/public_evidence_bundle.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--check-network",
+                    "--format",
+                    "json",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        checklist_by_key = {
+            item["key"]: item for item in payload["maintenance"]["checklist"]
+        }
+        self.assertEqual(payload["maintenance"]["ready_for_unpause"], "0")
+        self.assertEqual(payload["maintenance"]["blocker_1"], "host deploymatecloud.ru dns=unavailable")
+        self.assertEqual(checklist_by_key["public-network-check"]["status"], "blocked")
+        self.assertIn(
+            "host deploymatecloud.ru dns=unavailable",
+            checklist_by_key["public-network-check"]["detail"],
+        )
 
     def test_public_evidence_publish_updates_marker_comment_without_duplicates(self):
         with tempfile.TemporaryDirectory() as tmpdir:

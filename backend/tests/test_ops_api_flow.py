@@ -353,6 +353,50 @@ class OpsApiFlowTests(unittest.TestCase):
         self.assertEqual(checklist_by_key["deploy-key"]["status"], "ok")
         self.assertEqual(release["repair_playbook"][0]["key"], "planned-unpause")
 
+    def test_ops_overview_blocks_public_network_check_when_host_probe_fails(self):
+        with tempfile.NamedTemporaryFile("w", delete=False) as handle:
+            json.dump(
+                {
+                    "generated_at": "2026-06-21T03:10:00Z",
+                    "ready_for_unpause": "0",
+                    "release_audit_scheduled_paused": "false",
+                    "staging_release_paused": "false",
+                    "network_checks": "enabled",
+                    "issue_18_state": "CLOSED",
+                    "issue_19_state": "CLOSED",
+                    "blocker_count": "1",
+                    "blocker_1": "host deploymatecloud.ru dns=unavailable",
+                },
+                handle,
+            )
+            status_path = handle.name
+
+        self.addCleanup(lambda: os.path.exists(status_path) and os.unlink(status_path))
+
+        with patch.dict(
+            os.environ,
+            {
+                "DEPLOYMATE_RELEASE_MAINTENANCE_STATUS_FILE": status_path,
+            },
+            clear=False,
+        ):
+            response = self.client.get("/ops/overview?notifications_limit=100")
+
+        self.assertEqual(response.status_code, 200)
+        release = response.json()["release_maintenance"]
+        self.assertFalse(release["ready_for_unpause"])
+        self.assertEqual(release["primary_blocker"], "host deploymatecloud.ru dns=unavailable")
+        self.assertEqual(
+            release["next_step"],
+            "Resolve this release blocker before unpause: host deploymatecloud.ru dns=unavailable.",
+        )
+        checklist_by_key = {item["key"]: item for item in release["checklist"]}
+        self.assertEqual(checklist_by_key["public-network-check"]["status"], "blocked")
+        self.assertIn(
+            "host deploymatecloud.ru dns=unavailable",
+            checklist_by_key["public-network-check"]["detail"],
+        )
+
     def test_release_repair_workflow_guides_deploy_key_repair(self):
         with tempfile.NamedTemporaryFile("w", delete=False) as handle:
             json.dump(
