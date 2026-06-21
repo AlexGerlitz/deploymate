@@ -934,6 +934,23 @@ exit 1
                 text=True,
                 check=False,
             )
+            issue_comment_result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/public_evidence_bundle.py",
+                    "--repo",
+                    "AlexGerlitz/deploymate",
+                    "--branch",
+                    "develop",
+                    "--format",
+                    "issue-comment",
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
         self.assertEqual(json_result.returncode, 0, json_result.stdout + json_result.stderr)
         payload = json.loads(json_result.stdout)
@@ -981,6 +998,19 @@ exit 1
         self.assertIn("| Deploy key can authenticate | `current` |", markdown_result.stdout)
         self.assertIn("confirm deploy key repair before audit", markdown_result.stdout)
         self.assertIn("- `Release Maintenance Status artifact`", markdown_result.stdout)
+
+        self.assertEqual(
+            issue_comment_result.returncode,
+            0,
+            issue_comment_result.stdout + issue_comment_result.stderr,
+        )
+        self.assertIn("<!-- deploymate:release-repair-evidence -->", issue_comment_result.stdout)
+        self.assertIn("## DeployMate Release Repair Evidence", issue_comment_result.stdout)
+        self.assertIn("- Phase: `repair_required`", issue_comment_result.stdout)
+        self.assertIn("- Status: `blocked`", issue_comment_result.stdout)
+        self.assertIn("Deploy key can authenticate", issue_comment_result.stdout)
+        self.assertIn("confirm deploy key repair before audit", issue_comment_result.stdout)
+        self.assertIn("Re-running the publisher updates this same comment", issue_comment_result.stdout)
 
 
 if __name__ == "__main__":

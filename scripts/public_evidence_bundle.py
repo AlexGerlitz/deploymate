@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 RELEASE_SECRETS_AUDIT_WORKFLOW = "release-secrets-audit.yml"
+ISSUE_COMMENT_MARKER = "<!-- deploymate:release-repair-evidence -->"
 
 
 def run_command(args: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -119,6 +121,41 @@ def latest_workflow(runs: list[dict[str, Any]], workflow_name: str) -> dict[str,
 
 def release_secrets_audit_command(repo: str, branch: str) -> str:
     return f"gh workflow run {RELEASE_SECRETS_AUDIT_WORKFLOW} --repo {repo} --ref {branch}"
+
+
+def gh_api_json(
+    *,
+    repo: str,
+    endpoint: str,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+) -> Any:
+    if shutil.which("gh") is None:
+        raise RuntimeError("gh CLI is required to publish issue comments")
+
+    owner_repo = repo.strip()
+    if "/" not in owner_repo:
+        raise RuntimeError(f"repo must use owner/name format, got {repo!r}")
+
+    args = ["gh", "api", f"repos/{owner_repo}/{endpoint}", "--method", method]
+    temp_path = None
+    try:
+        if payload is not None:
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+                json.dump(payload, handle)
+                temp_path = handle.name
+            args.extend(["--input", temp_path])
+
+        result = run_command(args)
+    finally:
+        if temp_path:
+            Path(temp_path).unlink(missing_ok=True)
+
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "gh api failed").strip())
+    if not result.stdout.strip():
+        return {}
+    return json.loads(result.stdout)
 
 
 def build_bundle(repo: str, branch: str, check_network: bool) -> dict[str, Any]:
@@ -667,6 +704,139 @@ def build_repair_workflow(maintenance: dict[str, Any], *, repo: str, branch: str
     return workflow
 
 
+def build_issue_comment(bundle: dict[str, Any]) -> str:
+    maintenance = bundle["maintenance"]
+    repair_workflow = maintenance.get("repair_workflow", {})
+    workflows = bundle["workflows"]
+    incidents = release_incidents(maintenance)
+    steps = repair_workflow.get("steps", [])
+
+    lines = [
+        ISSUE_COMMENT_MARKER,
+        "## DeployMate Release Repair Evidence",
+        "",
+        f"- Generated: `{bundle['generated_at']}`",
+        f"- Repository: `{bundle['repo']}`",
+        f"- Branch: `{bundle['branch']}`",
+        f"- Commit: `{bundle['commit']}`",
+        f"- Phase: `{repair_workflow.get('phase', 'unknown')}`",
+        f"- Status: `{repair_workflow.get('status', 'unknown')}`",
+        f"- Next action: {repair_workflow.get('next_action', '')}",
+        f"- Manual audit: `{repair_workflow.get('manual_audit_command', '')}`",
+        f"- Confirmation phrase: `{repair_workflow.get('typed_confirmation_phrase', '')}`",
+        "",
+        "### Current incidents",
+        "",
+        "| Issue | Environment | State | Failure category |",
+        "| --- | --- | --- | --- |",
+    ]
+    for incident in incidents:
+        lines.append(
+            f"| #{incident['issue_number']} | `{incident['environment']}` | "
+            f"`{incident['state']}` | `{incident['failure_category']}` |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "### Workflow evidence",
+            "",
+            "| Workflow | Status | Conclusion | Run |",
+            "| --- | --- | --- | --- |",
+            workflow_row("CI", workflows["ci"]),
+            workflow_row("Release Maintenance Status", workflows["release_maintenance_status"]),
+            workflow_row("Release Secrets Audit", workflows["release_secrets_audit"]),
+            workflow_row("Public Evidence Bundle", {
+                "status": "completed",
+                "conclusion": "success",
+                "databaseId": os.getenv("GITHUB_RUN_ID", ""),
+                "url": (
+                    f"https://github.com/{bundle['repo']}/actions/runs/{os.getenv('GITHUB_RUN_ID', '')}"
+                    if os.getenv("GITHUB_RUN_ID")
+                    else ""
+                ),
+            }),
+            "",
+            "### Operator steps",
+            "",
+        ]
+    )
+    for index, step in enumerate(steps, start=1):
+        lines.append(
+            f"{index}. **{step.get('title', step.get('key', 'unknown'))}** "
+            f"(`{step.get('status', 'unknown')}`): {step.get('operator_action', '')}"
+        )
+
+    lines.extend(
+        [
+            "",
+            "This comment is generated from the public evidence bundle. Re-running the publisher updates this same comment instead of adding duplicates.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def open_incident_issue_numbers(bundle: dict[str, Any]) -> list[int]:
+    numbers: list[int] = []
+    for incident in release_incidents(bundle["maintenance"]):
+        if incident["state"] != "CLOSED":
+            try:
+                numbers.append(int(incident["issue_number"]))
+            except ValueError:
+                continue
+    return numbers
+
+
+def publish_issue_comment(bundle: dict[str, Any], *, issue_number: int) -> dict[str, Any]:
+    comment_body = build_issue_comment(bundle)
+    comments = gh_api_json(
+        repo=bundle["repo"],
+        endpoint=f"issues/{issue_number}/comments?per_page=100",
+    )
+    existing = next(
+        (
+            comment
+            for comment in comments
+            if ISSUE_COMMENT_MARKER in str(comment.get("body", ""))
+        ),
+        None,
+    )
+    if existing:
+        updated = gh_api_json(
+            repo=bundle["repo"],
+            endpoint=f"issues/comments/{existing['id']}",
+            method="PATCH",
+            payload={"body": comment_body},
+        )
+        return {
+            "issue_number": issue_number,
+            "action": "updated",
+            "comment_id": updated.get("id", existing["id"]),
+            "url": updated.get("html_url", existing.get("html_url", "")),
+        }
+
+    created = gh_api_json(
+        repo=bundle["repo"],
+        endpoint=f"issues/{issue_number}/comments",
+        method="POST",
+        payload={"body": comment_body},
+    )
+    return {
+        "issue_number": issue_number,
+        "action": "created",
+        "comment_id": created.get("id", ""),
+        "url": created.get("html_url", ""),
+    }
+
+
+def publish_open_incident_comments(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        publish_issue_comment(bundle, issue_number=issue_number)
+        for issue_number in open_incident_issue_numbers(bundle)
+    ]
+
+
 def md_escape(value: Any) -> str:
     text = str(value if value is not None else "")
     return text.replace("|", "\\|")
@@ -817,14 +987,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a public DeployMate evidence bundle.")
     parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY", "AlexGerlitz/deploymate"))
     parser.add_argument("--branch", default=os.getenv("GITHUB_REF_NAME", "develop"))
-    parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
+    parser.add_argument("--format", choices=("json", "markdown", "issue-comment"), default="markdown")
     parser.add_argument("--check-network", action="store_true")
+    parser.add_argument(
+        "--publish-open-incident-comments",
+        action="store_true",
+        help="Create or update the marker comment on currently open release incident issues.",
+    )
     args = parser.parse_args()
 
     bundle = build_bundle(args.repo, args.branch, args.check_network)
+    if args.publish_open_incident_comments:
+        bundle["published_issue_comments"] = publish_open_incident_comments(bundle)
+
     if args.format == "json":
         json.dump(bundle, sys.stdout, indent=2)
         sys.stdout.write("\n")
+        return 0
+
+    if args.format == "issue-comment":
+        sys.stdout.write(build_issue_comment(bundle))
         return 0
 
     sys.stdout.write(render_markdown(bundle))

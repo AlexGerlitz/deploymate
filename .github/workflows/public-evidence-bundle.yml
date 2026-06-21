@@ -64,6 +64,8 @@ jobs:
 
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format json > deploymate-public-evidence.json
           python3 scripts/public_evidence_bundle.py "${args[@]}" --format markdown > deploymate-public-evidence.md
+          python3 scripts/public_evidence_bundle.py "${args[@]}" --format issue-comment > deploymate-release-repair-issue-comment.md
+          printf '{"published":false,"reason":"publish_incident_comment input is false or unavailable"}\n' > deploymate-incident-comment-publish-result.json
 
           cat deploymate-public-evidence.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -74,4 +76,6 @@ jobs:
           path: |
             deploymate-public-evidence.json
             deploymate-public-evidence.md
+            deploymate-release-repair-issue-comment.md
+            deploymate-incident-comment-publish-result.json
           if-no-files-found: error

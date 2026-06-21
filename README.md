@@ -183,6 +183,7 @@ Recommended reviewer order:
 - separate SSH trust-anchor status from deploy-key authentication status before unpausing release automation
 - use the authenticated release repair workflow to copy the next action and export handoff/audit-trail evidence
 - export the same release readiness checklist and repair workflow packet through the public evidence bundle
+- download `deploymate-release-repair-issue-comment.md` from the evidence bundle, or run the script from a trusted operator context with `--publish-open-incident-comments` to update the marker comment on open release incident issues
 
 ## Stack
 
