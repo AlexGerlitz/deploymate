@@ -59,7 +59,7 @@ jobs:
 
           publish_incident_comment="${{ inputs.publish_incident_comment }}"
           if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
-            publish_incident_comment="true"
+            publish_incident_comment="false"
           elif [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
             publish_incident_comment="false"
           fi

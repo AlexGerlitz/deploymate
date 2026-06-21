@@ -291,7 +291,7 @@ required_snippets = [
     "publish_incident_comment:",
     "if [ \"$GITHUB_EVENT_NAME\" = \"schedule\" ]; then",
     "check_network=\"true\"",
-    "publish_incident_comment=\"true\"",
+    "publish_incident_comment=\"false\"",
     "scripts/public_evidence_bundle.py",
     "--publish-open-incident-comments",
     "deploymate-public-evidence.json",
