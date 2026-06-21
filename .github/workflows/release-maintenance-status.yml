@@ -17,7 +17,7 @@ on:
         description: "Comma-separated public hosts to check"
         required: true
         type: string
-        default: "deploymatecloud.ru,lab.deploymatecloud.ru"
+        default: "deploymate.152.53.178.83.sslip.io"
   schedule:
     - cron: "47 2 * * *"
 
@@ -49,13 +49,13 @@ jobs:
           require_ready="${{ inputs.require_ready }}"
 
           if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
-            hosts="deploymatecloud.ru,lab.deploymatecloud.ru"
+            hosts="deploymate.152.53.178.83.sslip.io"
             check_network="true"
             require_ready="false"
           fi
 
           if [ -z "$hosts" ]; then
-            hosts="deploymatecloud.ru,lab.deploymatecloud.ru"
+            hosts="deploymate.152.53.178.83.sslip.io"
           fi
 
           base_args=(--repo "$GITHUB_REPOSITORY" --hosts "$hosts")

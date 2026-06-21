@@ -56,7 +56,7 @@ Commercial licensing entry points:
 If you are opening this repository as a hiring reviewer, these are the fastest entry points:
 
 - live review route: `https://deploymate.152.53.178.83.sslip.io/review`
-- primary release target: `https://deploymatecloud.ru` when release maintenance evidence is green
+- current release target: `https://deploymate.152.53.178.83.sslip.io`
 - product preview screenshots: [Product Preview](#product-preview)
 - release notes: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)
 - roadmap: [ROADMAP.md](ROADMAP.md)
@@ -103,8 +103,8 @@ unverified marketing promise. The stable fallback review console is currently:
 
 - `https://deploymate.152.53.178.83.sslip.io/review`
 
-Before using the primary release target `https://deploymatecloud.ru` for a live
-review, open the latest `Public Evidence Bundle` artifact and check:
+Before using a custom-domain release target such as `https://deploymatecloud.ru`
+for a live review, open the latest `Public Evidence Bundle` artifact and check:
 
 - `Public network check`
 - `Ready for unpause`

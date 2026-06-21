@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="${GITHUB_REPOSITORY:-AlexGerlitz/deploymate}"
-HOSTS="deploymatecloud.ru,lab.deploymatecloud.ru"
+HOSTS="deploymate.152.53.178.83.sslip.io"
 CHECK_NETWORK=1
 REQUIRE_READY=0
 OUTPUT_FORMAT="human"
