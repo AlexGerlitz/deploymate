@@ -19,6 +19,7 @@ RELEASE_MAINTENANCE_SCRIPT="scripts/release_maintenance_status.sh"
 PUBLIC_EVIDENCE_SCRIPT="scripts/public_evidence_bundle.py"
 REVIEW_PACKET_VERIFY_SCRIPT="scripts/verify_review_packet.py"
 LATEST_REVIEW_PACKET_SCRIPT="scripts/check_latest_review_packet_artifact.py"
+PUBLIC_REVIEW_GATE_SCRIPT="scripts/public_review_gate.sh"
 RELEASE_INCIDENT_DIAGNOSTICS_SCRIPT="scripts/release_incident_diagnostics.py"
 RUNBOOK_FILE="RUNBOOK.md"
 
@@ -388,6 +389,38 @@ for snippet in required_snippets:
 PY
 }
 
+audit_public_review_gate_script_shape() {
+  python3 - "$PUBLIC_REVIEW_GATE_SCRIPT" "Makefile" <<'PY'
+import sys
+from pathlib import Path
+
+script = Path(sys.argv[1]).read_text(encoding="utf-8")
+makefile = Path(sys.argv[2]).read_text(encoding="utf-8")
+
+required_script_snippets = [
+    "bash scripts/release_workflow_audit.sh",
+    "python3 scripts/export_review_packet.py",
+    "python3 scripts/verify_review_packet.py",
+    "python3 scripts/check_latest_review_packet_artifact.py",
+    "--skip-github",
+    "--with-frontend",
+    "npm --prefix frontend run smoke:review",
+    "[public-review] ok",
+]
+for snippet in required_script_snippets:
+    if snippet not in script:
+        raise SystemExit(f"[release-audit] scripts/public_review_gate.sh is missing {snippet!r}")
+
+required_makefile_snippets = [
+    "public-review:",
+    "bash scripts/public_review_gate.sh $(PUBLIC_REVIEW_FLAGS)",
+]
+for snippet in required_makefile_snippets:
+    if snippet not in makefile:
+        raise SystemExit(f"[release-audit] Makefile is missing public review gate snippet {snippet!r}")
+PY
+}
+
 audit_public_evidence_docs_shape() {
   python3 - <<'PY'
 from pathlib import Path
@@ -399,6 +432,7 @@ release_notes = Path("docs/releases/v0.1.0.md").read_text(encoding="utf-8")
 required_readme = [
     "Public Evidence Bundle",
     "deploymate-review-packet",
+    "make public-review",
     "check_latest_review_packet_artifact.py",
     "verify_review_packet.py",
     "public review packet with CI, release-maintenance, incident status, repair playbook, README, manifest, and SHA-256 checksums",
@@ -419,6 +453,8 @@ required_runbook = [
     "deploymate-public-evidence.md",
     "deploymate-review-packet",
     "python3 scripts/check_latest_review_packet_artifact.py",
+    "make public-review",
+    "PUBLIC_REVIEW_FLAGS=--with-frontend",
     "python3 scripts/verify_review_packet.py dist/review",
 ]
 for snippet in required_runbook:
@@ -470,14 +506,17 @@ audit_public_evidence_workflow_shape
 audit_public_evidence_script_shape
 audit_review_packet_verify_script_shape
 audit_latest_review_packet_script_shape
+audit_public_review_gate_script_shape
 audit_public_evidence_docs_shape
 audit_release_surface_classification "backend/tests/test_production_env_audit.py" "docs"
 audit_release_surface_classification "backend/app/main.py" "backend"
+audit_release_surface_classification "Makefile" "docs"
 audit_release_surface_classification ".github/workflows/release-maintenance-status.yml" "docs"
 audit_release_surface_classification ".github/workflows/public-evidence-bundle.yml" "docs"
 audit_release_surface_classification "scripts/public_evidence_bundle.py" "docs"
 audit_release_surface_classification "scripts/verify_review_packet.py" "docs"
 audit_release_surface_classification "scripts/check_latest_review_packet_artifact.py" "docs"
+audit_release_surface_classification "scripts/public_review_gate.sh" "docs"
 audit_release_surface_classification "scripts/release_incident_diagnostics.py" "docs"
 
 release_audit_fingerprint="$(audit_cache_fingerprint_files \
@@ -494,6 +533,8 @@ release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "$PUBLIC_EVIDENCE_SCRIPT" \
   "$REVIEW_PACKET_VERIFY_SCRIPT" \
   "$LATEST_REVIEW_PACKET_SCRIPT" \
+  "$PUBLIC_REVIEW_GATE_SCRIPT" \
+  "Makefile" \
   "$RELEASE_INCIDENT_DIAGNOSTICS_SCRIPT" \
   "$RUNBOOK_FILE")"
 

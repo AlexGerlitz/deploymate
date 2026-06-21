@@ -77,7 +77,7 @@ If you want the shortest coherent pass through the project:
 1. start with the screenshots in [Product Preview](#product-preview)
 2. open `/review` when a live frontend is available
 3. open the latest `Public Evidence Bundle` GitHub Actions run and download `deploymate-review-packet`, or generate the same local packet with `python3 scripts/export_review_packet.py`
-4. verify the latest GitHub artifact with `python3 scripts/check_latest_review_packet_artifact.py`, or verify a downloaded/local packet with `python3 scripts/verify_review_packet.py <packet-dir>`
+4. run `make public-review` to verify the release/evidence contract, local packet, and latest GitHub artifact through `scripts/check_latest_review_packet_artifact.py`
 5. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
 6. read [RUNBOOK.md](RUNBOOK.md) and [SAFE-RELEASE.md](SAFE-RELEASE.md) for release and recovery discipline
 7. inspect [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md) for the public release shape
@@ -88,6 +88,8 @@ If you are evaluating whether this is more than a UI shell, the quickest evidenc
 
 - product screenshots and route map
 - public review packet with CI, release-maintenance, incident status, repair playbook, README, manifest, and SHA-256 checksums
+- one-command public review gate with `make public-review`
+- latest artifact checker `scripts/check_latest_review_packet_artifact.py` and local manifest verifier `scripts/verify_review_packet.py`
 - local review packet generation when GitHub artifacts are unavailable
 - release workflow and smoke discipline
 - roadmap and documentation continuity from product to operations

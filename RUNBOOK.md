@@ -629,6 +629,7 @@ python3 scripts/public_evidence_bundle.py --check-network --format markdown
 python3 scripts/export_review_packet.py --output dist/review
 python3 scripts/verify_review_packet.py dist/review
 python3 scripts/check_latest_review_packet_artifact.py
+make public-review
 ```
 
 The GitHub Actions workflow `Public Evidence Bundle` publishes both the raw
@@ -652,6 +653,10 @@ Use `python3 scripts/check_latest_review_packet_artifact.py` to download and
 verify the latest successful GitHub artifact from the current branch. Generate
 the packet locally when GitHub artifact download or the Actions API is
 unavailable but the current checkout still needs a portable review handoff.
+Use `make public-review` for the full reviewer gate: release workflow audit,
+local packet export, manifest verification, and latest GitHub artifact
+verification. Add `PUBLIC_REVIEW_FLAGS=--with-frontend` when the `/review`
+frontend route should be smoked in the same pass.
 
 The app can surface the same release-maintenance state in the Operations overview
 when the release maintenance status file path points to either
