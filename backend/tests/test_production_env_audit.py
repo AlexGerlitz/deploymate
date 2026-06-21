@@ -1273,6 +1273,44 @@ exit 1
             self.assertIn("`deploymate-review-index.json`", packet_readme)
             self.assertIn("https://deploymatecloud.ru/review", packet_readme)
 
+            verify_result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/verify_review_packet.py",
+                    str(output_dir),
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                verify_result.returncode,
+                0,
+                verify_result.stdout + verify_result.stderr,
+            )
+            self.assertIn("[review-packet-verify] ok", verify_result.stdout)
+
+            (output_dir / "deploymate-public-evidence.md").write_text(
+                "# tampered\n",
+                encoding="utf-8",
+            )
+            tampered_result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/verify_review_packet.py",
+                    str(output_dir),
+                ],
+                cwd=self.repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(tampered_result.returncode, 0)
+            self.assertIn("sha256 mismatch", tampered_result.stderr)
+
     def test_public_evidence_bundle_blocks_failed_public_network_checks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_gh = Path(tmpdir) / "gh"

@@ -627,6 +627,7 @@ python3 scripts/public_evidence_bundle.py --format markdown
 python3 scripts/public_evidence_bundle.py --format json
 python3 scripts/public_evidence_bundle.py --check-network --format markdown
 python3 scripts/export_review_packet.py --output dist/review
+python3 scripts/verify_review_packet.py dist/review
 ```
 
 The GitHub Actions workflow `Public Evidence Bundle` publishes both the raw
@@ -644,9 +645,11 @@ command without requiring GitHub artifact access first.
 
 The review packet writes `README.md`, the JSON bundle, review index, Markdown
 report, repair issue comment, and `MANIFEST.json` with file sizes and SHA-256
-checksums. Use the GitHub artifact for external review, or generate it locally
-when GitHub artifact download or the Actions API is unavailable but the current
-checkout still needs a portable review handoff.
+checksums. The workflow verifies that manifest with
+`python3 scripts/verify_review_packet.py deploymate-review-packet` before upload.
+Use the GitHub artifact for external review, or generate it locally when GitHub
+artifact download or the Actions API is unavailable but the current checkout
+still needs a portable review handoff.
 
 The app can surface the same release-maintenance state in the Operations overview
 when the release maintenance status file path points to either

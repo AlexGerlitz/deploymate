@@ -17,6 +17,7 @@ RELEASE_AUDIT_INCIDENT_ACTION=".github/actions/release-audit-incident/action.yml
 RELEASE_AUDIT_FAILURE_CLASSIFIER="scripts/release_audit_failure_classifier.js"
 RELEASE_MAINTENANCE_SCRIPT="scripts/release_maintenance_status.sh"
 PUBLIC_EVIDENCE_SCRIPT="scripts/public_evidence_bundle.py"
+REVIEW_PACKET_VERIFY_SCRIPT="scripts/verify_review_packet.py"
 RELEASE_INCIDENT_DIAGNOSTICS_SCRIPT="scripts/release_incident_diagnostics.py"
 RUNBOOK_FILE="RUNBOOK.md"
 
@@ -294,9 +295,11 @@ required_snippets = [
     "publish_incident_comment=\"false\"",
     "scripts/public_evidence_bundle.py",
     "scripts/export_review_packet.py",
+    "scripts/verify_review_packet.py",
     "--format review-index",
     "--publish-open-incident-comments",
     "review_packet_args=(--repo \"$GITHUB_REPOSITORY\" --branch \"$branch\" --output deploymate-review-packet)",
+    "python3 scripts/verify_review_packet.py deploymate-review-packet",
     "deploymate-public-evidence.json",
     "deploymate-review-index.json",
     "deploymate-public-evidence.md",
@@ -338,6 +341,28 @@ for snippet in required_snippets:
 PY
 }
 
+audit_review_packet_verify_script_shape() {
+  python3 - "$REVIEW_PACKET_VERIFY_SCRIPT" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+required_snippets = [
+    "Verify a DeployMate review packet manifest.",
+    "MANIFEST.json",
+    "sha256 mismatch",
+    "byte size mismatch",
+    "unexpected files",
+    "[review-packet-verify] ok",
+]
+for snippet in required_snippets:
+    if snippet not in text:
+        raise SystemExit(f"[release-audit] {path} is missing review packet verifier snippet {snippet!r}")
+PY
+}
+
 audit_public_evidence_docs_shape() {
   python3 - <<'PY'
 from pathlib import Path
@@ -349,6 +374,7 @@ release_notes = Path("docs/releases/v0.1.0.md").read_text(encoding="utf-8")
 required_readme = [
     "Public Evidence Bundle",
     "deploymate-review-packet",
+    "verify_review_packet.py",
     "public review packet with CI, release-maintenance, incident status, repair playbook, README, manifest, and SHA-256 checksums",
     "## Live Target Status",
     "Public network check",
@@ -366,6 +392,7 @@ required_runbook = [
     "deploymate-public-evidence.json",
     "deploymate-public-evidence.md",
     "deploymate-review-packet",
+    "python3 scripts/verify_review_packet.py dist/review",
 ]
 for snippet in required_runbook:
     if snippet not in runbook:
@@ -414,12 +441,14 @@ audit_release_maintenance_workflow_shape
 audit_release_maintenance_script_shape
 audit_public_evidence_workflow_shape
 audit_public_evidence_script_shape
+audit_review_packet_verify_script_shape
 audit_public_evidence_docs_shape
 audit_release_surface_classification "backend/tests/test_production_env_audit.py" "docs"
 audit_release_surface_classification "backend/app/main.py" "backend"
 audit_release_surface_classification ".github/workflows/release-maintenance-status.yml" "docs"
 audit_release_surface_classification ".github/workflows/public-evidence-bundle.yml" "docs"
 audit_release_surface_classification "scripts/public_evidence_bundle.py" "docs"
+audit_release_surface_classification "scripts/verify_review_packet.py" "docs"
 audit_release_surface_classification "scripts/release_incident_diagnostics.py" "docs"
 
 release_audit_fingerprint="$(audit_cache_fingerprint_files \
@@ -434,6 +463,7 @@ release_audit_fingerprint="$(audit_cache_fingerprint_files \
   "$RELEASE_AUDIT_FAILURE_CLASSIFIER" \
   "$RELEASE_MAINTENANCE_SCRIPT" \
   "$PUBLIC_EVIDENCE_SCRIPT" \
+  "$REVIEW_PACKET_VERIFY_SCRIPT" \
   "$RELEASE_INCIDENT_DIAGNOSTICS_SCRIPT" \
   "$RUNBOOK_FILE")"
 
