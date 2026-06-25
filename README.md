@@ -21,6 +21,8 @@
 </p>
 
 <p align="center">
+  <a href="#engineering-proof-snapshot">Engineering Proof Snapshot</a>
+  |
   <a href="#reviewer-package">Reviewer Package</a>
   |
   <a href="ARCHITECTURE.md">Architecture</a>
@@ -43,7 +45,7 @@ bundles, runbooks, backup/restore thinking, and production review flows.
 | Backend/platform ownership | FastAPI API, PostgreSQL-backed domain surfaces, admin workflows, runtime passport, server passport, templates, and upgrade requests. |
 | DevOps/release discipline | Docker runtime, GitHub Actions, scripted preflight, remote release helper, smoke checks, release safety docs, and rollback notes. |
 | Operational review | Live fallback review console, product screenshots, public evidence bundle, review packet export, incident status, and repair playbook. |
-| Reviewer path | Start with [Reviewer Package](#reviewer-package), then run `make public-review` for the release/evidence contract. |
+| Reviewer path | Start with this snapshot, open the [Reviewer Package](#reviewer-package), then run `make public-review` for the release/evidence contract. |
 
 ## License
 
