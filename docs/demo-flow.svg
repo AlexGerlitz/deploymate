@@ -16,7 +16,7 @@
   </defs>
   <rect width="980" height="260" rx="28" fill="url(#bg2)" />
   <text x="40" y="52" class="title">Reviewer Demo Flow</text>
-  <text x="40" y="78" class="body">A clean path for a hiring reviewer to validate product quality in a few minutes.</text>
+  <text x="40" y="78" class="body">A clean path for technical and product review in a few minutes.</text>
 
   <g transform="translate(40,118)">
     <rect width="180" height="96" rx="20" fill="#fff" stroke="#e5d3b3" />

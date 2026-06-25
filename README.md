@@ -53,7 +53,7 @@ Commercial licensing entry points:
 
 ## Reviewer Package
 
-If you are opening this repository as a hiring reviewer, these are the fastest entry points:
+If you are opening this repository for technical or product review, these are the fastest entry points:
 
 - live review route: `https://deploymate.152.53.178.83.sslip.io/review`
 - current release target: `https://deploymate.152.53.178.83.sslip.io`
