@@ -32,6 +32,15 @@
   <a href="PRODUCT-STRATEGY.md">Product Strategy</a>
 </p>
 
+<p align="center">
+  <strong>Profile / contact route:</strong>
+  <a href="https://alexgerlitz.github.io/AlexGerlitz/drivedesk-proof-route.html">DriveDesk AI Operator proof route</a>
+  |
+  <a href="https://alexgerlitz.github.io/AlexGerlitz/">portfolio</a>
+  |
+  <a href="https://alexgerlitz.github.io/AlexGerlitz/INTAKE_BRIEF.md">inbound brief</a>
+</p>
+
 DeployMate is a self-hosted deployment control panel for small teams that need a fast way to ship Docker containers, manage reusable templates, track operational state, and handle lightweight admin workflows from one UI.
 
 It is also a public DevOps/platform engineering proof surface: FastAPI, Next.js,
