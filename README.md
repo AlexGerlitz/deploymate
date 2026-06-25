@@ -32,7 +32,18 @@
 
 DeployMate is a self-hosted deployment control panel for small teams that need a fast way to ship Docker containers, manage reusable templates, track operational state, and handle lightweight admin workflows from one UI.
 
-It is built for pragmatic operator experience rather than platform complexity.
+It is also a public DevOps/platform engineering proof surface: FastAPI, Next.js,
+PostgreSQL, SSH runtime tooling, CI/CD, health checks, release gates, evidence
+bundles, runbooks, backup/restore thinking, and production review flows.
+
+## Engineering Proof Snapshot
+
+| Signal | Evidence |
+| --- | --- |
+| Backend/platform ownership | FastAPI API, PostgreSQL-backed domain surfaces, admin workflows, runtime passport, server passport, templates, and upgrade requests. |
+| DevOps/release discipline | Docker runtime, GitHub Actions, scripted preflight, remote release helper, smoke checks, release safety docs, and rollback notes. |
+| Operational review | Live fallback review console, product screenshots, public evidence bundle, review packet export, incident status, and repair playbook. |
+| Reviewer path | Start with [Reviewer Package](#reviewer-package), then run `make public-review` for the release/evidence contract. |
 
 ## License
 
@@ -597,7 +608,7 @@ PRs are not just ceremony here:
 
 For the current main product path walkthrough, use [docs/beginner-walkthrough.md](docs/beginner-walkthrough.md) first.
 
-If I were demoing the project to a reviewer, I would open it in this order:
+Review the current product path in this order:
 
 1. `/app` for the operations overview
 2. `/deployments/[deploymentId]` for runtime state, logs, and health
