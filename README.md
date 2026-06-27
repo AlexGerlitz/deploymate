@@ -42,6 +42,8 @@
   |
   <a href="https://alexgerlitz.github.io/AlexGerlitz/">portfolio</a>
   |
+  <a href="https://alexgerlitz.github.io/AlexGerlitz/enterprise-readiness.html">enterprise readiness</a>
+  |
   <a href="https://alexgerlitz.github.io/AlexGerlitz/intake-brief.html">inbound brief</a>
 </p>
 
