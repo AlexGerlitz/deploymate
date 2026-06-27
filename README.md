@@ -36,9 +36,13 @@
   <strong>Profile / contact route:</strong>
   <a href="https://alexgerlitz.github.io/AlexGerlitz/drivedesk-proof-route.html">DriveDesk AI Operator proof route</a>
   |
+  <a href="https://www.linkedin.com/in/alex-gerlitz-a659ab3bb/">LinkedIn message route</a>
+  |
+  <a href="https://alexgerlitz.github.io/AlexGerlitz/output/pdf/alex-gerlitz-remote-ai-automation-resume.pdf">PDF resume</a>
+  |
   <a href="https://alexgerlitz.github.io/AlexGerlitz/">portfolio</a>
   |
-  <a href="https://alexgerlitz.github.io/AlexGerlitz/INTAKE_BRIEF.md">inbound brief</a>
+  <a href="https://alexgerlitz.github.io/AlexGerlitz/intake-brief.html">inbound brief</a>
 </p>
 
 DeployMate is a self-hosted deployment control panel for small teams that need a fast way to ship Docker containers, manage reusable templates, track operational state, and handle lightweight admin workflows from one UI.
