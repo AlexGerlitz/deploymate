@@ -55,6 +55,11 @@ bundles, runbooks, backup/restore thinking, and production review flows.
 
 ## Engineering Proof Snapshot
 
+Hiring relevance: this is proof that I can turn deployment operations, release
+checklists, server access, runtime diagnostics, and recovery habits into a
+reviewable backend/platform product with tests, docs, CI, smoke checks, and
+handoff paths.
+
 | Signal | Evidence |
 | --- | --- |
 | Backend/platform ownership | FastAPI API, PostgreSQL-backed domain surfaces, admin workflows, runtime passport, server passport, templates, and upgrade requests. |
