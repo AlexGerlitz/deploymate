@@ -42,7 +42,7 @@
   |
   <a href="https://www.linkedin.com/in/alex-gerlitz-a659ab3bb/">LinkedIn message route</a>
   |
-  <a href="https://alexgerlitz.github.io/AlexGerlitz/output/pdf/alex-gerlitz-remote-ai-automation-resume.pdf">PDF resume</a>
+  <a href="https://alexgerlitz.github.io/AlexGerlitz/output/pdf/alex-gerlitz-python-backend-automation-resume.pdf">PDF resume</a>
   |
   <a href="https://alexgerlitz.github.io/AlexGerlitz/">portfolio</a>
   |
