@@ -24,7 +24,7 @@ Options:
   --with-frontend           Also run the public /review frontend smoke.
   -h, --help                Show this help.
 
-This gate verifies the reviewer-facing proof path:
+This gate verifies the reviewer-facing evidence path:
   1. release workflow/evidence contract
   2. local review packet generation
   3. local review packet manifest and SHA-256 integrity

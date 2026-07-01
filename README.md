@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <a href="#engineering-proof-snapshot">Engineering Proof Snapshot</a>
+  <a href="#engineering-evidence-snapshot">Engineering Evidence Snapshot</a>
   |
   <a href="#reviewer-package">Reviewer Package</a>
   |
@@ -36,7 +36,7 @@
   <strong>Profile / contact route:</strong>
   <a href="https://alexgerlitz.github.io/AlexGerlitz/linkedin-recruiter-packet.html">LinkedIn Recruiter Packet</a>
   |
-  <a href="https://alexgerlitz.github.io/AlexGerlitz/drivedesk-proof-route.html">DriveDesk AI Operator proof route</a>
+  <a href="https://alexgerlitz.github.io/AlexGerlitz/drivedesk-proof-route.html">DriveDesk AI Operator route</a>
   |
   <a href="https://alexgerlitz.github.io/AlexGerlitz/decision-ready-contact.html">Decision-Ready Contact</a>
   |
@@ -52,19 +52,21 @@
 </p>
 
 <p align="center">
-  <strong>Shortest proof path:</strong>
-  LinkedIn Recruiter Packet -> DriveDesk AI Operator proof route -> Decision-Ready Contact -> PDF resume.
+  <strong>Shortest review path:</strong>
+  LinkedIn Recruiter Packet -> DriveDesk AI Operator route -> Decision-Ready Contact -> PDF resume.
 </p>
 
 DeployMate is a self-hosted deployment control panel for small teams that need a fast way to ship Docker containers, manage reusable templates, track operational state, and handle lightweight admin workflows from one UI.
 
-It is also a public DevOps/platform engineering proof surface: FastAPI, Next.js,
+It is also a public DevOps/platform engineering evidence surface: FastAPI, Next.js,
 PostgreSQL, SSH runtime tooling, CI/CD, health checks, release gates, evidence
 bundles, runbooks, backup/restore thinking, and production review flows.
 
-## Engineering Proof Snapshot
+<a id="engineering-proof-snapshot"></a>
 
-Hiring relevance: this is proof that I can turn deployment operations, release
+## Engineering Evidence Snapshot
+
+Hiring relevance: this is evidence that I can turn deployment operations, release
 checklists, server access, runtime diagnostics, and recovery habits into a
 reviewable backend/platform product with tests, docs, CI, smoke checks, and
 handoff paths.
@@ -97,15 +99,15 @@ Commercial licensing entry points:
 
 If you are opening this repository for technical or product review, these are the fastest entry points:
 
-- live review route: `https://deploymate.152.53.178.83.sslip.io/review`
-- current release target: `https://deploymate.152.53.178.83.sslip.io`
+- live review route: use the latest `Public Evidence Bundle` artifact; the fallback target is tracked under [Live Target Status](#live-target-status)
+- current release target: custom-domain availability is validated by release-maintenance evidence, not assumed in the README
 - product preview screenshots: [Product Preview](#product-preview)
 - release notes: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)
 - roadmap: [ROADMAP.md](ROADMAP.md)
 - product strategy: [PRODUCT-STRATEGY.md](PRODUCT-STRATEGY.md)
 - architecture overview: [ARCHITECTURE.md](ARCHITECTURE.md)
 - production/release discipline: [RUNBOOK.md](RUNBOOK.md), [SAFE-RELEASE.md](SAFE-RELEASE.md), [SECURITY.md](SECURITY.md)
-- latest CI and operational proof: use the GitHub Actions workflow `Public Evidence Bundle`, which auto-refreshes after successful `CI`, and download the `deploymate-review-packet` artifact
+- latest CI and operational evidence: use the GitHub Actions workflow `Public Evidence Bundle`, which auto-refreshes after successful `CI`, and download the `deploymate-review-packet` artifact
 
 What to evaluate quickly:
 
@@ -118,7 +120,7 @@ What to evaluate quickly:
 If you want the shortest coherent pass through the project:
 
 1. start with the screenshots in [Product Preview](#product-preview)
-2. open `https://deploymate.152.53.178.83.sslip.io/review` for the live fallback review console
+2. open the live review route from the latest `Public Evidence Bundle`, or use the fallback route listed under [Live Target Status](#live-target-status)
 3. open the latest `Public Evidence Bundle` GitHub Actions run and download `deploymate-review-packet`, or generate the same local packet with `python3 scripts/export_review_packet.py`
 4. run `make public-review` to verify the release/evidence contract, local packet, and latest GitHub artifact through `scripts/check_latest_review_packet_artifact.py`
 5. read [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries
