@@ -1,0 +1,12 @@
+{
+  "schema": "jarvis_gateway_v3_postdeploy_verification_receipt_v1",
+  "state": "VERIFY_FAILED",
+  "exact_head": "db9426481e877caf04479b44e3d5d3622419f12c",
+  "regression_unit": "jarvis-regression-db9426481e87-20260718-144434.service",
+  "workflow_run_id": 29645053714,
+  "workflow_run_url": "https://github.com/AlexGerlitz/deploymate/actions/runs/29645053714",
+  "verification_result": "failure",
+  "read_only_verification": true,
+  "secret_values_recorded": false,
+  "observed_at": "2026-07-18T12:50:46.302Z"
+}
