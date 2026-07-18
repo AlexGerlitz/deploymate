@@ -41,32 +41,34 @@ jobs:
 
           raw = Path('job.log').read_text(encoding='utf-8', errors='replace')
           raw = re.sub(r'\x1b\[[0-9;]*m', '', raw)
-          rows = []
-          for line in raw.splitlines():
-              clean = re.sub(r'^.*?Z\s+', '', line).strip()
-              rows.append(clean)
-
-          precheck_pattern = re.compile(r'^PRECHECK head=[0-9a-f]{40} origin_main=[0-9a-f]{40} branch=main dirty=(?:true|false)$')
-          starts = [index for index, line in enumerate(rows) if precheck_pattern.fullmatch(line)]
-          state = 'ACTUAL_PRECHECK_FOUND' if starts else 'ACTUAL_PRECHECK_NOT_FOUND'
+          concrete = list(re.finditer(
+              r'PRECHECK head=[0-9a-f]{40} origin_main=[0-9a-f]{40} branch=main dirty=(?:true|false)',
+              raw,
+          ))
+          state = 'ACTUAL_PRECHECK_FOUND' if concrete else 'ACTUAL_PRECHECK_NOT_FOUND'
           excerpt = []
-          if starts:
-              start = starts[-1]
-              end = next((index for index in range(start, len(rows)) if rows[index] == 'BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED'), -1)
-              slice_end = end + 1 if end >= start else min(len(rows), start + 180)
-              excerpt = [line for line in rows[start:slice_end] if line]
-          else:
-              safe_markers = ('PRECHECK ', '--- STATUS_SHORT ---', '--- UNSTAGED_NAMES ---', '--- STAGED_NAMES ---', '--- UNTRACKED_NAMES ---', '--- DIFF_STAT ---', '--- OVERLAP_WITH_TARGET ---', '--- SERVICE_PROPERTIES ---', 'BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED')
-              excerpt = [line for line in rows if line.startswith(safe_markers)]
-
+          if concrete:
+              start_offset = concrete[-1].start()
+              end_marker = 'BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED'
+              end_offset = raw.find(end_marker, start_offset)
+              if end_offset < 0:
+                  end_offset = min(len(raw), start_offset + 12000)
+              else:
+                  end_offset += len(end_marker)
+              block = raw[start_offset:end_offset]
+              for line in block.splitlines():
+                  line = re.sub(r'^.*?Z\s+', '', line).strip()
+                  if line:
+                      excerpt.append(line)
           forbidden = re.compile(r'(authorization|bearer|private[_ -]?key|known[_ -]?hosts|token|secret)', re.I)
-          excerpt = [line for line in excerpt if not forbidden.search(line)][:200]
+          excerpt = [line for line in excerpt if not forbidden.search(line)][:240]
           payload = {
-              'schema': 'jarvis_gateway_v3_dirty_excerpt_v2',
+              'schema': 'jarvis_gateway_v3_dirty_excerpt_v3',
               'state': state,
               'source_job_id': 88075845684,
               'download_bytes': Path('job-download.bin').stat().st_size,
               'decoded_bytes': Path('job.log').stat().st_size,
+              'concrete_precheck_matches': len(concrete),
               'lines': excerpt,
               'secret_values_recorded': False,
           }
@@ -85,7 +87,6 @@ jobs:
             const branch = 'jarvis-v3-activation-receipts';
             const payload = JSON.parse(fs.readFileSync('dirty-excerpt.json', 'utf8'));
             payload.observed_at = new Date().toISOString();
-
             try {
               await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
             } catch (error) {
@@ -93,7 +94,6 @@ jobs:
               const base = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
               await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: base.data.object.sha });
             }
-
             let sha;
             const path = 'receipts/jarvis-v3-dirty-excerpt.json';
             try {
@@ -102,7 +102,6 @@ jobs:
             } catch (error) {
               if (error.status !== 404) throw error;
             }
-
             await github.rest.repos.createOrUpdateFileContents({
               owner, repo, branch, path, sha,
               message: 'Record safe JARVIS V3 dirty-worktree excerpt',
