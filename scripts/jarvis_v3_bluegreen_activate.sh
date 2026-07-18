@@ -4,6 +4,7 @@ set -Eeuo pipefail
 EXPECTED_SHA="${1:-}"
 OLD_ROOT="/opt/jarvis/gateway-v3"
 RELEASE_BASE="/opt/jarvis/releases/gateway-v3"
+RUNTIME_BASE="/opt/jarvis/runtime/gateway-v3"
 SERVICE="jarvis-gateway-v3.service"
 HEALTH_URL="http://127.0.0.1:8793/health"
 DROPIN_DIR="/etc/systemd/system/${SERVICE}.d"
@@ -38,7 +39,7 @@ TS="$(date +%Y%m%d-%H%M%S)"
 BACKUP_DIR="/opt/jarvis/backups/gateway-v3/bluegreen-$TS"
 RELEASE_ROOT="$RELEASE_BASE/$EXPECTED_SHA"
 RELEASE_TMP="$RELEASE_BASE/.${EXPECTED_SHA}.tmp-$TS"
-mkdir -p "$BACKUP_DIR" "$RELEASE_BASE" "$DROPIN_DIR"
+mkdir -p "$BACKUP_DIR" "$RELEASE_BASE" "$RUNTIME_BASE" "$DROPIN_DIR"
 
 printf '%s\n' "$BEFORE_HEAD" > "$BACKUP_DIR/before-head.txt"
 printf '%s\n' "$CURRENT_WORKDIR" > "$BACKUP_DIR/before-working-directory.txt"
@@ -70,28 +71,29 @@ rollback() {
 }
 trap rollback ERR
 
-if test -e "$RELEASE_ROOT"; then
-  test -d "$RELEASE_ROOT/.git"
-  test "$(git -C "$RELEASE_ROOT" rev-parse HEAD)" = "$EXPECTED_SHA"
-  test -z "$(git -C "$RELEASE_ROOT" status --porcelain)"
-else
-  rm -rf "$RELEASE_TMP"
-  HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config GIT_TERMINAL_PROMPT=0 \
-    git clone --no-checkout "$ORIGIN_URL" "$RELEASE_TMP"
-  git -C "$RELEASE_TMP" checkout --detach "$EXPECTED_SHA"
-  test "$(git -C "$RELEASE_TMP" rev-parse HEAD)" = "$EXPECTED_SHA"
-  test -z "$(git -C "$RELEASE_TMP" status --porcelain)"
-  mv "$RELEASE_TMP" "$RELEASE_ROOT"
-fi
+rm -rf "$RELEASE_TMP" "$RELEASE_ROOT"
+HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config GIT_TERMINAL_PROMPT=0 \
+  git clone --no-checkout "$ORIGIN_URL" "$RELEASE_TMP"
+git -C "$RELEASE_TMP" checkout --detach "$EXPECTED_SHA"
+test "$(git -C "$RELEASE_TMP" rev-parse HEAD)" = "$EXPECTED_SHA"
+test -z "$(git -C "$RELEASE_TMP" status --porcelain)"
+mv "$RELEASE_TMP" "$RELEASE_ROOT"
 
 OLD_OWNER="$(stat -c '%u:%g' "$OLD_ROOT")"
 chown -R "$OLD_OWNER" "$RELEASE_ROOT"
 
-for dir in state backups logs tmp temp .cache tasks voice inbox outbox; do
-  mkdir -p "$OLD_ROOT/$dir"
-  rm -rf "$RELEASE_ROOT/$dir"
-  ln -s "$OLD_ROOT/$dir" "$RELEASE_ROOT/$dir"
+RUNTIME_DIRS=(state backups logs tmp temp .cache tasks voice)
+if ! test -f "$RUNTIME_BASE/.seeded-v1"; then
+  for dir in "${RUNTIME_DIRS[@]}"; do
+    mkdir -p "$OLD_ROOT/$dir" "$RUNTIME_BASE/$dir"
+    rsync -a --exclude '.gitkeep' "$OLD_ROOT/$dir"/ "$RUNTIME_BASE/$dir"/
+  done
+  date -u +%FT%TZ > "$RUNTIME_BASE/.seeded-v1"
+fi
+for dir in "${RUNTIME_DIRS[@]}"; do
+  mkdir -p "$RUNTIME_BASE/$dir" "$RELEASE_ROOT/$dir"
 done
+chown -R "$OLD_OWNER" "$RUNTIME_BASE"
 
 mkdir -p "$RELEASE_ROOT/memory"
 if test -d "$OLD_ROOT/memory"; then
@@ -106,6 +108,20 @@ if test -d "$OLD_ROOT/memory"; then
     fi
   done < <(find "$OLD_ROOT/memory" -mindepth 1 -maxdepth 1 -print0)
 fi
+
+mkdir -p "$OLD_ROOT/inbox" "$OLD_ROOT/outbox/escalations" "$OLD_ROOT/outbox/recipe_stubs" \
+         "$RELEASE_ROOT/inbox" "$RELEASE_ROOT/outbox"
+for rel in inbox/command.txt outbox/response.txt outbox/escalations outbox/recipe_stubs; do
+  source="$OLD_ROOT/$rel"
+  target="$RELEASE_ROOT/$rel"
+  mkdir -p "$(dirname "$source")" "$(dirname "$target")"
+  if ! test -e "$source" && [[ "$rel" == */ ]]; then
+    mkdir -p "$source"
+  fi
+  if test -e "$source" && ! test -e "$target" && ! test -L "$target"; then
+    ln -s "$source" "$target"
+  fi
+done
 
 while IFS= read -r -d '' env_file; do
   name="$(basename "$env_file")"
@@ -128,13 +144,21 @@ fi
 
 cd "$RELEASE_ROOT"
 test -z "$(git status --porcelain)"
-HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config npm run check:deploy
+HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$RUNTIME_BASE/state" npm run check:deploy
 
 cat > "$DROPIN_FILE.tmp" <<EOF
 [Service]
 WorkingDirectory=$RELEASE_ROOT
 ExecStart=
 ExecStart=/usr/bin/node $RELEASE_ROOT/src/server.mjs
+BindPaths=$RUNTIME_BASE/state:$RELEASE_ROOT/state
+BindPaths=$RUNTIME_BASE/backups:$RELEASE_ROOT/backups
+BindPaths=$RUNTIME_BASE/logs:$RELEASE_ROOT/logs
+BindPaths=$RUNTIME_BASE/tmp:$RELEASE_ROOT/tmp
+BindPaths=$RUNTIME_BASE/temp:$RELEASE_ROOT/temp
+BindPaths=$RUNTIME_BASE/.cache:$RELEASE_ROOT/.cache
+BindPaths=$RUNTIME_BASE/tasks:$RELEASE_ROOT/tasks
+BindPaths=$RUNTIME_BASE/voice:$RELEASE_ROOT/voice
 EOF
 mv "$DROPIN_FILE.tmp" "$DROPIN_FILE"
 systemctl daemon-reload
@@ -155,9 +179,10 @@ test "$(systemctl is-active "$SERVICE")" = active
 test "$(systemctl show "$SERVICE" -p WorkingDirectory --value)" = "$RELEASE_ROOT"
 LIVE_EXECSTART="$(systemctl show "$SERVICE" -p ExecStart --value)"
 [[ "$LIVE_EXECSTART" == *"argv[]=/usr/bin/node $RELEASE_ROOT/src/server.mjs ;"* ]]
-HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config npm run check:live
+HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$RUNTIME_BASE/state" npm run check:live
 
-HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config node -e "import('./src/jarvis-index.mjs').then(async m=>{const r=await m.rebuildJarvisIndex({root:process.cwd(),stateDir:process.env.JARVIS_V3_STATE||'$OLD_ROOT/state'}); console.log(JSON.stringify({ok:true,documents:r.summary.documents,vector_layer:r.summary.vector_layer}))})"
+HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$RUNTIME_BASE/state" \
+  node -e "import('./src/jarvis-index.mjs').then(async m=>{const r=await m.rebuildJarvisIndex({root:process.cwd(),stateDir:process.env.JARVIS_V3_STATE}); console.log(JSON.stringify({ok:true,documents:r.summary.documents,vector_layer:r.summary.vector_layer}))})"
 
 KNOWN_GOOD_TMP="$BACKUP_DIR/known-good"
 mkdir -p "$KNOWN_GOOD_TMP"
@@ -169,9 +194,9 @@ rsync -a --delete \
   --exclude 'backups' \
   --exclude 'tmp' \
   "$RELEASE_ROOT"/ "$KNOWN_GOOD_TMP"/
-mkdir -p "$OLD_ROOT/state/known-good"
-rm -rf "$OLD_ROOT/state/known-good/current"
-cp -a "$KNOWN_GOOD_TMP" "$OLD_ROOT/state/known-good/current"
+mkdir -p "$RUNTIME_BASE/state/known-good"
+rm -rf "$RUNTIME_BASE/state/known-good/current"
+cp -a "$KNOWN_GOOD_TMP" "$RUNTIME_BASE/state/known-good/current"
 
 REGRESSION_UNIT="jarvis-regression-${EXPECTED_SHA:0:12}-$TS"
 systemd-run --unit="$REGRESSION_UNIT" --collect \
@@ -180,9 +205,9 @@ systemd-run --unit="$REGRESSION_UNIT" --collect \
   --property="TimeoutStopSec=30" \
   --property="KillMode=mixed" \
   --description="JARVIS post-deploy blue-green regression ${EXPECTED_SHA:0:12}" \
-  /usr/bin/env HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config \
+  /usr/bin/env HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$RUNTIME_BASE/state" \
   /bin/bash -lc "npm run check && npm run acceptance" >/dev/null
 
 trap - ERR
-printf 'JARVIS_V3_BLUEGREEN_OK exact_head=%s previous_head=%s dirty_checkout_preserved=%s release_root=%s service=active health=ok full_regression_unit=%s backup=%s\n' \
-  "$EXPECTED_SHA" "$BEFORE_HEAD" "$([ -n "$STATUS_BEFORE" ] && echo true || echo false)" "$RELEASE_ROOT" "$REGRESSION_UNIT" "$BACKUP_DIR"
+printf 'JARVIS_V3_BLUEGREEN_OK exact_head=%s previous_head=%s dirty_checkout_preserved=%s release_root=%s runtime_root=%s service=active health=ok full_regression_unit=%s backup=%s\n' \
+  "$EXPECTED_SHA" "$BEFORE_HEAD" "$([ -n "$STATUS_BEFORE" ] && echo true || echo false)" "$RELEASE_ROOT" "$RUNTIME_BASE" "$REGRESSION_UNIT" "$BACKUP_DIR"
