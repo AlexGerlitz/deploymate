@@ -26,8 +26,13 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${JOB_ID}/logs" \
-            -o job-logs.zip
-          unzip -p job-logs.zip > job.log
+            -o job-download.bin
+
+          if unzip -t job-download.bin >/dev/null 2>&1; then
+            unzip -p job-download.bin > job.log
+          else
+            cp job-download.bin job.log
+          fi
 
           python3 - <<'PY'
           import json
@@ -41,34 +46,35 @@ jobs:
               clean = re.sub(r'^.*?Z\s+', '', line).strip()
               rows.append(clean)
 
-          start = -1
-          for index, line in enumerate(rows):
-              if re.fullmatch(r'PRECHECK head=[0-9a-f]{40} origin_main=[0-9a-f]{40} branch=main dirty=(?:true|false)', line):
-                  start = index
-          if start < 0:
-              raise SystemExit('actual_precheck_not_found')
+          precheck_pattern = re.compile(r'^PRECHECK head=[0-9a-f]{40} origin_main=[0-9a-f]{40} branch=main dirty=(?:true|false)$')
+          starts = [index for index, line in enumerate(rows) if precheck_pattern.fullmatch(line)]
+          state = 'ACTUAL_PRECHECK_FOUND' if starts else 'ACTUAL_PRECHECK_NOT_FOUND'
+          excerpt = []
+          if starts:
+              start = starts[-1]
+              end = next((index for index in range(start, len(rows)) if rows[index] == 'BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED'), -1)
+              slice_end = end + 1 if end >= start else min(len(rows), start + 180)
+              excerpt = [line for line in rows[start:slice_end] if line]
+          else:
+              safe_markers = ('PRECHECK ', '--- STATUS_SHORT ---', '--- UNSTAGED_NAMES ---', '--- STAGED_NAMES ---', '--- UNTRACKED_NAMES ---', '--- DIFF_STAT ---', '--- OVERLAP_WITH_TARGET ---', '--- SERVICE_PROPERTIES ---', 'BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED')
+              excerpt = [line for line in rows if line.startswith(safe_markers)]
 
-          end = -1
-          for index in range(start, len(rows)):
-              if rows[index] == 'BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED':
-                  end = index
-                  break
-          if end < start:
-              raise SystemExit('actual_blocker_end_not_found')
-
-          excerpt = [line for line in rows[start:end + 1] if line]
           forbidden = re.compile(r'(authorization|bearer|private[_ -]?key|known[_ -]?hosts|token|secret)', re.I)
-          excerpt = [line for line in excerpt if not forbidden.search(line)]
-          Path('dirty-excerpt.log').write_text('\n'.join(excerpt) + '\n', encoding='utf-8')
-          Path('dirty-excerpt.json').write_text(json.dumps({
-              'schema': 'jarvis_gateway_v3_dirty_excerpt_v1',
-              'source_job_id': int('88075845684'),
+          excerpt = [line for line in excerpt if not forbidden.search(line)][:200]
+          payload = {
+              'schema': 'jarvis_gateway_v3_dirty_excerpt_v2',
+              'state': state,
+              'source_job_id': 88075845684,
+              'download_bytes': Path('job-download.bin').stat().st_size,
+              'decoded_bytes': Path('job.log').stat().st_size,
               'lines': excerpt,
               'secret_values_recorded': False,
-          }, indent=2) + '\n', encoding='utf-8')
+          }
+          Path('dirty-excerpt.log').write_text('\n'.join(excerpt) + ('\n' if excerpt else ''), encoding='utf-8')
+          Path('dirty-excerpt.json').write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
           PY
 
-          cat dirty-excerpt.log
+          cat dirty-excerpt.json
 
       - name: Persist safe diagnostic receipt
         uses: actions/github-script@v8
