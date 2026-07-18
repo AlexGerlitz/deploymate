@@ -21,23 +21,19 @@ jobs:
 
       - name: Add safe ExecStart diagnostic
         shell: bash
+        env:
+          OLD_B64: aWYgW1sgIiRFWEVDU1RBUlRfUFJPUEVSVFkiID09ICoiJE9MRF9ST09UIiogXV07IHRoZW4KICBlY2hvICJ1bnN1cHBvcnRlZF9hYnNvbHV0ZV9leGVjc3RhcnQiID4mMgogIGV4aXQgNwpmaQo=
+          NEW_B64: aWYgW1sgIiRFWEVDU1RBUlRfUFJPUEVSVFkiID09ICoiJE9MRF9ST09UIiogXV07IHRoZW4KICBwcmludGYgJ0VYRUNTVEFSVF9QUk9QRVJUWT0lc1xuJyAiJEVYRUNTVEFSVF9QUk9QRVJUWSIKICBlY2hvICJ1bnN1cHBvcnRlZF9hYnNvbHV0ZV9leGVjc3RhcnQiID4mMgogIGV4aXQgNwpmaQo=
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
+          import base64
+          import os
           from pathlib import Path
           path = Path('scripts/jarvis_v3_bluegreen_activate.sh')
           text = path.read_text(encoding='utf-8')
-          old = '''if [[ "$EXECSTART_PROPERTY" == *"$OLD_ROOT"* ]]; then
-  echo "unsupported_absolute_execstart" >&2
-  exit 7
-fi
-'''
-          new = '''if [[ "$EXECSTART_PROPERTY" == *"$OLD_ROOT"* ]]; then
-  printf 'EXECSTART_PROPERTY=%s\\n' "$EXECSTART_PROPERTY"
-  echo "unsupported_absolute_execstart" >&2
-  exit 7
-fi
-'''
+          old = base64.b64decode(os.environ['OLD_B64']).decode('utf-8')
+          new = base64.b64decode(os.environ['NEW_B64']).decode('utf-8')
           if text.count(old) != 1:
               raise SystemExit('execstart_marker_mismatch')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
