@@ -76,8 +76,8 @@ if test -e "$RELEASE_ROOT"; then
   test -z "$(git -C "$RELEASE_ROOT" status --porcelain)"
 else
   rm -rf "$RELEASE_TMP"
-  git clone --no-local --no-checkout "$OLD_ROOT" "$RELEASE_TMP"
-  git -C "$RELEASE_TMP" remote set-url origin "$ORIGIN_URL"
+  HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config GIT_TERMINAL_PROMPT=0 \
+    git clone --no-checkout "$ORIGIN_URL" "$RELEASE_TMP"
   git -C "$RELEASE_TMP" checkout --detach "$EXPECTED_SHA"
   test "$(git -C "$RELEASE_TMP" rev-parse HEAD)" = "$EXPECTED_SHA"
   test -z "$(git -C "$RELEASE_TMP" status --porcelain)"
