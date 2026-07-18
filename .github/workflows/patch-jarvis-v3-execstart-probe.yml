@@ -1,4 +1,4 @@
-name: Patch JARVIS V3 Blue-Green Clone Source
+name: Patch JARVIS V3 Release Clean Gate
 
 on:
   push:
@@ -19,11 +19,11 @@ jobs:
           ref: jarvis-v3-bluegreen-run
           fetch-depth: 0
 
-      - name: Use authenticated origin clone
+      - name: Add exact release status diagnostics
         shell: bash
         env:
-          OLD_B64: ICBnaXQgY2xvbmUgLS1uby1sb2NhbCAtLW5vLWNoZWNrb3V0ICIkT0xEX1JPT1QiICIkUkVMRUFTRV9UTVAiCiAgZ2l0IC1DICIkUkVMRUFTRV9UTVAiIHJlbW90ZSBzZXQtdXJsIG9yaWdpbiAiJE9SSUdJTl9VUkwiCiAgZ2l0IC1DICIkUkVMRUFTRV9UTVAiIGNoZWNrb3V0IC0tZGV0YWNoICIkRVhQRUNURURfU0hBIgo=
-          NEW_B64: ICBIT01FPS9vcHQvamFydmlzIFhER19DT05GSUdfSE9NRT0vb3B0L2phcnZpcy8uY29uZmlnIEdJVF9URVJNSU5BTF9QUk9NUFQ9MCBcCiAgICBnaXQgY2xvbmUgLS1uby1jaGVja291dCAiJE9SSUdJTl9VUkwiICIkUkVMRUFTRV9UTVAiCiAgZ2l0IC1DICIkUkVMRUFTRV9UTVAiIGNoZWNrb3V0IC0tZGV0YWNoICIkRVhQRUNURURfU0hBIgo=
+          OLD_B64: Y2QgIiRSRUxFQVNFX1JPT1QiCnRlc3QgLXogIiQoZ2l0IHN0YXR1cyAtLXBvcmNlbGFpbikiCkhPTUU9L29wdC9qYXJ2aXMgWERHX0NPTkZJR19IT01FPS9vcHQvamFydmlzLy5jb25maWcgSkFSVklTX1YzX1NUQVRFPSIkUlVOVElNRV9CQVNFL3N0YXRlIiBucG0gcnVuIGNoZWNrOmRlcGxveQo=
+          NEW_B64: Y2QgIiRSRUxFQVNFX1JPT1QiClJFTEVBU0VfU1RBVFVTPSIkKGdpdCBzdGF0dXMgLS1wb3JjZWxhaW4pIgppZiB0ZXN0IC1uICIkUkVMRUFTRV9TVEFUVVMiOyB0aGVuCiAgZWNobyAiUkVMRUFTRV9XT1JLVFJFRV9OT1RfQ0xFQU4iID4mMgogIGdpdCBzdGF0dXMgLS1zaG9ydCA+JjIKICBleGl0IDgKZmkKSE9NRT0vb3B0L2phcnZpcyBYREdfQ09ORklHX0hPTUU9L29wdC9qYXJ2aXMvLmNvbmZpZyBKQVJWSVNfVjNfU1RBVEU9IiRSVU5USU1FX0JBU0Uvc3RhdGUiIG5wbSBydW4gY2hlY2s6ZGVwbG95Cg==
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
@@ -35,18 +35,18 @@ jobs:
           old = base64.b64decode(os.environ['OLD_B64']).decode('utf-8')
           new = base64.b64decode(os.environ['NEW_B64']).decode('utf-8')
           if text.count(old) != 1:
-              raise SystemExit('clone_marker_mismatch')
+              raise SystemExit('clean_gate_marker_mismatch')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
           git diff --check
           test "$(git diff --name-only)" = "scripts/jarvis_v3_bluegreen_activate.sh"
 
-      - name: Commit clone fix
+      - name: Commit clean gate diagnostics
         shell: bash
         run: |
           set -Eeuo pipefail
-          git config user.name "JARVIS Blue-Green Clone Bot"
-          git config user.email "jarvis-bluegreen-clone@users.noreply.github.com"
+          git config user.name "JARVIS Release Clean Gate Bot"
+          git config user.email "jarvis-clean-gate@users.noreply.github.com"
           git add scripts/jarvis_v3_bluegreen_activate.sh
-          git commit -m "Clone exact JARVIS release from authenticated origin"
+          git commit -m "Report exact JARVIS release worktree status"
           git push origin HEAD:jarvis-v3-bluegreen-run
