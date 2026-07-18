@@ -1,0 +1,142 @@
+name: Run JARVIS V3 Full Regression In Live Namespace
+
+on:
+  push:
+    branches:
+      - jarvis-v3-regression-retry
+
+permissions:
+  contents: write
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 35
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+      EXPECTED_SHA: db9426481e877caf04479b44e3d5d3622419f12c
+      REGRESSION_UNIT: jarvis-regression-db9426481e87-namespace-retry
+    steps:
+      - name: Prepare pinned SSH transport
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          test -n "$DEPLOY_SSH_KNOWN_HOSTS"
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Run full regression in live mount namespace
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes "$DEPLOY_HOST" \
+            'sudo -n /bin/bash -s -- '"$EXPECTED_SHA"' '"$REGRESSION_UNIT"'' \
+            > jarvis-v3-regression-receipt.log 2>&1 <<'REMOTE'
+          set -Eeuo pipefail
+          expected="$1"
+          unit="$2"
+          release="/opt/jarvis/releases/gateway-v3/$expected"
+          service="jarvis-gateway-v3.service"
+          health_url="http://127.0.0.1:8793/health"
+          runtime_state="/opt/jarvis/runtime/gateway-v3/state"
+
+          [[ "$expected" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$unit" =~ ^jarvis-regression-[A-Za-z0-9_.-]+$ ]]
+          test -d "$release/.git"
+          test "$(git -C "$release" rev-parse HEAD)" = "$expected"
+          test -z "$(git -C "$release" status --porcelain)"
+          test "$(systemctl is-active "$service")" = active
+          test "$(systemctl show "$service" -p WorkingDirectory --value)" = "$release"
+          pid="$(systemctl show "$service" -p MainPID --value)"
+          [[ "$pid" =~ ^[1-9][0-9]*$ ]]
+
+          health="$(curl -fsS --max-time 10 "$health_url")"
+          node -e 'const p=JSON.parse(process.argv[1]); if(p.ok!==true || p.name!=="JARVIS Gateway v3") process.exit(1)' "$health"
+
+          systemctl reset-failed "$unit.service" >/dev/null 2>&1 || true
+          systemd-run --unit="$unit" --wait --pipe --collect \
+            --property="RuntimeMaxSec=1800" \
+            --property="TimeoutStopSec=30" \
+            --property="KillMode=mixed" \
+            --description="JARVIS full regression inside live namespace ${expected:0:12}" \
+            /usr/bin/nsenter --target "$pid" --mount -- \
+            /usr/bin/env HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$runtime_state" \
+            /bin/bash -lc "cd '$release' && npm run check && npm run acceptance"
+
+          test "$(systemctl is-active "$service")" = active
+          test "$(systemctl show "$service" -p WorkingDirectory --value)" = "$release"
+          health="$(curl -fsS --max-time 10 "$health_url")"
+          node -e 'const p=JSON.parse(process.argv[1]); if(p.ok!==true || p.name!=="JARVIS Gateway v3") process.exit(1)' "$health"
+          test "$(git -C "$release" rev-parse HEAD)" = "$expected"
+          test -z "$(git -C "$release" status --porcelain)"
+
+          printf 'JARVIS_V3_FULL_REGRESSION_OK exact_head=%s service=active health=ok release_clean=true namespace_pid=%s unit=%s\n' \
+            "$expected" "$pid" "$unit"
+          REMOTE
+          cat jarvis-v3-regression-receipt.log
+
+      - name: Upload full regression evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jarvis-v3-regression-receipt
+          path: jarvis-v3-regression-receipt.log
+          if-no-files-found: warn
+
+  receipt:
+    needs: regression
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Persist terminal full regression receipt
+        uses: actions/github-script@v8
+        env:
+          REGRESSION_RESULT: ${{ needs.regression.result }}
+          EXPECTED_SHA: db9426481e877caf04479b44e3d5d3622419f12c
+          REGRESSION_UNIT: jarvis-regression-db9426481e87-namespace-retry
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = 'jarvis-v3-activation-receipts';
+            const result = String(process.env.REGRESSION_RESULT || 'unknown');
+            const payload = {
+              schema: 'jarvis_gateway_v3_full_regression_receipt_v1',
+              state: result === 'success' ? 'DONE_WITH_EVIDENCE' : 'REGRESSION_FAILED',
+              exact_head: process.env.EXPECTED_SHA,
+              regression_unit: process.env.REGRESSION_UNIT,
+              workflow_run_id: context.runId,
+              workflow_run_url: `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`,
+              regression_result: result,
+              live_service_restarted: false,
+              live_namespace_used: true,
+              secret_values_recorded: false,
+              observed_at: new Date().toISOString(),
+            };
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const base = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: base.data.object.sha });
+            }
+            let sha;
+            const path = 'receipts/jarvis-v3-full-regression-latest.json';
+            try {
+              const current = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
+              sha = current.data.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            await github.rest.repos.createOrUpdateFileContents({
+              owner, repo, branch, path, sha,
+              message: `Record JARVIS V3 full regression ${context.runId}`,
+              content: Buffer.from(JSON.stringify(payload, null, 2) + '\n').toString('base64'),
+            });
