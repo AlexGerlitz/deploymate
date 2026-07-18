@@ -14,7 +14,7 @@ jobs:
     environment: staging
     timeout-minutes: 25
     env:
-      EXPECTED_SHA: 155a2351f1c112ca8ccc1f3eff1e49bafe47dda5
+      EXPECTED_SHA: db9426481e877caf04479b44e3d5d3622419f12c
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
       DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
@@ -67,7 +67,7 @@ jobs:
         uses: actions/github-script@v8
         env:
           RESULT: ${{ needs.activate.result }}
-          EXPECTED_SHA: 155a2351f1c112ca8ccc1f3eff1e49bafe47dda5
+          EXPECTED_SHA: db9426481e877caf04479b44e3d5d3622419f12c
         with:
           script: |
             const { owner, repo } = context.repo;
