@@ -1,0 +1,56 @@
+name: Patch JARVIS V3 ExecStart Probe
+
+on:
+  push:
+    branches:
+      - jarvis-v3-execstart-probe-patcher
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout blue-green branch
+        uses: actions/checkout@v6
+        with:
+          ref: jarvis-v3-bluegreen-run
+          fetch-depth: 0
+
+      - name: Add safe ExecStart diagnostic
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/jarvis_v3_bluegreen_activate.sh')
+          text = path.read_text(encoding='utf-8')
+          old = '''if [[ "$EXECSTART_PROPERTY" == *"$OLD_ROOT"* ]]; then
+  echo "unsupported_absolute_execstart" >&2
+  exit 7
+fi
+'''
+          new = '''if [[ "$EXECSTART_PROPERTY" == *"$OLD_ROOT"* ]]; then
+  printf 'EXECSTART_PROPERTY=%s\\n' "$EXECSTART_PROPERTY"
+  echo "unsupported_absolute_execstart" >&2
+  exit 7
+fi
+'''
+          if text.count(old) != 1:
+              raise SystemExit('execstart_marker_mismatch')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          git diff --check
+          test "$(git diff --name-only)" = "scripts/jarvis_v3_bluegreen_activate.sh"
+
+      - name: Commit probe patch
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "JARVIS ExecStart Probe Bot"
+          git config user.email "jarvis-execstart-probe@users.noreply.github.com"
+          git add scripts/jarvis_v3_bluegreen_activate.sh
+          git commit -m "Report JARVIS V3 absolute ExecStart safely"
+          git push origin HEAD:jarvis-v3-bluegreen-run
