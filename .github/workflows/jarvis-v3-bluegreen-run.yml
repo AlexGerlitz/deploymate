@@ -1,0 +1,106 @@
+name: Run Fixed JARVIS V3 Blue-Green Activation
+
+on:
+  push:
+    branches:
+      - jarvis-v3-bluegreen-run
+
+permissions:
+  contents: write
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 25
+    env:
+      EXPECTED_SHA: 155a2351f1c112ca8ccc1f3eff1e49bafe47dda5
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+    steps:
+      - name: Checkout fixed recipe
+        uses: actions/checkout@v6
+
+      - name: Prepare pinned SSH transport
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          test -n "$DEPLOY_SSH_KNOWN_HOSTS"
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Execute fixed blue-green recipe
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          chmod +x scripts/jarvis_v3_bluegreen_activate.sh
+          set +e
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes "$DEPLOY_HOST" \
+            'sudo -n /bin/bash -s -- '"$EXPECTED_SHA"'' \
+            < scripts/jarvis_v3_bluegreen_activate.sh \
+            > jarvis-v3-bluegreen-receipt.log 2>&1
+          remote_rc=$?
+          set -e
+          cat jarvis-v3-bluegreen-receipt.log
+          exit "$remote_rc"
+
+      - name: Upload blue-green receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jarvis-v3-bluegreen-receipt
+          path: jarvis-v3-bluegreen-receipt.log
+          if-no-files-found: warn
+
+  receipt:
+    needs: activate
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Persist terminal state
+        uses: actions/github-script@v8
+        env:
+          RESULT: ${{ needs.activate.result }}
+          EXPECTED_SHA: 155a2351f1c112ca8ccc1f3eff1e49bafe47dda5
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = 'jarvis-v3-activation-receipts';
+            const result = String(process.env.RESULT || 'unknown');
+            const payload = {
+              schema: 'jarvis_gateway_v3_bluegreen_activation_receipt_v1',
+              state: result === 'success' ? 'DONE_WITH_EVIDENCE' : 'ACTIVATION_FAILED',
+              exact_head: process.env.EXPECTED_SHA,
+              workflow_run_id: context.runId,
+              workflow_run_url: `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`,
+              activation_result: result,
+              dirty_checkout_preserved_by_contract: true,
+              secret_values_recorded: false,
+              observed_at: new Date().toISOString(),
+            };
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const base = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: base.data.object.sha });
+            }
+            let sha;
+            const path = 'receipts/jarvis-v3-bluegreen-latest.json';
+            try {
+              const current = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
+              sha = current.data.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            await github.rest.repos.createOrUpdateFileContents({
+              owner, repo, branch, path, sha,
+              message: `Record JARVIS V3 blue-green receipt ${context.runId}`,
+              content: Buffer.from(JSON.stringify(payload, null, 2) + '\n').toString('base64'),
+            });
