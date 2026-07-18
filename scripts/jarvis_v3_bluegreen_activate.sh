@@ -28,6 +28,7 @@ CURRENT_WORKDIR="$(systemctl show "$SERVICE" -p WorkingDirectory --value)"
 EXECSTART_PROPERTY="$(systemctl show "$SERVICE" -p ExecStart --value)"
 test "$CURRENT_WORKDIR" = "$OLD_ROOT" || { echo "unsupported_working_directory=$CURRENT_WORKDIR" >&2; exit 6; }
 if [[ "$EXECSTART_PROPERTY" == *"$OLD_ROOT"* ]]; then
+  printf 'EXECSTART_PROPERTY=%s\n' "$EXECSTART_PROPERTY"
   echo "unsupported_absolute_execstart" >&2
   exit 7
 fi
