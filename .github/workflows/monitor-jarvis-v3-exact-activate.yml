@@ -1,0 +1,110 @@
+name: Monitor JARVIS Gateway V3 Exact Activation
+
+on:
+  push:
+    branches:
+      - jarvis-v3-activation-monitor
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Wait for activation run and persist evidence
+        uses: actions/github-script@v8
+        env:
+          TARGET_SHA: c58b3b258b3e480cfdcd2153ce8c01163129164e
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const targetSha = process.env.TARGET_SHA;
+            const workflowId = 'jarvis-v3-exact-activate.yml';
+            const receiptBranch = 'jarvis-v3-activation-receipts';
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            let run = null;
+            for (let attempt = 1; attempt <= 120; attempt += 1) {
+              const response = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: workflowId,
+                branch: 'jarvis-v3-exact-activate',
+                per_page: 50,
+              });
+              run = (response.data.workflow_runs || []).find((candidate) => candidate.head_sha === targetSha) || null;
+              if (run?.status === 'completed') break;
+              await sleep(10_000);
+            }
+
+            const jobs = [];
+            if (run) {
+              const response = await github.rest.actions.listJobsForWorkflowRun({
+                owner,
+                repo,
+                run_id: run.id,
+                filter: 'latest',
+                per_page: 100,
+              });
+              for (const job of response.data.jobs || []) {
+                jobs.push({
+                  id: job.id,
+                  name: job.name,
+                  status: job.status,
+                  conclusion: job.conclusion,
+                  runner_name: job.runner_name || '',
+                  steps: (job.steps || []).map((step) => ({
+                    name: step.name,
+                    status: step.status,
+                    conclusion: step.conclusion,
+                  })),
+                });
+              }
+            }
+
+            const payload = {
+              schema: 'jarvis_gateway_v3_deploymate_monitor_v1',
+              state: run?.status === 'completed' && run?.conclusion === 'success'
+                ? 'DONE_WITH_EVIDENCE'
+                : run?.status === 'completed'
+                  ? 'ACTIVATION_FAILED'
+                  : 'ACTIVATION_NOT_OBSERVED',
+              target_workflow_commit: targetSha,
+              workflow_run_id: run?.id || null,
+              workflow_run_url: run?.html_url || '',
+              workflow_status: run?.status || 'not_observed',
+              workflow_conclusion: run?.conclusion || 'not_observed',
+              jobs,
+              secret_values_recorded: false,
+              observed_at: new Date().toISOString(),
+            };
+
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `heads/${receiptBranch}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const base = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${receiptBranch}`, sha: base.data.object.sha });
+            }
+
+            let sha;
+            const path = 'receipts/jarvis-v3-monitor.json';
+            try {
+              const current = await github.rest.repos.getContent({ owner, repo, path, ref: receiptBranch });
+              sha = current.data.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              branch: receiptBranch,
+              path,
+              sha,
+              message: `Record JARVIS V3 monitor ${targetSha.slice(0, 12)}`,
+              content: Buffer.from(JSON.stringify(payload, null, 2) + '\n').toString('base64'),
+            });
