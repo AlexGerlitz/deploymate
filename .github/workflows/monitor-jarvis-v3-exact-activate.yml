@@ -41,6 +41,7 @@ jobs:
             }
 
             const jobs = [];
+            let diagnosticExcerpt = [];
             if (run) {
               const response = await github.rest.actions.listJobsForWorkflowRun({
                 owner,
@@ -63,10 +64,41 @@ jobs:
                   })),
                 });
               }
+
+              const activationJob = (response.data.jobs || []).find((job) => job.name === 'activate');
+              if (activationJob) {
+                try {
+                  const logs = await github.request('GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs', {
+                    owner,
+                    repo,
+                    job_id: activationJob.id,
+                    request: { redirect: 'follow' },
+                  });
+                  const raw = Buffer.isBuffer(logs.data)
+                    ? logs.data.toString('utf8')
+                    : typeof logs.data === 'string'
+                      ? logs.data
+                      : JSON.stringify(logs.data);
+                  const clean = raw.replace(/\u001b\[[0-9;]*m/g, '');
+                  const lines = clean.split(/\r?\n/);
+                  const start = lines.findIndex((line) => line.includes('PRECHECK head='));
+                  const end = lines.findIndex((line, index) => index >= start && line.includes('BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED'));
+                  if (start >= 0) {
+                    const sliceEnd = end >= start ? end + 1 : Math.min(lines.length, start + 120);
+                    diagnosticExcerpt = lines.slice(start, sliceEnd)
+                      .map((line) => line.replace(/^.*?Z\s+/, '').trim())
+                      .filter(Boolean)
+                      .filter((line) => !/(DEPLOY_HOST|PRIVATE_KEY|KNOWN_HOSTS|authorization|bearer|token|secret)/i.test(line))
+                      .slice(0, 120);
+                  }
+                } catch (error) {
+                  diagnosticExcerpt = [`log_capture_failed_http_${error.status || 0}`];
+                }
+              }
             }
 
             const payload = {
-              schema: 'jarvis_gateway_v3_deploymate_monitor_v1',
+              schema: 'jarvis_gateway_v3_deploymate_monitor_v2',
               state: run?.status === 'completed' && run?.conclusion === 'success'
                 ? 'DONE_WITH_EVIDENCE'
                 : run?.status === 'completed'
@@ -78,6 +110,7 @@ jobs:
               workflow_status: run?.status || 'not_observed',
               workflow_conclusion: run?.conclusion || 'not_observed',
               jobs,
+              diagnostic_excerpt: diagnosticExcerpt,
               secret_values_recorded: false,
               observed_at: new Date().toISOString(),
             };
