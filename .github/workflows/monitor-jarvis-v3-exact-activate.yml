@@ -81,15 +81,18 @@ jobs:
                       : JSON.stringify(logs.data);
                   const clean = raw.replace(/\u001b\[[0-9;]*m/g, '');
                   const lines = clean.split(/\r?\n/);
-                  const start = lines.findIndex((line) => line.includes('PRECHECK head='));
+                  let start = -1;
+                  for (let index = 0; index < lines.length; index += 1) {
+                    if (lines[index].includes('PRECHECK head=')) start = index;
+                  }
                   const end = lines.findIndex((line, index) => index >= start && line.includes('BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED'));
                   if (start >= 0) {
-                    const sliceEnd = end >= start ? end + 1 : Math.min(lines.length, start + 120);
+                    const sliceEnd = end >= start ? end + 1 : Math.min(lines.length, start + 160);
                     diagnosticExcerpt = lines.slice(start, sliceEnd)
                       .map((line) => line.replace(/^.*?Z\s+/, '').trim())
                       .filter(Boolean)
                       .filter((line) => !/(DEPLOY_HOST|PRIVATE_KEY|KNOWN_HOSTS|authorization|bearer|token|secret)/i.test(line))
-                      .slice(0, 120);
+                      .slice(0, 160);
                   }
                 } catch (error) {
                   diagnosticExcerpt = [`log_capture_failed_http_${error.status || 0}`];
