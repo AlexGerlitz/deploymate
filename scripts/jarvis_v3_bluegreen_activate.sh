@@ -187,7 +187,11 @@ test "$(systemctl is-active "$SERVICE")" = active
 test "$(systemctl show "$SERVICE" -p WorkingDirectory --value)" = "$RELEASE_ROOT"
 LIVE_EXECSTART="$(systemctl show "$SERVICE" -p ExecStart --value)"
 [[ "$LIVE_EXECSTART" == *"argv[]=/usr/bin/node $RELEASE_ROOT/src/server.mjs ;"* ]]
-HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$RUNTIME_BASE/state" npm run check:live
+SERVICE_PID="$(systemctl show "$SERVICE" -p MainPID --value)"
+[[ "$SERVICE_PID" =~ ^[1-9][0-9]*$ ]]
+nsenter --target "$SERVICE_PID" --mount -- \
+  /usr/bin/env HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$RUNTIME_BASE/state" \
+  /bin/bash -lc "cd '$RELEASE_ROOT' && npm run check:live"
 
 HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$RUNTIME_BASE/state" \
   node -e "import('./src/jarvis-index.mjs').then(async m=>{const r=await m.rebuildJarvisIndex({root:process.cwd(),stateDir:process.env.JARVIS_V3_STATE}); console.log(JSON.stringify({ok:true,documents:r.summary.documents,vector_layer:r.summary.vector_layer}))})"
