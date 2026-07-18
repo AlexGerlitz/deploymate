@@ -6,7 +6,7 @@ on:
       - jarvis-v3-exact-activate
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: jarvis-gateway-v3-exact-activation
@@ -88,3 +88,53 @@ jobs:
           name: jarvis-v3-exact-activation-receipt
           path: jarvis-v3-production-receipt.log
           if-no-files-found: warn
+
+  receipt:
+    needs: activate
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Persist terminal activation receipt
+        uses: actions/github-script@v8
+        env:
+          ACTIVATION_RESULT: ${{ needs.activate.result }}
+          EXPECTED_SHA: 155a2351f1c112ca8ccc1f3eff1e49bafe47dda5
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = 'jarvis-v3-activation-receipts';
+            const result = String(process.env.ACTIVATION_RESULT || 'unknown');
+            const payload = {
+              schema: 'jarvis_gateway_v3_deploymate_activation_receipt_v1',
+              state: result === 'success' ? 'DONE_WITH_EVIDENCE' : 'ACTIVATION_FAILED',
+              exact_head: process.env.EXPECTED_SHA,
+              environment: 'staging',
+              workflow_run_id: context.runId,
+              workflow_run_url: `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`,
+              activation_result: result,
+              secret_values_recorded: false,
+              observed_at: new Date().toISOString(),
+            };
+
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const base = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: base.data.object.sha });
+            }
+
+            let sha;
+            try {
+              const current = await github.rest.repos.getContent({ owner, repo, path: 'receipts/jarvis-v3-latest.json', ref: branch });
+              sha = current.data.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner, repo, branch, sha,
+              path: 'receipts/jarvis-v3-latest.json',
+              message: `Record JARVIS V3 activation receipt ${context.runId}`,
+              content: Buffer.from(JSON.stringify(payload, null, 2) + '\n').toString('base64'),
+            });
