@@ -1,0 +1,90 @@
+name: Activate JARVIS Gateway V3 Exact Head
+
+on:
+  push:
+    branches:
+      - jarvis-v3-exact-activate
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-gateway-v3-exact-activation
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 20
+    env:
+      EXPECTED_SHA: 155a2351f1c112ca8ccc1f3eff1e49bafe47dda5
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+    steps:
+      - name: Prepare pinned SSH access
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          test -n "$DEPLOY_SSH_KNOWN_HOSTS"
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Activate fixed JARVIS exact head through guarded server recipe
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes "$DEPLOY_HOST" 'bash -s -- '"$EXPECTED_SHA"'' <<'REMOTE' | tee jarvis-v3-production-receipt.log
+          set -Eeuo pipefail
+          expected="$1"
+          root="/opt/jarvis/gateway-v3"
+          service="jarvis-gateway-v3.service"
+          health_url="http://127.0.0.1:8793/health"
+
+          [[ "$expected" =~ ^[a-f0-9]{40}$ ]]
+          test -d "$root/.git"
+          cd "$root"
+
+          before="$(git rev-parse HEAD)"
+          branch="$(git branch --show-current)"
+          status_before="$(git status --porcelain)"
+          printf 'PRECHECK head=%s branch=%s dirty=%s\n' "$before" "$branch" "$([ -n "$status_before" ] && echo true || echo false)"
+
+          test "$branch" = "main"
+          test -z "$status_before"
+          git fetch --no-tags origin main
+          remote="$(git rev-parse origin/main)"
+          test "$remote" = "$expected"
+          git merge --ff-only "$expected"
+          after="$(git rev-parse HEAD)"
+          test "$after" = "$expected"
+          test -z "$(git status --porcelain)"
+
+          if [ "$(id -u)" -eq 0 ]; then
+            HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config npm run deploy:guard
+          else
+            sudo -n env HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config /bin/bash -lc 'cd /opt/jarvis/gateway-v3 && npm run deploy:guard'
+          fi
+
+          test "$(git rev-parse HEAD)" = "$expected"
+          test -z "$(git status --porcelain)"
+          test "$(systemctl is-active "$service")" = "active"
+          health="$(curl -fsS --max-time 10 "$health_url")"
+          node -e 'const p=JSON.parse(process.argv[1]); if(p.ok!==true || p.name!=="JARVIS Gateway v3") process.exit(1)' "$health"
+
+          printf 'JARVIS_V3_PRODUCTION_OK exact_head=%s service=active health=ok bootstrap_source=docs/CHATGPT_TOOL_BOOTSTRAP.md\n' "$expected"
+          REMOTE
+
+      - name: Upload activation receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jarvis-v3-exact-activation-receipt
+          path: jarvis-v3-production-receipt.log
+          if-no-files-found: warn
