@@ -1,4 +1,4 @@
-name: Patch JARVIS V3 Exact ExecStart Contract
+name: Patch JARVIS V3 Blue-Green Clone Source
 
 on:
   push:
@@ -19,15 +19,11 @@ jobs:
           ref: jarvis-v3-bluegreen-run
           fetch-depth: 0
 
-      - name: Apply exact systemd contract
+      - name: Use authenticated origin clone
         shell: bash
         env:
-          OLD1: dGVzdCAiJENVUlJFTlRfV09SS0RJUiIgPSAiJE9MRF9ST09UIiB8fCB7IGVjaG8gInVuc3VwcG9ydGVkX3dvcmtpbmdfZGlyZWN0b3J5PSRDVVJSRU5UX1dPUktESVIiID4mMjsgZXhpdCA2OyB9CmlmIFtbICIkRVhFQ1NUQVJUX1BST1BFUlRZIiA9PSAqIiRPTERfUk9PVCIqIF1dOyB0aGVuCiAgcHJpbnRmICdFWEVDU1RBUlRfUFJPUEVSVFk9JXNcbicgIiRFWEVDU1RBUlRfUFJPUEVSVFkiCiAgZWNobyAidW5zdXBwb3J0ZWRfYWJzb2x1dGVfZXhlY3N0YXJ0IiA+JjIKICBleGl0IDcKZmkK
-          NEW1: dGVzdCAiJENVUlJFTlRfV09SS0RJUiIgPSAiJE9MRF9ST09UIiB8fCB7IGVjaG8gInVuc3VwcG9ydGVkX3dvcmtpbmdfZGlyZWN0b3J5PSRDVVJSRU5UX1dPUktESVIiID4mMjsgZXhpdCA2OyB9CkVYUEVDVEVEX0VYRUNTVEFSVD0iL3Vzci9iaW4vbm9kZSAkT0xEX1JPT1Qvc3JjL3NlcnZlci5tanMiCmlmIFtbICIkRVhFQ1NUQVJUX1BST1BFUlRZIiAhPSAqImFyZ3ZbXT0kRVhQRUNURURfRVhFQ1NUQVJUIDsiKiBdXTsgdGhlbgogIHByaW50ZiAnRVhFQ1NUQVJUX1BST1BFUlRZPSVzXG4nICIkRVhFQ1NUQVJUX1BST1BFUlRZIgogIGVjaG8gInVuc3VwcG9ydGVkX2V4ZWNzdGFydF9jb250cmFjdCIgPiYyCiAgZXhpdCA3CmZpCg==
-          OLD2: Y2F0ID4gIiREUk9QSU5fRklMRS50bXAiIDw8RU9GCltTZXJ2aWNlXQpXb3JraW5nRGlyZWN0b3J5PSRSRUxFQVNFX1JPT1QKRU9GCg==
-          NEW2: Y2F0ID4gIiREUk9QSU5fRklMRS50bXAiIDw8RU9GCltTZXJ2aWNlXQpXb3JraW5nRGlyZWN0b3J5PSRSRUxFQVNFX1JPT1QKRXhlY1N0YXJ0PQpFeGVjU3RhcnQ9L3Vzci9iaW4vbm9kZSAkUkVMRUFTRV9ST09UL3NyYy9zZXJ2ZXIubWpzCkVPRgo=
-          OLD3: dGVzdCAiJChzeXN0ZW1jdGwgaXMtYWN0aXZlICIkU0VSVklDRSIpIiA9IGFjdGl2ZQp0ZXN0ICIkKHN5c3RlbWN0bCBzaG93ICIkU0VSVklDRSIgLXAgV29ya2luZ0RpcmVjdG9yeSAtLXZhbHVlKSIgPSAiJFJFTEVBU0VfUk9PVCIKSE9NRT0vb3B0L2phcnZpcyBYREdfQ09ORklHX0hPTUU9L29wdC9qYXJ2aXMvLmNvbmZpZyBucG0gcnVuIGNoZWNrOmxpdmUK
-          NEW3: dGVzdCAiJChzeXN0ZW1jdGwgaXMtYWN0aXZlICIkU0VSVklDRSIpIiA9IGFjdGl2ZQp0ZXN0ICIkKHN5c3RlbWN0bCBzaG93ICIkU0VSVklDRSIgLXAgV29ya2luZ0RpcmVjdG9yeSAtLXZhbHVlKSIgPSAiJFJFTEVBU0VfUk9PVCIKTElWRV9FWEVDU1RBUlQ9IiQoc3lzdGVtY3RsIHNob3cgIiRTRVJWSUNFIiAtcCBFeGVjU3RhcnQgLS12YWx1ZSkiCltbICIkTElWRV9FWEVDU1RBUlQiID09ICoiYXJndltdPS91c3IvYmluL25vZGUgJFJFTEVBU0VfUk9PVC9zcmMvc2VydmVyLm1qcyA7IiogXV0KSE9NRT0vb3B0L2phcnZpcyBYREdfQ09ORklHX0hPTUU9L29wdC9qYXJ2aXMvLmNvbmZpZyBucG0gcnVuIGNoZWNrOmxpdmUK
+          OLD_B64: ICBnaXQgY2xvbmUgLS1uby1sb2NhbCAtLW5vLWNoZWNrb3V0ICIkT0xEX1JPT1QiICIkUkVMRUFTRV9UTVAiCiAgZ2l0IC1DICIkUkVMRUFTRV9UTVAiIHJlbW90ZSBzZXQtdXJsIG9yaWdpbiAiJE9SSUdJTl9VUkwiCiAgZ2l0IC1DICIkUkVMRUFTRV9UTVAiIGNoZWNrb3V0IC0tZGV0YWNoICIkRVhQRUNURURfU0hBIgo=
+          NEW_B64: ICBIT01FPS9vcHQvamFydmlzIFhER19DT05GSUdfSE9NRT0vb3B0L2phcnZpcy8uY29uZmlnIEdJVF9URVJNSU5BTF9QUk9NUFQ9MCBcCiAgICBnaXQgY2xvbmUgLS1uby1jaGVja291dCAiJE9SSUdJTl9VUkwiICIkUkVMRUFTRV9UTVAiCiAgZ2l0IC1DICIkUkVMRUFTRV9UTVAiIGNoZWNrb3V0IC0tZGV0YWNoICIkRVhQRUNURURfU0hBIgo=
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
@@ -36,23 +32,21 @@ jobs:
           from pathlib import Path
           path = Path('scripts/jarvis_v3_bluegreen_activate.sh')
           text = path.read_text(encoding='utf-8')
-          for index in (1, 2, 3):
-              old = base64.b64decode(os.environ[f'OLD{index}']).decode('utf-8')
-              new = base64.b64decode(os.environ[f'NEW{index}']).decode('utf-8')
-              if text.count(old) != 1:
-                  raise SystemExit(f'marker_mismatch_{index}')
-              text = text.replace(old, new, 1)
-          path.write_text(text, encoding='utf-8')
+          old = base64.b64decode(os.environ['OLD_B64']).decode('utf-8')
+          new = base64.b64decode(os.environ['NEW_B64']).decode('utf-8')
+          if text.count(old) != 1:
+              raise SystemExit('clone_marker_mismatch')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
           git diff --check
           test "$(git diff --name-only)" = "scripts/jarvis_v3_bluegreen_activate.sh"
 
-      - name: Commit exact contract
+      - name: Commit clone fix
         shell: bash
         run: |
           set -Eeuo pipefail
-          git config user.name "JARVIS Exact ExecStart Bot"
-          git config user.email "jarvis-execstart@users.noreply.github.com"
+          git config user.name "JARVIS Blue-Green Clone Bot"
+          git config user.email "jarvis-bluegreen-clone@users.noreply.github.com"
           git add scripts/jarvis_v3_bluegreen_activate.sh
-          git commit -m "Support exact JARVIS V3 systemd ExecStart override"
+          git commit -m "Clone exact JARVIS release from authenticated origin"
           git push origin HEAD:jarvis-v3-bluegreen-run
