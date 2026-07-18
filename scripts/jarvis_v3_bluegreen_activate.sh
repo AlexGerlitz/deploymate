@@ -143,7 +143,12 @@ if test -d "$OLD_ROOT/node_modules"; then
 fi
 
 cd "$RELEASE_ROOT"
-test -z "$(git status --porcelain)"
+RELEASE_STATUS="$(git status --porcelain)"
+if test -n "$RELEASE_STATUS"; then
+  echo "RELEASE_WORKTREE_NOT_CLEAN" >&2
+  git status --short >&2
+  exit 8
+fi
 HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config JARVIS_V3_STATE="$RUNTIME_BASE/state" npm run check:deploy
 
 cat > "$DROPIN_FILE.tmp" <<EOF
