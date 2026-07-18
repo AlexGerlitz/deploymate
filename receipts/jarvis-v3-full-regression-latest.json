@@ -1,0 +1,13 @@
+{
+  "schema": "jarvis_gateway_v3_full_regression_receipt_v1",
+  "state": "DONE_WITH_EVIDENCE",
+  "exact_head": "db9426481e877caf04479b44e3d5d3622419f12c",
+  "regression_unit": "jarvis-regression-db9426481e87-namespace-retry",
+  "workflow_run_id": 29645152125,
+  "workflow_run_url": "https://github.com/AlexGerlitz/deploymate/actions/runs/29645152125",
+  "regression_result": "success",
+  "live_service_restarted": false,
+  "live_namespace_used": true,
+  "secret_values_recorded": false,
+  "observed_at": "2026-07-18T13:06:50.992Z"
+}
