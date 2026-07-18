@@ -1,4 +1,4 @@
-name: Patch JARVIS V3 Release Clean Gate
+name: Patch JARVIS V3 Mailbox Runtime Binds
 
 on:
   push:
@@ -19,11 +19,13 @@ jobs:
           ref: jarvis-v3-bluegreen-run
           fetch-depth: 0
 
-      - name: Add exact release status diagnostics
+      - name: Apply clean mailbox runtime binds
         shell: bash
         env:
-          OLD_B64: Y2QgIiRSRUxFQVNFX1JPT1QiCnRlc3QgLXogIiQoZ2l0IHN0YXR1cyAtLXBvcmNlbGFpbikiCkhPTUU9L29wdC9qYXJ2aXMgWERHX0NPTkZJR19IT01FPS9vcHQvamFydmlzLy5jb25maWcgSkFSVklTX1YzX1NUQVRFPSIkUlVOVElNRV9CQVNFL3N0YXRlIiBucG0gcnVuIGNoZWNrOmRlcGxveQo=
-          NEW_B64: Y2QgIiRSRUxFQVNFX1JPT1QiClJFTEVBU0VfU1RBVFVTPSIkKGdpdCBzdGF0dXMgLS1wb3JjZWxhaW4pIgppZiB0ZXN0IC1uICIkUkVMRUFTRV9TVEFUVVMiOyB0aGVuCiAgZWNobyAiUkVMRUFTRV9XT1JLVFJFRV9OT1RfQ0xFQU4iID4mMgogIGdpdCBzdGF0dXMgLS1zaG9ydCA+JjIKICBleGl0IDgKZmkKSE9NRT0vb3B0L2phcnZpcyBYREdfQ09ORklHX0hPTUU9L29wdC9qYXJ2aXMvLmNvbmZpZyBKQVJWSVNfVjNfU1RBVEU9IiRSVU5USU1FX0JBU0Uvc3RhdGUiIG5wbSBydW4gY2hlY2s6ZGVwbG95Cg==
+          OLD1: bWtkaXIgLXAgIiRPTERfUk9PVC9pbmJveCIgIiRPTERfUk9PVC9vdXRib3gvZXNjYWxhdGlvbnMiICIkT0xEX1JPT1Qvb3V0Ym94L3JlY2lwZV9zdHVicyIgXAogICAgICAgICAiJFJFTEVBU0VfUk9PVC9pbmJveCIgIiRSRUxFQVNFX1JPT1Qvb3V0Ym94Igpmb3IgcmVsIGluIGluYm94L2NvbW1hbmQudHh0IG91dGJveC9yZXNwb25zZS50eHQgb3V0Ym94L2VzY2FsYXRpb25zIG91dGJveC9yZWNpcGVfc3R1YnM7IGRvCiAgc291cmNlPSIkT0xEX1JPT1QvJHJlbCIKICB0YXJnZXQ9IiRSRUxFQVNFX1JPT1QvJHJlbCIKICBta2RpciAtcCAiJChkaXJuYW1lICIkc291cmNlIikiICIkKGRpcm5hbWUgIiR0YXJnZXQiKSIKICBpZiAhIHRlc3QgLWUgIiRzb3VyY2UiICYmIFtbICIkcmVsIiA9PSAqLyBdXTsgdGhlbgogICAgbWtkaXIgLXAgIiRzb3VyY2UiCiAgZmkKICBpZiB0ZXN0IC1lICIkc291cmNlIiAmJiAhIHRlc3QgLWUgIiR0YXJnZXQiICYmICEgdGVzdCAtTCAiJHRhcmdldCI7IHRoZW4KICAgIGxuIC1zICIkc291cmNlIiAiJHRhcmdldCIKICBmaQpkb25lCg==
+          NEW1: bWtkaXIgLXAgIiRSVU5USU1FX0JBU0UvaW5ib3giICIkUlVOVElNRV9CQVNFL291dGJveC9lc2NhbGF0aW9ucyIgIiRSVU5USU1FX0JBU0Uvb3V0Ym94L3JlY2lwZV9zdHVicyIgXAogICAgICAgICAiJFJFTEVBU0VfUk9PVC9pbmJveCIgIiRSRUxFQVNFX1JPT1Qvb3V0Ym94L2VzY2FsYXRpb25zIiAiJFJFTEVBU0VfUk9PVC9vdXRib3gvcmVjaXBlX3N0dWJzIgp0b3VjaCAiJFJVTlRJTUVfQkFTRS9pbmJveC9jb21tYW5kLnR4dCIgIiRSVU5USU1FX0JBU0Uvb3V0Ym94L3Jlc3BvbnNlLnR4dCIgXAogICAgICAiJFJFTEVBU0VfUk9PVC9pbmJveC9jb21tYW5kLnR4dCIgIiRSRUxFQVNFX1JPT1Qvb3V0Ym94L3Jlc3BvbnNlLnR4dCIKaWYgISB0ZXN0IC1mICIkUlVOVElNRV9CQVNFLy5tYWlsYm94LXNlZWRlZC12MSI7IHRoZW4KICB0ZXN0IC1mICIkT0xEX1JPT1QvaW5ib3gvY29tbWFuZC50eHQiICYmIGNwIC1hICIkT0xEX1JPT1QvaW5ib3gvY29tbWFuZC50eHQiICIkUlVOVElNRV9CQVNFL2luYm94L2NvbW1hbmQudHh0IgogIHRlc3QgLWYgIiRPTERfUk9PVC9vdXRib3gvcmVzcG9uc2UudHh0IiAmJiBjcCAtYSAiJE9MRF9ST09UL291dGJveC9yZXNwb25zZS50eHQiICIkUlVOVElNRV9CQVNFL291dGJveC9yZXNwb25zZS50eHQiCiAgdGVzdCAtZCAiJE9MRF9ST09UL291dGJveC9lc2NhbGF0aW9ucyIgJiYgcnN5bmMgLWEgLS1leGNsdWRlICcuZ2l0a2VlcCcgIiRPTERfUk9PVC9vdXRib3gvZXNjYWxhdGlvbnMiLyAiJFJVTlRJTUVfQkFTRS9vdXRib3gvZXNjYWxhdGlvbnMiLwogIHRlc3QgLWQgIiRPTERfUk9PVC9vdXRib3gvcmVjaXBlX3N0dWJzIiAmJiByc3luYyAtYSAtLWV4Y2x1ZGUgJy5naXRrZWVwJyAiJE9MRF9ST09UL291dGJveC9yZWNpcGVfc3R1YnMiLyAiJFJVTlRJTUVfQkFTRS9vdXRib3gvcmVjaXBlX3N0dWJzIi8KICBkYXRlIC11ICslRlQlVFogPiAiJFJVTlRJTUVfQkFTRS8ubWFpbGJveC1zZWVkZWQtdjEiCmZpCmNob3duIC1SICIkT0xEX09XTkVSIiAiJFJVTlRJTUVfQkFTRS9pbmJveCIgIiRSVU5USU1FX0JBU0Uvb3V0Ym94Igo=
+          OLD2: QmluZFBhdGhzPSRSVU5USU1FX0JBU0UvdGFza3M6JFJFTEVBU0VfUk9PVC90YXNrcwpCaW5kUGF0aHM9JFJVTlRJTUVfQkFTRS92b2ljZTokUkVMRUFTRV9ST09UL3ZvaWNlCkVPRgo=
+          NEW2: QmluZFBhdGhzPSRSVU5USU1FX0JBU0UvdGFza3M6JFJFTEVBU0VfUk9PVC90YXNrcwpCaW5kUGF0aHM9JFJVTlRJTUVfQkFTRS92b2ljZTokUkVMRUFTRV9ST09UL3ZvaWNlCkJpbmRQYXRocz0kUlVOVElNRV9CQVNFL2luYm94L2NvbW1hbmQudHh0OiRSRUxFQVNFX1JPT1QvaW5ib3gvY29tbWFuZC50eHQKQmluZFBhdGhzPSRSVU5USU1FX0JBU0Uvb3V0Ym94L3Jlc3BvbnNlLnR4dDokUkVMRUFTRV9ST09UL291dGJveC9yZXNwb25zZS50eHQKQmluZFBhdGhzPSRSVU5USU1FX0JBU0Uvb3V0Ym94L2VzY2FsYXRpb25zOiRSRUxFQVNFX1JPT1Qvb3V0Ym94L2VzY2FsYXRpb25zCkJpbmRQYXRocz0kUlVOVElNRV9CQVNFL291dGJveC9yZWNpcGVfc3R1YnM6JFJFTEVBU0VfUk9PVC9vdXRib3gvcmVjaXBlX3N0dWJzCkVPRgo=
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
@@ -32,21 +34,23 @@ jobs:
           from pathlib import Path
           path = Path('scripts/jarvis_v3_bluegreen_activate.sh')
           text = path.read_text(encoding='utf-8')
-          old = base64.b64decode(os.environ['OLD_B64']).decode('utf-8')
-          new = base64.b64decode(os.environ['NEW_B64']).decode('utf-8')
-          if text.count(old) != 1:
-              raise SystemExit('clean_gate_marker_mismatch')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          for index in (1, 2):
+              old = base64.b64decode(os.environ[f'OLD{index}']).decode('utf-8')
+              new = base64.b64decode(os.environ[f'NEW{index}']).decode('utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'mailbox_marker_mismatch_{index}')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
           PY
           git diff --check
           test "$(git diff --name-only)" = "scripts/jarvis_v3_bluegreen_activate.sh"
 
-      - name: Commit clean gate diagnostics
+      - name: Commit mailbox bind fix
         shell: bash
         run: |
           set -Eeuo pipefail
-          git config user.name "JARVIS Release Clean Gate Bot"
-          git config user.email "jarvis-clean-gate@users.noreply.github.com"
+          git config user.name "JARVIS Mailbox Bind Bot"
+          git config user.email "jarvis-mailbox-bind@users.noreply.github.com"
           git add scripts/jarvis_v3_bluegreen_activate.sh
-          git commit -m "Report exact JARVIS release worktree status"
+          git commit -m "Bind JARVIS mailbox runtime without dirtying release"
           git push origin HEAD:jarvis-v3-bluegreen-run
