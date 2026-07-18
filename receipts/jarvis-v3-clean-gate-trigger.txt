@@ -1,0 +1,2 @@
+trigger=release_clean_gate
+expected_sha=155a2351f1c112ca8ccc1f3eff1e49bafe47dda5
