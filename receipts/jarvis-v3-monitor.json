@@ -1,5 +1,5 @@
 {
-  "schema": "jarvis_gateway_v3_deploymate_monitor_v1",
+  "schema": "jarvis_gateway_v3_deploymate_monitor_v2",
   "state": "ACTIVATION_FAILED",
   "target_workflow_commit": "de12f7aaac5234d9d6296b41bbd17d44d4a34073",
   "workflow_run_id": 29642744266,
@@ -66,6 +66,33 @@
       ]
     }
   ],
+  "diagnostic_excerpt": [
+    "printf 'PRECHECK head=%s origin_main=%s branch=%s dirty=%s\\n' \"$before\" \"$remote\" \"$branch\" \"$([ -n \"$status_before\" ] && echo true || echo false)\"",
+    "test \"$branch\" = \"main\"",
+    "test \"$remote\" = \"$expected\"",
+    "if [ -n \"$status_before\" ]; then",
+    "dirty_names=\"$(mktemp)\"",
+    "target_names=\"$(mktemp)\"",
+    "trap 'rm -f \"$dirty_names\" \"$target_names\"' EXIT",
+    "printf '%s\\n' '--- STATUS_SHORT ---'",
+    "git status --short",
+    "printf '%s\\n' '--- UNSTAGED_NAMES ---'",
+    "git diff --name-status",
+    "printf '%s\\n' '--- STAGED_NAMES ---'",
+    "git diff --cached --name-status",
+    "printf '%s\\n' '--- UNTRACKED_NAMES ---'",
+    "git ls-files --others --exclude-standard",
+    "printf '%s\\n' '--- DIFF_STAT ---'",
+    "git diff --stat",
+    "git diff --cached --stat",
+    "{ git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | sort -u > \"$dirty_names\"",
+    "git diff --name-only HEAD..origin/main | sort -u > \"$target_names\"",
+    "printf '%s\\n' '--- OVERLAP_WITH_TARGET ---'",
+    "comm -12 \"$dirty_names\" \"$target_names\" || true",
+    "printf '%s\\n' '--- SERVICE_PROPERTIES ---'",
+    "systemctl show \"$service\" -p FragmentPath -p DropInPaths -p User -p Group -p WorkingDirectory -p ExecStart --no-pager",
+    "echo 'BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED'"
+  ],
   "secret_values_recorded": false,
-  "observed_at": "2026-07-18T11:33:47.253Z"
+  "observed_at": "2026-07-18T11:37:21.546Z"
 }
