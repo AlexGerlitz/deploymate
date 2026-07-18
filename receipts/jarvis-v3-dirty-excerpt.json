@@ -1,10 +1,11 @@
 {
-  "schema": "jarvis_gateway_v3_dirty_excerpt_v2",
+  "schema": "jarvis_gateway_v3_dirty_excerpt_v3",
   "state": "ACTUAL_PRECHECK_NOT_FOUND",
   "source_job_id": 88075845684,
   "download_bytes": 10898,
   "decoded_bytes": 10898,
+  "concrete_precheck_matches": 0,
   "lines": [],
   "secret_values_recorded": false,
-  "observed_at": "2026-07-18T11:43:03.195Z"
+  "observed_at": "2026-07-18T11:44:57.124Z"
 }
