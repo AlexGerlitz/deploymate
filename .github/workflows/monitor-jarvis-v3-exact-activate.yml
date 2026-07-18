@@ -26,7 +26,8 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${JOB_ID}/logs" \
-            -o job.log
+            -o job-logs.zip
+          unzip -p job-logs.zip > job.log
 
           python3 - <<'PY'
           import json
