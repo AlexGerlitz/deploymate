@@ -20,7 +20,6 @@ ORIGIN_URL="$(git remote get-url origin)"
 STATUS_BEFORE="$(git status --porcelain)"
 
 test "$BRANCH" = "main" || { echo "unexpected_branch=$BRANCH" >&2; exit 4; }
-git fetch --no-tags origin main
 REMOTE_HEAD="$(git rev-parse origin/main)"
 test "$REMOTE_HEAD" = "$EXPECTED_SHA" || { echo "origin_main_mismatch expected=$EXPECTED_SHA actual=$REMOTE_HEAD" >&2; exit 5; }
 
