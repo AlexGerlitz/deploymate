@@ -17,7 +17,7 @@ jobs:
       - name: Wait for activation run and persist evidence
         uses: actions/github-script@v8
         env:
-          TARGET_SHA: c58b3b258b3e480cfdcd2153ce8c01163129164e
+          TARGET_SHA: de12f7aaac5234d9d6296b41bbd17d44d4a34073
         with:
           script: |
             const { owner, repo } = context.repo;
