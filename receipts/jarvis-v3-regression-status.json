@@ -1,0 +1,11 @@
+{
+  "schema": "jarvis_gateway_v3_regression_status_v1",
+  "target_sha": "ce6cba7eefae7d3a6f10e077a10ae36544de76f4",
+  "run_id": 29645152125,
+  "status": "in_progress",
+  "conclusion": null,
+  "event": "push",
+  "created_at": "2026-07-18T12:53:43Z",
+  "updated_at": "2026-07-18T12:53:48Z",
+  "observed_at": "2026-07-18T12:55:08.197Z"
+}
