@@ -53,14 +53,39 @@ jobs:
 
           before="$(git rev-parse HEAD)"
           branch="$(git branch --show-current)"
-          status_before="$(git status --porcelain)"
-          printf 'PRECHECK head=%s branch=%s dirty=%s\n' "$before" "$branch" "$([ -n "$status_before" ] && echo true || echo false)"
-
-          test "$branch" = "main"
-          test -z "$status_before"
           git fetch --no-tags origin main
           remote="$(git rev-parse origin/main)"
+          status_before="$(git status --porcelain)"
+          printf 'PRECHECK head=%s origin_main=%s branch=%s dirty=%s\n' "$before" "$remote" "$branch" "$([ -n "$status_before" ] && echo true || echo false)"
+
+          test "$branch" = "main"
           test "$remote" = "$expected"
+
+          if [ -n "$status_before" ]; then
+            dirty_names="$(mktemp)"
+            target_names="$(mktemp)"
+            trap 'rm -f "$dirty_names" "$target_names"' EXIT
+            printf '%s\n' '--- STATUS_SHORT ---'
+            git status --short
+            printf '%s\n' '--- UNSTAGED_NAMES ---'
+            git diff --name-status
+            printf '%s\n' '--- STAGED_NAMES ---'
+            git diff --cached --name-status
+            printf '%s\n' '--- UNTRACKED_NAMES ---'
+            git ls-files --others --exclude-standard
+            printf '%s\n' '--- DIFF_STAT ---'
+            git diff --stat
+            git diff --cached --stat
+            { git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | sort -u > "$dirty_names"
+            git diff --name-only HEAD..origin/main | sort -u > "$target_names"
+            printf '%s\n' '--- OVERLAP_WITH_TARGET ---'
+            comm -12 "$dirty_names" "$target_names" || true
+            printf '%s\n' '--- SERVICE_PROPERTIES ---'
+            systemctl show "$service" -p FragmentPath -p DropInPaths -p User -p Group -p WorkingDirectory -p ExecStart --no-pager
+            echo 'BLOCKED_DIRTY_WORKTREE_NO_CHANGES_PERFORMED'
+            exit 78
+          fi
+
           git merge --ff-only "$expected"
           after="$(git rev-parse HEAD)"
           test "$after" = "$expected"
