@@ -1,0 +1,64 @@
+name: Apply Fixed JARVIS V3 Blue-Green Route
+
+on:
+  push:
+    branches:
+      - jarvis-v3-bluegreen-patcher
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout activation branch
+        uses: actions/checkout@v6
+        with:
+          ref: jarvis-v3-exact-activate
+          fetch-depth: 0
+
+      - name: Replace activation body with fixed recipe call
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/jarvis-v3-exact-activate.yml')
+          text = path.read_text(encoding='utf-8')
+          start_marker = '      - name: Activate fixed JARVIS exact head through guarded server recipe\n'
+          end_marker = '      - name: Upload activation receipt\n'
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          replacement = '''      - name: Activate fixed JARVIS exact head through blue-green recipe
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          chmod +x scripts/jarvis_v3_bluegreen_activate.sh
+          set +e
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes "$DEPLOY_HOST" \
+            'sudo -n /bin/bash -s -- '"$EXPECTED_SHA"'' \
+            < scripts/jarvis_v3_bluegreen_activate.sh \
+            > jarvis-v3-production-receipt.log 2>&1
+          remote_rc=$?
+          set -e
+          cat jarvis-v3-production-receipt.log
+          exit "$remote_rc"
+
+'''
+          path.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
+          PY
+          git diff --check
+          test "$(git diff --name-only)" = ".github/workflows/jarvis-v3-exact-activate.yml"
+
+      - name: Commit bounded route update
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "JARVIS Blue-Green Route Bot"
+          git config user.email "jarvis-bluegreen@users.noreply.github.com"
+          git add .github/workflows/jarvis-v3-exact-activate.yml
+          git commit -m "Use fixed blue-green JARVIS V3 activation recipe"
+          git push origin HEAD:jarvis-v3-exact-activate
