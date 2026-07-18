@@ -1,0 +1,63 @@
+name: Probe JARVIS V3 Blue-Green Run Status
+
+on:
+  push:
+    branches:
+      - jarvis-v3-bluegreen-status
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Persist current run status
+        uses: actions/github-script@v8
+        env:
+          TARGET_SHA: 44191b3759c73a4cf73ec2a285caf4767374331b
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const target = process.env.TARGET_SHA;
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'jarvis-v3-bluegreen-run.yml',
+              branch: 'jarvis-v3-bluegreen-run',
+              per_page: 50,
+            });
+            const run = (response.data.workflow_runs || []).find((row) => row.head_sha === target) || null;
+            const payload = {
+              schema: 'jarvis_gateway_v3_bluegreen_status_v1',
+              target_sha: target,
+              run_id: run?.id || null,
+              status: run?.status || 'not_observed',
+              conclusion: run?.conclusion || null,
+              event: run?.event || '',
+              created_at: run?.created_at || '',
+              updated_at: run?.updated_at || '',
+              observed_at: new Date().toISOString(),
+            };
+            const branch = 'jarvis-v3-activation-receipts';
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const base = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: base.data.object.sha });
+            }
+            let sha;
+            const path = 'receipts/jarvis-v3-bluegreen-status.json';
+            try {
+              const current = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
+              sha = current.data.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            await github.rest.repos.createOrUpdateFileContents({
+              owner, repo, branch, path, sha,
+              message: `Record JARVIS V3 blue-green status ${target.slice(0, 12)}`,
+              content: Buffer.from(JSON.stringify(payload, null, 2) + '\n').toString('base64'),
+            });
