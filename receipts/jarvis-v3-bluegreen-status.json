@@ -1,0 +1,11 @@
+{
+  "schema": "jarvis_gateway_v3_bluegreen_status_v1",
+  "target_sha": "44191b3759c73a4cf73ec2a285caf4767374331b",
+  "run_id": 29643890781,
+  "status": "completed",
+  "conclusion": "failure",
+  "event": "push",
+  "created_at": "2026-07-18T12:11:58Z",
+  "updated_at": "2026-07-18T12:13:38Z",
+  "observed_at": "2026-07-18T12:14:06.207Z"
+}
