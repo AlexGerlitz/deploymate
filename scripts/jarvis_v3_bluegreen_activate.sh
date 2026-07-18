@@ -27,9 +27,10 @@ test "$REMOTE_HEAD" = "$EXPECTED_SHA" || { echo "origin_main_mismatch expected=$
 CURRENT_WORKDIR="$(systemctl show "$SERVICE" -p WorkingDirectory --value)"
 EXECSTART_PROPERTY="$(systemctl show "$SERVICE" -p ExecStart --value)"
 test "$CURRENT_WORKDIR" = "$OLD_ROOT" || { echo "unsupported_working_directory=$CURRENT_WORKDIR" >&2; exit 6; }
-if [[ "$EXECSTART_PROPERTY" == *"$OLD_ROOT"* ]]; then
+EXPECTED_EXECSTART="/usr/bin/node $OLD_ROOT/src/server.mjs"
+if [[ "$EXECSTART_PROPERTY" != *"argv[]=$EXPECTED_EXECSTART ;"* ]]; then
   printf 'EXECSTART_PROPERTY=%s\n' "$EXECSTART_PROPERTY"
-  echo "unsupported_absolute_execstart" >&2
+  echo "unsupported_execstart_contract" >&2
   exit 7
 fi
 
@@ -132,6 +133,8 @@ HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config npm run check:deploy
 cat > "$DROPIN_FILE.tmp" <<EOF
 [Service]
 WorkingDirectory=$RELEASE_ROOT
+ExecStart=
+ExecStart=/usr/bin/node $RELEASE_ROOT/src/server.mjs
 EOF
 mv "$DROPIN_FILE.tmp" "$DROPIN_FILE"
 systemctl daemon-reload
@@ -150,6 +153,8 @@ node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync(process.argv
 
 test "$(systemctl is-active "$SERVICE")" = active
 test "$(systemctl show "$SERVICE" -p WorkingDirectory --value)" = "$RELEASE_ROOT"
+LIVE_EXECSTART="$(systemctl show "$SERVICE" -p ExecStart --value)"
+[[ "$LIVE_EXECSTART" == *"argv[]=/usr/bin/node $RELEASE_ROOT/src/server.mjs ;"* ]]
 HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config npm run check:live
 
 HOME=/opt/jarvis XDG_CONFIG_HOME=/opt/jarvis/.config node -e "import('./src/jarvis-index.mjs').then(async m=>{const r=await m.rebuildJarvisIndex({root:process.cwd(),stateDir:process.env.JARVIS_V3_STATE||'$OLD_ROOT/state'}); console.log(JSON.stringify({ok:true,documents:r.summary.documents,vector_layer:r.summary.vector_layer}))})"
