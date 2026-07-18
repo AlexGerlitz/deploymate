@@ -109,19 +109,18 @@ if test -d "$OLD_ROOT/memory"; then
   done < <(find "$OLD_ROOT/memory" -mindepth 1 -maxdepth 1 -print0)
 fi
 
-mkdir -p "$OLD_ROOT/inbox" "$OLD_ROOT/outbox/escalations" "$OLD_ROOT/outbox/recipe_stubs" \
-         "$RELEASE_ROOT/inbox" "$RELEASE_ROOT/outbox"
-for rel in inbox/command.txt outbox/response.txt outbox/escalations outbox/recipe_stubs; do
-  source="$OLD_ROOT/$rel"
-  target="$RELEASE_ROOT/$rel"
-  mkdir -p "$(dirname "$source")" "$(dirname "$target")"
-  if ! test -e "$source" && [[ "$rel" == */ ]]; then
-    mkdir -p "$source"
-  fi
-  if test -e "$source" && ! test -e "$target" && ! test -L "$target"; then
-    ln -s "$source" "$target"
-  fi
-done
+mkdir -p "$RUNTIME_BASE/inbox" "$RUNTIME_BASE/outbox/escalations" "$RUNTIME_BASE/outbox/recipe_stubs" \
+         "$RELEASE_ROOT/inbox" "$RELEASE_ROOT/outbox/escalations" "$RELEASE_ROOT/outbox/recipe_stubs"
+touch "$RUNTIME_BASE/inbox/command.txt" "$RUNTIME_BASE/outbox/response.txt" \
+      "$RELEASE_ROOT/inbox/command.txt" "$RELEASE_ROOT/outbox/response.txt"
+if ! test -f "$RUNTIME_BASE/.mailbox-seeded-v1"; then
+  test -f "$OLD_ROOT/inbox/command.txt" && cp -a "$OLD_ROOT/inbox/command.txt" "$RUNTIME_BASE/inbox/command.txt"
+  test -f "$OLD_ROOT/outbox/response.txt" && cp -a "$OLD_ROOT/outbox/response.txt" "$RUNTIME_BASE/outbox/response.txt"
+  test -d "$OLD_ROOT/outbox/escalations" && rsync -a --exclude '.gitkeep' "$OLD_ROOT/outbox/escalations"/ "$RUNTIME_BASE/outbox/escalations"/
+  test -d "$OLD_ROOT/outbox/recipe_stubs" && rsync -a --exclude '.gitkeep' "$OLD_ROOT/outbox/recipe_stubs"/ "$RUNTIME_BASE/outbox/recipe_stubs"/
+  date -u +%FT%TZ > "$RUNTIME_BASE/.mailbox-seeded-v1"
+fi
+chown -R "$OLD_OWNER" "$RUNTIME_BASE/inbox" "$RUNTIME_BASE/outbox"
 
 while IFS= read -r -d '' env_file; do
   name="$(basename "$env_file")"
@@ -164,6 +163,10 @@ BindPaths=$RUNTIME_BASE/temp:$RELEASE_ROOT/temp
 BindPaths=$RUNTIME_BASE/.cache:$RELEASE_ROOT/.cache
 BindPaths=$RUNTIME_BASE/tasks:$RELEASE_ROOT/tasks
 BindPaths=$RUNTIME_BASE/voice:$RELEASE_ROOT/voice
+BindPaths=$RUNTIME_BASE/inbox/command.txt:$RELEASE_ROOT/inbox/command.txt
+BindPaths=$RUNTIME_BASE/outbox/response.txt:$RELEASE_ROOT/outbox/response.txt
+BindPaths=$RUNTIME_BASE/outbox/escalations:$RELEASE_ROOT/outbox/escalations
+BindPaths=$RUNTIME_BASE/outbox/recipe_stubs:$RELEASE_ROOT/outbox/recipe_stubs
 EOF
 mv "$DROPIN_FILE.tmp" "$DROPIN_FILE"
 systemctl daemon-reload
