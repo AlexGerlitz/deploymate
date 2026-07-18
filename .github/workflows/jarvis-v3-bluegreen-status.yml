@@ -16,7 +16,7 @@ jobs:
       - name: Persist current run status
         uses: actions/github-script@v8
         env:
-          TARGET_SHA: c4553202daea26696d0885ffd1b81527f94f0526
+          TARGET_SHA: 930e0d8a085e0a16ebdb1c44fa25f8384543f6a3
         with:
           script: |
             const { owner, repo } = context.repo;
