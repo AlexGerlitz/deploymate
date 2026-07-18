@@ -1,0 +1,71 @@
+{
+  "schema": "jarvis_gateway_v3_deploymate_monitor_v1",
+  "state": "ACTIVATION_FAILED",
+  "target_workflow_commit": "c58b3b258b3e480cfdcd2153ce8c01163129164e",
+  "workflow_run_id": 29642610865,
+  "workflow_run_url": "https://github.com/AlexGerlitz/deploymate/actions/runs/29642610865",
+  "workflow_status": "completed",
+  "workflow_conclusion": "failure",
+  "jobs": [
+    {
+      "id": 88075507050,
+      "name": "activate",
+      "status": "completed",
+      "conclusion": "failure",
+      "runner_name": "GitHub Actions 1000006577",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Prepare pinned SSH access",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Activate fixed JARVIS exact head through guarded server recipe",
+          "status": "completed",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Upload activation receipt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 88075518552,
+      "name": "receipt",
+      "status": "completed",
+      "conclusion": "success",
+      "runner_name": "GitHub Actions 1000006578",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Persist terminal activation receipt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "secret_values_recorded": false,
+  "observed_at": "2026-07-18T11:29:43.398Z"
+}
