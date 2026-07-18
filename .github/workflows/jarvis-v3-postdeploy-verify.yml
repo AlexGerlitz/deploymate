@@ -1,0 +1,170 @@
+name: Verify JARVIS Gateway V3 Production Release
+
+on:
+  push:
+    branches:
+      - jarvis-v3-postdeploy-verify
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 25
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+      EXPECTED_SHA: db9426481e877caf04479b44e3d5d3622419f12c
+      REGRESSION_UNIT: jarvis-regression-db9426481e87-20260718-144434.service
+    steps:
+      - name: Prepare pinned SSH transport
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          test -n "$DEPLOY_SSH_KNOWN_HOSTS"
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Verify exact live release and terminal full regression
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes "$DEPLOY_HOST" \
+            'sudo -n /bin/bash -s -- '"$EXPECTED_SHA"' '"$REGRESSION_UNIT"'' \
+            > jarvis-v3-postdeploy-receipt.log 2>&1 <<'REMOTE'
+          set -Eeuo pipefail
+          expected="$1"
+          regression_unit="$2"
+          release="/opt/jarvis/releases/gateway-v3/$expected"
+          service="jarvis-gateway-v3.service"
+          health_url="http://127.0.0.1:8793/health"
+
+          [[ "$expected" =~ ^[a-f0-9]{40}$ ]]
+          test -d "$release/.git"
+          test "$(git -C "$release" rev-parse HEAD)" = "$expected"
+          test -z "$(git -C "$release" status --porcelain)"
+          test "$(systemctl is-active "$service")" = active
+          test "$(systemctl show "$service" -p WorkingDirectory --value)" = "$release"
+          live_exec="$(systemctl show "$service" -p ExecStart --value)"
+          [[ "$live_exec" == *"argv[]=/usr/bin/node $release/src/server.mjs ;"* ]]
+
+          health="$(curl -fsS --max-time 10 "$health_url")"
+          node -e 'const p=JSON.parse(process.argv[1]); if(p.ok!==true || p.name!=="JARVIS Gateway v3") process.exit(1)' "$health"
+
+          terminal_state=""
+          terminal_result=""
+          terminal_status=""
+          for _ in $(seq 1 120); do
+            if systemctl show "$regression_unit" >/dev/null 2>&1; then
+              active="$(systemctl show "$regression_unit" -p ActiveState --value)"
+              sub="$(systemctl show "$regression_unit" -p SubState --value)"
+              result="$(systemctl show "$regression_unit" -p Result --value)"
+              status="$(systemctl show "$regression_unit" -p ExecMainStatus --value)"
+              if [[ "$active" == active || "$active" == activating || "$sub" == running || "$sub" == start ]]; then
+                sleep 5
+                continue
+              fi
+              terminal_state="$active/$sub"
+              terminal_result="$result"
+              terminal_status="$status"
+              break
+            fi
+
+            journal="$(journalctl -u "$regression_unit" --no-pager --output=cat 2>/dev/null || true)"
+            if grep -q '^FAIL ' <<<"$journal" || grep -q 'npm ERR!' <<<"$journal" || grep -q 'Failed with result' <<<"$journal"; then
+              echo "$journal" | tail -n 260
+              echo "FULL_REGRESSION_FAILED_FROM_JOURNAL" >&2
+              exit 31
+            fi
+            if grep -q '\[check-supervisor\] passed mode=full' <<<"$journal" && grep -q '^ok public_tools 14$' <<<"$journal"; then
+              terminal_state="collected"
+              terminal_result="success"
+              terminal_status="0"
+              break
+            fi
+            sleep 5
+          done
+
+          if [[ "$terminal_state" != collected ]]; then
+            test "$terminal_result" = success
+            test "$terminal_status" = 0
+          fi
+
+          journal="$(journalctl -u "$regression_unit" --no-pager --output=cat 2>/dev/null || true)"
+          if grep -q '^FAIL ' <<<"$journal" || grep -q 'npm ERR!' <<<"$journal" || grep -q 'Failed with result' <<<"$journal"; then
+            echo "$journal" | tail -n 260
+            echo "FULL_REGRESSION_FAILURE_MARKER" >&2
+            exit 32
+          fi
+          grep -q '\[check-supervisor\] passed mode=full' <<<"$journal"
+          grep -q '^ok public_tools 14$' <<<"$journal"
+
+          printf 'JARVIS_V3_POSTDEPLOY_OK exact_head=%s release_clean=true service=active health=ok regression_unit=%s regression_state=%s regression_result=%s regression_status=%s\n' \
+            "$expected" "$regression_unit" "$terminal_state" "$terminal_result" "$terminal_status"
+          REMOTE
+          cat jarvis-v3-postdeploy-receipt.log
+
+      - name: Upload post-deploy evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jarvis-v3-postdeploy-receipt
+          path: jarvis-v3-postdeploy-receipt.log
+          if-no-files-found: warn
+
+  receipt:
+    needs: verify
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Persist terminal verification receipt
+        uses: actions/github-script@v8
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          EXPECTED_SHA: db9426481e877caf04479b44e3d5d3622419f12c
+          REGRESSION_UNIT: jarvis-regression-db9426481e87-20260718-144434.service
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = 'jarvis-v3-activation-receipts';
+            const result = String(process.env.VERIFY_RESULT || 'unknown');
+            const payload = {
+              schema: 'jarvis_gateway_v3_postdeploy_verification_receipt_v1',
+              state: result === 'success' ? 'DONE_WITH_EVIDENCE' : 'VERIFY_FAILED',
+              exact_head: process.env.EXPECTED_SHA,
+              regression_unit: process.env.REGRESSION_UNIT,
+              workflow_run_id: context.runId,
+              workflow_run_url: `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`,
+              verification_result: result,
+              read_only_verification: true,
+              secret_values_recorded: false,
+              observed_at: new Date().toISOString(),
+            };
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const base = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: base.data.object.sha });
+            }
+            let sha;
+            const path = 'receipts/jarvis-v3-postdeploy-latest.json';
+            try {
+              const current = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
+              sha = current.data.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            await github.rest.repos.createOrUpdateFileContents({
+              owner, repo, branch, path, sha,
+              message: `Record JARVIS V3 post-deploy receipt ${context.runId}`,
+              content: Buffer.from(JSON.stringify(payload, null, 2) + '\n').toString('base64'),
+            });
