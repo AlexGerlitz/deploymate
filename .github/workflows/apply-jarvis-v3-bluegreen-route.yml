@@ -21,9 +21,13 @@ jobs:
 
       - name: Replace activation body with fixed recipe call
         shell: bash
+        env:
+          REPLACEMENT_B64: ICAgICAgLSBuYW1lOiBBY3RpdmF0ZSBmaXhlZCBKQVJWSVMgZXhhY3QgaGVhZCB0aHJvdWdoIGJsdWUtZ3JlZW4gcmVjaXBlCiAgICAgICAgc2hlbGw6IGJhc2gKICAgICAgICBydW46IHwKICAgICAgICAgIHNldCAtRWV1byBwaXBlZmFpbAogICAgICAgICAgY2htb2QgK3ggc2NyaXB0cy9qYXJ2aXNfdjNfYmx1ZWdyZWVuX2FjdGl2YXRlLnNoCiAgICAgICAgICBzZXQgK2UKICAgICAgICAgIHNzaCAtbyBCYXRjaE1vZGU9eWVzIC1vIElkZW50aXRpZXNPbmx5PXllcyAiJERFUExPWV9IT1NUIiBcCiAgICAgICAgICAgICdzdWRvIC1uIC9iaW4vYmFzaCAtcyAtLSAnIiRFWFBFQ1RFRF9TSEEiJycgXAogICAgICAgICAgICA8IHNjcmlwdHMvamFydmlzX3YzX2JsdWVncmVlbl9hY3RpdmF0ZS5zaCBcCiAgICAgICAgICAgID4gamFydmlzLXYzLXByb2R1Y3Rpb24tcmVjZWlwdC5sb2cgMj4mMQogICAgICAgICAgcmVtb3RlX3JjPSQ/CiAgICAgICAgICBzZXQgLWUKICAgICAgICAgIGNhdCBqYXJ2aXMtdjMtcHJvZHVjdGlvbi1yZWNlaXB0LmxvZwogICAgICAgICAgZXhpdCAiJHJlbW90ZV9yYyIKCg==
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
+          import base64
+          import os
           from pathlib import Path
 
           path = Path('.github/workflows/jarvis-v3-exact-activate.yml')
@@ -32,22 +36,7 @@ jobs:
           end_marker = '      - name: Upload activation receipt\n'
           start = text.index(start_marker)
           end = text.index(end_marker, start)
-          replacement = '''      - name: Activate fixed JARVIS exact head through blue-green recipe
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          chmod +x scripts/jarvis_v3_bluegreen_activate.sh
-          set +e
-          ssh -o BatchMode=yes -o IdentitiesOnly=yes "$DEPLOY_HOST" \
-            'sudo -n /bin/bash -s -- '"$EXPECTED_SHA"'' \
-            < scripts/jarvis_v3_bluegreen_activate.sh \
-            > jarvis-v3-production-receipt.log 2>&1
-          remote_rc=$?
-          set -e
-          cat jarvis-v3-production-receipt.log
-          exit "$remote_rc"
-
-'''
+          replacement = base64.b64decode(os.environ['REPLACEMENT_B64']).decode('utf-8')
           path.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
           PY
           git diff --check
